@@ -11,27 +11,27 @@ export default function FridgeSection() {
     const [user, setUser] = useState(null);
     const [error, setError] = useState(null);
 
-    useEffect(() => {
-        const fetchUserAndFridge = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session?.user) {
-                router.push('/login');
-                return;
-            }
-            setUser(session.user);
+    // useEffect(() => {
+    //     const fetchUserAndFridge = async () => {
+    //         const { data: { session } } = await supabase.auth.getSession();
+    //         if (!session?.user) {
+    //             router.push('/login');
+    //             return;
+    //         }
+    //         setUser(session.user);
 
-            const { data, error } = await supabase
-                .from('fridge_items')
-                .select('*')
-                .eq('user_id', session.user.id)
-                .order('inserted_at', { ascending: false });
+    //         const { data, error } = await supabase
+    //             .from('fridge_items')
+    //             .select('*')
+    //             .eq('user_id', session.user.id)
+    //             .order('inserted_at', { ascending: false });
 
-            if (error) console.error('Error fetching fridge:', error);
-            else setFridge(data);
-        };
+    //         if (error) console.error('Error fetching fridge:', error);
+    //         else setFridge(data);
+    //     };
 
-        fetchUserAndFridge();
-    }, []);
+    //     fetchUserAndFridge();
+    // }, []);
 
     const addItem = async () => {
         if (!item.trim() || !user) return;
