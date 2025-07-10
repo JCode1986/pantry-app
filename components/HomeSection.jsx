@@ -16,27 +16,27 @@ export default function HomeSection() {
     const [user, setUser] = useState(null);
 
     // Load user and pantry from Supabase
-    useEffect(() => {
-        const fetchUserAndPantry = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session?.user) {
-                window.location.href = '/login';
-                return;
-            }
-            setUser(session.user);
+    // useEffect(() => {
+    //     const fetchUserAndPantry = async () => {
+    //         const { data: { session } } = await supabase.auth.getSession();
+    //         if (!session?.user) {
+    //             window.location.href = '/login';
+    //             return;
+    //         }
+    //         setUser(session.user);
 
-            const { data, error } = await supabase
-                .from('pantry_items')
-                .select('*')
-                .eq('user_id', session.user.id)
-                .order('inserted_at', { ascending: false });
+    //         const { data, error } = await supabase
+    //             .from('pantry_items')
+    //             .select('*')
+    //             .eq('user_id', session.user.id)
+    //             .order('inserted_at', { ascending: false });
 
-            if (error) console.error('Error fetching pantry:', error);
-            else setPantry(data);
-        };
+    //         if (error) console.error('Error fetching pantry:', error);
+    //         else setPantry(data);
+    //     };
 
-        fetchUserAndPantry();
-    }, []);
+    //     fetchUserAndPantry();
+    // }, []);
 
 
     const addItem = async () => {

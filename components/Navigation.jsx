@@ -3,25 +3,25 @@ import Link from 'next/link';
 import { supabase } from '../lib/supabaseClient';
 import { useState } from 'react';
 import { FaUtensils, FaSnowflake, FaHeart, FaBars, FaTimes, FaSignOutAlt, FaSpinner } from 'react-icons/fa';
+import { logout } from '@/app/actions/auth';
 
 export default function Navigation() {
     const [isOpen, setIsOpen] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
 
+
     const handleLogout = async () => {
         setLoggingOut(true);
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-            console.error('Error signing out:', error);
-            setLoggingOut(false);
-            return;
-        }
 
-        // Force session refresh to prevent stale state
-        await supabase.auth.refreshSession();
+        try {
+        await logout();
 
-        // Hard redirect ensures Middleware detects logout
+        // ✅ Force page reload so Middleware detects logout
         window.location.href = '/login';
+        } catch (err) {
+        console.error('Logout failed:', err);
+        setLoggingOut(false);
+        }
     };
 
     return (

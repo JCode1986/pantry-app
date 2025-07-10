@@ -2,9 +2,9 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
+import { login } from '@/app/actions/auth';
 
 export default function LoginPage() {
-    const router = useRouter();
     const searchParams = useSearchParams();
     const redirectTo = searchParams.get('redirectTo') || '/';
     const [email, setEmail] = useState('');
@@ -12,19 +12,34 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    // const handleSignIn = async (e) => {
+    //      e.preventDefault();
+    //     try {
+    //         await login({ email, password });
+    //         router.push('/'); // Go to home after login
+    //     } catch (err) {
+    //         setError(err.message);
+    //     }
+    // };
+
+    
     const handleSignIn = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
 
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) {
-            setError(error.message);
-        } else {
-            router.push(redirectTo); // ✅ Go back to intended page
+        try {
+            await login({ email, password });
+            // ✅ Redirect user back to original page or home
+            window.location.href = redirectTo;
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
+
+
 
     const handleSignUp = async (e) => {
         e.preventDefault();
