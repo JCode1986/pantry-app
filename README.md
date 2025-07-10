@@ -17,7 +17,7 @@ A modern, responsive web app that helps users discover recipes based on ingredie
 
 ## 🛠️ Tech Stack
 - **Frontend:** Next.js 15 (JavaScript)
-- **UI:** Tailwind CSS + HeroUI
+- **UI:** Tailwind CSS
 - **State Management:** localStorage (no backend)
 - **API:** Spoonacular API (Free tier)
 - **Animations:** Framer Motion

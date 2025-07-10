@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@heroui/react": "^2.7.11",
+    "@supabase/auth-helpers-nextjs": "^0.10.0",
+    "@supabase/supabase-js": "^2.50.4",
     "axios": "^1.10.0",
     "framer-motion": "^12.23.1",
     "next": "15.3.5",
