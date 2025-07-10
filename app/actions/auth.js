@@ -2,29 +2,30 @@
 
 import { getSession } from "@/lib/sessionOptions";
 import { supabase } from "@/lib/supabaseClient";
+import { redirect } from "next/navigation";
 
 export async function login({ email, password }) {
-  const session = await getSession();
+    const session = await getSession();
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+    });
 
-  if (error) {
-    throw new Error(error.message);
-  }
+    if (error) {
+        throw new Error(error.message);
+    }
 
-  // Store tokens securely in Iron Session
-  session.user = {
-    access_token: data.session.access_token,
-    refresh_token: data.session.refresh_token,
-    expires_at: data.session.expires_at,
-    user: data.session.user,
-  };
-  await session.save();
+    // Store tokens securely in Iron Session
+    session.user = {
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        expires_at: data.session.expires_at,
+        user: data.session.user,
+    };
+    await session.save();
 
-  return data.session.user;
+    redirect("/")
 }
 
 export async function logout() {
