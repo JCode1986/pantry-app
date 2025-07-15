@@ -1,37 +1,12 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { FaRegTrashAlt, FaPlus } from "react-icons/fa";
-import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
+import { useState } from 'react';
+import { FaRegTrashAlt, FaPlus } from "react-icons/fa";
 
-export default function FridgeSection() {
-    const router = useRouter()
+export default function FridgeSection({user}) {
     const [fridge, setFridge] = useState([]);
     const [item, setItem] = useState('');
-    const [user, setUser] = useState(null);
     const [error, setError] = useState(null);
-
-    // useEffect(() => {
-    //     const fetchUserAndFridge = async () => {
-    //         const { data: { session } } = await supabase.auth.getSession();
-    //         if (!session?.user) {
-    //             router.push('/login');
-    //             return;
-    //         }
-    //         setUser(session.user);
-
-    //         const { data, error } = await supabase
-    //             .from('fridge_items')
-    //             .select('*')
-    //             .eq('user_id', session.user.id)
-    //             .order('inserted_at', { ascending: false });
-
-    //         if (error) console.error('Error fetching fridge:', error);
-    //         else setFridge(data);
-    //     };
-
-    //     fetchUserAndFridge();
-    // }, []);
 
     const addItem = async () => {
         if (!item.trim() || !user) return;
@@ -74,6 +49,7 @@ export default function FridgeSection() {
                     type="text"
                     value={item}
                     onChange={(e) => setItem(e.target.value)}
+                    maxLength={30}
                     placeholder="Add fridge item..."
                     className="border rounded px-3 py-2 w-full focus:outline-none focus:ring focus:ring-blue-300"
                 />

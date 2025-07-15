@@ -18,6 +18,13 @@ export async function middleware(req) {
     return NextResponse.redirect(loginUrl);
   }
 
+    if (token && session?.user?.expires_at < Date.now() / 1000) {
+    console.log('Token expired. Forcing logout.');
+    session.destroy();
+    const loginUrl = new URL('/login', req.url);
+    return NextResponse.redirect(loginUrl);
+  }
+
   // ✅ If user is logged in and trying to access login, redirect home
   if (token && isLoginPage) {
     return NextResponse.redirect(new URL('/', req.url));
@@ -30,4 +37,21 @@ export const config = {
   matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 };
 
+// import { updateSession } from '@/utils/supabase/middleware'
 
+// export async function middleware(request) {
+//   return await updateSession(request)
+// }
+
+// export const config = {
+//   matcher: [
+//     /*
+//      * Match all request paths except for the ones starting with:
+//      * - _next/static (static files)
+//      * - _next/image (image optimization files)
+//      * - favicon.ico (favicon file)
+//      * Feel free to modify this pattern to include more paths.
+//      */
+//     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+//   ],
+// }

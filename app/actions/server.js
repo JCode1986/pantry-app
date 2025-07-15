@@ -1,5 +1,6 @@
 'use server';
 import { supabase } from '@/lib/supabaseClient';
+import { supabaseServer } from '@/lib/supabaseServer';
 import axios from 'axios';
 
 export async function fetchRecipes(ingredients) {
@@ -50,5 +51,21 @@ export async function removePantryItem(itemId) {
     .eq('id', itemId);
 
   if (error) throw error;
+}
+
+export async function addStorage(name) {
+  const supabase = await supabaseServer();
+
+  const { data, error } = await supabase
+    .from('food_storages')
+    .insert([{ name }])
+    .select();
+
+  if (error) {
+    console.error('Error adding storage (server):', error);
+    return { error: error.message };
+  }
+
+  return { data: data[0] };
 }
 
