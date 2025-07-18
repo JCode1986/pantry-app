@@ -14,8 +14,9 @@ export default function Navigation() {
         try {
             await logout();
 
-            document.cookie = 'sb-icjhicevzeybasiwgxnm-auth-token=; Max-Age=0; path=/;';
-            document.cookie = 'sb-icjhicevzeybasiwgxnm-refresh-token=; Max-Age=0; path=/;';
+            localStorage.clear();
+            // document.cookie = 'sb-icjhicevzeybasiwgxnm-auth-token=; Max-Age=0; path=/;';
+            // document.cookie = 'sb-icjhicevzeybasiwgxnm-refresh-token=; Max-Age=0; path=/;';
 
             // ✅ Hard reload ensures Middleware sees no session
             window.location.href = '/login';

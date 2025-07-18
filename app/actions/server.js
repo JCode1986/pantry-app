@@ -1,6 +1,8 @@
 'use server';
+import { getSession } from '@/lib/sessionOptions';
 import { supabase } from '@/lib/supabaseClient';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { createClient } from '@/utils/supabase/server';
 import axios from 'axios';
 
 export async function fetchRecipes(ingredients) {
@@ -53,8 +55,27 @@ export async function removePantryItem(itemId) {
   if (error) throw error;
 }
 
+// export async function addStorage(name) {
+//   const supabase = await supabaseServer();
+
+//   console.log(supabase, 'supabase')
+
+//   const { data, error } = await supabase
+//     .from('food_storages')
+//     .insert([{ name }])
+//     .select();
+
+//   if (error) {
+//     console.error('Error adding storage (server):', error);
+//     return { error: error.message };
+//   }
+
+//   return { data: data[0] };
+// }
+
+
 export async function addStorage(name) {
-  const supabase = await supabaseServer();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from('food_storages')
@@ -66,6 +87,42 @@ export async function addStorage(name) {
     return { error: error.message };
   }
 
+  // 🚨 Supabase .insert().select() returns an array already
+  return { data: data[0] }; // Return single item (for clarity)
+}
+
+export async function deleteStorage(id) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from('food_storages')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error deleting storage:', error);
+    return { error: error.message };
+  }
+
+  return { success: true };
+}
+
+export async function updateStorage(id, name) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('food_storages')
+    .update({ name })
+    .eq('id', id)
+    .select();
+
+  if (error) {
+    console.error('Error updating storage:', error);
+    return { error: error.message };
+  }
+
   return { data: data[0] };
 }
+
+
 
