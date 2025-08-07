@@ -1,72 +1,72 @@
 'use client';
 import { useState } from 'react';
-import { FaPlus, FaTrash, FaEdit, FaCheck, FaTimes, FaUtensils } from 'react-icons/fa';
-import { addStorage, deleteStorage, updateStorage } from '@/app/actions/server';
+import { FaPlus, FaTrash, FaEdit, FaCheck, FaTimes } from 'react-icons/fa';
+import { addStorage, deleteStorage, updateStorageName } from '@/app/actions/server';
 
 export default function HomeSection({ user, storages }) {
-  const [allStorages, setAllStorages] = useState(storages);
+  const [allStorages, setAllStorages] = useState(storages || []);
   const [filter, setFilter] = useState('All');
   const [storageName, setStorageName] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState('');
 
+  // Add new storage
   const addStorageHandler = async () => {
     if (!storageName.trim()) return;
-
-    const result = await addStorage(storageName.trim());
-    if (result.error) {
-      console.error(result.error);
-      return;
+    try {
+      const newStorage = await addStorage(storageName.trim());
+      setAllStorages([newStorage, ...allStorages]);
+      setStorageName('');
+    } catch (err) {
+      console.error('Error adding storage:', err);
     }
-
-    setAllStorages([...(result.data ? [result.data] : []), ...allStorages]);
-    setStorageName('');
   };
 
-  const deleteStorageHandler = async (id) => {
-    if (!confirm('Are you sure you want to delete this storage?')) return;
-
-    const result = await deleteStorage(id);
-    if (result.error) {
-      console.error(result.error);
-      return;
-    }
-
-    setAllStorages(allStorages.filter(storage => storage.id !== id));
-  };
-
+  // Start editing a storage name
   const startEditing = (id, currentName) => {
     setEditingId(id);
     setEditingName(currentName);
   };
 
+  // Cancel editing
   const cancelEditing = () => {
     setEditingId(null);
     setEditingName('');
   };
 
+  // Save edited name
   const saveEditHandler = async (id) => {
     if (!editingName.trim()) return;
-
-    const result = await updateStorage(id, editingName.trim());
-    if (result.error) {
-      console.error(result.error);
-      return;
+    try {
+      await updateStorageName(id, editingName.trim());
+      setAllStorages(
+        allStorages.map((storage) =>
+          storage.id === id ? { ...storage, name: editingName.trim() } : storage
+        )
+      );
+      cancelEditing();
+    } catch (err) {
+      console.error('Error updating storage:', err);
     }
-
-    setAllStorages(
-      allStorages.map(s =>
-        s.id === id ? { ...s, name: result.data.name } : s
-      )
-    );
-
-    setEditingId(null);
-    setEditingName('');
   };
 
-  const filteredStorages = filter === 'All'
-    ? allStorages
-    : allStorages.filter(s => s.name.toLowerCase().includes(filter.toLowerCase()));
+  // Delete storage
+  const deleteStorageHandler = async (id) => {
+    if (!confirm('Are you sure you want to delete this storage?')) return;
+    try {
+      await deleteStorage(id);
+      setAllStorages(allStorages.filter((storage) => storage.id !== id));
+    } catch (err) {
+      console.error('Error deleting storage:', err);
+    }
+  };
+
+  const filteredStorages =
+    filter === 'All'
+      ? allStorages
+      : allStorages.filter((s) =>
+          s.name.toLowerCase().includes(filter.toLowerCase())
+        );
 
   return (
     <main className="p-6 max-w-5xl mx-auto mt-20">
@@ -99,7 +99,7 @@ export default function HomeSection({ user, storages }) {
             className="w-full sm:w-[200px] border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-300"
           >
             <option>All</option>
-            {allStorages?.map(s => (
+            {allStorages?.map((s) => (
               <option key={s.id}>{s.name}</option>
             ))}
           </select>
@@ -120,7 +120,9 @@ export default function HomeSection({ user, storages }) {
             {filteredStorages?.map((storage, idx) => (
               <tr
                 key={storage.id}
-                className={`border-b ${idx % 2 === 0 ? 'bg-gray-50' : 'bg-white'} hover:bg-gray-100 transition`}
+                className={`border-b ${
+                  idx % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+                } hover:bg-gray-100 transition`}
               >
                 <td className="p-3">
                   {editingId === storage.id ? (
