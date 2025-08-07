@@ -13,12 +13,19 @@ export default function Navigation() {
         setLoggingOut(true);
         try {
             await logout();
+
+            localStorage.clear();
+            // document.cookie = 'sb-icjhicevzeybasiwgxnm-auth-token=; Max-Age=0; path=/;';
+            // document.cookie = 'sb-icjhicevzeybasiwgxnm-refresh-token=; Max-Age=0; path=/;';
+
+            // ✅ Hard reload ensures Middleware sees no session
             window.location.href = '/login';
         } catch (err) {
             console.error('Logout failed:', err);
             setLoggingOut(false);
         }
     };
+
 
     return (
         <>

@@ -28,10 +28,10 @@ export default async function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-         <SessionProvider>
-            { token ? <Navigation /> : <div className="h-[55px] sm:h-[48px]"/> }
-            {children}
-          </SessionProvider>
+        <SessionProvider>
+          { token ? <Navigation /> : <div className="h-[55px] sm:h-[48px]"/> }
+          {children}
+        </SessionProvider>
       </body>
     </html>
   );

@@ -1,8 +1,8 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import { login } from '@/app/actions/auth';
+import { login, signup } from '@/app/actions/auth';
 
 export default function LoginPage() {
     const searchParams = useSearchParams();
@@ -32,7 +32,14 @@ export default function LoginPage() {
         setLoading(true);
         setError(null);
 
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await supabase.auth.signUp({ 
+            email,
+            password,
+            options: {
+                emailRedirectTo: `http://localhost:3000/magic-link-sync`
+            }
+        });
+
         if (error) {
             setError(error.message);
         } else {
