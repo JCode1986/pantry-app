@@ -115,17 +115,23 @@ export async function deleteStorageArea(id) {
   return error ? { error } : { success: true };
 }
 
-export async function addItem(categoryId, { name, quantity, expiration_date }) {
+export async function addItem(categoryId, { name, quantity = 0, expiration_date = null }) {
   const supabase = await createClient();
+
   const { data, error } = await supabase
     .from('items')
     .insert([{ category_id: categoryId, name, quantity, expiration_date }])
-    .select('*')
-    .single();
+    .select('*')               
+    .single();                 
 
-  if (error) throw error;
-  return { data };
+  if (error) {
+    console.error('Error adding item:', error);
+    return { error };
+  }
+
+  return { data };            
 }
+
 
 export async function updateItem(itemId, name) {
   const supabase = await createClient();

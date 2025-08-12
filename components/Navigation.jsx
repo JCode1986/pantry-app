@@ -30,19 +30,13 @@ export default function Navigation() {
     return (
         <>
             <nav className="bg-white shadow-md sticky top-0 z-50">
-                <div className="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+                <div className="max-w-[1300px] mx-auto px-4 py-3 flex justify-between items-center">
                     <div className="flex items-center space-x-4">
                         <Link href="/" className="flex items-center gap-1 text-gray-700 hover:text-blue-600">
-                            <FaUtensils />
-                            <span>Pantry</span>
+                            Overview
                         </Link>
-                        <Link href="/fridge" className="items-center gap-1 text-gray-700 hover:text-blue-600 hidden sm:flex">
-                            <FaSnowflake />
-                            <span>Fridge</span>
-                        </Link>
-                        <Link href="/favorites" className="items-center gap-1 text-gray-700 hover:text-blue-600 hidden sm:flex">
-                            <FaHeart />
-                            <span>Favorite Recipes</span>
+                        <Link href="/locations" className="items-center gap-1 text-gray-700 hover:text-blue-600 hidden sm:flex">
+                            Locations
                         </Link>
                     </div>
 
@@ -68,18 +62,18 @@ export default function Navigation() {
                 {isOpen && (
                     <div className="sm:hidden px-4 pb-3 space-y-2">
                         <Link
-                            href="/fridge"
+                            href="/"
                             onClick={() => setIsOpen(false)}
                             className="block text-gray-700 hover:text-blue-600"
                         >
-                            <FaSnowflake className="inline-block mr-1" /> Fridge
+                            <FaSnowflake className="inline-block mr-1" /> Overview
                         </Link>
                         <Link
-                            href="/favorites"
+                            href="/locations"
                             onClick={() => setIsOpen(false)}
                             className="block text-gray-700 hover:text-blue-600"
                         >
-                            <FaHeart className="inline-block mr-1" /> Favorites
+                            <FaHeart className="inline-block mr-1" /> Locations
                         </Link>
                         <button
                             onClick={() => setShowModal(true)}
