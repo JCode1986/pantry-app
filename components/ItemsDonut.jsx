@@ -19,9 +19,9 @@ export default function ItemsDonut({ data }) {
   const total = chartData.reduce((s, d) => s + d.value, 0);
 
   return (
-    <div className="rounded-2xl bg-white shadow-sm h-full">
-      <div className="p-5 border-b">
-        <h2 className="text-lg font-semibold">Items by location</h2>
+    <div className="rounded-2xl bg-white shadow-sm h-full border-gray-300 border">
+      <div className="p-5 border-b border-gray-300">
+        <h2 className="text-lg font-semibold text-stocksense-teal">Items by location</h2>
         <p className="text-xs text-gray-500 mt-1">Total: {total}</p>
       </div>
 
@@ -61,7 +61,7 @@ export default function ItemsDonut({ data }) {
           <li key={i} className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2">
               <span className="inline-block h-3 w-3 rounded-sm" style={{ background: d.color }} />
-              <span className="text-gray-700">{d.name}</span>
+              <span className="text-gray-600">{d.name}</span>
             </div>
             <span className="text-gray-500">{d.value}</span>
           </li>

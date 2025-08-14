@@ -1,4 +1,3 @@
-// components/StatsCards.jsx
 'use client';
 
 import { motion } from 'framer-motion';
@@ -24,7 +23,7 @@ export default function StatsCards({ totals }) {
             initial={{ y: 16, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.35, delay: idx * 0.06, type: 'spring', stiffness: 120 }}
-            className="group relative overflow-hidden rounded-2xl bg-white shadow-sm"
+            className="group relative overflow-hidden rounded-2xl bg-white shadow-sm border-gray-300 border"
           >
             {/* soft gradient ribbon */}
             <div className={`pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-gradient-to-br ${c.accent} opacity-20 blur-2xl`} />
@@ -32,17 +31,17 @@ export default function StatsCards({ totals }) {
             <div className="p-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`rounded-xl p-3 text-white bg-gradient-to-br ${c.accent} shadow-sm`}>
+                  <div className={`rounded-xl p-3 text-white bg-gradient-to-br ${c.accent} shadow-sm border-gray-300 border`}>
                     <Icon className="h-5 w-5" />
                   </div>
-                  <h3 className="text-sm font-medium text-gray-600">{c.label}</h3>
+                  <h3 className="text-sm md:text-base font-semibold text-stocksense-teal">{c.label}</h3>
                 </div>
                 <span className="text-xs text-gray-400">total</span>
               </div>
 
               <div className="mt-4 flex items-end justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-3xl font-semibold tracking-tight">{value}</span>
+                  <span className="text-3xl font-semibold tracking-tight text-gray-600">{value}</span>
                   <span className="text-xs text-gray-400">records</span>
                 </div>
 

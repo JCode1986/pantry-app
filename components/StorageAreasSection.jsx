@@ -204,29 +204,35 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
     setNewItemData(prev => ({ ...prev, [categoryId]: {} }));
   };
 
-  const handleUpdateItem = async (itemId, categoryId, storageAreaId, updatedFields) => {
-    const result = await updateItem(itemId, updatedFields);
-    if (!result?.error) {
-      setStorageAreas(prev =>
-        prev.map(area =>
-          area.id === storageAreaId
-            ? {
-                ...area,
-                categories: area.categories.map(cat =>
-                  cat.id === categoryId
-                    ? {
-                        ...cat,
-                        items: cat.items.map(it => (it.id === itemId ? { ...it, ...updatedFields } : it)),
-                      }
-                    : cat
-                ),
-              }
-            : area
-        )
-      );
-      setEditingItem(prev => ({ ...prev, [itemId]: undefined }));
+  const handleUpdateItem = async (itemId, categoryId, storageAreaId, updated) => {
+    const { data, error } = await updateItem(itemId, updated);
+    if (error) {
+      console.error(error);
+      return;
     }
+
+    setStorageAreas(prev =>
+      prev.map(area =>
+        area.id === storageAreaId
+          ? {
+              ...area,
+              categories: area.categories.map(cat =>
+                cat.id === categoryId
+                  ? {
+                      ...cat,
+                      items: cat.items.map(it => (it.id === itemId ? data : it)),
+                    }
+                  : cat
+              ),
+            }
+          : area
+      )
+    );
+
+    // close editor for this item
+    setEditingItem(prev => ({ ...prev, [itemId]: undefined }));
   };
+
 
   const handleDeleteItem = async (itemId, categoryId, storageAreaId) => {
     const result = await deleteItem(itemId);
@@ -326,7 +332,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search categories or items…"
-              className="border rounded-lg px-3 py-2 w-72 max-w-full focus:outline-none focus:ring-2 focus:ring-blue-300"
+              className="border border-gray-300 shadow rounded-lg px-3 py-2 w-72 max-w-full focus:outline-none focus:ring-2 focus:ring-blue-300"
             />
             {search && (
               <button
@@ -352,7 +358,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
               min={1}
               value={expDays}
               onChange={(e) => setExpDays(Math.max(1, parseInt(e.target.value || '7', 10)))}
-              className="border rounded px-2 py-1 w-16"
+              className="border border-gray-300 shadow rounded px-2 py-1 w-16"
               disabled={!expSoonEnabled}
             />
             <span className="text-sm">days</span>
@@ -375,7 +381,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
             value={newStorageName}
             onChange={(e) => setNewStorageName(e.target.value)}
             placeholder="New storage area (e.g., Pantry, Fridge, Garage shelf, Aisle #)"
-            className="border px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 w-full"
+            className="border border-gray-300 shadow px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 w-full"
           />
           <button
             onClick={handleAddStorageArea}
@@ -387,13 +393,13 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
         <div className="flex gap-2 justify-end">
           <button
             onClick={expandAllAreas}
-            className="rounded-lg border px-3 py-1.5 text-sm hover:bg-gray-50"
+            className="rounded-lg border border-gray-300 shadow px-3 py-1.5 text-sm hover:bg-gray-50"
           >
             Expand all areas
           </button>
           <button
             onClick={collapseAllAreas}
-            className="rounded-lg border px-3 py-1.5 text-sm hover:bg-gray-50"
+            className="rounded-lg border border-gray-300 shadow px-3 py-1.5 text-sm hover:bg-gray-50"
           >
             Collapse all areas
           </button>
@@ -401,12 +407,12 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
       </div>
 
       {/* Areas */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         {storageAreas.map((area) => (
           <motion.div
             key={area.id}
             layout
-            className="rounded-2xl border bg-white shadow-sm p-4"
+            className="rounded-2xl border border-gray-300 shadow bg-white p-4"
           >
             {/* Area header */}
             <div className="flex items-start justify-between gap-3">
@@ -422,7 +428,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
                   <input
                     value={editingName}
                     onChange={(e) => setEditingName(e.target.value)}
-                    className="border px-2 py-1 rounded-md w-56 sm:w-72 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    className="border border-gray-300 shadow px-2 py-1 rounded-md w-56 sm:w-72 focus:outline-none focus:ring-2 focus:ring-blue-300"
                   />
                 ) : (
                   <div>
@@ -462,13 +468,13 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
                 )}
                 <button
                   onClick={() => expandAllCategoriesInArea(area)}
-                  className="rounded-lg border px-2 py-1.5 text-xs hover:bg-gray-50"
+                  className="rounded-lg border border-gray-300 shadow px-2 py-1.5 text-xs hover:bg-gray-50"
                 >
                   Expand cats
                 </button>
                 <button
                   onClick={() => collapseAllCategoriesInArea(area)}
-                  className="rounded-lg border px-2 py-1.5 text-xs hover:bg-gray-50"
+                  className="rounded-lg border border-gray-300 shadow px-2 py-1.5 text-xs hover:bg-gray-50"
                 >
                   Collapse cats
                 </button>
@@ -481,7 +487,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
                 value={newCategoryName[area.id] || ''}
                 onChange={(e) => setNewCategoryName({ ...newCategoryName, [area.id]: e.target.value })}
                 placeholder="New category (e.g., Fruits, Tools, Cleaning…)"
-                className="border px-3 py-2 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-green-300"
+                className="border border-gray-300 shadow px-3 py-2 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-green-300"
               />
               <button
                 onClick={() => handleAddCategory(area.id)}
@@ -512,7 +518,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
                         const allSelected = items.length > 0 && selectedCount === items.length;
 
                         return (
-                          <motion.div key={category.id} layout className="rounded-xl border p-3">
+                          <motion.div key={category.id} layout className="rounded-xl border border-gray-300 shadow p-3">
                             {/* Category header */}
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex items-center gap-2">
@@ -529,7 +535,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
                                     onChange={(e) =>
                                       setEditingCategoryName({ ...editingCategoryName, [category.id]: e.target.value })
                                     }
-                                    className="border px-2 py-1 rounded-md w-48 sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                    className="border border-gray-300 shadow px-2 py-1 rounded-md w-48 sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-300"
                                   />
                                 ) : (
                                   <div>
@@ -595,7 +601,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
                                   })
                                 }
                                 placeholder="Item name"
-                                className="border px-3 py-2 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-green-300"
+                                className="border border-gray-300 shadow px-3 py-2 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-green-300"
                               />
                               <input
                                 type="number"
@@ -608,7 +614,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
                                   })
                                 }
                                 placeholder="Qty"
-                                className="border px-3 py-2 rounded-md w-full sm:w-28 focus:outline-none focus:ring-2 focus:ring-green-300"
+                                className="border border-gray-300 shadow px-3 py-2 rounded-md w-full sm:w-28 focus:outline-none focus:ring-2 focus:ring-green-300"
                               />
                               <input
                                 type="date"
@@ -619,7 +625,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
                                     [category.id]: { ...newItemData[category.id], expiration: e.target.value },
                                   })
                                 }
-                                className="border px-3 py-2 rounded-md w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-green-300"
+                                className="border border-gray-300 shadow px-3 py-2 rounded-md w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-green-300"
                               />
                               <button
                                 onClick={() => handleAddItem(category.id)}
@@ -674,7 +680,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
                                         <motion.div
                                           key={item.id}
                                           layout
-                                          className={`flex justify-between items-center border rounded-lg px-3 py-2 ${selected ? 'ring-2 ring-red-200' : ''}`}
+                                          className={`flex justify-between items-center border border-gray-300 shadow rounded-lg px-3 py-2 ${selected ? 'ring-2 ring-red-200' : ''}`}
                                         >
                                           {editingItem[item.id] !== undefined ? (
                                             <div className="flex flex-col sm:flex-row gap-2 w-full">
@@ -686,7 +692,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
                                                     [item.id]: { ...prev[item.id], name: e.target.value },
                                                   }))
                                                 }
-                                                className="border px-2 py-1 rounded-md w-full sm:w-1/3"
+                                                className="border border-gray-300 shadow px-2 py-1 rounded-md w-full sm:w-1/3"
                                               />
                                               <input
                                                 type="number"
@@ -698,7 +704,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
                                                     [item.id]: { ...prev[item.id], quantity: e.target.value },
                                                   }))
                                                 }
-                                                className="border px-2 py-1 rounded-md w-full sm:w-24"
+                                                className="border border-gray-300 shadow px-2 py-1 rounded-md w-full sm:w-24"
                                               />
                                               <input
                                                 type="date"
@@ -709,17 +715,35 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
                                                     [item.id]: { ...prev[item.id], expiration_date: e.target.value },
                                                   }))
                                                 }
-                                                className="border px-2 py-1 rounded-md w-full sm:w-48"
+                                                className="border border-gray-300 shadow px-2 py-1 rounded-md w-full sm:w-48"
                                               />
                                               <div className="flex gap-2 items-center">
-                                                <button
+                                                {/* <button
                                                   onClick={() =>
                                                     handleUpdateItem(item.id, category.id, area.id, editingItem[item.id])
                                                   }
                                                   className="text-green-600 rounded p-2 hover:bg-green-50"
                                                 >
                                                   <FaCheck />
-                                                </button>
+                                                </button> */}
+                                                <button
+  onClick={() => {
+    const e = editingItem[item.id] || {};
+    const updated = {
+      name: (e.name ?? '').trim() || item.name,
+      quantity: Number.isFinite(+e.quantity)
+        ? parseInt(e.quantity, 10)
+        : (item.quantity ?? 0),
+      expiration_date:
+        e.expiration_date ?? item.expiration_date ?? null,
+    };
+    handleUpdateItem(item.id, category.id, area.id, updated);
+  }}
+  className="text-green-600 rounded p-2 hover:bg-green-50"
+>
+  <FaCheck />
+</button>
+
                                                 <button
                                                   onClick={() => setEditingItem(prev => ({ ...prev, [item.id]: undefined }))}
                                                   className="text-gray-600 rounded p-2 hover:bg-gray-50"

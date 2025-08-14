@@ -18,12 +18,12 @@ export default async function HomePage() {
     getCount('items'),
   ]);
 
-  // Recent activity: latest 12 items (you can bump this)
+  // Recent activity: latest 12 rows
   const { data: recent = [] } = await supabase
-    .from('items_with_paths')
+    .from('recent_activity')
     .select('*')
-    .order('created_at', { ascending: false })
     .limit(12);
+
 
   // Donut data: items per location
   const { data: perLocation = [] } = await supabase
@@ -31,9 +31,9 @@ export default async function HomePage() {
     .select('*');
 
   return (
-    <main className="mx-auto max-w-6xl px-5 py-8 space-y-10">
-      <header>
-        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Pantry Overview</h1>
+    <main className="mx-auto max-w-6xl px-5 py-8 space-y-10 mt-8">
+      <header className='md:text-left text-center'>
+        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-stocksense-teal">Stock Overview</h1>
         <p className="text-gray-500 mt-1">Snapshot of your data and what’s new.</p>
       </header>
 

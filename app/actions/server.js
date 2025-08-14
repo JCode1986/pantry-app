@@ -132,18 +132,38 @@ export async function addItem(categoryId, { name, quantity = 0, expiration_date 
   return { data };            
 }
 
-
-export async function updateItem(itemId, name) {
+// actions/server.js
+export async function updateItem(itemId, updates) {
   const supabase = await createClient();
+
+  // Normalize keys coming from the client
+  const payload = {};
+  if (typeof updates?.name === 'string') payload.name = updates.name.trim();
+  if (updates?.quantity !== undefined) payload.quantity = Number.parseInt(updates.quantity, 10) || 0;
+
+  // accept either expiration or expiration_date from client
+  const exp = updates?.expiration ?? updates?.expiration_date ?? null;
+  if (exp !== undefined) payload.expiration_date = exp || null;
+
+  if (Object.keys(payload).length === 0) {
+    return { error: 'No valid fields to update' };
+  }
+
   const { data, error } = await supabase
     .from('items')
-    .update({ name })
+    .update(payload)
     .eq('id', itemId)
-    .select('*');
+    .select('*')     // return the updated row
+    .single();
 
-  if (error) throw error;
-  return { data: data[0] };
+  if (error) {
+    console.error('Error updating item:', error);
+    return { error: error.message };
+  }
+
+  return { data };
 }
+
 
 export async function deleteItem(itemId) {
   const supabase = await createClient();

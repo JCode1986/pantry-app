@@ -3,51 +3,148 @@
 import { motion } from 'framer-motion';
 import { FaBoxOpen } from 'react-icons/fa';
 
+/** Helpers */
+function label(k) {
+  switch (k) {
+    case 'expiration_date':
+      return 'Expiration';
+    case 'quantity':
+      return 'Qty';
+    case 'name':
+      return 'Name';
+    default:
+      return k.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+}
+
+function serializeValue(v) {
+  if (v === null || v === undefined || v === '') return '—';
+  if (typeof v === 'object') return objectToPairs(v);
+  return String(v);
+}
+
+function objectToPairs(obj) {
+  return Object.entries(obj || {})
+    .map(([k, val]) => `${label(k)}: ${serializeValue(val)}`)
+    .join(', ');
+}
+
+function formatChanges(changes) {
+  if (!changes || typeof changes !== 'object') return 'Updated';
+
+  // Canonical: { field: {from, to}, ... }
+  const looksCanonical = Object.values(changes).every(
+    (v) => v && typeof v === 'object' && ('from' in v || 'to' in v)
+  );
+
+  if (looksCanonical) {
+    const parts = [];
+    for (const [field, diff] of Object.entries(changes)) {
+      const fromVal = serializeValue(diff.from);
+      const toVal =
+        typeof diff.to === 'object' && diff.to !== null
+          ? objectToPairs(diff.to)
+          : serializeValue(diff.to);
+      parts.push(`${label(field)}: ${fromVal} to ${toVal}`);
+    }
+    return parts.join(' • ');
+  }
+
+  // Snapshot: { name: 'milk', quantity: '1', expiration_date: '2025-08-21' }
+  const pretty = [];
+  for (const [k, v] of Object.entries(changes)) {
+    pretty.push(`${label(k)}: ${serializeValue(v)}`);
+  }
+  return pretty.length ? `Updated ${pretty.join(' • ')}` : 'Updated';
+}
+
+function ActionBadge({ action }) {
+  const map = {
+    added: {
+      text: 'Added',
+      className:
+        'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:ring-emerald-800/50',
+    },
+    updated: {
+      text: 'Updated',
+      className:
+        'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:ring-amber-800/50',
+    },
+    deleted: {
+      text: 'Removed',
+      className:
+        'bg-rose-50 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:ring-rose-800/50',
+    },
+  };
+  const cfg = map[action] ?? map.updated;
+  return (
+    <span className={`px-2 py-0.5 text-[11px] rounded-full font-medium ${cfg.className}`}>
+      {cfg.text}
+    </span>
+  );
+}
+
+/** Component */
 export default function RecentActivity({ items }) {
   return (
-    <div className="rounded-2xl bg-white shadow-sm">
-      <div className="flex items-center justify-between p-5 border-b">
-        <h2 className="text-lg font-semibold">Recent activity</h2>
-        <span className="text-xs text-gray-400">{items.length} items</span>
+    <div className="rounded-2xl bg-white shadow-sm border border-gray-200 dark:bg-zinc-900 dark:border-zinc-800">
+      <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-zinc-800">
+        <h2 className="text-lg font-semibold text-stocksense-teal dark:text-stocksense-sky">
+          Recent activity
+        </h2>
+        <span className="text-xs text-gray-600 dark:text-gray-400">{items.length} items</span>
       </div>
 
-      <ul className="divide-y">
+      <ul className="divide-y divide-gray-200 dark:divide-zinc-800">
         {items.length === 0 ? (
-          <li className="p-5 text-gray-500 text-sm">No recent activity yet.</li>
+          <li className="p-5 text-gray-600 dark:text-gray-400 text-sm">No recent activity yet.</li>
         ) : (
-          items.map((r, idx) => (
-            <motion.li
-              key={r.item_id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, delay: idx * 0.03 }}
-              className="flex items-center justify-between p-4"
-            >
-              <div className="flex items-center gap-3">
-                <div className="rounded-xl p-2 bg-gray-100">
-                  <FaBoxOpen className="h-4 w-4 text-gray-600" />
+          items.map((r, idx) => {
+            const action = (r.action || '').toLowerCase(); // 'added' | 'updated' | 'removed'
+            const details =
+              action === 'added'
+                ? `Qty ${r.quantity ?? 0}${r.expiration_date ? ` · Exp ${r.expiration_date}` : ''}`
+                : action === 'deleted'
+                ? 'Removed'
+                : formatChanges(r.changes);
+
+            return (
+              <motion.li
+                key={`${r.item_name}-${idx}`}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: idx * 0.03 }}
+                className="flex items-start justify-between gap-3 p-4 text-gray-700 dark:text-gray-300"
+              >
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="rounded-xl p-2 bg-gray-100 dark:bg-zinc-800 shrink-0">
+                    <FaBoxOpen className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-sm">
+                      <ActionBadge action={action} />{' '}
+                      <span className="font-medium">{r.item_name}</span>
+                      <span className="text-gray-500 dark:text-gray-400"> in </span>
+                      <span className="font-medium">{r.category_name}</span>
+                      <span className="text-gray-500 dark:text-gray-400"> · </span>
+                      <span className="text-gray-700 dark:text-gray-300">{r.storage_area_name}</span>
+                      <span className="text-gray-500 dark:text-gray-400"> @ </span>
+                      <span className="text-gray-700 dark:text-gray-300">{r.location_name}</span>
+                    </p>
+
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 whitespace-normal break-words">
+                      {details}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm">
-                    <span className="font-medium">{r.item_name}</span>
-                    <span className="text-gray-500"> in </span>
-                    <span className="font-medium">{r.category_name}</span>
-                    <span className="text-gray-500"> · </span>
-                    <span className="text-gray-600">{r.storage_area_name}</span>
-                    <span className="text-gray-500"> @ </span>
-                    <span className="text-gray-600">{r.location_name}</span>
-                  </p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Qty {r.quantity ?? 0}
-                    {r.expiration_date ? ` · Exp ${r.expiration_date}` : ''}
-                  </p>
-                </div>
-              </div>
-              <span className="text-xs text-gray-400">
-                {new Date(r.created_at).toLocaleString()}
-              </span>
-            </motion.li>
-          ))
+
+                <span className="text-[11px] leading-5 text-gray-500 dark:text-gray-400 shrink-0">
+                  {r.created_at ? new Date(r.created_at).toLocaleString() : ''}
+                </span>
+              </motion.li>
+            );
+          })
         )}
       </ul>
     </div>
