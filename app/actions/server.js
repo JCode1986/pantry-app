@@ -115,29 +115,55 @@ export async function deleteStorageArea(id) {
   return error ? { error } : { success: true };
 }
 
-export async function addItem(categoryId, { name, quantity, expiration_date }) {
+export async function addItem(categoryId, { name, quantity = 0, expiration_date = null }) {
   const supabase = await createClient();
+
   const { data, error } = await supabase
     .from('items')
     .insert([{ category_id: categoryId, name, quantity, expiration_date }])
-    .select('*')
+    .select('*')               
+    .single();                 
+
+  if (error) {
+    console.error('Error adding item:', error);
+    return { error };
+  }
+
+  return { data };            
+}
+
+// actions/server.js
+export async function updateItem(itemId, updates) {
+  const supabase = await createClient();
+
+  // Normalize keys coming from the client
+  const payload = {};
+  if (typeof updates?.name === 'string') payload.name = updates.name.trim();
+  if (updates?.quantity !== undefined) payload.quantity = Number.parseInt(updates.quantity, 10) || 0;
+
+  // accept either expiration or expiration_date from client
+  const exp = updates?.expiration ?? updates?.expiration_date ?? null;
+  if (exp !== undefined) payload.expiration_date = exp || null;
+
+  if (Object.keys(payload).length === 0) {
+    return { error: 'No valid fields to update' };
+  }
+
+  const { data, error } = await supabase
+    .from('items')
+    .update(payload)
+    .eq('id', itemId)
+    .select('*')     // return the updated row
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error updating item:', error);
+    return { error: error.message };
+  }
+
   return { data };
 }
 
-export async function updateItem(itemId, name) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('items')
-    .update({ name })
-    .eq('id', itemId)
-    .select('*');
-
-  if (error) throw error;
-  return { data: data[0] };
-}
 
 export async function deleteItem(itemId) {
   const supabase = await createClient();

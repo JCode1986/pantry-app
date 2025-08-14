@@ -32,6 +32,53 @@ export async function login({ email, password }) {
   redirect("/")
 }
 
+export async function refreshToken() {
+  const session = await getSession();
+  const refresh_token = session?.user?.refresh_token;
+
+  if (!refresh_token) throw new Error("Missing refresh token");
+
+  const { data, error } = await supabase.auth.refreshSession({ refresh_token });
+
+  if (error || !data?.session) {
+    throw new Error(error?.message || "Failed to refresh session");
+  }
+
+  const newSession = data.session;
+
+  session.user = {
+    access_token: newSession.access_token,
+    refresh_token: newSession.refresh_token,
+    expires_at: newSession.expires_at,
+    user: newSession.user,
+  };
+
+  await session.save();
+}
+
+export async function getValidSession() {
+  const session = await getSession();
+
+  const user = session?.user;
+  if (!user?.expires_at || !user?.refresh_token) return null;
+
+  const now = Math.floor(Date.now() / 1000);
+
+  if (now < user.expires_at - 60) {
+    return session; // token is still valid
+  }
+
+  try {
+    // attempt to refresh if user is active
+    await refreshToken();
+    // return await getSession();
+  } catch (e) {
+    console.warn("Token refresh failed. Logging out.");
+    await logout();
+    return null;
+  }
+}
+
 export async function logout() {
   const session = await getSession();
 
