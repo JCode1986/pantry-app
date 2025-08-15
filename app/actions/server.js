@@ -239,12 +239,17 @@ export async function addCategory(storageAreaId, name) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('storage_categories')
-    .insert([{ storage_area_id: storageAreaId, name }])
-    .select('*')
+    .insert({ storage_area_id: storageAreaId, name })
+    .select('id, name, storage_area_id, created_at')
     .single();
 
-  return error ? { error } : { data };
+  if (error) {
+    console.error('addCategory error:', error);
+    return { data: null, error };
+  }
+  return { data, error: null };
 }
+
 
 export async function updateCategoryName(categoryId, name) {
   const supabase = await createClient();

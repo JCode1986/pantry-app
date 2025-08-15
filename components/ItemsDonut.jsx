@@ -26,9 +26,9 @@ export default function ItemsDonut({ data }) {
       </div>
 
       <div className="p-4 h-80">
-        {chartData.length === 0 ? (
+        {total === 0 ? (
           <div className="h-full flex items-center justify-center text-gray-500 text-sm">
-            No data yet.
+            No items available for data.
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">

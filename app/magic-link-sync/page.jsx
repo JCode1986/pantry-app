@@ -19,8 +19,6 @@ export default function MagicLinkSyncPage() {
           return;
         }
 
-        console.log(session, 'sesssssion')
-
         // ✅ Send session to API to store in Iron Session
         const res = await fetch('/api/sync-session', {
           method: 'POST',

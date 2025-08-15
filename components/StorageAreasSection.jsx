@@ -122,7 +122,15 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
   const handleAddCategory = async (storageAreaId) => {
     const name = newCategoryName[storageAreaId]?.trim();
     if (!name) return;
+
     const result = await addCategory(storageAreaId, name);
+
+    if (result?.error) {
+      console.error('addCategory error:', result.error); // <— see the RLS message here
+      alert(result.error.message || 'Failed to add category');
+      return;
+    }
+
     if (result?.data) {
       setStorageAreas(prev =>
         prev.map(a =>
@@ -135,6 +143,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
       setExpandedCategories(prev => ({ ...prev, [result.data.id]: true }));
     }
   };
+
 
   const handleUpdateCategory = async (categoryId, storageAreaId) => {
     const name = editingCategoryName[categoryId]?.trim();
@@ -320,7 +329,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
   return (
     <div className="space-y-4">
       {/* Top toolbar */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between text-center md:text-left">
         <div className="text-sm text-gray-600">
           <span className="font-medium">{totalAreas}</span> storage {totalAreas === 1 ? 'area' : 'areas'} •{' '}
           <span className="font-medium">{totalCategories}</span> categories
@@ -337,7 +346,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
             {search && (
               <button
                 onClick={() => setSearch('')}
-                className="text-gray-600 text-sm px-2 py-1 rounded hover:bg-gray-100"
+                className="text-gray-600 text-sm px-3 py-2 rounded hover:bg-gray-100 shadow border border-stocksense-gray"
               >
                 Clear
               </button>
@@ -350,26 +359,19 @@ export default function StorageAreasSection({ locationId, initialStorageAreas })
                 type="checkbox"
                 checked={expSoonEnabled}
                 onChange={() => setExpSoonEnabled(v => !v)}
+                className=' w-6 h-6 border border-stocksense-gray cursor-pointer'
               />
-              Expiring ≤
+              Expiring in
             </label>
             <input
               type="number"
               min={1}
               value={expDays}
               onChange={(e) => setExpDays(Math.max(1, parseInt(e.target.value || '7', 10)))}
-              className="border border-gray-300 shadow rounded px-2 py-1 w-16"
+              className={`border border-gray-300 shadow rounded px-2 py-1 w-16 ${!expSoonEnabled && 'bg-gray-300'}`}
               disabled={!expSoonEnabled}
             />
             <span className="text-sm">days</span>
-            {expSoonEnabled && (
-              <button
-                onClick={() => { setExpSoonEnabled(false); setExpDays(7); }}
-                className="text-gray-600 text-sm px-2 py-1 rounded hover:bg-gray-100"
-              >
-                Reset
-              </button>
-            )}
           </div>
         </div>
       </div>

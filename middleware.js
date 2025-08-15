@@ -8,7 +8,7 @@ export async function middleware(req) {
   console.log('token:', token);
 
   const isLoginPage = req.nextUrl.pathname === '/login';
-  const protectedPaths = ['/', '/fridge', '/favorites', '/locations'];
+  const protectedPaths = ['/', '/fridge', '/favorites', '/locations', '/storage-areas'];
   const isProtected = protectedPaths.includes(req.nextUrl.pathname);
 
   // ✅ If no user and protected path, redirect to login
