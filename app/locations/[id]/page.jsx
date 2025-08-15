@@ -53,7 +53,7 @@ export default async function Page({ params }) {
 
   return (
     <main className="max-w-[1300px] mx-auto p-6 mt-8">
-      <h1 className="text-3xl font-bold mb-6">📦 {location.name}</h1>
+      <h1 className="text-3xl font-bold mb-6 text-center md:text-left">📦 {location.name}</h1>
       <StorageAreasSection
         locationId={location.id}
         initialStorageAreas={storageAreas}
@@ -61,4 +61,3 @@ export default async function Page({ params }) {
     </main>
   );
 }
-

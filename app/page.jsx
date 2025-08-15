@@ -30,8 +30,11 @@ export default async function HomePage() {
     .from('items_count_per_location')
     .select('*');
 
+
+    console.log(recent, 'recent')
+
   return (
-    <main className="mx-auto max-w-6xl px-5 py-8 space-y-10 mt-8">
+    <main className="mx-auto max-w-6xl px-5 py-8 space-y-10 pt-8 min-h-[100vh]">
       <header className='md:text-left text-center'>
         <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-stocksense-teal">Stock Overview</h1>
         <p className="text-gray-500 mt-1">Snapshot of your data and what’s new.</p>
@@ -43,8 +46,10 @@ export default async function HomePage() {
         <div className="lg:col-span-2">
           <RecentActivity items={recent} />
         </div>
-        <div className="lg:col-span-1">
-          <ItemsDonut data={perLocation} />
+        <div className="lg:col-span-1 flex items-start">
+          <div className="min-h-[350px] w-full">
+            <ItemsDonut data={perLocation} />
+          </div>    
         </div>
       </section>
     </main>

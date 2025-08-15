@@ -26,11 +26,13 @@ export default async function RootLayout({ children }) {
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased `}
       >
         <SessionProvider>
-          { token ? <Navigation /> : <div className="h-[55px] sm:h-[48px]"/> }
-          {children}
+          { token && <Navigation /> }
+          <div className="bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10">
+            {children}
+          </div>
         </SessionProvider>
       </body>
     </html>

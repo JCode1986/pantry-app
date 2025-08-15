@@ -5,8 +5,6 @@ export async function POST(req) {
     const body = await req.json();
     const session = await getSession();
 
-    console.log(body, 'body')
-
     // Save tokens in Iron Session
     session.user = {
       access_token: body.access_token,

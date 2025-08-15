@@ -1,19 +1,20 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { FaBoxOpen } from 'react-icons/fa';
+import {
+  FaBoxOpen,        // item
+  FaMapMarkerAlt,   // location
+  FaBoxes,          // storage area
+  FaTags            // category
+} from 'react-icons/fa';
 
 /** Helpers */
 function label(k) {
   switch (k) {
-    case 'expiration_date':
-      return 'Expiration';
-    case 'quantity':
-      return 'Qty';
-    case 'name':
-      return 'Name';
-    default:
-      return k.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    case 'expiration_date': return 'Expiration';
+    case 'quantity': return 'Qty';
+    case 'name': return 'Name';
+    default: return k.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   }
 }
 
@@ -32,7 +33,6 @@ function objectToPairs(obj) {
 function formatChanges(changes) {
   if (!changes || typeof changes !== 'object') return 'Updated';
 
-  // Canonical: { field: {from, to}, ... }
   const looksCanonical = Object.values(changes).every(
     (v) => v && typeof v === 'object' && ('from' in v || 'to' in v)
   );
@@ -50,7 +50,7 @@ function formatChanges(changes) {
     return parts.join(' • ');
   }
 
-  // Snapshot: { name: 'milk', quantity: '1', expiration_date: '2025-08-21' }
+  // Snapshot (fallback)
   const pretty = [];
   for (const [k, v] of Object.entries(changes)) {
     pretty.push(`${label(k)}: ${serializeValue(v)}`);
@@ -84,6 +84,82 @@ function ActionBadge({ action }) {
   );
 }
 
+function entityIcon(entity) {
+  switch (entity) {
+    case 'location': return <FaMapMarkerAlt className="h-4 w-4 text-gray-600 dark:text-gray-400" />;
+    case 'storage_area': return <FaBoxes className="h-4 w-4 text-gray-600 dark:text-gray-400" />;
+    case 'category': return <FaTags className="h-4 w-4 text-gray-600 dark:text-gray-400" />;
+    default: return <FaBoxOpen className="h-4 w-4 text-gray-600 dark:text-gray-400" />; // item
+  }
+}
+
+function breadcrumb(r) {
+  // r.entity_type: 'location' | 'storage_area' | 'category' | 'item'
+  switch ((r.entity_type || '').toLowerCase()) {
+    case 'location':
+      return <span className="font-medium">{r.location_name}</span>;
+
+    case 'storage_area':
+      return (
+        <>
+          <span className="font-medium">{r.storage_area_name}</span>
+          <span className="text-gray-500 dark:text-gray-400"> @ </span>
+          <span className="text-gray-700 dark:text-gray-300">{r.location_name}</span>
+        </>
+      );
+
+    case 'category':
+      return (
+        <>
+          <span className="font-medium">{r.category_name}</span>
+          <span className="text-gray-500 dark:text-gray-400"> · </span>
+          <span className="text-gray-700 dark:text-gray-300">{r.storage_area_name}</span>
+          <span className="text-gray-500 dark:text-gray-400"> @ </span>
+          <span className="text-gray-700 dark:text-gray-300">{r.location_name}</span>
+        </>
+      );
+
+    default: // item
+      return (
+        <>
+          <span className="font-medium">{r.item_name}</span>
+          <span className="text-gray-500 dark:text-gray-400"> in </span>
+          <span className="font-medium">{r.category_name}</span>
+          <span className="text-gray-500 dark:text-gray-400"> · </span>
+          <span className="text-gray-700 dark:text-gray-300">{r.storage_area_name}</span>
+          <span className="text-gray-500 dark:text-gray-400"> @ </span>
+          <span className="text-gray-700 dark:text-gray-300">{r.location_name}</span>
+        </>
+      );
+  }
+}
+
+function detailLine(r) {
+  const action = (r.action || '').toLowerCase();
+
+  // Non-item entities: show simple rename (when present) or generic message
+  if (r.entity_type !== 'item') {
+    console.log(r, 'whats this????')
+    if (action === 'deleted') return `Removed ${r.item_or_entity_name}`;
+    if (action === 'added') return `Created ${r.item_or_entity_name}`;
+    // show only name change if provided
+    if (r.changes?.name) {
+      const { from, to } = r.changes.name;
+      return `Name: ${serializeValue(from)} to ${serializeValue(to)}`;
+    }
+    return 'Updated';
+  }
+
+  // Item-specific
+  if (action === 'added') {
+    return `Qty ${r.quantity ?? 0}${r.expiration_date ? ` · Exp ${r.expiration_date}` : ''}`;
+  }
+  if (action === 'deleted') {
+    return `Removed ${r.item_or_entity_name} from ${r.entity_type}`;
+  }
+  return formatChanges(r.changes);
+}
+
 /** Component */
 export default function RecentActivity({ items }) {
   return (
@@ -100,17 +176,11 @@ export default function RecentActivity({ items }) {
           <li className="p-5 text-gray-600 dark:text-gray-400 text-sm">No recent activity yet.</li>
         ) : (
           items.map((r, idx) => {
-            const action = (r.action || '').toLowerCase(); // 'added' | 'updated' | 'removed'
-            const details =
-              action === 'added'
-                ? `Qty ${r.quantity ?? 0}${r.expiration_date ? ` · Exp ${r.expiration_date}` : ''}`
-                : action === 'deleted'
-                ? 'Removed'
-                : formatChanges(r.changes);
+            const action = (r.action || '').toLowerCase(); // added | updated | deleted
 
             return (
               <motion.li
-                key={`${r.item_name}-${idx}`}
+                key={`${r.id ?? r.item_id ?? r.entity_id ?? idx}`}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.25, delay: idx * 0.03 }}
@@ -118,23 +188,16 @@ export default function RecentActivity({ items }) {
               >
                 <div className="flex items-start gap-3 min-w-0">
                   <div className="rounded-xl p-2 bg-gray-100 dark:bg-zinc-800 shrink-0">
-                    <FaBoxOpen className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                    {entityIcon((r.entity_type || 'item').toLowerCase())}
                   </div>
 
                   <div className="min-w-0">
                     <p className="text-sm">
-                      <ActionBadge action={action} />{' '}
-                      <span className="font-medium">{r.item_name}</span>
-                      <span className="text-gray-500 dark:text-gray-400"> in </span>
-                      <span className="font-medium">{r.category_name}</span>
-                      <span className="text-gray-500 dark:text-gray-400"> · </span>
-                      <span className="text-gray-700 dark:text-gray-300">{r.storage_area_name}</span>
-                      <span className="text-gray-500 dark:text-gray-400"> @ </span>
-                      <span className="text-gray-700 dark:text-gray-300">{r.location_name}</span>
+                      <ActionBadge action={action} /> {breadcrumb(r)}
                     </p>
 
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 whitespace-normal break-words">
-                      {details}
+                      {detailLine(r)}
                     </p>
                   </div>
                 </div>

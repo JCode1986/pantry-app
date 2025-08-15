@@ -14,6 +14,7 @@ import {
   FaTimes,
   FaEye,
   FaMapMarkedAlt,
+  FaMapMarkerAlt,
 } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -28,25 +29,16 @@ export default function LocationsSection({ locations }) {
   // Motion variants
   const listVariants = {
     hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: { staggerChildren: 0.06, delayChildren: 0.05 },
-    },
+    show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.05 } },
   };
   const itemVariants = {
     hidden: { opacity: 0, y: 10, scale: 0.98 },
-    show: {
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      transition: { type: 'spring', stiffness: 260, damping: 22 },
-    },
+    show: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 22 } },
   };
 
   const handleAdd = async () => {
     if (!locationName.trim()) return;
     const newLoc = await addLocation(locationName.trim());
-
     setAllLocations([
       ...allLocations,
       { ...newLoc, areasCount: 0, categoriesCount: 0, itemsCount: 0 },
@@ -57,25 +49,37 @@ export default function LocationsSection({ locations }) {
   const handleDelete = async (id) => {
     if (!confirm('Delete this location?')) return;
     await deleteLocation(id);
-    setAllLocations(allLocations.filter((loc) => loc.id !== id));
+    setAllLocations((prev) => prev.filter((loc) => loc.id !== id));
+    if (editingId === id) {
+      setEditingId(null);
+      setEditingName('');
+    }
   };
 
-  const handleEdit = async (id) => {
-    if (!editingName.trim()) return;
-    await updateLocationName(id, editingName.trim());
-    setAllLocations(
-      allLocations.map((loc) =>
-        loc.id === id ? { ...loc, name: editingName } : loc
-      )
-    );
+  const handleEditSave = async (id) => {
+    const name = editingName.trim();
+    if (!name) return;
+    // optimistic
+    setAllLocations((prev) => prev.map((loc) => (loc.id === id ? { ...loc, name } : loc)));
+    await updateLocationName(id, name);
     setEditingId(null);
     setEditingName('');
   };
 
+  const handleEditCancel = () => {
+    setEditingId(null);
+    setEditingName('');
+  };
+
+  const onEditKey = (e, id) => {
+    if (e.key === 'Enter') handleEditSave(id);
+    if (e.key === 'Escape') handleEditCancel();
+  };
+
   return (
-    <main className="p-5 max-w-6xl mx-auto mt-8">
+    <main className="p-5 max-w-6xl mx-auto min-h-[96.3vh]">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-2">
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-2 mt-8">
         <div className="text-3xl font-bold flex gap-3 items-center justify-center md:justify-start">
           <div className="rounded-xl p-3 text-white bg-gradient-to-br from-[#0E7488] to-[#0B5563] shadow-sm border border-white/10">
             <FaMapMarkedAlt className="h-5 w-5" />
@@ -93,8 +97,9 @@ export default function LocationsSection({ locations }) {
           type="text"
           value={locationName}
           onChange={(e) => setLocationName(e.target.value)}
-          placeholder="New location (e.g., Home)"
-          className="border border-gray-300 focus:border-[#0E7488] focus:ring-2 focus:ring-[#9FE7D7]/50 px-3 py-2 rounded w-full sm:w-1/2"
+          placeholder="New location (e.g., Home, Work, Grocery Store)"
+          className="w-full max-w-[500px] rounded-lg border text-sm md:text-base border-stocksense-gray px-3 py-2 outline-none focus:ring-2 focus:ring-stocksense-sky/60 focus:border-stocksense-sky bg-white"
+          onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
         />
         <motion.button
           whileHover={{ scale: 1.02 }}
@@ -106,232 +111,121 @@ export default function LocationsSection({ locations }) {
         </motion.button>
       </div>
 
-      {/* Mobile cards */}
-      <AnimatePresence initial={false}>
-        <motion.div
-          variants={listVariants}
-          initial="hidden"
-          animate="show"
-          className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-4"
-        >
-          {allLocations.map((loc) => (
-            <motion.div
-              key={loc.id}
-              variants={itemVariants}
-              layout
-              className="rounded-xl border border-gray-300 bg-white shadow-sm overflow-hidden"
-            >
-              {/* Card header */}
-              <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-[#0E7488] to-[#23A094] text-white">
-                <div className="rounded-lg bg-white/20 p-2">
-                  <FaMapMarkedAlt className="h-4 w-4" />
-                </div>
-
-                {editingId === loc.id ? (
-                  <input
-                    value={editingName}
-                    onChange={(e) => setEditingName(e.target.value)}
-                    placeholder="Location name"
-                    className="flex-1 bg-white/10 placeholder-white/70 text-white border border-white/30 rounded-md px-2 py-1 focus:outline-none"
-                  />
-                ) : (
-                  <h3 className="font-semibold text-base truncate">{loc.name}</h3>
-                )}
-              </div>
-
-              {/* Card body */}
-              <div className="p-4 space-y-3">
-                {/* Counts */}
-                <div className="flex flex-wrap gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-slate-500" />
-                    Areas: {loc.areasCount ?? 0}
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#DDEFF0] px-2.5 py-1 text-xs font-medium text-[#0E7488]">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#0E7488]" />
-                    Categories: {loc.categoriesCount ?? 0}
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#E6F7F3] px-2.5 py-1 text-xs font-medium text-[#2B3A3A]">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#23A094]" />
-                    Items: {loc.itemsCount ?? 0}
-                  </span>
-                </div>
-
-                {/* Actions */}
-                {editingId === loc.id ? (
-                  <div className="flex items-center gap-2">
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleEdit(loc.id)}
-                      className="flex-1 inline-flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-                    >
-                      <FaCheck /> Save
-                    </motion.button>
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => setEditingId(null)}
-                      className="flex-1 inline-flex items-center justify-center gap-2 rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
-                    >
-                      <FaTimes /> Cancel
-                    </motion.button>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-3 gap-2">
-                    <motion.button
-                      whileHover={{ y: -1 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => router.push(`/locations/${loc.id}`)}
-                      className="inline-flex items-center justify-center gap-2 rounded-md bg-[#0E7488] px-3 py-2 text-sm font-medium text-white hover:bg-[#0B5563]"
-                    >
-                      <FaEye /> View
-                    </motion.button>
-                    <motion.button
-                      whileHover={{ y: -1 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => {
-                        setEditingId(loc.id);
-                        setEditingName(loc.name);
-                      }}
-                      className="inline-flex items-center justify-center gap-2 rounded-md bg-amber-500 px-3 py-2 text-sm font-medium text-white hover:bg-amber-600"
-                    >
-                      <FaEdit /> Edit
-                    </motion.button>
-                    <motion.button
-                      whileHover={{ y: -1 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleDelete(loc.id)}
-                      className="inline-flex items-center justify-center gap-2 rounded-md bg-rose-500 px-3 py-2 text-sm font-medium text-white hover:bg-rose-600"
-                    >
-                      <FaTrash /> Delete
-                    </motion.button>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          ))}
-
-          {allLocations.length === 0 && (
-            <motion.div
-              variants={itemVariants}
-              className="col-span-full text-center text-gray-500 border border-dashed rounded-xl p-8"
-            >
-              No locations yet — add your first one above.
-            </motion.div>
-          )}
-        </motion.div>
-      </AnimatePresence>
-
-      {/* Desktop table */}
-      <div className="overflow-x-auto rounded-lg shadow border border-gray-300 bg-white md:block hidden">
-        <table className="min-w-full rounded-lg">
-          <thead className="bg-[#EAF7F5] border-b border-gray-300">
-            <tr>
-              <th className="p-3 text-left text-[#0B5563] font-semibold md:w-[358px]">Location</th>
-              <th className="p-3 text-left text-[#0B5563] font-semibold">Areas</th>
-              <th className="p-3 text-left text-[#0B5563] font-semibold">Categories</th>
-              <th className="p-3 text-left text-[#0B5563] font-semibold">Items</th>
-              <th className="p-3 text-left text-[#0B5563] font-semibold md:w-[340px] w-full">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <AnimatePresence component="tbody" initial={false}>
-            <motion.tbody
-              variants={listVariants}
-              initial="hidden"
-              animate="show"
-              className="[&>tr]:transition"
-            >
-              {allLocations.map((loc) => (
-                <motion.tr
-                  key={loc.id}
-                  variants={itemVariants}
-                  layout
-                  className="border-b border-gray-100 hover:bg-[#F6FBFA]"
-                >
-                  <td className="p-3">
-                    {editingId === loc.id ? (
-                      <input
-                        value={editingName}
-                        onChange={(e) => setEditingName(e.target.value)}
-                        className="border-gray-300 border px-2 py-1 rounded w-full focus:border-[#0E7488] focus:ring-2 focus:ring-[#9FE7D7]/50"
-                      />
-                    ) : (
-                      <span className="font-medium text-[#2B3A3A]">{loc.name}</span>
-                    )}
-                  </td>
-
-                  <td className="p-3 tabular-nums">{loc.areasCount ?? 0}</td>
-                  <td className="p-3 tabular-nums">{loc.categoriesCount ?? 0}</td>
-                  <td className="p-3 tabular-nums">{loc.itemsCount ?? 0}</td>
-
-                  <td className="p-3">
-                    {editingId === loc.id ? (
-                      <div className="flex flex-wrap gap-3">
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => handleEdit(loc.id)}
-                          className="text-emerald-700 hover:text-emerald-800 flex items-center gap-2"
-                        >
-                          <FaCheck /> Save
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => setEditingId(null)}
-                          className="text-gray-500 hover:text-gray-700 flex items-center gap-2"
-                        >
-                          <FaTimes /> Cancel
-                        </motion.button>
+      {/* List */}
+      <div className="border shadow border-stocksense-gray rounded-lg bg-white overflow-hidden">
+        <AnimatePresence initial={false}>
+          <motion.ul
+            variants={listVariants}
+            initial="hidden"
+            animate="show"
+            className="divide-y divide-gray-200 dark:divide-zinc-800"
+          >
+            {allLocations.length === 0 ? (
+              <li className="p-5 text-gray-600 dark:text-gray-400 text-sm">
+                No locations yet — add your first one above.
+              </li>
+            ) : (
+              allLocations.map((loc, idx) => {
+                const isEditing = editingId === loc.id;
+                return (
+                  <motion.li
+                    key={loc.id}
+                    variants={itemVariants}
+                    className="flex items-start justify-between gap-3 p-4 text-gray-700 dark:text-gray-300"
+                  >
+                    {/* Left: icon + content */}
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="rounded-xl p-2 bg-gray-100 dark:bg-zinc-800 shrink-0">
+                        <FaMapMarkerAlt className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                       </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-3">
-                        <motion.button
-                          whileHover={{ y: -1 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => router.push(`/locations/${loc.id}`)}
-                          className="text-[#0E7488] hover:text-[#0B5563] flex items-center gap-2"
-                        >
-                          <FaEye /> View
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ y: -1 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => {
-                            setEditingId(loc.id);
-                            setEditingName(loc.name);
-                          }}
-                          className="text-amber-600 hover:text-amber-700 flex items-center gap-2"
-                        >
-                          <FaEdit /> Edit
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ y: -1 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => handleDelete(loc.id)}
-                          className="text-rose-600 hover:text-rose-700 flex items-center gap-2"
-                        >
-                          <FaTrash /> Delete
-                        </motion.button>
-                      </div>
-                    )}
-                  </td>
-                </motion.tr>
-              ))}
 
-              {allLocations.length === 0 && (
-                <motion.tr variants={itemVariants}>
-                  <td colSpan={5} className="p-5 text-center text-gray-500">
-                    No locations yet — add your first one above.
-                  </td>
-                </motion.tr>
-              )}
-            </motion.tbody>
-          </AnimatePresence>
-        </table>
+                      <div className="min-w-0">
+                        {/* Name / Edit field */}
+                        {isEditing ? (
+                          <input
+                            autoFocus
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            onKeyDown={(e) => onEditKey(e, loc.id)}
+                            className="text-sm font-medium text-[#2B3A3A] border border-gray-300 rounded px-2 py-1 focus:border-[#0E7488] focus:ring-2 focus:ring-[#9FE7D7]/50"
+                          />
+                        ) : (
+                          <p className="text-sm font-medium text-[#2B3A3A]">{loc.name}</p>
+                        )}
+
+                        {/* Counts */}
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 whitespace-normal break-words">
+                          <span className="font-medium">{loc.areasCount ?? 0}</span> Areas ·{' '}
+                          <span className="font-medium">{loc.categoriesCount ?? 0}</span> Categories ·{' '}
+                          <span className="font-medium">{loc.itemsCount ?? 0}</span> Items
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Right: meta + actions */}
+                    <div className="flex flex-col items-end gap-2 shrink-0 text-right">
+                      <span className="text-[11px] leading-5 text-gray-500 dark:text-gray-400">
+                        Created:{' '}
+                        {loc.created_at ? new Date(loc.created_at).toLocaleString() : ''}
+                      </span>
+
+                      {isEditing ? (
+                        <div className="flex gap-3">
+                          <motion.button
+                            whileHover={{ y: -1 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => handleEditSave(loc.id)}
+                            className="text-emerald-700 hover:text-emerald-800 flex items-center gap-1 text-xs md:text-sm"
+                          >
+                            <FaCheck /> Save
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ y: -1 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={handleEditCancel}
+                            className="text-gray-600 hover:text-gray-700 flex items-center gap-1 text-xs md:text-sm"
+                          >
+                            <FaTimes /> Cancel
+                          </motion.button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-3">
+                          <motion.button
+                            whileHover={{ y: -1 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => router.push(`/locations/${loc.id}`)}
+                            className="text-[#0E7488] hover:text-[#0B5563] flex items-center gap-1 text-xs md:text-sm cursor-pointer"
+                          >
+                            <FaEye /> View
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ y: -1 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => {
+                              setEditingId(loc.id);
+                              setEditingName(loc.name);
+                            }}
+                            className="text-amber-600 hover:text-amber-700 flex items-center gap-1 text-xs md:text-sm cursor-pointer"
+                          >
+                            <FaEdit /> Edit
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ y: -1 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => handleDelete(loc.id)}
+                            className="text-rose-600 hover:text-rose-700 flex items-center gap-1 text-xs md:text-sm cursor-pointer"
+                          >
+                            <FaTrash /> Delete
+                          </motion.button>
+                        </div>
+                      )}
+                    </div>
+                  </motion.li>
+                );
+              })
+            )}
+          </motion.ul>
+        </AnimatePresence>
       </div>
     </main>
   );

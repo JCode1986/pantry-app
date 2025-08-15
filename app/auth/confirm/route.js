@@ -15,8 +15,6 @@ export async function GET(request) {
       token_hash,
     })
 
-    console.log(data, 'dataaaaaaaaaaaa')
-
     if (!error) {
       // redirect user to specified redirect URL or root of app
       redirect(next)
