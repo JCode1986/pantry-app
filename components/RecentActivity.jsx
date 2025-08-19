@@ -1,7 +1,10 @@
 'use client';
 
 import { motion } from 'framer-motion';
+
 import {
+  FaMapMarkedAlt,
+  FaWarehouse,
   FaBoxOpen,        // item
   FaMapMarkerAlt,   // location
   FaBoxes,          // storage area
@@ -86,10 +89,10 @@ function ActionBadge({ action }) {
 
 function entityIcon(entity) {
   switch (entity) {
-    case 'location': return <FaMapMarkerAlt className="h-4 w-4 text-gray-600 dark:text-gray-400" />;
-    case 'storage_area': return <FaBoxes className="h-4 w-4 text-gray-600 dark:text-gray-400" />;
-    case 'category': return <FaTags className="h-4 w-4 text-gray-600 dark:text-gray-400" />;
-    default: return <FaBoxOpen className="h-4 w-4 text-gray-600 dark:text-gray-400" />; // item
+    case 'location': return <FaMapMarkedAlt className="h-4 w-4 text-white dark:text-gray-400" />;
+    case 'storage_area': return <FaWarehouse className="h-4 w-4 text-white dark:text-gray-400" />;
+    case 'category': return <FaTags className="h-4 w-4 text-white dark:text-gray-400" />;
+    default: return <FaBoxOpen className="h-4 w-4 text-white dark:text-gray-400" />; // item
   }
 }
 
@@ -187,7 +190,12 @@ export default function RecentActivity({ items }) {
                 className="flex items-start justify-between gap-3 p-4 text-gray-700 dark:text-gray-300"
               >
                 <div className="flex items-start gap-3 min-w-0">
-                  <div className="rounded-xl p-2 bg-gray-100 dark:bg-zinc-800 shrink-0">
+                  <div className={`rounded-xl p-2 bg-gray-100 dark:bg-zinc-800 shrink-0 bg-gradient-to-br 
+                    ${r.entity_type === "location" && "from-indigo-500 to-violet-500"}
+                    ${r.entity_type === "storage_area" && "from-sky-500 to-cyan-500"}
+                    ${r.entity_type === "category" && "from-emerald-500 to-lime-500"}
+                    ${r.entity_type === "item" && "from-rose-500 to-orange-500"}
+                    `}>
                     {entityIcon((r.entity_type || 'item').toLowerCase())}
                   </div>
 
