@@ -175,7 +175,7 @@ export default function LocationsSection({ locations }) {
                             whileHover={{ y: -1 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => handleEditSave(loc.id)}
-                            className="text-emerald-700 hover:text-emerald-800 flex items-center gap-1 text-xs md:text-sm"
+                            className="text-emerald-700 hover:text-emerald-800 flex items-center gap-1 text-xs md:text-sm cursor-pointer"
                           >
                             <FaCheck /> Save
                           </motion.button>
@@ -183,7 +183,7 @@ export default function LocationsSection({ locations }) {
                             whileHover={{ y: -1 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={handleEditCancel}
-                            className="text-gray-600 hover:text-gray-700 flex items-center gap-1 text-xs md:text-sm"
+                            className="text-gray-600 hover:text-gray-700 flex items-center gap-1 text-xs md:text-sm cursor-pointer"
                           >
                             <FaTimes /> Cancel
                           </motion.button>

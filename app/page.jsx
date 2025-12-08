@@ -19,10 +19,22 @@ export default async function HomePage() {
   ]);
 
   // Recent activity: latest 12 rows
-  const { data: recent = [] } = await supabase
+  // const { data: recent = [] } = await supabase
+  //   .from('recent_activity')
+  //   .select('*')
+  //   .limit(12);
+
+  // Recent activity: latest 12 rows
+  const { data: recent, error: recentError } = await supabase
     .from('recent_activity')
     .select('*')
     .limit(12);
+
+  if (recentError) {
+    console.error('recent_activity error:', recentError);
+  }
+
+  const safeRecent = recent ?? [];
 
 
   // Donut data: items per location
@@ -44,7 +56,7 @@ export default async function HomePage() {
 
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <RecentActivity items={recent} />
+          <RecentActivity items={safeRecent} />
         </div>
         <div className="lg:col-span-1 flex items-start">
           <div className="min-h-[350px] w-full">

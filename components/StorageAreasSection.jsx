@@ -19,7 +19,6 @@ import {
   FaTrash,
   FaCheck,
   FaTimes,
-  FaChevronDown,
   FaChevronUp,
   FaSearch,
 } from 'react-icons/fa';
@@ -101,6 +100,14 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
     setExpandedCategories((prev) => ({ ...prev, ...Object.fromEntries((area.categories || []).map((c) => [c.id, true])) }));
   const collapseAllCategoriesInArea = (area) =>
     setExpandedCategories((prev) => ({ ...prev, ...Object.fromEntries((area.categories || []).map((c) => [c.id, false])) }));
+  const allAreasExpanded =
+    (storageAreas || []).length > 0 &&
+    (storageAreas || []).every((a) => expandedAreas[a.id]);
+  // const allCatsExpanded =
+  //   (area.categories || []).length > 0 &&
+  //   (area.categories || []).every((c) => expandedCategories[c.id]);
+
+
 
   // ---------- Storage Area CRUD ----------
   const handleAddStorageArea = async () => {
@@ -301,7 +308,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
 
   // ---------- UI ----------
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 transition-all duration-150">
       {/* Top: Title & Tools */}
       <div className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -361,20 +368,13 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
             </span>
           </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={expandAllAreas}
-              className="rounded-xl border border-stocksense-gray px-3 py-1.5 text-xs hover:bg-gray-50"
-            >
-              Expand all Areas
-            </button>
-            <button
-              onClick={collapseAllAreas}
-              className="rounded-xl border border-stocksense-gray px-3 py-1.5 text-xs hover:bg-gray-50"
-            >
-              Collapse all Areas
-            </button>
-          </div>
+          <button
+            onClick={allAreasExpanded ? collapseAllAreas : expandAllAreas}
+            className="rounded-xl border border-stocksense-gray px-3 py-1.5 text-xs hover:bg-gray-50 cursor-pointer flex justify-between gap-2 items-center max-w-[142.06px] w-full"
+          >
+            {allAreasExpanded ? 'Collapse all Areas' : 'Expand all Areas'} <FaChevronUp className={`${allAreasExpanded ? '' : 'rotate-180'} transition-all duration-150 cursor-pointer`}/>
+          </button>
+
         </div>
 
         {/* Add area */}
@@ -390,9 +390,9 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
               whileHover={{ y: -1 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleAddStorageArea}
-              className="rounded-xl px-4 py-2 bg-gradient-to-br from-[#0E7488] to-[#0B5563] text-white shadow hover:brightness-110"
+              className="rounded-xl px-4 py-2 bg-gradient-to-br from-[#0E7488] to-[#0B5563] text-white shadow hover:brightness-110 cursor-pointer"
             >
-              <span className="inline-flex items-center gap-2"><FaPlus /> Add</span>
+              <span className="inline-flex items-center gap-2 w-max"><FaPlus /> Add Storage</span>
             </motion.button>
           </div>
         </div>
@@ -403,22 +403,27 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
         {storageAreas.map((area, aIdx) => (
           <motion.div
             key={area.id}
-            layout
+            // layout
             initial={{ opacity: 0, y: 10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ type: 'spring', stiffness: 220, damping: 20, delay: aIdx * 0.02 }}
             className="rounded-2xl border border-stocksense-gray bg-white shadow-sm"
           >
             {/* Area header */}
-            <div className="p-4 md:p-5 flex items-start justify-between gap-3">
+            <div className="p-4 md:p-5 flex items-start gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <button
-                  onClick={() => toggleArea(area.id)}
-                  className="text-[#0E7488] rounded-lg p-1.5 hover:bg-[#E6FAF6] border border-transparent hover:border-[#9FE7D7]"
-                  aria-label={expandedAreas[area.id] ? 'Collapse area' : 'Expand area'}
-                >
-                  {expandedAreas[area.id] ? <FaChevronUp /> : <FaChevronDown />}
-                </button>
+                {
+                  area.categories?.length ?
+                  <button
+                    onClick={() => toggleArea(area.id)}
+                    className="text-[#0E7488] rounded-lg p-1.5 hover:bg-[#E6FAF6] border border-transparent hover:border-[#9FE7D7]"
+                    aria-label={expandedAreas[area.id] ? 'Collapse area' : 'Expand area'}
+                  >
+                    <FaChevronUp className={`${expandedAreas[area.id] ? '' : 'rotate-180'} transition-all duration-150 cursor-pointer`}/>
+                  </button>
+                  :
+                  null
+                }
 
                 {editingId === area.id ? (
                   <input
@@ -439,10 +444,10 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
               <div className="flex flex-wrap gap-2 shrink-0">
                 {editingId === area.id ? (
                   <>
-                    <button onClick={() => handleSaveEdit(area.id)} className="text-emerald-600 rounded-lg p-2 hover:bg-emerald-50">
+                    <button onClick={() => handleSaveEdit(area.id)} className="text-emerald-600 cursor-pointer rounded-lg p-2 hover:bg-emerald-50">
                       <FaCheck />
                     </button>
-                    <button onClick={() => setEditingId(null)} className="text-gray-600 rounded-lg p-2 hover:bg-gray-50">
+                    <button onClick={() => setEditingId(null)} className="text-gray-600 cursor-pointer rounded-lg p-2 hover:bg-gray-50">
                       <FaTimes />
                     </button>
                   </>
@@ -453,30 +458,41 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                         setEditingId(area.id);
                         setEditingName(area.name);
                       }}
-                      className="text-amber-600 rounded-lg p-2 hover:bg-amber-50"
+                      className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
                     >
                       <FaEdit />
                     </button>
                     <button
                       onClick={() => handleDeleteStorageArea(area.id)}
-                      className="text-rose-600 rounded-lg p-2 hover:bg-rose-50"
+                      className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
                     >
                       <FaTrash />
                     </button>
                   </>
                 )}
-                <button
+                {/* <button
                   onClick={() => expandAllCategoriesInArea(area)}
-                  className="rounded-lg border border-stocksense-gray px-2.5 py-1.5 text-xs hover:bg-gray-50"
+                  className="rounded-lg border border-stocksense-gray px-2.5 py-1.5 text-xs hover:bg-gray-50 cursor-pointer"
                 >
                   Expand categories
                 </button>
                 <button
                   onClick={() => collapseAllCategoriesInArea(area)}
-                  className="rounded-lg border border-stocksense-gray px-2.5 py-1.5 text-xs hover:bg-gray-50"
+                  className="rounded-lg border border-stocksense-gray px-2.5 py-1.5 text-xs hover:bg-gray-50 cursor-pointer"
                 >
                   Collapse categories
-                </button>
+                </button> */}
+                {/* <button
+                  onClick={() =>
+                    allCatsExpanded
+                      ? collapseAllCategoriesInArea(area)
+                      : expandAllCategoriesInArea(area)
+                  }
+                  className="rounded-lg border border-stocksense-gray px-2.5 py-1.5 text-xs hover:bg-gray-50 cursor-pointer"
+                >
+                  {allCatsExpanded ? 'Collapse categories' : 'Expand categories'}
+                </button> */}
+
               </div>
             </div>
 
@@ -486,16 +502,16 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                 <input
                   value={newCategoryName[area.id] || ''}
                   onChange={(e) => setNewCategoryName({ ...newCategoryName, [area.id]: e.target.value })}
-                  placeholder="Add a category (e.g., Fruits, Tools, Cleaning)"
+                  placeholder={`Add category in ${area.name} (e.g., Fruits, Tools, Cleaning)`}
                   className="border border-stocksense-gray rounded-xl px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
                 />
                 <motion.button
                   whileHover={{ y: -1 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => handleAddCategory(area.id)}
-                  className="rounded-xl px-3 py-2 bg-[#0E7488] text-white hover:bg-[#0B5563]"
+                  className="rounded-xl px-3 py-2 bg-[#0E7488] text-white hover:bg-[#0B5563] cursor-pointer"
                 >
-                  <FaPlus />
+                  <span className="inline-flex items-center gap-2 w-max"><FaPlus /> Add Category</span>
                 </motion.button>
               </div>
             </div>
@@ -523,7 +539,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                         return (
                           <motion.div
                             key={category.id}
-                            layout
+                            // layout
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.22, delay: cIdx * 0.02 }}
@@ -532,13 +548,18 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                             {/* Category header */}
                             <div className="p-3 sm:p-4 flex items-start justify-between gap-3">
                               <div className="flex items-center gap-2 min-w-0">
-                                <button
-                                  onClick={() => toggleCategory(category.id)}
-                                  className="text-[#0E7488] rounded-lg p-1 hover:bg-[#E6FAF6] border border-transparent hover:border-[#9FE7D7]"
-                                  aria-label={expandedCategories[category.id] ? 'Collapse category' : 'Expand category'}
-                                >
-                                  {expandedCategories[category.id] ? <FaChevronUp /> : <FaChevronDown />}
-                                </button>
+                                {
+                                  items.length ?
+                                  <button
+                                    onClick={() => toggleCategory(category.id)}
+                                    className="text-[#0E7488] rounded-lg p-1 hover:bg-[#E6FAF6] border border-transparent hover:border-[#9FE7D7]"
+                                    aria-label={expandedCategories[category.id] ? 'Collapse category' : 'Expand category'}
+                                  >
+                                    <FaChevronUp className={`${expandedCategories[category.id] ? '' : 'rotate-180'} transition-all duration-150 cursor-pointer`}/>
+                                  </button>
+                                  :
+                                  null
+                                }
 
                                 {editingCategoryName[category.id] !== undefined ? (
                                   <input
@@ -559,13 +580,13 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                   <>
                                     <button
                                       onClick={() => handleUpdateCategory(category.id, area.id)}
-                                      className="text-emerald-600 rounded-lg p-2 hover:bg-emerald-50"
+                                      className="text-emerald-600 cursor-pointer rounded-lg p-2 hover:bg-emerald-50"
                                     >
                                       <FaCheck />
                                     </button>
                                     <button
                                       onClick={() => setEditingCategoryName({ ...editingCategoryName, [category.id]: undefined })}
-                                      className="text-gray-600 rounded-lg p-2 hover:bg-gray-50"
+                                      className="text-gray-600 cursor-pointer rounded-lg p-2 hover:bg-gray-50"
                                     >
                                       <FaTimes />
                                     </button>
@@ -574,13 +595,13 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                   <>
                                     <button
                                       onClick={() => setEditingCategoryName({ ...editingCategoryName, [category.id]: category.name })}
-                                      className="text-amber-600 rounded-lg p-2 hover:bg-amber-50"
+                                      className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
                                     >
                                       <FaEdit />
                                     </button>
                                     <button
                                       onClick={() => handleDeleteCategory(category.id, area.id)}
-                                      className="text-rose-600 rounded-lg p-2 hover:bg-rose-50"
+                                      className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
                                     >
                                       <FaTrash />
                                     </button>
@@ -600,7 +621,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                       [category.id]: { ...newItemData[category.id], name: e.target.value },
                                     })
                                   }
-                                  placeholder="Item name"
+                                  placeholder={`Add Item in ${category.name}`}
                                   className="border border-stocksense-gray rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
                                 />
                                 <input
@@ -631,9 +652,9 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                   whileHover={{ y: -1 }}
                                   whileTap={{ scale: 0.98 }}
                                   onClick={() => handleAddItem(category.id)}
-                                  className="rounded-lg px-3 py-2 bg-[#0E7488] text-white hover:bg-[#0B5563]"
+                                  className="rounded-lg px-3 py-2 bg-[#0E7488] text-white hover:bg-[#0B5563] cursor-pointer"
                                 >
-                                  <FaPlus />
+                                  <span className="inline-flex items-center gap-2 w-max"><FaPlus /> Add Item</span>
                                 </motion.button>
                               </div>
                             </div>
@@ -647,32 +668,33 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                   initial="collapsed"
                                   animate="open"
                                   exit="collapsed"
-                                  className="overflow-hidden"
+                                  className="overflow-hidden pl-8"
                                 >
                                   {items.length > 0 && (
-                                    <div className="px-3 sm:px-4 pb-2 flex flex-wrap items-center gap-2 text-sm">
-                                      <label className="flex items-center gap-2">
+                                    <div className="px-3 sm:px-4 flex flex-wrap items-center text-sm h-[34px] mb-2 gap-2">
+                                      <label className="flex items-center gap-2 cursor-pointer">
                                         <input
                                           type="checkbox"
+                                          className='cursor-pointer'
                                           checked={allSelected}
                                           onChange={(e) => {
                                             if (e.target.checked) selectAllInCategory({ ...category, items });
                                             else clearSelectInCategory(category.id);
                                           }}
                                         />
-                                        Select all
+                                        Select all Items
                                       </label>
                                       {Object.values(selectedByCategory[category.id] || {}).some(Boolean) && (
                                         <button
                                           onClick={() => handleBulkDelete(category.id, area.id)}
-                                          className="text-rose-700 border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-md"
+                                          className="text-rose-700 border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-md cursor-pointer"
                                         >
-                                          Delete selected ({Object.values(selectedByCategory[category.id]).filter(Boolean).length})
+                                          Delete selected items ({Object.values(selectedByCategory[category.id]).filter(Boolean).length})
                                         </button>
                                       )}
                                     </div>
                                   )}
-                                  <div className="px-3 sm:px-4 pb-4 space-y-2">
+                                  <div className={`${items.length && 'pb-4 '} px-3 sm:px-4 space-y-2`}>
                                     {items.map((item, iIdx) => {
                                       const soon = isExpiringSoon(item.expiration_date, expDays);
                                       const selected = !!(selectedByCategory[category.id]?.[item.id]);
@@ -680,7 +702,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                       return (
                                         <motion.div
                                           key={item.id}
-                                          layout
+                                          // layout
                                           initial={{ opacity: 0, y: 6 }}
                                           animate={{ opacity: 1, y: 0 }}
                                           transition={{ duration: 0.18, delay: iIdx * 0.015 }}
@@ -732,13 +754,13 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                                     };
                                                     handleUpdateItem(item.id, category.id, area.id, updated);
                                                   }}
-                                                  className="text-emerald-600 rounded-lg p-2 hover:bg-emerald-50"
+                                                  className="text-emerald-600 cursor-pointer rounded-lg p-2 hover:bg-emerald-50"
                                                 >
                                                   <FaCheck />
                                                 </button>
                                                 <button
                                                   onClick={() => setEditingItem((prev) => ({ ...prev, [item.id]: undefined }))}
-                                                  className="text-gray-600 rounded-lg p-2 hover:bg-gray-50"
+                                                  className="text-gray-600 cursor-pointer rounded-lg p-2 hover:bg-gray-50"
                                                 >
                                                   <FaTimes />
                                                 </button>
@@ -779,7 +801,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                                       },
                                                     }))
                                                   }
-                                                  className="text-amber-600 rounded-lg p-2 hover:bg-amber-50"
+                                                  className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
                                                 >
                                                   <FaEdit />
                                                 </button>
@@ -788,7 +810,7 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                                     if (!confirm('Delete this item?')) return;
                                                     await handleDeleteItem(item.id, category.id, area.id);
                                                   }}
-                                                  className="text-rose-600 rounded-lg p-2 hover:bg-rose-50"
+                                                  className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
                                                 >
                                                   <FaTrash />
                                                 </button>
