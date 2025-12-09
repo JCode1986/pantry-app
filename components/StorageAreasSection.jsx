@@ -12,6 +12,7 @@ import {
   addItem,
   updateItem,
   deleteItem,
+  updateItemLocation,
 } from '@/app/actions/server';
 import {
   FaPlus,
@@ -21,6 +22,7 @@ import {
   FaTimes,
   FaChevronUp,
   FaSearch,
+  FaArrowsAlt 
 } from 'react-icons/fa';
 
 const collapseVariants = {
@@ -29,7 +31,9 @@ const collapseVariants = {
 };
 
 // --- small date helpers ---
-const parseISO = (d) => (typeof d === 'string' ? new Date(`${d}T00:00:00`) : d ? new Date(d) : null);
+const parseISO = (d) =>
+  typeof d === 'string' ? new Date(`${d}T00:00:00`) : d ? new Date(d) : null;
+
 const daysUntil = (d) => {
   const date = parseISO(d);
   if (!date) return Infinity;
@@ -38,15 +42,20 @@ const daysUntil = (d) => {
   const diff = (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
   return Math.floor(diff);
 };
+
 const isExpiringSoon = (d, withinDays) => daysUntil(d) <= withinDays;
 
-export default function StorageAreasSection({ locationId, initialStorageAreas, locationName }) {
+export default function StorageAreasSection({
+  locationId,
+  initialStorageAreas,
+  locationName,
+  // optional: pass all locations if you want true cross-location moves
+  allLocations,
+}) {
   const [storageAreas, setStorageAreas] = useState(initialStorageAreas);
   const [newStorageName, setNewStorageName] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState('');
-
-  console.log(initialStorageAreas, 'initialStorageAreas')
 
   const [newCategoryName, setNewCategoryName] = useState({});
   const [editingCategoryName, setEditingCategoryName] = useState({});
@@ -64,6 +73,35 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
   const [search, setSearch] = useState('');
   const [expSoonEnabled, setExpSoonEnabled] = useState(false);
   const [expDays, setExpDays] = useState(7);
+
+  // Move items modal state
+  const [moveModal, setMoveModal] = useState({
+    open: false,
+    sourceAreaId: null,
+    sourceCategoryId: null,
+    targetLocationId: locationId,
+    targetAreaId: null,
+    targetCategoryId: null,
+    itemIds: [],
+  });
+
+  // Build locations list for the modal, normalize storageAreas vs storage_areas
+  const locationsForMove = useMemo(() => {
+    if (allLocations && allLocations.length) {
+      return allLocations.map((loc) => ({
+        ...loc,
+        storageAreas: loc.storageAreas || loc.storage_areas || [],
+      }));
+    }
+    // fallback: only current location with current storageAreas
+    return [
+      {
+        id: locationId,
+        name: locationName,
+        storageAreas,
+      },
+    ];
+  }, [allLocations, locationId, locationName, storageAreas]);
 
   // initialize expanded for everything on mount / when length changes
   useEffect(() => {
@@ -85,29 +123,33 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
   const totalItems = useMemo(() => {
     let n = 0;
     for (const a of storageAreas) {
-      for (const c of (a.categories || [])) n += (c.items?.length || 0);
+      for (const c of a.categories || []) n += c.items?.length || 0;
     }
     return n;
   }, [storageAreas]);
 
-
   // ---------- Expand/Collapse helpers ----------
-  const toggleArea = (id) => setExpandedAreas((prev) => ({ ...prev, [id]: !prev[id] }));
-  const toggleCategory = (id) => setExpandedCategories((prev) => ({ ...prev, [id]: !prev[id] }));
-  const expandAllAreas = () => setExpandedAreas(Object.fromEntries((storageAreas || []).map((a) => [a.id, true])));
-  const collapseAllAreas = () => setExpandedAreas(Object.fromEntries((storageAreas || []).map((a) => [a.id, false])));
-  const expandAllCategoriesInArea = (area) =>
-    setExpandedCategories((prev) => ({ ...prev, ...Object.fromEntries((area.categories || []).map((c) => [c.id, true])) }));
-  const collapseAllCategoriesInArea = (area) =>
-    setExpandedCategories((prev) => ({ ...prev, ...Object.fromEntries((area.categories || []).map((c) => [c.id, false])) }));
+  const toggleArea = (id) =>
+    setExpandedAreas((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+
+  const toggleCategory = (id) =>
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+
+  const expandAllAreas = () =>
+    setExpandedAreas(Object.fromEntries((storageAreas || []).map((a) => [a.id, true])));
+
+  const collapseAllAreas = () =>
+    setExpandedAreas(Object.fromEntries((storageAreas || []).map((a) => [a.id, false])));
+
   const allAreasExpanded =
     (storageAreas || []).length > 0 &&
     (storageAreas || []).every((a) => expandedAreas[a.id]);
-  // const allCatsExpanded =
-  //   (area.categories || []).length > 0 &&
-  //   (area.categories || []).every((c) => expandedCategories[c.id]);
-
-
 
   // ---------- Storage Area CRUD ----------
   const handleAddStorageArea = async () => {
@@ -123,7 +165,9 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
     if (!editingName.trim()) return;
     const result = await updateStorageArea(id, editingName.trim());
     if (!result?.error) {
-      setStorageAreas((prev) => prev.map((a) => (a.id === id ? { ...a, name: editingName.trim() } : a)));
+      setStorageAreas((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, name: editingName.trim() } : a))
+      );
       setEditingId(null);
       setEditingName('');
     }
@@ -151,7 +195,11 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
 
     if (result?.data) {
       setStorageAreas((prev) =>
-        prev.map((a) => (a.id === storageAreaId ? { ...a, categories: [...(a.categories || []), result.data] } : a))
+        prev.map((a) =>
+          a.id === storageAreaId
+            ? { ...a, categories: [...(a.categories || []), result.data] }
+            : a
+        )
       );
       setNewCategoryName((prev) => ({ ...prev, [storageAreaId]: '' }));
       setExpandedCategories((prev) => ({ ...prev, [result.data.id]: true }));
@@ -166,7 +214,12 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
       setStorageAreas((prev) =>
         prev.map((a) =>
           a.id === storageAreaId
-            ? { ...a, categories: a.categories.map((c) => (c.id === categoryId ? { ...c, name } : c)) }
+            ? {
+                ...a,
+                categories: a.categories.map((c) =>
+                  c.id === categoryId ? { ...c, name } : c
+                ),
+              }
             : a
         )
       );
@@ -183,7 +236,14 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
     const result = await deleteCategory(categoryId);
     if (!result?.error) {
       setStorageAreas((prev) =>
-        prev.map((a) => (a.id === storageAreaId ? { ...a, categories: a.categories.filter((c) => c.id !== categoryId) } : a))
+        prev.map((a) =>
+          a.id === storageAreaId
+            ? {
+                ...a,
+                categories: a.categories.filter((c) => c.id !== categoryId),
+              }
+            : a
+        )
       );
     }
   };
@@ -195,7 +255,9 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
 
     const payload = {
       name: item.name.trim(),
-      quantity: Number.isFinite(+item.quantity) ? parseInt(String(item.quantity), 10) : 0,
+      quantity: Number.isFinite(+item.quantity)
+        ? parseInt(String(item.quantity), 10)
+        : 0,
       expiration_date: item.expiration || null,
     };
 
@@ -208,7 +270,11 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
     setStorageAreas((prev) =>
       prev.map((area) => ({
         ...area,
-        categories: (area.categories || []).map((cat) => (cat.id === categoryId ? { ...cat, items: [...(cat.items || []), created] } : cat)),
+        categories: (area.categories || []).map((cat) =>
+          cat.id === categoryId
+            ? { ...cat, items: [...(cat.items || []), created] }
+            : cat
+        ),
       }))
     );
 
@@ -228,7 +294,14 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
           ? {
               ...area,
               categories: area.categories.map((cat) =>
-                cat.id === categoryId ? { ...cat, items: cat.items.map((it) => (it.id === itemId ? data : it)) } : cat
+                cat.id === categoryId
+                  ? {
+                      ...cat,
+                      items: cat.items.map((it) =>
+                        it.id === itemId ? data : it
+                      ),
+                    }
+                  : cat
               ),
             }
           : area
@@ -246,7 +319,14 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
           area.id === storageAreaId
             ? {
                 ...area,
-                categories: area.categories.map((cat) => (cat.id === categoryId ? { ...cat, items: cat.items.filter((it) => it.id !== itemId) } : cat)),
+                categories: area.categories.map((cat) =>
+                  cat.id === categoryId
+                    ? {
+                        ...cat,
+                        items: cat.items.filter((it) => it.id !== itemId),
+                      }
+                    : cat
+                ),
               }
             : area
         )
@@ -259,7 +339,8 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
     const selectedMap = selectedByCategory[categoryId] || {};
     const ids = Object.keys(selectedMap).filter((k) => selectedMap[k]);
     if (ids.length === 0) return;
-    if (!confirm(`Delete ${ids.length} selected item${ids.length > 1 ? 's' : ''}?`)) return;
+    if (!confirm(`Delete ${ids.length} selected item${ids.length > 1 ? 's' : ''}?`))
+      return;
 
     for (const id of ids) await deleteItem(id);
 
@@ -268,7 +349,14 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
         area.id === storageAreaId
           ? {
               ...area,
-              categories: area.categories.map((cat) => (cat.id === categoryId ? { ...cat, items: (cat.items || []).filter((i) => !selectedMap[i.id]) } : cat)),
+              categories: area.categories.map((cat) =>
+                cat.id === categoryId
+                  ? {
+                      ...cat,
+                      items: (cat.items || []).filter((i) => !selectedMap[i.id]),
+                    }
+                  : cat
+              ),
             }
           : area
       )
@@ -280,7 +368,10 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
   const toggleSelectItem = (categoryId, itemId) => {
     setSelectedByCategory((prev) => ({
       ...prev,
-      [categoryId]: { ...(prev[categoryId] || {}), [itemId]: !prev[categoryId]?.[itemId] },
+      [categoryId]: {
+        ...(prev[categoryId] || {}),
+        [itemId]: !prev[categoryId]?.[itemId],
+      },
     }));
   };
 
@@ -293,15 +384,166 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
     setSelectedByCategory((prev) => ({ ...prev, [categoryId]: {} }));
   };
 
+  // ---------- Move items logic ----------
+
+  const openMoveModal = (areaId, categoryId, singleItemId = null) => {
+    const selectedMap = selectedByCategory[categoryId] || {};
+    let itemIds = Object.keys(selectedMap).filter((k) => selectedMap[k]);
+
+    // If nothing selected but a single item action triggered it, move that one
+    if (itemIds.length === 0 && singleItemId) {
+      itemIds = [singleItemId];
+    }
+
+    if (itemIds.length === 0) {
+      alert('Select at least one item to move.');
+      return;
+    }
+
+    // Default target: current location + same area/category
+    setMoveModal({
+      open: true,
+      sourceAreaId: areaId,
+      sourceCategoryId: categoryId,
+      targetLocationId: locationId,
+      targetAreaId: areaId,
+      targetCategoryId: categoryId,
+      itemIds,
+    });
+  };
+
+  const handleConfirmMove = async () => {
+    const {
+      sourceAreaId,
+      sourceCategoryId,
+      targetLocationId,
+      targetAreaId,
+      targetCategoryId,
+      itemIds,
+    } = moveModal;
+
+    if (!targetCategoryId || itemIds.length === 0) return;
+
+    // Find source area/category in current state
+    const sourceArea = storageAreas.find(
+      (a) => String(a.id) === String(sourceAreaId)
+    );
+    const sourceCat = sourceArea?.categories?.find(
+      (c) => String(c.id) === String(sourceCategoryId)
+    );
+    const itemsToMove = (sourceCat?.items || []).filter((it) =>
+      itemIds.includes(it.id)
+    );
+
+    // --- DB update ---
+    // Only update category_id on items (no location_id on items table)
+    const results = await Promise.all(
+      itemsToMove.map((it) =>
+        updateItemLocation(it.id, {
+          categoryId: targetCategoryId,
+        })
+      )
+    );
+
+    const hasError = results.some((r) => r?.error);
+    if (hasError) {
+      console.error('Error moving some items:', results);
+      // optional: show toast/alert here
+    }
+
+    // --- Local state update ---
+    // If moving within the same location, also add to the target category in this UI.
+    // If moving to another location, we only remove locally; they'll show up on that location's page.
+    if (String(targetLocationId) === String(locationId)) {
+      setStorageAreas((prev) =>
+        prev.map((area) => {
+          if (
+            String(area.id) !== String(sourceAreaId) &&
+            String(area.id) !== String(targetAreaId)
+          ) {
+            return area;
+          }
+
+          return {
+            ...area,
+            categories: (area.categories || []).map((cat) => {
+              // remove from source
+              if (String(cat.id) === String(sourceCategoryId)) {
+                return {
+                  ...cat,
+                  items: (cat.items || []).filter((it) => !itemIds.includes(it.id)),
+                };
+              }
+
+              // add to target (same location case)
+              if (String(cat.id) === String(targetCategoryId)) {
+                return {
+                  ...cat,
+                  items: [
+                    ...(cat.items || []),
+                    ...itemsToMove.map((it) => ({
+                      ...it,
+                      category_id: targetCategoryId,
+                    })),
+                  ],
+                };
+              }
+
+              return cat;
+            }),
+          };
+        })
+      );
+    } else {
+      // different location: just remove from source; other location UI will fetch fresh data
+      setStorageAreas((prev) =>
+        prev.map((area) => {
+          if (String(area.id) !== String(sourceAreaId)) return area;
+          return {
+            ...area,
+            categories: (area.categories || []).map((cat) =>
+              String(cat.id) === String(sourceCategoryId)
+                ? {
+                    ...cat,
+                    items: (cat.items || []).filter((it) => !itemIds.includes(it.id)),
+                  }
+                : cat
+            ),
+          };
+        })
+      );
+    }
+
+    // Clear selection on source category and close modal
+    setSelectedByCategory((prev) => ({
+      ...prev,
+      [sourceCategoryId]: {},
+    }));
+
+    setMoveModal({
+      open: false,
+      sourceAreaId: null,
+      sourceCategoryId: null,
+      targetLocationId: locationId,
+      targetAreaId: null,
+      targetCategoryId: null,
+      itemIds: [],
+    });
+  };
+
   // ---------- Filtering ----------
   const normalizedSearch = search.trim().toLowerCase();
   const filterItem = (item) => {
-    const nameOk = !normalizedSearch || item.name.toLowerCase().includes(normalizedSearch);
-    const expOk = !expSoonEnabled || isExpiringSoon(item.expiration_date, expDays);
+    const nameOk =
+      !normalizedSearch || item.name.toLowerCase().includes(normalizedSearch);
+    const expOk =
+      !expSoonEnabled || isExpiringSoon(item.expiration_date, expDays);
     return nameOk && expOk;
   };
+
   const filterCategoryVisible = (category) => {
-    const nameMatch = !normalizedSearch || category.name.toLowerCase().includes(normalizedSearch);
+    const nameMatch =
+      !normalizedSearch || category.name.toLowerCase().includes(normalizedSearch);
     if (nameMatch) return true;
     return (category.items || []).some(filterItem);
   };
@@ -313,8 +555,12 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
       <div className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-stocksense-teal">Storage & Inventory</h1>
-            <p className="text-sm text-gray-500">Add areas, group items by categories, and keep tabs on what’s expiring.</p>
+            <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-stocksense-teal">
+              Storage &amp; Inventory
+            </h1>
+            <p className="text-sm text-gray-500">
+              Add areas, group items by categories, and keep tabs on what’s expiring.
+            </p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -344,8 +590,12 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                 type="number"
                 min={1}
                 value={expDays}
-                onChange={(e) => setExpDays(Math.max(1, parseInt(e.target.value || '7', 10)))}
-                className={`border border-stocksense-gray rounded px-2 py-1 w-16 ${!expSoonEnabled && 'bg-gray-100 text-gray-400'}`}
+                onChange={(e) =>
+                  setExpDays(Math.max(1, parseInt(e.target.value || '7', 10)))
+                }
+                className={`border border-stocksense-gray rounded px-2 py-1 w-16 ${
+                  !expSoonEnabled && 'bg-gray-100 text-gray-400'
+                }`}
                 disabled={!expSoonEnabled}
               />
               <span className="text-sm">days</span>
@@ -356,12 +606,13 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
         {/* Stats + Add new area */}
         <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="flex flex-wrap gap-2 items-center">
-            <p className='text-gray-500 text-sm'>Total for {locationName}:</p>
+            <p className="text-gray-500 text-sm">Total for {locationName}:</p>
             <span className="px-2.5 py-1 rounded-full text-xs bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]">
               <strong>{totalAreas}</strong> {totalAreas === 1 ? 'Area' : 'Areas'}
             </span>
             <span className="px-2.5 py-1 rounded-full text-xs bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]">
-              <strong>{totalCategories}</strong> {totalCategories === 1 ? 'Category' : 'Categories'}
+              <strong>{totalCategories}</strong>{' '}
+              {totalCategories === 1 ? 'Category' : 'Categories'}
             </span>
             <span className="px-2.5 py-1 rounded-full text-xs bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]">
               <strong>{totalItems}</strong> {totalItems === 1 ? 'Item' : 'Items'}
@@ -370,11 +621,15 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
 
           <button
             onClick={allAreasExpanded ? collapseAllAreas : expandAllAreas}
-            className="rounded-xl border border-stocksense-gray px-3 py-1.5 text-xs hover:bg-gray-50 cursor-pointer flex justify-between gap-2 items-center max-w-[142.06px] w-full"
+            className="rounded-xl border border-stocksense-gray px-3 py-1.5 text-xs hover:bg-gray-50 cursor-pointer flex justify-between gap-2 items-center max-w-[150px] w-full"
           >
-            {allAreasExpanded ? 'Collapse all Areas' : 'Expand all Areas'} <FaChevronUp className={`${allAreasExpanded ? '' : 'rotate-180'} transition-all duration-150 cursor-pointer`}/>
+            {allAreasExpanded ? 'Collapse all Areas' : 'Expand all Areas'}
+            <FaChevronUp
+              className={`${
+                allAreasExpanded ? '' : 'rotate-180'
+              } transition-all duration-150 cursor-pointer`}
+            />
           </button>
-
         </div>
 
         {/* Add area */}
@@ -392,7 +647,9 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
               onClick={handleAddStorageArea}
               className="rounded-xl px-4 py-2 bg-gradient-to-br from-[#0E7488] to-[#0B5563] text-white shadow hover:brightness-110 cursor-pointer"
             >
-              <span className="inline-flex items-center gap-2 w-max"><FaPlus /> Add Storage</span>
+              <span className="inline-flex items-center gap-2 w-max">
+                <FaPlus /> Add Storage
+              </span>
             </motion.button>
           </div>
         </div>
@@ -403,7 +660,6 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
         {storageAreas.map((area, aIdx) => (
           <motion.div
             key={area.id}
-            // layout
             initial={{ opacity: 0, y: 10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ type: 'spring', stiffness: 220, damping: 20, delay: aIdx * 0.02 }}
@@ -412,18 +668,19 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
             {/* Area header */}
             <div className="p-4 md:p-5 flex items-start gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                {
-                  area.categories?.length ?
+                {area.categories?.length ? (
                   <button
                     onClick={() => toggleArea(area.id)}
                     className="text-[#0E7488] rounded-lg p-1.5 hover:bg-[#E6FAF6] border border-transparent hover:border-[#9FE7D7]"
                     aria-label={expandedAreas[area.id] ? 'Collapse area' : 'Expand area'}
                   >
-                    <FaChevronUp className={`${expandedAreas[area.id] ? '' : 'rotate-180'} transition-all duration-150 cursor-pointer`}/>
+                    <FaChevronUp
+                      className={`${
+                        expandedAreas[area.id] ? '' : 'rotate-180'
+                      } transition-all duration-150 cursor-pointer`}
+                    />
                   </button>
-                  :
-                  null
-                }
+                ) : null}
 
                 {editingId === area.id ? (
                   <input
@@ -433,9 +690,13 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                   />
                 ) : (
                   <div className="min-w-0">
-                    <h2 className="text-lg font-semibold text-stocksense-teal truncate">{area.name} <span className='text-sm text-gray-400 font-medium'>(Area)</span></h2>
+                    <h2 className="text-lg font-semibold text-stocksense-teal truncate">
+                      {area.name}{' '}
+                      <span className="text-sm text-gray-400 font-medium">(Area)</span>
+                    </h2>
                     <p className="text-xs text-gray-500">
-                      {(area.categories?.length || 0)} {(area.categories?.length || 0) === 1 ? 'category' : 'categories'}
+                      {area.categories?.length || 0}{' '}
+                      {area.categories?.length === 1 ? 'category' : 'categories'}
                     </p>
                   </div>
                 )}
@@ -444,10 +705,16 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
               <div className="flex flex-wrap gap-2 shrink-0">
                 {editingId === area.id ? (
                   <>
-                    <button onClick={() => handleSaveEdit(area.id)} className="text-emerald-600 cursor-pointer rounded-lg p-2 hover:bg-emerald-50">
+                    <button
+                      onClick={() => handleSaveEdit(area.id)}
+                      className="text-emerald-600 cursor-pointer rounded-lg p-2 hover:bg-emerald-50"
+                    >
                       <FaCheck />
                     </button>
-                    <button onClick={() => setEditingId(null)} className="text-gray-600 cursor-pointer rounded-lg p-2 hover:bg-gray-50">
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="text-gray-600 cursor-pointer rounded-lg p-2 hover:bg-gray-50"
+                    >
                       <FaTimes />
                     </button>
                   </>
@@ -470,29 +737,6 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                     </button>
                   </>
                 )}
-                {/* <button
-                  onClick={() => expandAllCategoriesInArea(area)}
-                  className="rounded-lg border border-stocksense-gray px-2.5 py-1.5 text-xs hover:bg-gray-50 cursor-pointer"
-                >
-                  Expand categories
-                </button>
-                <button
-                  onClick={() => collapseAllCategoriesInArea(area)}
-                  className="rounded-lg border border-stocksense-gray px-2.5 py-1.5 text-xs hover:bg-gray-50 cursor-pointer"
-                >
-                  Collapse categories
-                </button> */}
-                {/* <button
-                  onClick={() =>
-                    allCatsExpanded
-                      ? collapseAllCategoriesInArea(area)
-                      : expandAllCategoriesInArea(area)
-                  }
-                  className="rounded-lg border border-stocksense-gray px-2.5 py-1.5 text-xs hover:bg-gray-50 cursor-pointer"
-                >
-                  {allCatsExpanded ? 'Collapse categories' : 'Expand categories'}
-                </button> */}
-
               </div>
             </div>
 
@@ -501,7 +745,12 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
               <div className="flex gap-2">
                 <input
                   value={newCategoryName[area.id] || ''}
-                  onChange={(e) => setNewCategoryName({ ...newCategoryName, [area.id]: e.target.value })}
+                  onChange={(e) =>
+                    setNewCategoryName({
+                      ...newCategoryName,
+                      [area.id]: e.target.value,
+                    })
+                  }
                   placeholder={`Add category in ${area.name} (e.g., Fruits, Tools, Cleaning)`}
                   className="border border-stocksense-gray rounded-xl px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
                 />
@@ -511,7 +760,9 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                   onClick={() => handleAddCategory(area.id)}
                   className="rounded-xl px-3 py-2 bg-[#0E7488] text-white hover:bg-[#0B5563] cursor-pointer"
                 >
-                  <span className="inline-flex items-center gap-2 w-max"><FaPlus /> Add Category</span>
+                  <span className="inline-flex items-center gap-2 w-max">
+                    <FaPlus /> Add Category
+                  </span>
                 </motion.button>
               </div>
             </div>
@@ -534,12 +785,12 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                         const items = (category.items || []).filter(filterItem);
                         const selMap = selectedByCategory[category.id] || {};
                         const selectedCount = Object.values(selMap).filter(Boolean).length;
-                        const allSelected = items.length > 0 && selectedCount === items.length;
+                        const allSelected =
+                          items.length > 0 && selectedCount === items.length;
 
                         return (
                           <motion.div
                             key={category.id}
-                            // layout
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.22, delay: cIdx * 0.02 }}
@@ -548,29 +799,49 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                             {/* Category header */}
                             <div className="p-3 sm:p-4 flex items-start justify-between gap-3">
                               <div className="flex items-center gap-2 min-w-0">
-                                {
-                                  items.length ?
+                                {items.length ? (
                                   <button
                                     onClick={() => toggleCategory(category.id)}
                                     className="text-[#0E7488] rounded-lg p-1 hover:bg-[#E6FAF6] border border-transparent hover:border-[#9FE7D7]"
-                                    aria-label={expandedCategories[category.id] ? 'Collapse category' : 'Expand category'}
+                                    aria-label={
+                                      expandedCategories[category.id]
+                                        ? 'Collapse category'
+                                        : 'Expand category'
+                                    }
                                   >
-                                    <FaChevronUp className={`${expandedCategories[category.id] ? '' : 'rotate-180'} transition-all duration-150 cursor-pointer`}/>
+                                    <FaChevronUp
+                                      className={`${
+                                        expandedCategories[category.id]
+                                          ? ''
+                                          : 'rotate-180'
+                                      } transition-all duration-150 cursor-pointer`}
+                                    />
                                   </button>
-                                  :
-                                  null
-                                }
+                                ) : null}
 
                                 {editingCategoryName[category.id] !== undefined ? (
                                   <input
                                     value={editingCategoryName[category.id]}
-                                    onChange={(e) => setEditingCategoryName({ ...editingCategoryName, [category.id]: e.target.value })}
+                                    onChange={(e) =>
+                                      setEditingCategoryName({
+                                        ...editingCategoryName,
+                                        [category.id]: e.target.value,
+                                      })
+                                    }
                                     className="border border-stocksense-gray rounded-lg px-2.5 py-1.5 w-56 sm:w-64 focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
                                   />
                                 ) : (
                                   <div className="min-w-0">
-                                    <h3 className="font-medium text-stocksense-teal truncate">{category.name} <span className='text-gray-400 text-sm'>(Category)</span></h3>
-                                    <p className="text-xs text-gray-500">{items.length} {items.length === 1 ? 'item' : 'items'}</p>
+                                    <h3 className="font-medium text-stocksense-teal truncate">
+                                      {category.name}{' '}
+                                      <span className="text-gray-400 text-sm">
+                                        (Category)
+                                      </span>
+                                    </h3>
+                                    <p className="text-xs text-gray-500">
+                                      {items.length}{' '}
+                                      {items.length === 1 ? 'item' : 'items'}
+                                    </p>
                                   </div>
                                 )}
                               </div>
@@ -579,13 +850,20 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                 {editingCategoryName[category.id] !== undefined ? (
                                   <>
                                     <button
-                                      onClick={() => handleUpdateCategory(category.id, area.id)}
+                                      onClick={() =>
+                                        handleUpdateCategory(category.id, area.id)
+                                      }
                                       className="text-emerald-600 cursor-pointer rounded-lg p-2 hover:bg-emerald-50"
                                     >
                                       <FaCheck />
                                     </button>
                                     <button
-                                      onClick={() => setEditingCategoryName({ ...editingCategoryName, [category.id]: undefined })}
+                                      onClick={() =>
+                                        setEditingCategoryName({
+                                          ...editingCategoryName,
+                                          [category.id]: undefined,
+                                        })
+                                      }
                                       className="text-gray-600 cursor-pointer rounded-lg p-2 hover:bg-gray-50"
                                     >
                                       <FaTimes />
@@ -594,13 +872,20 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                 ) : (
                                   <>
                                     <button
-                                      onClick={() => setEditingCategoryName({ ...editingCategoryName, [category.id]: category.name })}
+                                      onClick={() =>
+                                        setEditingCategoryName({
+                                          ...editingCategoryName,
+                                          [category.id]: category.name,
+                                        })
+                                      }
                                       className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
                                     >
                                       <FaEdit />
                                     </button>
                                     <button
-                                      onClick={() => handleDeleteCategory(category.id, area.id)}
+                                      onClick={() =>
+                                        handleDeleteCategory(category.id, area.id)
+                                      }
                                       className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
                                     >
                                       <FaTrash />
@@ -618,7 +903,10 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                   onChange={(e) =>
                                     setNewItemData({
                                       ...newItemData,
-                                      [category.id]: { ...newItemData[category.id], name: e.target.value },
+                                      [category.id]: {
+                                        ...newItemData[category.id],
+                                        name: e.target.value,
+                                      },
                                     })
                                   }
                                   placeholder={`Add Item in ${category.name}`}
@@ -631,7 +919,10 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                   onChange={(e) =>
                                     setNewItemData({
                                       ...newItemData,
-                                      [category.id]: { ...newItemData[category.id], quantity: e.target.value },
+                                      [category.id]: {
+                                        ...newItemData[category.id],
+                                        quantity: e.target.value,
+                                      },
                                     })
                                   }
                                   placeholder="Qty"
@@ -643,7 +934,10 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                   onChange={(e) =>
                                     setNewItemData({
                                       ...newItemData,
-                                      [category.id]: { ...newItemData[category.id], expiration: e.target.value },
+                                      [category.id]: {
+                                        ...newItemData[category.id],
+                                        expiration: e.target.value,
+                                      },
                                     })
                                   }
                                   className="border border-stocksense-gray rounded-lg px-3 py-2 w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
@@ -654,7 +948,9 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                   onClick={() => handleAddItem(category.id)}
                                   className="rounded-lg px-3 py-2 bg-[#0E7488] text-white hover:bg-[#0B5563] cursor-pointer"
                                 >
-                                  <span className="inline-flex items-center gap-2 w-max"><FaPlus /> Add Item</span>
+                                  <span className="inline-flex items-center gap-2 w-max">
+                                    <FaPlus /> Add Item
+                                  </span>
                                 </motion.button>
                               </div>
                             </div>
@@ -675,38 +971,72 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                       <label className="flex items-center gap-2 cursor-pointer">
                                         <input
                                           type="checkbox"
-                                          className='cursor-pointer'
+                                          className="cursor-pointer"
                                           checked={allSelected}
                                           onChange={(e) => {
-                                            if (e.target.checked) selectAllInCategory({ ...category, items });
+                                            if (e.target.checked)
+                                              selectAllInCategory({ ...category, items });
                                             else clearSelectInCategory(category.id);
                                           }}
                                         />
                                         Select all Items
                                       </label>
-                                      {Object.values(selectedByCategory[category.id] || {}).some(Boolean) && (
-                                        <button
-                                          onClick={() => handleBulkDelete(category.id, area.id)}
-                                          className="text-rose-700 border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-md cursor-pointer"
-                                        >
-                                          Delete selected items ({Object.values(selectedByCategory[category.id]).filter(Boolean).length})
-                                        </button>
+
+                                      {Object.values(
+                                        selectedByCategory[category.id] || {}
+                                      ).some(Boolean) && (
+                                        <>
+                                          <button
+                                            onClick={() =>
+                                              openMoveModal(area.id, category.id)
+                                            }
+                                            className="text-[#0E7488] border border-[#9FE7D7] bg-[#E6FAF6] hover:bg-[#d5f3ea] px-3 py-1.5 rounded-md cursor-pointer"
+                                          >
+                                            Move selected items
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              handleBulkDelete(category.id, area.id)
+                                            }
+                                            className="text-rose-700 border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-md cursor-pointer"
+                                          >
+                                            Delete selected items (
+                                            {Object.values(
+                                              selectedByCategory[category.id]
+                                            ).filter(Boolean).length}
+                                            )
+                                          </button>
+                                        </>
                                       )}
                                     </div>
                                   )}
-                                  <div className={`${items.length && 'pb-4 '} px-3 sm:px-4 space-y-2`}>
+
+                                  <div
+                                    className={`${
+                                      items.length && 'pb-4 '
+                                    } px-3 sm:px-4 space-y-2`}
+                                  >
                                     {items.map((item, iIdx) => {
-                                      const soon = isExpiringSoon(item.expiration_date, expDays);
-                                      const selected = !!(selectedByCategory[category.id]?.[item.id]);
+                                      const soon = isExpiringSoon(
+                                        item.expiration_date,
+                                        expDays
+                                      );
+                                      const selected = !!(
+                                        selectedByCategory[category.id]?.[item.id]
+                                      );
 
                                       return (
                                         <motion.div
                                           key={item.id}
-                                          // layout
                                           initial={{ opacity: 0, y: 6 }}
                                           animate={{ opacity: 1, y: 0 }}
-                                          transition={{ duration: 0.18, delay: iIdx * 0.015 }}
-                                          className={`flex justify-between items-center border border-stocksense-gray rounded-xl px-3 py-2 bg-white ${selected ? 'ring-2 ring-rose-200' : ''}`}
+                                          transition={{
+                                            duration: 0.18,
+                                            delay: iIdx * 0.015,
+                                          }}
+                                          className={`flex justify-between items-center border border-stocksense-gray rounded-xl px-3 py-2 bg-white ${
+                                            selected ? 'ring-2 ring-rose-200' : ''
+                                          }`}
                                         >
                                           {editingItem[item.id] !== undefined ? (
                                             <div className="flex flex-col sm:flex-row gap-2 w-full">
@@ -715,7 +1045,10 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                                 onChange={(e) =>
                                                   setEditingItem((prev) => ({
                                                     ...prev,
-                                                    [item.id]: { ...prev[item.id], name: e.target.value },
+                                                    [item.id]: {
+                                                      ...prev[item.id],
+                                                      name: e.target.value,
+                                                    },
                                                   }))
                                                 }
                                                 className="border border-stocksense-gray rounded-lg px-2 py-1 w-full sm:w-1/3"
@@ -727,18 +1060,27 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                                 onChange={(e) =>
                                                   setEditingItem((prev) => ({
                                                     ...prev,
-                                                    [item.id]: { ...prev[item.id], quantity: e.target.value },
+                                                    [item.id]: {
+                                                      ...prev[item.id],
+                                                      quantity: e.target.value,
+                                                    },
                                                   }))
                                                 }
                                                 className="border border-stocksense-gray rounded-lg px-2 py-1 w-full sm:w-24"
                                               />
                                               <input
                                                 type="date"
-                                                value={editingItem[item.id].expiration_date || ''}
+                                                value={
+                                                  editingItem[item.id].expiration_date ||
+                                                  ''
+                                                }
                                                 onChange={(e) =>
                                                   setEditingItem((prev) => ({
                                                     ...prev,
-                                                    [item.id]: { ...prev[item.id], expiration_date: e.target.value },
+                                                    [item.id]: {
+                                                      ...prev[item.id],
+                                                      expiration_date: e.target.value,
+                                                    },
                                                   }))
                                                 }
                                                 className="border border-stocksense-gray rounded-lg px-2 py-1 w-full sm:w-48"
@@ -746,20 +1088,43 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                               <div className="flex gap-2 items-center">
                                                 <button
                                                   onClick={() => {
-                                                    const e = editingItem[item.id] || {};
+                                                    const e =
+                                                      editingItem[item.id] || {};
                                                     const updated = {
-                                                      name: (e.name ?? '').trim() || item.name,
-                                                      quantity: Number.isFinite(+e.quantity) ? parseInt(String(e.quantity), 10) : (item.quantity ?? 0),
-                                                      expiration_date: e.expiration_date ?? item.expiration_date ?? null,
+                                                      name:
+                                                        (e.name ?? '').trim() ||
+                                                        item.name,
+                                                      quantity: Number.isFinite(
+                                                        +e.quantity
+                                                      )
+                                                        ? parseInt(
+                                                            String(e.quantity),
+                                                            10
+                                                          )
+                                                        : item.quantity ?? 0,
+                                                      expiration_date:
+                                                        e.expiration_date ??
+                                                        item.expiration_date ??
+                                                        null,
                                                     };
-                                                    handleUpdateItem(item.id, category.id, area.id, updated);
+                                                    handleUpdateItem(
+                                                      item.id,
+                                                      category.id,
+                                                      area.id,
+                                                      updated
+                                                    );
                                                   }}
                                                   className="text-emerald-600 cursor-pointer rounded-lg p-2 hover:bg-emerald-50"
                                                 >
                                                   <FaCheck />
                                                 </button>
                                                 <button
-                                                  onClick={() => setEditingItem((prev) => ({ ...prev, [item.id]: undefined }))}
+                                                  onClick={() =>
+                                                    setEditingItem((prev) => ({
+                                                      ...prev,
+                                                      [item.id]: undefined,
+                                                    }))
+                                                  }
                                                   className="text-gray-600 cursor-pointer rounded-lg p-2 hover:bg-gray-50"
                                                 >
                                                   <FaTimes />
@@ -772,7 +1137,12 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                                 <input
                                                   type="checkbox"
                                                   checked={selected}
-                                                  onChange={() => toggleSelectItem(category.id, item.id)}
+                                                  onChange={() =>
+                                                    toggleSelectItem(
+                                                      category.id,
+                                                      item.id
+                                                    )
+                                                  }
                                                   className="mt-1"
                                                 />
                                                 <div className="min-w-0">
@@ -780,16 +1150,36 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                                     {item.name}
                                                     {soon && (
                                                       <span className="ml-2 text-[10px] uppercase tracking-wide bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
-                                                        {daysUntil(item.expiration_date) < 0 ? 'Expired' : 'Soon'}
+                                                        {daysUntil(
+                                                          item.expiration_date
+                                                        ) < 0
+                                                          ? 'Expired'
+                                                          : 'Soon'}
                                                       </span>
                                                     )}
                                                   </p>
                                                   <p className="text-sm text-gray-500 truncate">
-                                                    Qty: {item.quantity} • Exp: {item.expiration_date || '—'}
+                                                    Qty: {item.quantity} • Exp:{' '}
+                                                    {item.expiration_date || '—'}
                                                   </p>
                                                 </div>
                                               </div>
                                               <div className="flex gap-2 items-center shrink-0">
+                                                {/* Move single item */}
+                                                <button
+                                                  onClick={() =>
+                                                    openMoveModal(
+                                                      area.id,
+                                                      category.id,
+                                                      item.id
+                                                    )
+                                                  }
+                                                  className="text-[#0E7488] cursor-pointer rounded-lg p-2 hover:bg-[#E6FAF6]"
+                                                  title="Move item to another category"
+                                                >
+                                                  <FaArrowsAlt />
+                                                </button>
+
                                                 <button
                                                   onClick={() =>
                                                     setEditingItem((prev) => ({
@@ -797,7 +1187,9 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                                       [item.id]: {
                                                         name: item.name,
                                                         quantity: item.quantity,
-                                                        expiration_date: item.expiration_date || '',
+                                                        expiration_date:
+                                                          item.expiration_date ||
+                                                          '',
                                                       },
                                                     }))
                                                   }
@@ -807,8 +1199,13 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
                                                 </button>
                                                 <button
                                                   onClick={async () => {
-                                                    if (!confirm('Delete this item?')) return;
-                                                    await handleDeleteItem(item.id, category.id, area.id);
+                                                    if (!confirm('Delete this item?'))
+                                                      return;
+                                                    await handleDeleteItem(
+                                                      item.id,
+                                                      category.id,
+                                                      area.id
+                                                    );
                                                   }}
                                                   className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
                                                 >
@@ -834,7 +1231,206 @@ export default function StorageAreasSection({ locationId, initialStorageAreas, l
           </motion.div>
         ))}
       </div>
+
+      {/* Move Items Modal */}
+      <AnimatePresence>
+        {moveModal.open && (
+          <motion.div
+            className="fixed inset-0 z-40 flex items-center justify-center bg-black/40"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              className="w-full max-w-md rounded-2xl bg-white shadow-xl border border-stocksense-gray p-5 space-y-4"
+            >
+              <h2 className="text-lg font-semibold text-stocksense-teal">
+                Move {moveModal.itemIds.length} item
+                {moveModal.itemIds.length > 1 ? 's' : ''}
+              </h2>
+              <p className="text-sm text-gray-500">
+                Choose where you want to move the selected item
+                {moveModal.itemIds.length > 1 ? 's' : ''}.
+              </p>
+
+              {/* Location */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Location</label>
+                <select
+                  value={
+                    moveModal.targetLocationId
+                      ? String(moveModal.targetLocationId)
+                      : ''
+                  }
+                  onChange={(e) => {
+                    const newLocId = e.target.value || null;
+                    const loc =
+                      locationsForMove.find(
+                        (l) => String(l.id) === String(newLocId)
+                      ) || locationsForMove[0];
+
+                    const areasForLoc =
+                      String(loc.id) === String(locationId)
+                        ? storageAreas
+                        : loc.storageAreas || [];
+
+                    const firstArea = areasForLoc?.[0];
+                    const firstCat = firstArea?.categories?.[0];
+
+                    setMoveModal((prev) => ({
+                      ...prev,
+                      targetLocationId: newLocId,
+                      targetAreaId: firstArea ? firstArea.id : null,
+                      targetCategoryId: firstCat ? firstCat.id : null,
+                    }));
+                  }}
+                  className="w-full rounded-lg border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
+                >
+                  {locationsForMove.map((loc) => (
+                    <option key={loc.id} value={String(loc.id)}>
+                      {loc.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Target storage area */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">
+                  Storage area
+                </label>
+                <select
+                  value={moveModal.targetAreaId ? String(moveModal.targetAreaId) : ''}
+                  onChange={(e) => {
+                    const newAreaId = e.target.value || null;
+
+                    const loc =
+                      locationsForMove.find(
+                        (l) =>
+                          String(l.id) === String(moveModal.targetLocationId)
+                      ) || locationsForMove[0];
+
+                    const areasForLoc =
+                      String(loc.id) === String(locationId)
+                        ? storageAreas
+                        : loc.storageAreas || [];
+
+                    const area =
+                      areasForLoc.find(
+                        (a) => String(a.id) === String(newAreaId)
+                      ) || null;
+                    const firstCat = area?.categories?.[0];
+
+                    setMoveModal((prev) => ({
+                      ...prev,
+                      targetAreaId: newAreaId,
+                      targetCategoryId: firstCat ? firstCat.id : null,
+                    }));
+                  }}
+                  className="w-full rounded-lg border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
+                >
+                  <option value="">Select area…</option>
+                  {(() => {
+                    const loc =
+                      locationsForMove.find(
+                        (l) =>
+                          String(l.id) === String(moveModal.targetLocationId)
+                      ) || locationsForMove[0];
+
+                    const areasForLoc =
+                      String(loc.id) === String(locationId)
+                        ? storageAreas
+                        : loc.storageAreas || [];
+
+                    return areasForLoc.map((a) => (
+                      <option key={a.id} value={String(a.id)}>
+                        {a.name}
+                      </option>
+                    ));
+                  })()}
+                </select>
+              </div>
+
+              {/* Target category */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">
+                  Category
+                </label>
+                <select
+                  value={
+                    moveModal.targetCategoryId
+                      ? String(moveModal.targetCategoryId)
+                      : ''
+                  }
+                  onChange={(e) =>
+                    setMoveModal((prev) => ({
+                      ...prev,
+                      targetCategoryId: e.target.value || null,
+                    }))
+                  }
+                  disabled={!moveModal.targetAreaId}
+                  className="w-full rounded-lg border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50 disabled:bg-gray-50 disabled:text-gray-400"
+                >
+                  <option value="">Select category…</option>
+                  {(() => {
+                    const loc =
+                      locationsForMove.find(
+                        (l) =>
+                          String(l.id) === String(moveModal.targetLocationId)
+                      ) || locationsForMove[0];
+
+                    const areasForLoc =
+                      String(loc.id) === String(locationId)
+                        ? storageAreas
+                        : loc.storageAreas || [];
+
+                    const area = areasForLoc.find(
+                      (a) =>
+                        String(a.id) === String(moveModal.targetAreaId)
+                    );
+                    return (
+                      area?.categories?.map((c) => (
+                        <option key={c.id} value={String(c.id)}>
+                          {c.name}
+                        </option>
+                      )) || null
+                    );
+                  })()}
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  onClick={() =>
+                    setMoveModal({
+                      open: false,
+                      sourceAreaId: null,
+                      sourceCategoryId: null,
+                      targetLocationId: locationId,
+                      targetAreaId: null,
+                      targetCategoryId: null,
+                      itemIds: [],
+                    })
+                  }
+                  className="px-3 py-1.5 text-sm rounded-lg border border-stocksense-gray hover:bg-gray-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmMove}
+                  disabled={!moveModal.targetAreaId || !moveModal.targetCategoryId}
+                  className="px-3 py-1.5 text-sm rounded-lg bg-[#0E7488] text-white hover:bg-[#0B5563] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  Move
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
-

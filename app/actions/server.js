@@ -272,3 +272,44 @@ export async function deleteCategory(categoryId) {
 
   return error ? { error } : { success: true };
 }
+
+export async function updateItemLocation(itemId, values) {
+  const supabase = await createClient(); // ⬅️ need to await here
+
+  // Extract possible category fields coming from the client
+  const {
+    categoryId,
+    category_id,
+    ...rest
+  } = values || {};
+
+  const newCategoryId = categoryId ?? category_id ?? undefined;
+
+  const updatePayload = {
+    ...rest,
+  };
+
+  // We ONLY update category_id on items; items table does NOT have location_id
+  if (newCategoryId !== undefined) {
+    updatePayload.category_id = newCategoryId;
+  }
+
+  // If for some reason there is nothing to update, bail early
+  if (Object.keys(updatePayload).length === 0) {
+    return { data: null, error: 'No valid fields to update' };
+  }
+
+  const { data, error } = await supabase
+    .from('items')
+    .update(updatePayload)
+    .eq('id', itemId)
+    .select('*')
+    .single();
+
+  if (error) {
+    console.error('updateItemLocation error:', error);
+    return { data: null, error };
+  }
+
+  return { data, error: null };
+}
