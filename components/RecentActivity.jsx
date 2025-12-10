@@ -6,8 +6,6 @@ import {
   FaMapMarkedAlt,
   FaWarehouse,
   FaBoxOpen,        // item
-  FaMapMarkerAlt,   // location
-  FaBoxes,          // storage area
   FaTags            // category
 } from 'react-icons/fa';
 
@@ -17,7 +15,10 @@ function label(k) {
     case 'expiration_date': return 'Expiration';
     case 'quantity': return 'Qty';
     case 'name': return 'Name';
-    default: return k.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    default:
+      return k
+        .replaceAll('_', ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase());
   }
 }
 
@@ -42,14 +43,30 @@ function formatChanges(changes) {
 
   if (looksCanonical) {
     const parts = [];
+
     for (const [field, diff] of Object.entries(changes)) {
-      const fromVal = serializeValue(diff.from);
+      if (!diff) continue;
+
+      const fromRaw = diff.from;
+      const toRaw = diff.to;
+
+      // 🔍 If nothing actually changed, skip this field
+      const same =
+        JSON.stringify(fromRaw ?? null) === JSON.stringify(toRaw ?? null);
+      if (same) continue;
+
+      const fromVal = serializeValue(fromRaw);
       const toVal =
-        typeof diff.to === 'object' && diff.to !== null
-          ? objectToPairs(diff.to)
-          : serializeValue(diff.to);
+        typeof toRaw === 'object' && toRaw !== null
+          ? objectToPairs(toRaw)
+          : serializeValue(toRaw);
+
       parts.push(`${label(field)}: ${fromVal} to ${toVal}`);
     }
+
+    // If everything was identical, just say "Updated"
+    if (parts.length === 0) return 'Updated';
+
     return parts.join(' • ');
   }
 
@@ -61,7 +78,10 @@ function formatChanges(changes) {
   return pretty.length ? `Updated ${pretty.join(' • ')}` : 'Updated';
 }
 
+
 function ActionBadge({ action }) {
+  const normalized = (action || '').toLowerCase();
+
   const map = {
     added: {
       text: 'Added',
@@ -78,8 +98,15 @@ function ActionBadge({ action }) {
       className:
         'bg-rose-50 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:ring-rose-800/50',
     },
+    moved: {
+      text: 'Moved',
+      className:
+        'bg-sky-50 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:ring-sky-800/50',
+    },
   };
-  const cfg = map[action] ?? map.updated;
+
+  const cfg = map[normalized] ?? map.updated;
+
   return (
     <span className={`px-2 py-0.5 text-[11px] rounded-full font-medium ${cfg.className}`}>
       {cfg.text}
@@ -89,10 +116,14 @@ function ActionBadge({ action }) {
 
 function entityIcon(entity) {
   switch (entity) {
-    case 'location': return <FaMapMarkedAlt className="h-4 w-4 text-white dark:text-gray-400" />;
-    case 'storage_area': return <FaWarehouse className="h-4 w-4 text-white dark:text-gray-400" />;
-    case 'category': return <FaTags className="h-4 w-4 text-white dark:text-gray-400" />;
-    default: return <FaBoxOpen className="h-4 w-4 text-white dark:text-gray-400" />; // item
+    case 'location':
+      return <FaMapMarkedAlt className="h-4 w-4 text-white dark:text-gray-400" />;
+    case 'storage_area':
+      return <FaWarehouse className="h-4 w-4 text-white dark:text-gray-400" />;
+    case 'category':
+      return <FaTags className="h-4 w-4 text-white dark:text-gray-400" />;
+    default:
+      return <FaBoxOpen className="h-4 w-4 text-white dark:text-gray-400" />; // item
   }
 }
 
@@ -137,15 +168,35 @@ function breadcrumb(r) {
   }
 }
 
+  function formatMovePath(obj) {
+    if (!obj || typeof obj !== 'object') return '';
+    const loc = obj.location || obj.Location;
+    const area = obj.area || obj.Area;
+    const cat = obj.category || obj.Category;
+    const parts = [loc, area, cat].filter(Boolean);
+    return parts.join(' · ');
+  }
+
+  function movedTitle(r) {
+    const name =
+      r.item_name ||
+      r.name_at_event ||
+      r.item_or_entity_name ||
+      'item';
+    return (
+      <>
+        Moved <span className="font-medium">{name}</span>
+      </>
+    );
+  }
+
 function detailLine(r) {
   const action = (r.action || '').toLowerCase();
 
-  // Non-item entities: show simple rename (when present) or generic message
+  // Non-item entities
   if (r.entity_type !== 'item') {
-    console.log(r, 'whats this????')
     if (action === 'deleted') return `Removed ${r.item_or_entity_name}`;
     if (action === 'added') return `Created ${r.item_or_entity_name}`;
-    // show only name change if provided
     if (r.changes?.name) {
       const { from, to } = r.changes.name;
       return `Name: ${serializeValue(from)} to ${serializeValue(to)}`;
@@ -155,13 +206,46 @@ function detailLine(r) {
 
   // Item-specific
   if (action === 'added') {
-    return `Qty ${r.quantity ?? 0}${r.expiration_date ? ` · Exp ${r.expiration_date}` : ''}`;
+    return `Qty ${r.quantity ?? 0}${
+      r.expiration_date ? ` · Exp ${r.expiration_date}` : ''
+    }`;
   }
+
   if (action === 'deleted') {
-    return `Removed ${r.item_or_entity_name} from ${r.entity_type}`;
+    // 👇 Show where the item was removed from
+    const parts = [
+      r.location_name,
+      r.storage_area_name,
+      r.category_name,
+    ].filter(Boolean);
+    return `From: ${parts.join(' · ')}`;
   }
+
+  // 👉 Moved: show from/to with location / area / category
+  if (action === 'moved') {
+    const ch = r.changes || {};
+    const fromObj = ch.from || ch.old || null;
+    const toObj = ch.updated_to || ch.to || null;
+
+    const fromStr = formatMovePath(fromObj);
+    const toStr = formatMovePath(toObj);
+
+    if (fromStr || toStr) {
+      return (
+        <span>
+          From: {fromStr || '—'} <br />
+          To: {toStr || '—'}
+        </span>
+      );
+    }
+    return 'Moved';
+  }
+
+  // Default: generic updates
   return formatChanges(r.changes);
 }
+
+
 
 /** Component */
 export default function RecentActivity({ items }) {
@@ -171,15 +255,19 @@ export default function RecentActivity({ items }) {
         <h2 className="text-lg font-semibold text-stocksense-teal dark:text-stocksense-sky">
           Recent activity
         </h2>
-        <span className="text-xs text-gray-600 dark:text-gray-400">{items.length} items</span>
+        <span className="text-xs text-gray-600 dark:text-gray-400">
+          {items.length} items
+        </span>
       </div>
 
       <ul className="divide-y divide-gray-200 dark:divide-zinc-800">
         {items.length === 0 ? (
-          <li className="p-5 text-gray-600 dark:text-gray-400 text-sm">No recent activity yet.</li>
+          <li className="p-5 text-gray-600 dark:text-gray-400 text-sm">
+            No recent activity yet.
+          </li>
         ) : (
           items.map((r, idx) => {
-            const action = (r.action || '').toLowerCase(); // added | updated | deleted
+            const action = (r.action || '').toLowerCase(); // added | updated | deleted | moved
 
             return (
               <motion.li
@@ -190,20 +278,30 @@ export default function RecentActivity({ items }) {
                 className="flex items-start justify-between gap-3 p-4 text-gray-700 dark:text-gray-300"
               >
                 <div className="flex items-start gap-3 min-w-0">
-                  <div className={`rounded-xl p-2 bg-gray-100 dark:bg-zinc-800 shrink-0 bg-gradient-to-br 
-                    ${r.entity_type === "location" && "from-indigo-500 to-violet-500"}
-                    ${r.entity_type === "storage_area" && "from-sky-500 to-cyan-500"}
-                    ${r.entity_type === "category" && "from-emerald-500 to-lime-500"}
-                    ${r.entity_type === "item" && "from-rose-500 to-orange-500"}
-                    `}>
+                  <div
+                    className={`rounded-xl p-2 bg-gray-100 dark:bg-zinc-800 shrink-0 bg-gradient-to-br 
+                    ${r.entity_type === 'location' && 'from-indigo-500 to-violet-500'}
+                    ${r.entity_type === 'storage_area' && 'from-sky-500 to-cyan-500'}
+                    ${r.entity_type === 'category' && 'from-emerald-500 to-lime-500'}
+                    ${r.entity_type === 'item' && 'from-rose-500 to-orange-500'}
+                    `}
+                  >
                     {entityIcon((r.entity_type || 'item').toLowerCase())}
                   </div>
 
                   <div className="min-w-0">
                     <p className="text-sm">
-                      <ActionBadge action={action} /> {breadcrumb(r)}
+                      <ActionBadge action={action} />{' '}
+                      {action === 'moved' || (action === 'deleted' && r.entity_type === 'item') ? (
+                        // moved / deleted items -> just item name
+                        <span className="font-medium">
+                          {r.item_name || r.name_at_event || r.item_or_entity_name || 'item'}
+                        </span>
+                      ) : (
+                        // everything else -> full breadcrumb
+                        breadcrumb(r)
+                      )}
                     </p>
-
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 whitespace-normal break-words">
                       {detailLine(r)}
                     </p>
@@ -221,3 +319,4 @@ export default function RecentActivity({ items }) {
     </div>
   );
 }
+

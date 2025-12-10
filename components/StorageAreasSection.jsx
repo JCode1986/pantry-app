@@ -424,7 +424,7 @@ export default function StorageAreasSection({
 
     if (!targetCategoryId || itemIds.length === 0) return;
 
-    // Find source area/category in current state
+    // 🔎 Find source area/category in current state
     const sourceArea = storageAreas.find(
       (a) => String(a.id) === String(sourceAreaId)
     );
@@ -435,8 +435,7 @@ export default function StorageAreasSection({
       itemIds.includes(it.id)
     );
 
-    // --- DB update ---
-    // Only update category_id on items (no location_id on items table)
+    // --- DB update: only change category_id ---
     const results = await Promise.all(
       itemsToMove.map((it) =>
         updateItemLocation(it.id, {
@@ -448,12 +447,11 @@ export default function StorageAreasSection({
     const hasError = results.some((r) => r?.error);
     if (hasError) {
       console.error('Error moving some items:', results);
-      // optional: show toast/alert here
+      alert('There was a problem moving one or more items. Nothing was changed.');
+      return;
     }
 
     // --- Local state update ---
-    // If moving within the same location, also add to the target category in this UI.
-    // If moving to another location, we only remove locally; they'll show up on that location's page.
     if (String(targetLocationId) === String(locationId)) {
       setStorageAreas((prev) =>
         prev.map((area) => {
@@ -530,6 +528,8 @@ export default function StorageAreasSection({
       itemIds: [],
     });
   };
+
+
 
   // ---------- Filtering ----------
   const normalizedSearch = search.trim().toLowerCase();

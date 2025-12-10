@@ -2,7 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navigation from "@/components/Navigation";
 import { SessionProvider } from "@/lib/SessionContext";
-import { getSession } from "@/lib/sessionOptions";
+import { getSessionForLayout } from "./actions/auth";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,16 +20,25 @@ export const metadata = {
 };
 
 export default async function RootLayout({ children }) {
-  const session = await getSession();
-  const token = session?.user?.access_token
+  const session = await getSessionForLayout(); // ✅ read-only
+  // const token = session?.user?.access_token;
+  // const expiresAt = session?.user?.expires_at;
+  // const now = Math.floor(Date.now() / 1000);
+
+  // // treat token as valid only if not expired
+  // const hasValidToken = !!token && (!expiresAt || expiresAt > now);
+
+  const token = session?.user?.access_token;
+
+  // For layout/UI, just treat any existing token as "logged in"
+  const isLoggedIn = !!token;
+
 
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased `}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <SessionProvider>
-          { token && <Navigation /> }
+          {isLoggedIn && <Navigation />}
           <div className="bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10">
             {children}
           </div>

@@ -274,40 +274,31 @@ export async function deleteCategory(categoryId) {
 }
 
 export async function updateItemLocation(itemId, values) {
-  const supabase = await createClient(); // ⬅️ need to await here
+  const supabase = await createClient();
 
-  // Extract possible category fields coming from the client
-  const {
-    categoryId,
-    category_id,
-    ...rest
-  } = values || {};
+  const { categoryId, category_id } = values || {};
 
-  const newCategoryId = categoryId ?? category_id ?? undefined;
+  const newCategoryId =
+    categoryId !== undefined && categoryId !== null
+      ? categoryId
+      : category_id;
 
-  const updatePayload = {
-    ...rest,
-  };
-
-  // We ONLY update category_id on items; items table does NOT have location_id
-  if (newCategoryId !== undefined) {
-    updatePayload.category_id = newCategoryId;
+  if (!itemId || !newCategoryId) {
+    const error = new Error('Missing itemId or categoryId in updateItemLocation');
+    console.error('updateItemLocation validation error:', { itemId, values, error });
+    return { data: null, error };
   }
 
-  // If for some reason there is nothing to update, bail early
-  if (Object.keys(updatePayload).length === 0) {
-    return { data: null, error: 'No valid fields to update' };
-  }
-
+  // Only update category_id – nothing else
   const { data, error } = await supabase
     .from('items')
-    .update(updatePayload)
+    .update({ category_id: newCategoryId })
     .eq('id', itemId)
     .select('*')
     .single();
 
   if (error) {
-    console.error('updateItemLocation error:', error);
+    console.error('updateItemLocation DB error:', error);
     return { data: null, error };
   }
 

@@ -19,12 +19,6 @@ export default async function HomePage() {
   ]);
 
   // Recent activity: latest 12 rows
-  // const { data: recent = [] } = await supabase
-  //   .from('recent_activity')
-  //   .select('*')
-  //   .limit(12);
-
-  // Recent activity: latest 12 rows
   const { data: recent, error: recentError } = await supabase
     .from('recent_activity')
     .select('*')
@@ -41,9 +35,6 @@ export default async function HomePage() {
   const { data: perLocation = [] } = await supabase
     .from('items_count_per_location')
     .select('*');
-
-
-    console.log(recent, 'recent')
 
   return (
     <main className="mx-auto max-w-6xl px-5 py-8 space-y-10 pt-8 min-h-[100vh]">

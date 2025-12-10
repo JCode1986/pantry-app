@@ -1,8 +1,8 @@
 'use client';
+import { logoutAction } from '@/app/actions/auth';
 import Link from 'next/link';
 import { useState } from 'react';
 import { FaUtensils, FaSnowflake, FaHeart, FaBars, FaTimes, FaSignOutAlt, FaSpinner } from 'react-icons/fa';
-import { logout } from '@/app/actions/auth';
 
 export default function Navigation() {
     const [isOpen, setIsOpen] = useState(false);
@@ -12,7 +12,7 @@ export default function Navigation() {
     const handleLogout = async () => {
         setLoggingOut(true);
         try {
-            await logout();
+            await logoutAction();
 
             localStorage.clear();
             // document.cookie = 'sb-icjhicevzeybasiwgxnm-auth-token=; Max-Age=0; path=/;';
