@@ -18,6 +18,7 @@ import {
 } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import ConfirmDeleteModal from '@/components/modals/ConfirmDeleteModal';
 
 export default function LocationsSection({ locations }) {
   const router = useRouter();
@@ -25,6 +26,13 @@ export default function LocationsSection({ locations }) {
   const [locationName, setLocationName] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState('');
+
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    isDeleting: false,
+    locationId: null,
+    name: '',
+  });
 
   // Motion variants
   const listVariants = {
@@ -74,6 +82,45 @@ export default function LocationsSection({ locations }) {
   const onEditKey = (e, id) => {
     if (e.key === 'Enter') handleEditSave(id);
     if (e.key === 'Escape') handleEditCancel();
+  };
+
+  // Open the delete modal for a given location
+const openDeleteDialog = (loc) => {
+  setDeleteDialog({
+    open: true,
+    isDeleting: false,
+    locationId: loc.id,
+    name: loc.name,
+  });
+};
+
+const closeDeleteDialog = () => {
+  setDeleteDialog((prev) => ({ ...prev, open: false, isDeleting: false }));
+};
+
+  const handleConfirmDelete = async () => {
+    const { locationId } = deleteDialog;
+    if (!locationId) return;
+
+    try {
+      setDeleteDialog((prev) => ({ ...prev, isDeleting: true }));
+
+      await deleteLocation(locationId);
+
+      setAllLocations((prev) => prev.filter((loc) => loc.id !== locationId));
+
+      if (editingId === locationId) {
+        setEditingId(null);
+        setEditingName('');
+      }
+    } finally {
+      setDeleteDialog({
+        open: false,
+        isDeleting: false,
+        locationId: null,
+        name: '',
+      });
+    }
   };
 
   return (
@@ -212,7 +259,8 @@ export default function LocationsSection({ locations }) {
                           <motion.button
                             whileHover={{ y: -1 }}
                             whileTap={{ scale: 0.98 }}
-                            onClick={() => handleDelete(loc.id)}
+                            // onClick={() => handleDelete(loc.id)}
+                            onClick={() => openDeleteDialog(loc)}
                             className="text-rose-600 hover:text-rose-700 flex items-center gap-1 text-xs md:text-sm cursor-pointer"
                           >
                             <FaTrash /> Delete
@@ -227,6 +275,18 @@ export default function LocationsSection({ locations }) {
           </motion.ul>
         </AnimatePresence>
       </div>
+      <ConfirmDeleteModal
+        isOpen={deleteDialog.open}
+        isDeleting={deleteDialog.isDeleting}
+        onCancel={closeDeleteDialog}
+        onConfirm={handleConfirmDelete}
+        title={
+          deleteDialog.name
+            ? `Delete location "${deleteDialog.name}"?`
+            : 'Delete location?'
+        }
+        description="This will remove this location and any storage areas, categories, and items associated with it. This action cannot be undone."
+      />
     </main>
   );
 }

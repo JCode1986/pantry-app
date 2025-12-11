@@ -1,13 +1,17 @@
 'use client';
 
-import {
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Button,
-} from '@heroui/react';
+import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/modal";
+import { Button } from "@heroui/button";
+
+
+// import {
+//   Modal,
+//   ModalContent,
+//   ModalHeader,
+//   ModalBody,
+//   ModalFooter,
+//   Button,
+// } from '@heroui/modal';
 
 export default function ConfirmDeleteModal({
   isOpen,

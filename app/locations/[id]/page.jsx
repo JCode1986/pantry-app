@@ -6,7 +6,7 @@ import { notFound } from 'next/navigation';
 
 export default async function Page({ params }) {
   const supabase = await createClient();
-  const { id } = params;
+  const { id } = await params;
 
   // 1) Fetch the current location
   const { data: location, error: locationError } = await supabase
