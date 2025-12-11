@@ -24,6 +24,7 @@ import {
   FaSearch,
   FaArrowsAlt 
 } from 'react-icons/fa';
+import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
 
 const collapseVariants = {
   collapsed: { height: 0, opacity: 0, transition: { duration: 0.2 } },
@@ -84,6 +85,33 @@ export default function StorageAreasSection({
     targetCategoryId: null,
     itemIds: [],
   });
+
+  // Delete dialog state
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    entityType: null,  // 'area' | 'category' | 'item' | 'bulk-items'
+    payload: null,
+    isDeleting: false,
+  });
+
+  const openDeleteDialog = (entityType, payload) => {
+    setDeleteDialog({
+      open: true,
+      entityType,
+      payload,
+      isDeleting: false,
+    });
+  };
+
+  const closeDeleteDialog = () => {
+    setDeleteDialog({
+      open: false,
+      entityType: null,
+      payload: null,
+      isDeleting: false,
+    });
+  };
+
 
   // Build locations list for the modal, normalize storageAreas vs storage_areas
   const locationsForMove = useMemo(() => {
@@ -181,6 +209,15 @@ export default function StorageAreasSection({
     }
   };
 
+  const performDeleteStorageArea = async (id) => {
+    const result = await deleteStorageArea(id);
+    if (!result?.error) {
+      setStorageAreas((prev) => prev.filter((a) => a.id !== id));
+    } else {
+      console.error('deleteStorageArea error:', result.error);
+    }
+  };
+
   // ---------- Category CRUD ----------
   const handleAddCategory = async (storageAreaId) => {
     const name = (newCategoryName[storageAreaId] || '').trim();
@@ -245,6 +282,24 @@ export default function StorageAreasSection({
             : a
         )
       );
+    }
+  };
+
+  const performDeleteCategory = async (categoryId, storageAreaId) => {
+    const result = await deleteCategory(categoryId);
+    if (!result?.error) {
+      setStorageAreas((prev) =>
+        prev.map((a) =>
+          a.id === storageAreaId
+            ? {
+                ...a,
+                categories: a.categories.filter((c) => c.id !== categoryId),
+              }
+            : a
+        )
+      );
+    } else {
+      console.error('deleteCategory error:', result.error);
     }
   };
 
@@ -334,6 +389,31 @@ export default function StorageAreasSection({
     }
   };
 
+  const performDeleteItem = async (itemId, categoryId, storageAreaId) => {
+    const result = await deleteItem(itemId);
+    if (!result?.error) {
+      setStorageAreas((prev) =>
+        prev.map((area) =>
+          area.id === storageAreaId
+            ? {
+                ...area,
+                categories: area.categories.map((cat) =>
+                  cat.id === categoryId
+                    ? {
+                        ...cat,
+                        items: cat.items.filter((it) => it.id !== itemId),
+                      }
+                    : cat
+                ),
+              }
+            : area
+        )
+      );
+    } else {
+      console.error('deleteItem error:', result.error);
+    }
+  };
+
   // bulk delete for a category
   const handleBulkDelete = async (categoryId, storageAreaId) => {
     const selectedMap = selectedByCategory[categoryId] || {};
@@ -364,6 +444,105 @@ export default function StorageAreasSection({
 
     setSelectedByCategory((prev) => ({ ...prev, [categoryId]: {} }));
   };
+
+  const performBulkDeleteItems = async (itemIds, categoryId, storageAreaId) => {
+    for (const id of itemIds) {
+      await deleteItem(id);
+    }
+
+    setStorageAreas((prev) =>
+      prev.map((area) =>
+        area.id === storageAreaId
+          ? {
+              ...area,
+              categories: area.categories.map((cat) =>
+                cat.id === categoryId
+                  ? {
+                      ...cat,
+                      items: (cat.items || []).filter((i) => !itemIds.includes(i.id)),
+                    }
+                  : cat
+              ),
+            }
+          : area
+      )
+    );
+
+    setSelectedByCategory((prev) => ({ ...prev, [categoryId]: {} }));
+  };
+
+  const handleConfirmDelete = async () => {
+    const { entityType, payload } = deleteDialog;
+    if (!entityType || !payload) return;
+
+    setDeleteDialog((prev) => ({ ...prev, isDeleting: true }));
+
+    try {
+      if (entityType === 'area') {
+        await performDeleteStorageArea(payload.areaId);
+      } else if (entityType === 'category') {
+        await performDeleteCategory(payload.categoryId, payload.storageAreaId);
+      } else if (entityType === 'item') {
+        await performDeleteItem(
+          payload.itemId,
+          payload.categoryId,
+          payload.storageAreaId
+        );
+      } else if (entityType === 'bulk-items') {
+        await performBulkDeleteItems(
+          payload.itemIds,
+          payload.categoryId,
+          payload.storageAreaId
+        );
+      }
+    } catch (e) {
+      console.error('Error during delete:', e);
+    } finally {
+      closeDeleteDialog();
+    }
+  };
+
+  const deleteTitle = (() => {
+    const { entityType, payload } = deleteDialog;
+    if (!entityType || !payload) return 'Delete';
+
+    if (entityType === 'area') {
+      return `Delete storage area "${payload.name}"?`;
+    }
+    if (entityType === 'category') {
+      return `Delete category "${payload.name}"?`;
+    }
+    if (entityType === 'item') {
+      return `Delete item "${payload.itemName}"?`;
+    }
+    if (entityType === 'bulk-items') {
+      return `Delete ${payload.count} items?`;
+    }
+    return 'Delete';
+  })();
+
+  const deleteDescription = (() => {
+    const { entityType, payload } = deleteDialog;
+    if (!entityType || !payload) return '';
+
+    if (entityType === 'area') {
+      return 'This will remove this storage area and all of its categories and items. This action cannot be undone.';
+    }
+    if (entityType === 'category') {
+      return `This will remove the category "${payload.name}" in ${payload.areaName}, including all items inside it. This action cannot be undone.`;
+    }
+    if (entityType === 'item') {
+      return `This will permanently delete "${payload.itemName}" from ${payload.categoryName} in ${payload.areaName}.`;
+    }
+    if (entityType === 'bulk-items') {
+      return `This will permanently delete ${payload.count} selected item${
+        payload.count > 1 ? 's' : ''
+      } from ${payload.categoryName} in ${payload.areaName}.`;
+    }
+    return '';
+  })();
+
+
 
   const toggleSelectItem = (categoryId, itemId) => {
     setSelectedByCategory((prev) => ({
@@ -729,8 +908,19 @@ export default function StorageAreasSection({
                     >
                       <FaEdit />
                     </button>
-                    <button
+                    {/* <button
                       onClick={() => handleDeleteStorageArea(area.id)}
+                      className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
+                    >
+                      <FaTrash />
+                    </button> */}
+                    <button
+                      onClick={() =>
+                        openDeleteDialog('area', {
+                          areaId: area.id,
+                          name: area.name,
+                        })
+                      }
                       className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
                     >
                       <FaTrash />
@@ -882,14 +1072,28 @@ export default function StorageAreasSection({
                                     >
                                       <FaEdit />
                                     </button>
-                                    <button
+                                    {/* <button
                                       onClick={() =>
                                         handleDeleteCategory(category.id, area.id)
                                       }
                                       className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
                                     >
                                       <FaTrash />
+                                    </button> */}
+                                    <button
+                                      onClick={() =>
+                                        openDeleteDialog('category', {
+                                          categoryId: category.id,
+                                          storageAreaId: area.id,
+                                          name: category.name,
+                                          areaName: area.name,
+                                        })
+                                      }
+                                      className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
+                                    >
+                                      <FaTrash />
                                     </button>
+
                                   </>
                                 )}
                               </div>
@@ -964,10 +1168,11 @@ export default function StorageAreasSection({
                                   initial="collapsed"
                                   animate="open"
                                   exit="collapsed"
-                                  className="overflow-hidden pl-8"
+                                  className="overflow-hidden sm:pl-8"
                                 >
                                   {items.length > 0 && (
                                     <div className="px-3 sm:px-4 flex flex-wrap items-center text-sm h-[34px] mb-2 gap-2">
+                                      <h3 className='font-medium text-lg text-stocksense-teal truncate'>Items</h3>
                                       <label className="flex items-center gap-2 cursor-pointer">
                                         <input
                                           type="checkbox"
@@ -979,7 +1184,7 @@ export default function StorageAreasSection({
                                             else clearSelectInCategory(category.id);
                                           }}
                                         />
-                                        Select all Items
+                                        Select all
                                       </label>
 
                                       {Object.values(
@@ -994,7 +1199,7 @@ export default function StorageAreasSection({
                                           >
                                             Move selected items
                                           </button>
-                                          <button
+                                          {/* <button
                                             onClick={() =>
                                               handleBulkDelete(category.id, area.id)
                                             }
@@ -1004,6 +1209,27 @@ export default function StorageAreasSection({
                                             {Object.values(
                                               selectedByCategory[category.id]
                                             ).filter(Boolean).length}
+                                            )
+                                          </button> */}
+                                          <button
+                                            onClick={() => {
+                                              const selectedMap = selectedByCategory[category.id] || {};
+                                              const ids = Object.keys(selectedMap).filter((k) => selectedMap[k]);
+                                              if (!ids.length) return;
+
+                                              openDeleteDialog('bulk-items', {
+                                                itemIds: ids,
+                                                categoryId: category.id,
+                                                storageAreaId: area.id,
+                                                categoryName: category.name,
+                                                areaName: area.name,
+                                                count: ids.length,
+                                              });
+                                            }}
+                                            className="text-rose-700 border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-md cursor-pointer"
+                                          >
+                                            Delete selected items (
+                                            {Object.values(selectedByCategory[category.id] || {}).filter(Boolean).length}
                                             )
                                           </button>
                                         </>
@@ -1197,7 +1423,7 @@ export default function StorageAreasSection({
                                                 >
                                                   <FaEdit />
                                                 </button>
-                                                <button
+                                                {/* <button
                                                   onClick={async () => {
                                                     if (!confirm('Delete this item?'))
                                                       return;
@@ -1210,7 +1436,23 @@ export default function StorageAreasSection({
                                                   className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
                                                 >
                                                   <FaTrash />
+                                                </button> */}
+                                                <button
+                                                  onClick={() =>
+                                                    openDeleteDialog('item', {
+                                                      itemId: item.id,
+                                                      itemName: item.name,
+                                                      categoryId: category.id,
+                                                      storageAreaId: area.id,
+                                                      categoryName: category.name,
+                                                      areaName: area.name,
+                                                    })
+                                                  }
+                                                  className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
+                                                >
+                                                  <FaTrash />
                                                 </button>
+
                                               </div>
                                             </>
                                           )}
@@ -1431,6 +1673,17 @@ export default function StorageAreasSection({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Reusable delete confirmation modal */}
+      <ConfirmDeleteModal
+        isOpen={deleteDialog.open}
+        isDeleting={deleteDialog.isDeleting}
+        onCancel={closeDeleteDialog}
+        onConfirm={handleConfirmDelete}
+        title={deleteTitle}
+        description={deleteDescription}
+      />
+
     </div>
   );
 }
