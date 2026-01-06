@@ -245,8 +245,6 @@ function detailLine(r) {
   return formatChanges(r.changes);
 }
 
-
-
 /** Component */
 export default function RecentActivity({ items }) {
   return (

@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
 import { login } from '@/app/actions/auth';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
+import Image from 'next/image';
 
 export default function LoginPage() {
   const searchParams = useSearchParams();
@@ -98,15 +99,20 @@ export default function LoginPage() {
           {/* Header */}
           <div className="px-6 sm:px-8 pt-6 pb-4 bg-gradient-to-r from-stocksense-teal to-stocksense-sky">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-white/15 grid place-items-center">
-                {/* mini mark */}
-                <span className="text-white font-bold text-lg">SS</span>
+              <div className="relative h-[120px] w-[130px] bg-white rounded-full">
+                <Image
+                    src="/stocksense-logo-2.png"
+                    alt="StockSense logo"
+                    fill
+                    sizes="130px"
+                    priority
+                  />
               </div>
               <div>
                 <h1 className="text-white text-xl sm:text-2xl font-semibold leading-tight">
                   Welcome to StockSense
                 </h1>
-                <p className="text-white/80 text-xs sm:text-sm">Sign in to manage your pantry.</p>
+                <p className="text-white/80 text-xs sm:text-sm">Sign in to manage your items.</p>
               </div>
             </div>
           </div>

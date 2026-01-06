@@ -1,129 +1,257 @@
-'use client';
-import { logoutAction } from '@/app/actions/auth';
-import Link from 'next/link';
-import { useState } from 'react';
-import { FaUtensils, FaSnowflake, FaHeart, FaBars, FaTimes, FaSignOutAlt, FaSpinner } from 'react-icons/fa';
+"use client";
+
+import Link from "next/link";
+import Image from "next/image";
+import { usePathname } from "next/navigation";
+import { useMemo, useState } from "react";
+import { logoutAction } from "@/app/actions/auth";
+import {
+  Navbar,
+  NavbarBrand,
+  NavbarContent,
+  NavbarItem,
+  NavbarMenuToggle,
+  NavbarMenu,
+  NavbarMenuItem,
+  Button,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+} from "@heroui/react";
+import {
+  FaMapMarkedAlt,
+  FaWarehouse,
+  FaTags,
+  FaBoxOpen,
+  FaSignOutAlt,
+  FaSpinner,
+  FaHome,
+} from "react-icons/fa";
+
+const navItems = [
+  { href: "/", label: "Overview", icon: FaHome },
+  { href: "/locations", label: "Locations", icon: FaMapMarkedAlt },
+  { href: "/areas", label: "Areas", icon: FaWarehouse },
+  { href: "/categories", label: "Categories", icon: FaTags },
+  { href: "/items", label: "Items", icon: FaBoxOpen },
+];
+
+function cx(...classes) {
+  return classes.filter(Boolean).join(" ");
+}
 
 export default function Navigation() {
-    const [isOpen, setIsOpen] = useState(false);
-    const [loggingOut, setLoggingOut] = useState(false);
-    const [showModal, setShowModal] = useState(false);
+  const pathname = usePathname();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-    const handleLogout = async () => {
-        setLoggingOut(true);
-        try {
-            await logoutAction();
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-            localStorage.clear();
-            // document.cookie = 'sb-icjhicevzeybasiwgxnm-auth-token=; Max-Age=0; path=/;';
-            // document.cookie = 'sb-icjhicevzeybasiwgxnm-refresh-token=; Max-Age=0; path=/;';
+  const activeHref = useMemo(() => {
+    // Handle nested routes like /locations/[id]
+    const match =
+      navItems.find((i) => i.href !== "/" && pathname?.startsWith(i.href)) ||
+      navItems.find((i) => i.href === "/");
+    return match?.href || "/";
+  }, [pathname]);
 
-            // ✅ Hard reload ensures Middleware sees no session
-            window.location.href = '/login';
-        } catch (err) {
-            console.error('Logout failed:', err);
-            setLoggingOut(false);
-        }
-    };
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await logoutAction();
+      localStorage.clear();
+      window.location.href = "/login";
+    } catch (err) {
+      console.error("Logout failed:", err);
+      setLoggingOut(false);
+    }
+  };
 
+  return (
+    <>
+      <Navbar
+        isBordered
+        maxWidth="xl"
+        isMenuOpen={isMenuOpen}
+        onMenuOpenChange={setIsMenuOpen}
+        className="bg-white"
+      >
+        <NavbarContent justify="start" className="gap-3">
+          <NavbarMenuToggle
+            aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+            className="sm:hidden"
+          />
 
-    return (
-        <>
-            <nav className="bg-white shadow-md sticky top-0 z-50">
-                <div className="max-w-[1300px] mx-auto px-4 py-5 flex justify-between items-center">
-                    <div className="flex items-center space-x-4">
-                        <Link href="/" className="flex items-center gap-1 text-gray-700 hover:text-stocksense-tealDark hover:underline transition-all duration-150 ease-in-out">
-                            Overview
-                        </Link>
-                        <Link href="/locations" className="items-center gap-1 text-gray-700 hover:text stroke-stocksense-tealDark hidden sm:flex hover:underline transition-all duration-150 ease-in-out">
-                            Locations
-                        </Link>
-                    </div>
-
-                    {/* Mobile menu toggle */}
-                    <div className="sm:hidden">
-                        <button onClick={() => setIsOpen(!isOpen)} className="text-gray-700 focus:outline-none">
-                            {isOpen ? <FaTimes className="w-6 h-6" /> : <FaBars className="w-6 h-6" />}
-                        </button>
-                    </div>
-
-                    {/* Logout for desktop */}
-                    <button
-                        onClick={() => setShowModal(true)}
-                        disabled={loggingOut}
-                        className={`hidden sm:flex items-center gap-1 text-red-500 hover:text-red-700 cursor-pointer ${loggingOut ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                        {loggingOut ? <FaSpinner className="animate-spin" /> : <FaSignOutAlt />}
-                        <span>{loggingOut ? 'Logging out...' : 'Logout'}</span>
-                    </button>
+        <NavbarBrand>
+            <Link href="/">
+                <div className="relative h-[120px] w-[130px]">
+                    <Image
+                        src="/stocksense-logo-2.png"
+                        alt="StockSense logo"
+                        fill
+                        sizes="130px"
+                        priority
+                    />
                 </div>
+            </Link>
+        </NavbarBrand>
 
-                {/* Mobile dropdown menu */}
-                {isOpen && (
-                    <div className="sm:hidden px-4 pb-3 space-y-2">
-                        <Link
-                            href="/"
-                            onClick={() => setIsOpen(false)}
-                            className="block text-gray-700 hover:text-blue-600"
-                        >
-                            <FaSnowflake className="inline-block mr-1" /> Overview
-                        </Link>
-                        <Link
-                            href="/locations"
-                            onClick={() => setIsOpen(false)}
-                            className="block text-gray-700 hover:text-blue-600"
-                        >
-                            <FaHeart className="inline-block mr-1" /> Locations
-                        </Link>
-                        <button
-                            onClick={() => setShowModal(true)}
-                            disabled={loggingOut}
-                            className={`block text-red-500 hover:text-red-700 ${loggingOut ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                            {loggingOut ? (
-                                <>
-                                    <FaSpinner className="animate-spin inline-block mr-1" /> Logging out...
-                                </>
-                            ) : (
-                                <>
-                                    <FaSignOutAlt className="inline-block mr-1" /> Logout
-                                </>
-                            )}
-                        </button>
-                    </div>
-                )}
-            </nav>
+          <NavbarContent className="hidden sm:flex gap-2" justify="start">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeHref === item.href;
 
-            {/* Confirmation Modal */}
-            {showModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50">
-                    <div className="bg-white rounded-lg p-6 max-w-sm w-full shadow-lg">
-                        <h2 className="text-lg font-semibold mb-4">Confirm Logout</h2>
-                        <p className="mb-6">Are you sure you want to log out?</p>
-                        <div className="flex justify-end gap-2">
-                            <button
-                                onClick={() => setShowModal(false)}
-                                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setShowModal(false);
-                                    handleLogout();
-                                }}
-                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                            >
-                                {loggingOut ? (
-                                    <FaSpinner className="animate-spin inline-block mr-1" />
-                                ) : (
-                                    'Logout'
-                                )}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </>
-    );
+              return (
+                <NavbarItem key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={cx(
+                      "inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition",
+                      isActive
+                        ? "bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]"
+                        : "text-gray-600 hover:text-[#0E7488] hover:bg-gray-50"
+                    )}
+                    aria-current={isActive ? "page" : undefined}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </Link>
+                </NavbarItem>
+              );
+            })}
+          </NavbarContent>
+        </NavbarContent>
+
+        <NavbarContent justify="end" className="gap-2">
+          <NavbarItem className="hidden sm:flex">
+            <Button
+              variant="flat"
+              className={cx(
+                "rounded-xl border",
+                loggingOut
+                  ? "cursor-not-allowed opacity-70"
+                  : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+              )}
+              onPress={() => setShowLogoutModal(true)}
+              isDisabled={loggingOut}
+              startContent={
+                loggingOut ? (
+                  <FaSpinner className="animate-spin" />
+                ) : (
+                  <FaSignOutAlt />
+                )
+              }
+            >
+              {loggingOut ? "Logging out..." : "Logout"}
+            </Button>
+          </NavbarItem>
+        </NavbarContent>
+
+        {/* Mobile menu */}
+        <NavbarMenu className="pt-6">
+          <div className="px-2 pb-2 text-xs font-medium text-gray-400">
+            Navigation
+          </div>
+
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeHref === item.href;
+
+            return (
+              <NavbarMenuItem key={item.href}>
+                <Link
+                  href={item.href}
+                  onClick={() => setIsMenuOpen(false)}
+                  className={cx(
+                    "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition",
+                    isActive
+                      ? "bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]"
+                      : "text-gray-700 hover:bg-gray-50"
+                  )}
+                  aria-current={isActive ? "page" : undefined}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </Link>
+              </NavbarMenuItem>
+            );
+          })}
+
+          <div className="mt-3 border-t border-gray-200 pt-3">
+            <Button
+              variant="flat"
+              className={cx(
+                "w-full justify-start rounded-xl border",
+                loggingOut
+                  ? "cursor-not-allowed opacity-70"
+                  : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+              )}
+              onPress={() => setShowLogoutModal(true)}
+              isDisabled={loggingOut}
+              startContent={
+                loggingOut ? (
+                  <FaSpinner className="animate-spin" />
+                ) : (
+                  <FaSignOutAlt />
+                )
+              }
+            >
+              {loggingOut ? "Logging out..." : "Logout"}
+            </Button>
+          </div>
+        </NavbarMenu>
+      </Navbar>
+
+      {/* Logout confirmation modal */}
+      <Modal
+        isOpen={showLogoutModal}
+        onOpenChange={setShowLogoutModal}
+        placement="center"
+      >
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex flex-col gap-1">
+                Confirm logout
+              </ModalHeader>
+              <ModalBody>
+                <p className="text-sm text-gray-600">
+                  Are you sure you want to log out?
+                </p>
+              </ModalBody>
+              <ModalFooter>
+                <Button
+                  variant="light"
+                  className="rounded-xl"
+                  onPress={onClose}
+                  isDisabled={loggingOut}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="rounded-xl bg-rose-600 text-white"
+                  onPress={async () => {
+                    onClose();
+                    await handleLogout();
+                  }}
+                  isDisabled={loggingOut}
+                  startContent={
+                    loggingOut ? (
+                      <FaSpinner className="animate-spin" />
+                    ) : (
+                      <FaSignOutAlt />
+                    )
+                  }
+                >
+                  {loggingOut ? "Logging out..." : "Logout"}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+    </>
+  );
 }
