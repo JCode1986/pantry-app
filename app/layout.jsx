@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "StockSense",
   icons: {
-    icon: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
+    icon: "/icon.png",
+    apple: "/icon.png",
   },
 };
 

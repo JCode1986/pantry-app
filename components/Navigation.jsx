@@ -3,8 +3,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { logoutAction } from "@/app/actions/auth";
+import GlobalAddItemModal from "@/components/GlobalAddItemModal";
 import {
   Navbar,
   NavbarBrand,
@@ -28,6 +29,7 @@ import {
   FaSignOutAlt,
   FaSpinner,
   FaHome,
+  FaPlus,
 } from "react-icons/fa";
 
 const navItems = [
@@ -48,6 +50,9 @@ export default function Navigation() {
 
   const [loggingOut, setLoggingOut] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [addItemContext, setAddItemContext] = useState(null);
+  const [addItemNotice, setAddItemNotice] = useState(null);
 
   const activeHref = useMemo(() => {
     // Handle nested routes like /locations/[id]
@@ -68,6 +73,29 @@ export default function Navigation() {
       setLoggingOut(false);
     }
   };
+
+  useEffect(() => {
+    if (!addItemNotice) return;
+
+    const timeout = window.setTimeout(() => {
+      setAddItemNotice(null);
+    }, 3500);
+
+    return () => window.clearTimeout(timeout);
+  }, [addItemNotice]);
+
+  useEffect(() => {
+    const openAddItem = (event) => {
+      setAddItemContext(event.detail ?? null);
+      setShowAddItemModal(true);
+    };
+
+    window.addEventListener("stocksense:open-add-item", openAddItem);
+
+    return () => {
+      window.removeEventListener("stocksense:open-add-item", openAddItem);
+    };
+  }, []);
 
   return (
     <>
@@ -127,6 +155,19 @@ export default function Navigation() {
         <NavbarContent justify="end" className="gap-2">
           <NavbarItem className="hidden sm:flex">
             <Button
+              className="rounded-xl bg-[#0E7488] text-white"
+              onPress={() => {
+                setAddItemContext(null);
+                setShowAddItemModal(true);
+              }}
+              startContent={<FaPlus />}
+            >
+              Add Item
+            </Button>
+          </NavbarItem>
+
+          <NavbarItem className="hidden sm:flex">
+            <Button
               variant="flat"
               className={cx(
                 "rounded-xl border",
@@ -181,9 +222,21 @@ export default function Navigation() {
 
           <div className="mt-3 border-t border-gray-200 pt-3">
             <Button
+              className="w-full justify-start rounded-xl bg-[#0E7488] text-white"
+              onPress={() => {
+                setIsMenuOpen(false);
+                setAddItemContext(null);
+                setShowAddItemModal(true);
+              }}
+              startContent={<FaPlus />}
+            >
+              Add Item
+            </Button>
+
+            <Button
               variant="flat"
               className={cx(
-                "w-full justify-start rounded-xl border",
+                "mt-2 w-full justify-start rounded-xl border",
                 loggingOut
                   ? "cursor-not-allowed opacity-70"
                   : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
@@ -203,6 +256,26 @@ export default function Navigation() {
           </div>
         </NavbarMenu>
       </Navbar>
+
+      <GlobalAddItemModal
+        isOpen={showAddItemModal}
+        initialContext={addItemContext}
+        onClose={() => setShowAddItemModal(false)}
+        onAdded={({ itemName, destinationName }) =>
+          setAddItemNotice({ itemName, destinationName })
+        }
+      />
+
+      {addItemNotice && (
+        <div className="fixed right-4 top-4 z-50 max-w-sm rounded-xl border border-[#9FE7D7] bg-white px-4 py-3 shadow-lg">
+          <div className="text-sm font-semibold text-stocksense-teal">
+            Item added
+          </div>
+          <div className="text-sm text-gray-600">
+            {addItemNotice.itemName} was added to {addItemNotice.destinationName}.
+          </div>
+        </div>
+      )}
 
       {/* Logout confirmation modal */}
       <Modal

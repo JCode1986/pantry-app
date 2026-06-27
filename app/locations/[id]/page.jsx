@@ -91,7 +91,7 @@ export default async function Page({ params }) {
   return (
     <main className="max-w-[1300px] mx-auto p-6 pt-8 min-h-[100vh]">
       <h1 className="text-3xl font-bold mb-6 text-center md:text-left">
-        📦 {location.name}
+        {location.name}
       </h1>
       <StorageAreasSection
         locationName={location?.name}

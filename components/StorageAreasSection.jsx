@@ -25,26 +25,20 @@ import {
   FaArrowsAlt 
 } from 'react-icons/fa';
 import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
+import MoveItemsModal from './storage/MoveItemsModal';
+import OpenGlobalAddItemButton from './OpenGlobalAddItemButton';
+import {
+  daysUntil,
+  isExpiringSoon,
+  toNonNegativeInteger,
+  toPositiveInteger,
+} from '@/utils/pantry/date';
+import { containsQuery } from '@/utils/pantry/search';
 
 const collapseVariants = {
   collapsed: { height: 0, opacity: 0, transition: { duration: 0.2 } },
   open: { height: 'auto', opacity: 1, transition: { duration: 0.25 } },
 };
-
-// --- small date helpers ---
-const parseISO = (d) =>
-  typeof d === 'string' ? new Date(`${d}T00:00:00`) : d ? new Date(d) : null;
-
-const daysUntil = (d) => {
-  const date = parseISO(d);
-  if (!date) return Infinity;
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const diff = (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
-  return Math.floor(diff);
-};
-
-const isExpiringSoon = (d, withinDays) => daysUntil(d) <= withinDays;
 
 export default function StorageAreasSection({
   locationId,
@@ -53,7 +47,7 @@ export default function StorageAreasSection({
   // optional: pass all locations if you want true cross-location moves
   allLocations,
 }) {
-  const [storageAreas, setStorageAreas] = useState(initialStorageAreas);
+  const [storageAreas, setStorageAreas] = useState(initialStorageAreas ?? []);
   const [newStorageName, setNewStorageName] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState('');
@@ -93,6 +87,99 @@ export default function StorageAreasSection({
     payload: null,
     isDeleting: false,
   });
+
+  useEffect(() => {
+    const handleItemAdded = (event) => {
+      const item = event.detail?.item;
+      if (!item?.storageAreaId || String(item.locationId) !== String(locationId)) {
+        return;
+      }
+
+      const itemSummary = {
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity ?? 0,
+        expiration_date: item.expiration_date ?? null,
+        category_id: item.category_id ?? item.categoryId,
+      };
+
+      setStorageAreas((prev) => {
+        const areaExists = (prev ?? []).some(
+          (area) => String(area.id) === String(item.storageAreaId)
+        );
+
+        if (!areaExists) {
+          return [
+            ...(prev ?? []),
+            {
+              id: item.storageAreaId,
+              name: item.storageAreaName ?? 'Storage area',
+              categories: [
+                {
+                  id: item.categoryId,
+                  name: item.categoryName ?? 'Category',
+                  items: [itemSummary],
+                },
+              ],
+            },
+          ].sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        return (prev ?? []).map((area) => {
+          if (String(area.id) !== String(item.storageAreaId)) return area;
+
+          const categories = area.categories ?? [];
+          const categoryExists = categories.some(
+            (category) => String(category.id) === String(item.categoryId)
+          );
+
+          const nextCategories = categoryExists
+            ? categories.map((category) => {
+                if (String(category.id) !== String(item.categoryId)) {
+                  return category;
+                }
+
+                if ((category.items ?? []).some((i) => String(i.id) === String(item.id))) {
+                  return category;
+                }
+
+                return {
+                  ...category,
+                  items: [...(category.items ?? []), itemSummary],
+                };
+              })
+            : [
+                ...categories,
+                {
+                  id: item.categoryId,
+                  name: item.categoryName ?? 'Category',
+                  items: [itemSummary],
+                },
+              ];
+
+          return {
+            ...area,
+            categories: nextCategories,
+          };
+        });
+      });
+
+      setExpandedAreas((prev) => ({
+        ...prev,
+        [item.storageAreaId]: true,
+      }));
+      setExpandedCategories((prev) => ({
+        ...prev,
+        [item.categoryId]: true,
+      }));
+    };
+
+    window.addEventListener('stocksense:item-added', handleItemAdded);
+
+    return () => {
+      window.removeEventListener('stocksense:item-added', handleItemAdded);
+    };
+  }, [locationId]);
 
   const openDeleteDialog = (entityType, payload) => {
     setDeleteDialog({
@@ -150,7 +237,7 @@ export default function StorageAreasSection({
 
   const totalItems = useMemo(() => {
     let n = 0;
-    for (const a of storageAreas) {
+    for (const a of storageAreas ?? []) {
       for (const c of a.categories || []) n += c.items?.length || 0;
     }
     return n;
@@ -198,14 +285,6 @@ export default function StorageAreasSection({
       );
       setEditingId(null);
       setEditingName('');
-    }
-  };
-
-  const handleDeleteStorageArea = async (id) => {
-    if (!confirm('Delete this storage area?')) return;
-    const result = await deleteStorageArea(id);
-    if (!result?.error) {
-      setStorageAreas((prev) => prev.filter((a) => a.id !== id));
     }
   };
 
@@ -268,23 +347,6 @@ export default function StorageAreasSection({
     }
   };
 
-  const handleDeleteCategory = async (categoryId, storageAreaId) => {
-    if (!confirm('Delete this category?')) return;
-    const result = await deleteCategory(categoryId);
-    if (!result?.error) {
-      setStorageAreas((prev) =>
-        prev.map((a) =>
-          a.id === storageAreaId
-            ? {
-                ...a,
-                categories: a.categories.filter((c) => c.id !== categoryId),
-              }
-            : a
-        )
-      );
-    }
-  };
-
   const performDeleteCategory = async (categoryId, storageAreaId) => {
     const result = await deleteCategory(categoryId);
     if (!result?.error) {
@@ -310,9 +372,7 @@ export default function StorageAreasSection({
 
     const payload = {
       name: item.name.trim(),
-      quantity: Number.isFinite(+item.quantity)
-        ? parseInt(String(item.quantity), 10)
-        : 0,
+      quantity: toNonNegativeInteger(item.quantity, 0),
       expiration_date: item.expiration || null,
     };
 
@@ -366,29 +426,6 @@ export default function StorageAreasSection({
     setEditingItem((prev) => ({ ...prev, [itemId]: undefined }));
   };
 
-  const handleDeleteItem = async (itemId, categoryId, storageAreaId) => {
-    const result = await deleteItem(itemId);
-    if (!result?.error) {
-      setStorageAreas((prev) =>
-        prev.map((area) =>
-          area.id === storageAreaId
-            ? {
-                ...area,
-                categories: area.categories.map((cat) =>
-                  cat.id === categoryId
-                    ? {
-                        ...cat,
-                        items: cat.items.filter((it) => it.id !== itemId),
-                      }
-                    : cat
-                ),
-              }
-            : area
-        )
-      );
-    }
-  };
-
   const performDeleteItem = async (itemId, categoryId, storageAreaId) => {
     const result = await deleteItem(itemId);
     if (!result?.error) {
@@ -412,37 +449,6 @@ export default function StorageAreasSection({
     } else {
       console.error('deleteItem error:', result.error);
     }
-  };
-
-  // bulk delete for a category
-  const handleBulkDelete = async (categoryId, storageAreaId) => {
-    const selectedMap = selectedByCategory[categoryId] || {};
-    const ids = Object.keys(selectedMap).filter((k) => selectedMap[k]);
-    if (ids.length === 0) return;
-    if (!confirm(`Delete ${ids.length} selected item${ids.length > 1 ? 's' : ''}?`))
-      return;
-
-    for (const id of ids) await deleteItem(id);
-
-    setStorageAreas((prev) =>
-      prev.map((area) =>
-        area.id === storageAreaId
-          ? {
-              ...area,
-              categories: area.categories.map((cat) =>
-                cat.id === categoryId
-                  ? {
-                      ...cat,
-                      items: (cat.items || []).filter((i) => !selectedMap[i.id]),
-                    }
-                  : cat
-              ),
-            }
-          : area
-      )
-    );
-
-    setSelectedByCategory((prev) => ({ ...prev, [categoryId]: {} }));
   };
 
   const performBulkDeleteItems = async (itemIds, categoryId, storageAreaId) => {
@@ -714,7 +720,7 @@ export default function StorageAreasSection({
   const normalizedSearch = search.trim().toLowerCase();
   const filterItem = (item) => {
     const nameOk =
-      !normalizedSearch || item.name.toLowerCase().includes(normalizedSearch);
+      !normalizedSearch || containsQuery(item.name, normalizedSearch);
     const expOk =
       !expSoonEnabled || isExpiringSoon(item.expiration_date, expDays);
     return nameOk && expOk;
@@ -722,7 +728,7 @@ export default function StorageAreasSection({
 
   const filterCategoryVisible = (category) => {
     const nameMatch =
-      !normalizedSearch || category.name.toLowerCase().includes(normalizedSearch);
+      !normalizedSearch || containsQuery(category.name, normalizedSearch);
     if (nameMatch) return true;
     return (category.items || []).some(filterItem);
   };
@@ -770,7 +776,7 @@ export default function StorageAreasSection({
                 min={1}
                 value={expDays}
                 onChange={(e) =>
-                  setExpDays(Math.max(1, parseInt(e.target.value || '7', 10)))
+                  setExpDays(toPositiveInteger(e.target.value, 7))
                 }
                 className={`border border-stocksense-gray rounded px-2 py-1 w-16 ${
                   !expSoonEnabled && 'bg-gray-100 text-gray-400'
@@ -809,6 +815,11 @@ export default function StorageAreasSection({
               } transition-all duration-150 cursor-pointer`}
             />
           </button>
+          <OpenGlobalAddItemButton
+            context={{
+              locationId,
+            }}
+          />
         </div>
 
         {/* Add area */}
@@ -908,12 +919,6 @@ export default function StorageAreasSection({
                     >
                       <FaEdit />
                     </button>
-                    {/* <button
-                      onClick={() => handleDeleteStorageArea(area.id)}
-                      className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
-                    >
-                      <FaTrash />
-                    </button> */}
                     <button
                       onClick={() =>
                         openDeleteDialog('area', {
@@ -1072,14 +1077,6 @@ export default function StorageAreasSection({
                                     >
                                       <FaEdit />
                                     </button>
-                                    {/* <button
-                                      onClick={() =>
-                                        handleDeleteCategory(category.id, area.id)
-                                      }
-                                      className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
-                                    >
-                                      <FaTrash />
-                                    </button> */}
                                     <button
                                       onClick={() =>
                                         openDeleteDialog('category', {
@@ -1199,18 +1196,6 @@ export default function StorageAreasSection({
                                           >
                                             Move selected items
                                           </button>
-                                          {/* <button
-                                            onClick={() =>
-                                              handleBulkDelete(category.id, area.id)
-                                            }
-                                            className="text-rose-700 border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-md cursor-pointer"
-                                          >
-                                            Delete selected items (
-                                            {Object.values(
-                                              selectedByCategory[category.id]
-                                            ).filter(Boolean).length}
-                                            )
-                                          </button> */}
                                           <button
                                             onClick={() => {
                                               const selectedMap = selectedByCategory[category.id] || {};
@@ -1320,14 +1305,11 @@ export default function StorageAreasSection({
                                                       name:
                                                         (e.name ?? '').trim() ||
                                                         item.name,
-                                                      quantity: Number.isFinite(
-                                                        +e.quantity
-                                                      )
-                                                        ? parseInt(
-                                                            String(e.quantity),
-                                                            10
-                                                          )
-                                                        : item.quantity ?? 0,
+                                                      quantity:
+                                                        toNonNegativeInteger(
+                                                          e.quantity,
+                                                          item.quantity ?? 0
+                                                        ),
                                                       expiration_date:
                                                         e.expiration_date ??
                                                         item.expiration_date ??
@@ -1423,20 +1405,6 @@ export default function StorageAreasSection({
                                                 >
                                                   <FaEdit />
                                                 </button>
-                                                {/* <button
-                                                  onClick={async () => {
-                                                    if (!confirm('Delete this item?'))
-                                                      return;
-                                                    await handleDeleteItem(
-                                                      item.id,
-                                                      category.id,
-                                                      area.id
-                                                    );
-                                                  }}
-                                                  className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
-                                                >
-                                                  <FaTrash />
-                                                </button> */}
                                                 <button
                                                   onClick={() =>
                                                     openDeleteDialog('item', {
@@ -1474,205 +1442,14 @@ export default function StorageAreasSection({
         ))}
       </div>
 
-      {/* Move Items Modal */}
-      <AnimatePresence>
-        {moveModal.open && (
-          <motion.div
-            className="fixed inset-0 z-40 flex items-center justify-center bg-black/40"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 10 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 10 }}
-              className="w-full max-w-md rounded-2xl bg-white shadow-xl border border-stocksense-gray p-5 space-y-4"
-            >
-              <h2 className="text-lg font-semibold text-stocksense-teal">
-                Move {moveModal.itemIds.length} item
-                {moveModal.itemIds.length > 1 ? 's' : ''}
-              </h2>
-              <p className="text-sm text-gray-500">
-                Choose where you want to move the selected item
-                {moveModal.itemIds.length > 1 ? 's' : ''}.
-              </p>
-
-              {/* Location */}
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-gray-600">Location</label>
-                <select
-                  value={
-                    moveModal.targetLocationId
-                      ? String(moveModal.targetLocationId)
-                      : ''
-                  }
-                  onChange={(e) => {
-                    const newLocId = e.target.value || null;
-                    const loc =
-                      locationsForMove.find(
-                        (l) => String(l.id) === String(newLocId)
-                      ) || locationsForMove[0];
-
-                    const areasForLoc =
-                      String(loc.id) === String(locationId)
-                        ? storageAreas
-                        : loc.storageAreas || [];
-
-                    const firstArea = areasForLoc?.[0];
-                    const firstCat = firstArea?.categories?.[0];
-
-                    setMoveModal((prev) => ({
-                      ...prev,
-                      targetLocationId: newLocId,
-                      targetAreaId: firstArea ? firstArea.id : null,
-                      targetCategoryId: firstCat ? firstCat.id : null,
-                    }));
-                  }}
-                  className="w-full rounded-lg border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
-                >
-                  {locationsForMove.map((loc) => (
-                    <option key={loc.id} value={String(loc.id)}>
-                      {loc.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Target storage area */}
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-gray-600">
-                  Storage area
-                </label>
-                <select
-                  value={moveModal.targetAreaId ? String(moveModal.targetAreaId) : ''}
-                  onChange={(e) => {
-                    const newAreaId = e.target.value || null;
-
-                    const loc =
-                      locationsForMove.find(
-                        (l) =>
-                          String(l.id) === String(moveModal.targetLocationId)
-                      ) || locationsForMove[0];
-
-                    const areasForLoc =
-                      String(loc.id) === String(locationId)
-                        ? storageAreas
-                        : loc.storageAreas || [];
-
-                    const area =
-                      areasForLoc.find(
-                        (a) => String(a.id) === String(newAreaId)
-                      ) || null;
-                    const firstCat = area?.categories?.[0];
-
-                    setMoveModal((prev) => ({
-                      ...prev,
-                      targetAreaId: newAreaId,
-                      targetCategoryId: firstCat ? firstCat.id : null,
-                    }));
-                  }}
-                  className="w-full rounded-lg border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
-                >
-                  <option value="">Select area…</option>
-                  {(() => {
-                    const loc =
-                      locationsForMove.find(
-                        (l) =>
-                          String(l.id) === String(moveModal.targetLocationId)
-                      ) || locationsForMove[0];
-
-                    const areasForLoc =
-                      String(loc.id) === String(locationId)
-                        ? storageAreas
-                        : loc.storageAreas || [];
-
-                    return areasForLoc.map((a) => (
-                      <option key={a.id} value={String(a.id)}>
-                        {a.name}
-                      </option>
-                    ));
-                  })()}
-                </select>
-              </div>
-
-              {/* Target category */}
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-gray-600">
-                  Category
-                </label>
-                <select
-                  value={
-                    moveModal.targetCategoryId
-                      ? String(moveModal.targetCategoryId)
-                      : ''
-                  }
-                  onChange={(e) =>
-                    setMoveModal((prev) => ({
-                      ...prev,
-                      targetCategoryId: e.target.value || null,
-                    }))
-                  }
-                  disabled={!moveModal.targetAreaId}
-                  className="w-full rounded-lg border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50 disabled:bg-gray-50 disabled:text-gray-400"
-                >
-                  <option value="">Select category…</option>
-                  {(() => {
-                    const loc =
-                      locationsForMove.find(
-                        (l) =>
-                          String(l.id) === String(moveModal.targetLocationId)
-                      ) || locationsForMove[0];
-
-                    const areasForLoc =
-                      String(loc.id) === String(locationId)
-                        ? storageAreas
-                        : loc.storageAreas || [];
-
-                    const area = areasForLoc.find(
-                      (a) =>
-                        String(a.id) === String(moveModal.targetAreaId)
-                    );
-                    return (
-                      area?.categories?.map((c) => (
-                        <option key={c.id} value={String(c.id)}>
-                          {c.name}
-                        </option>
-                      )) || null
-                    );
-                  })()}
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  onClick={() =>
-                    setMoveModal({
-                      open: false,
-                      sourceAreaId: null,
-                      sourceCategoryId: null,
-                      targetLocationId: locationId,
-                      targetAreaId: null,
-                      targetCategoryId: null,
-                      itemIds: [],
-                    })
-                  }
-                  className="px-3 py-1.5 text-sm rounded-lg border border-stocksense-gray hover:bg-gray-50 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleConfirmMove}
-                  disabled={!moveModal.targetAreaId || !moveModal.targetCategoryId}
-                  className="px-3 py-1.5 text-sm rounded-lg bg-[#0E7488] text-white hover:bg-[#0B5563] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  Move
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <MoveItemsModal
+        moveModal={moveModal}
+        setMoveModal={setMoveModal}
+        locationsForMove={locationsForMove}
+        storageAreas={storageAreas}
+        currentLocationId={locationId}
+        onConfirm={handleConfirmMove}
+      />
 
       {/* Reusable delete confirmation modal */}
       <ConfirmDeleteModal

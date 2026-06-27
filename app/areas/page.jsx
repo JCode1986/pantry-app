@@ -34,10 +34,9 @@ export default async function Page() {
     ...new Set((areasRaw ?? []).map((a) => a.location_id).filter(Boolean)),
   ];
 
-  const { data: locationsRaw, error: locationsError } = await supabase
-    .from("locations")
-    .select("id, name")
-    .in("id", locationIds);
+  const { data: locationsRaw, error: locationsError } = locationIds.length
+    ? await supabase.from("locations").select("id, name").in("id", locationIds)
+    : { data: [], error: null };
 
   if (locationsError) {
     console.error("Locations fetch error (message):", locationsError?.message);

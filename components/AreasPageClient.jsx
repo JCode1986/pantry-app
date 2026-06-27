@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Input,
   Button,
@@ -13,9 +13,11 @@ import {
 import { FaSearch } from "react-icons/fa";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import { updateStorageArea, deleteStorageArea } from "@/app/actions/server";
+import { containsQuery } from "@/utils/pantry/search";
+import OpenGlobalAddItemButton from "@/components/OpenGlobalAddItemButton";
 
 export default function AreasPageClient({ initialAreas }) {
-  const [areas, setAreas] = useState(initialAreas);
+  const [areas, setAreas] = useState(initialAreas ?? []);
   const [search, setSearch] = useState("");
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -34,15 +36,91 @@ export default function AreasPageClient({ initialAreas }) {
     [areas, activeAreaId]
   );
 
+  useEffect(() => {
+    const handleItemAdded = (event) => {
+      const item = event.detail?.item;
+      if (!item?.storageAreaId) return;
+
+      setAreas((prev) => {
+        const existingArea = prev.find(
+          (area) => String(area.id) === String(item.storageAreaId)
+        );
+
+        if (!existingArea) {
+          return [
+            ...prev,
+            {
+              id: item.storageAreaId,
+              name: item.storageAreaName ?? "Storage area",
+              location: {
+                id: item.locationId ?? null,
+                name: item.locationName ?? "Unknown location",
+              },
+              categories: [
+                {
+                  id: item.categoryId,
+                  name: item.categoryName ?? "Category",
+                  itemsCount: 1,
+                },
+              ],
+              categoriesCount: 1,
+              itemsCount: 1,
+            },
+          ].sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        return prev.map((area) => {
+          if (String(area.id) !== String(item.storageAreaId)) return area;
+
+          const categories = area.categories ?? [];
+          const existingCategory = categories.find(
+            (category) => String(category.id) === String(item.categoryId)
+          );
+
+          const nextCategories = existingCategory
+            ? categories.map((category) =>
+                String(category.id) === String(item.categoryId)
+                  ? {
+                      ...category,
+                      itemsCount: (category.itemsCount ?? 0) + 1,
+                    }
+                  : category
+              )
+            : [
+                ...categories,
+                {
+                  id: item.categoryId,
+                  name: item.categoryName ?? "Category",
+                  itemsCount: 1,
+                },
+              ];
+
+          return {
+            ...area,
+            categories: nextCategories,
+            categoriesCount: nextCategories.length,
+            itemsCount: (area.itemsCount ?? 0) + 1,
+          };
+        });
+      });
+    };
+
+    window.addEventListener("stocksense:item-added", handleItemAdded);
+
+    return () => {
+      window.removeEventListener("stocksense:item-added", handleItemAdded);
+    };
+  }, []);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return areas;
 
     return areas.filter((a) => {
-      const areaMatch = a.name.toLowerCase().includes(q);
-      const locMatch = (a.location?.name || "").toLowerCase().includes(q);
+      const areaMatch = containsQuery(a.name, q);
+      const locMatch = containsQuery(a.location?.name, q);
       const catMatch = (a.categories || []).some((c) =>
-        c.name.toLowerCase().includes(q)
+        containsQuery(c.name, q)
       );
       return areaMatch || locMatch || catMatch;
     });
@@ -147,7 +225,7 @@ export default function AreasPageClient({ initialAreas }) {
             key={a.id}
             onClick={() => openDrawer(a)}
             className="text-left rounded-2xl border border-stocksense-gray bg-white shadow-sm p-4
-                       hover:bg-gray-50 transition"
+                       hover:bg-gray-50 transition cursor-pointer"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -168,8 +246,20 @@ export default function AreasPageClient({ initialAreas }) {
         ))}
 
         {filtered.length === 0 && (
-          <div className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center text-gray-500">
-            No storage areas match your search.
+          <div className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center">
+            <p className="text-gray-500">No storage areas match your search.</p>
+            <div className="mt-4 flex justify-center">
+              <OpenGlobalAddItemButton
+                context={
+                  activeArea
+                    ? {
+                        locationId: activeArea.location?.id,
+                        storageAreaId: activeArea.id,
+                      }
+                    : undefined
+                }
+              />
+            </div>
           </div>
         )}
       </div>

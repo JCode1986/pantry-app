@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { FaPlus, FaTrash, FaEdit, FaCheck, FaTimes } from 'react-icons/fa';
 import { addStorage, deleteStorage, updateStorageName } from '@/app/actions/server';
+import { containsQuery } from '@/utils/pantry/search';
 
 export default function HomeSection({ user, storages }) {
   const [allStorages, setAllStorages] = useState(storages || []);
@@ -64,13 +65,11 @@ export default function HomeSection({ user, storages }) {
   const filteredStorages =
     filter === 'All'
       ? allStorages
-      : allStorages.filter((s) =>
-          s.name.toLowerCase().includes(filter.toLowerCase())
-        );
+      : allStorages.filter((s) => containsQuery(s.name, filter.toLowerCase()));
 
   return (
     <main className="p-6 max-w-5xl mx-auto mt-20">
-      <h1 className="text-3xl font-bold mb-6">🍱 My Food Storages</h1>
+      <h1 className="text-3xl font-bold mb-6">My Food Storages</h1>
 
       <div className="flex flex-col sm:flex-row sm:justify-between gap-4 mb-6">
         {/* Add Storage */}

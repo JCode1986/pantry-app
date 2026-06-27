@@ -1,13 +1,15 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Input, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
 import { FaSearch } from "react-icons/fa";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import { updateCategoryName, deleteCategory } from "@/app/actions/server";
+import { containsQuery } from "@/utils/pantry/search";
+import OpenGlobalAddItemButton from "@/components/OpenGlobalAddItemButton";
 
 export default function CategoriesPageClient({ initialCategories }) {
-  const [categories, setCategories] = useState(initialCategories);
+  const [categories, setCategories] = useState(initialCategories ?? []);
   const [search, setSearch] = useState("");
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -25,15 +27,77 @@ export default function CategoriesPageClient({ initialCategories }) {
     [categories, activeCategoryId]
   );
 
+  useEffect(() => {
+    const handleItemAdded = (event) => {
+      const item = event.detail?.item;
+      if (!item?.categoryId) return;
+
+      setCategories((prev) => {
+        const existingCategory = prev.find(
+          (category) => String(category.id) === String(item.categoryId)
+        );
+
+        const itemSummary = {
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity ?? 0,
+          expiration_date: item.expiration_date ?? null,
+        };
+
+        if (!existingCategory) {
+          return [
+            ...prev,
+            {
+              id: item.categoryId,
+              name: item.categoryName ?? "Category",
+              insertedAt: null,
+              storageArea: {
+                id: item.storageAreaId ?? null,
+                name: item.storageAreaName ?? "Unknown area",
+              },
+              location: {
+                id: item.locationId ?? null,
+                name: item.locationName ?? "Unknown location",
+              },
+              items: [itemSummary],
+              itemsCount: 1,
+            },
+          ].sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        return prev.map((category) => {
+          if (String(category.id) !== String(item.categoryId)) return category;
+          if ((category.items ?? []).some((i) => String(i.id) === String(item.id))) {
+            return category;
+          }
+
+          const items = [...(category.items ?? []), itemSummary];
+
+          return {
+            ...category,
+            items,
+            itemsCount: items.length,
+          };
+        });
+      });
+    };
+
+    window.addEventListener("stocksense:item-added", handleItemAdded);
+
+    return () => {
+      window.removeEventListener("stocksense:item-added", handleItemAdded);
+    };
+  }, []);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return categories;
 
     return categories.filter((c) => {
-      const nameMatch = c.name.toLowerCase().includes(q);
-      const locMatch = (c.location?.name || "").toLowerCase().includes(q);
-      const areaMatch = (c.storageArea?.name || "").toLowerCase().includes(q);
-      const itemMatch = (c.items || []).some((i) => i.name.toLowerCase().includes(q));
+      const nameMatch = containsQuery(c.name, q);
+      const locMatch = containsQuery(c.location?.name, q);
+      const areaMatch = containsQuery(c.storageArea?.name, q);
+      const itemMatch = (c.items || []).some((i) => containsQuery(i.name, q));
       return nameMatch || locMatch || areaMatch || itemMatch;
     });
   }, [categories, search]);
@@ -126,10 +190,6 @@ export default function CategoriesPageClient({ initialCategories }) {
                 inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
               }}
             />
-            {/* Add Category (optional): requires selecting location/area because categories belong to an area */}
-            <Button className="rounded-xl bg-[#0E7488] text-white">
-              + Add Category
-            </Button>
           </div>
         </div>
       </div>
@@ -140,7 +200,7 @@ export default function CategoriesPageClient({ initialCategories }) {
           <button
             key={c.id}
             onClick={() => openDrawer(c)}
-            className="text-left rounded-2xl border border-stocksense-gray bg-white shadow-sm p-4 hover:bg-gray-50 transition"
+            className="text-left rounded-2xl border border-stocksense-gray bg-white shadow-sm p-4 hover:bg-gray-50 transition cursor-pointer"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -162,8 +222,11 @@ export default function CategoriesPageClient({ initialCategories }) {
         ))}
 
         {filtered.length === 0 && (
-          <div className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center text-gray-500">
-            No categories match your search.
+          <div className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center">
+            <p className="text-gray-500">No categories match your search.</p>
+            <div className="mt-4 flex justify-center">
+              <OpenGlobalAddItemButton />
+            </div>
           </div>
         )}
       </div>

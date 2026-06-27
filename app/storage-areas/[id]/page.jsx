@@ -1,17 +1,23 @@
 import { createClient } from '@/utils/supabase/server';
 import Link from 'next/link';
 import CategoriesGrid from '@/components/CategoriesGrid';
+import { notFound } from 'next/navigation';
 
 export default async function StorageAreaCategoriesPage({ params }) {
   const supabase = await createClient();
   const { id } = await params;
 
   // Area + parent location for breadcrumb
-  const { data: area } = await supabase
+  const { data: area, error: areaError } = await supabase
     .from('storage_areas')
     .select('id, name, location_id, locations(name)')
     .eq('id', id)
     .single();
+
+  if (areaError || !area) {
+    console.error('Storage area fetch error:', areaError?.message || areaError);
+    notFound();
+  }
 
   // Categories in this area
   const { data: categories = [] } = await supabase
@@ -24,14 +30,14 @@ export default async function StorageAreaCategoriesPage({ params }) {
     <main className="mx-auto max-w-6xl px-5 py-8 space-y-6">
       <nav className="text-sm text-gray-500">
         <Link href={`/locations/${area?.location_id}`} className="hover:underline">
-          {area?.locations?.name}
+          {area.locations?.name ?? 'Unknown location'}
         </Link>{' '}
-        / <span className="text-gray-700">{area?.name}</span>
+        / <span className="text-gray-700">{area.name}</span>
       </nav>
 
       <header>
         <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
-          {area?.name} – Categories
+          {area.name} - Categories
         </h1>
         <p className="text-gray-500">All categories inside this storage area</p>
       </header>

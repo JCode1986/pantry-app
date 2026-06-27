@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   addLocation,
   deleteLocation,
@@ -33,6 +33,52 @@ export default function LocationsSection({ locations }) {
     locationId: null,
     name: '',
   });
+
+  useEffect(() => {
+    const handleItemAdded = (event) => {
+      const item = event.detail?.item;
+      if (!item?.locationId) return;
+
+      setAllLocations((prev) => {
+        const locationExists = (prev ?? []).some(
+          (location) => String(location.id) === String(item.locationId)
+        );
+
+        if (!locationExists) {
+          return [
+            ...(prev ?? []),
+            {
+              id: item.locationId,
+              name: item.locationName ?? 'Location',
+              created_at: null,
+              areasCount: 1,
+              categoriesCount: 1,
+              itemsCount: 1,
+            },
+          ].sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        return (prev ?? []).map((location) =>
+          String(location.id) === String(item.locationId)
+            ? {
+                ...location,
+                areasCount:
+                  (location.areasCount ?? 0) + (item.createdStorageArea ? 1 : 0),
+                categoriesCount:
+                  (location.categoriesCount ?? 0) + (item.createdCategory ? 1 : 0),
+                itemsCount: (location.itemsCount ?? 0) + 1,
+              }
+            : location
+        );
+      });
+    };
+
+    window.addEventListener('stocksense:item-added', handleItemAdded);
+
+    return () => {
+      window.removeEventListener('stocksense:item-added', handleItemAdded);
+    };
+  }, []);
 
   // Motion variants
   const listVariants = {

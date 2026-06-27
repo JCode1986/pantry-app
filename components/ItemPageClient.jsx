@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Input,
   Button,
@@ -13,24 +13,17 @@ import {
 import { FaSearch } from "react-icons/fa";
 import { updateItem, deleteItem, updateItemLocation } from "@/app/actions/server";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
-
-// --- date helpers ---
-const parseISO = (d) =>
-  typeof d === "string" ? new Date(`${d}T00:00:00`) : d ? new Date(d) : null;
-
-const daysUntil = (d) => {
-  const date = parseISO(d);
-  if (!date) return Infinity;
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const diff = (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
-  return Math.floor(diff);
-};
-
-const isExpiringSoon = (d, withinDays) => daysUntil(d) <= withinDays;
+import OpenGlobalAddItemButton from "@/components/OpenGlobalAddItemButton";
+import {
+  daysUntil,
+  isExpiringSoon,
+  toNonNegativeInteger,
+  toPositiveInteger,
+} from "@/utils/pantry/date";
+import { containsQuery } from "@/utils/pantry/search";
 
 export default function ItemsPageClient({ initialItems, moveLocations }) {
-  const [items, setItems] = useState(initialItems);
+  const [items, setItems] = useState(initialItems ?? []);
 
   // filters
   const [search, setSearch] = useState("");
@@ -70,15 +63,60 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
     [items, activeItemId]
   );
 
+  useEffect(() => {
+    const handleItemAdded = (event) => {
+      const item = event.detail?.item;
+      if (!item?.id) return;
+
+      const loc =
+        moveLocations.find((l) => String(l.id) === String(item.locationId)) ||
+        null;
+      const area =
+        (loc?.storage_areas || []).find(
+          (a) => String(a.id) === String(item.storageAreaId)
+        ) || null;
+      const cat =
+        (area?.categories || []).find(
+          (c) => String(c.id) === String(item.categoryId)
+        ) || null;
+
+      const normalizedItem = {
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity ?? 0,
+        expiration_date: item.expiration_date ?? null,
+        category_id: item.category_id ?? item.categoryId ?? null,
+        location: loc ? { id: loc.id, name: loc.name } : null,
+        area: area ? { id: area.id, name: area.name } : null,
+        category: cat ? { id: cat.id, name: cat.name } : null,
+      };
+
+      setItems((prev) => {
+        if (prev.some((existing) => String(existing.id) === String(item.id))) {
+          return prev;
+        }
+
+        return [...prev, normalizedItem].sort((a, b) =>
+          a.name.localeCompare(b.name)
+        );
+      });
+    };
+
+    window.addEventListener("stocksense:item-added", handleItemAdded);
+
+    return () => {
+      window.removeEventListener("stocksense:item-added", handleItemAdded);
+    };
+  }, [moveLocations]);
+
   const normalizedSearch = search.trim().toLowerCase();
 
   const filteredItems = useMemo(() => {
     return (items || []).filter((it) => {
-      const nameOk =
-        !normalizedSearch || (it.name || "").toLowerCase().includes(normalizedSearch);
+      const nameOk = !normalizedSearch || containsQuery(it.name, normalizedSearch);
 
-      const path = `${it.location?.name || ""} ${it.area?.name || ""} ${it.category?.name || ""}`.toLowerCase();
-      const pathOk = !normalizedSearch || path.includes(normalizedSearch);
+      const path = `${it.location?.name || ""} ${it.area?.name || ""} ${it.category?.name || ""}`;
+      const pathOk = !normalizedSearch || containsQuery(path, normalizedSearch);
 
       const expOk = !expSoonEnabled || isExpiringSoon(it.expiration_date, expDays);
 
@@ -165,7 +203,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
     const name = editName.trim();
     if (!name) return;
 
-    const qty = Number.isFinite(+editQty) ? parseInt(String(editQty), 10) : 0;
+    const qty = toNonNegativeInteger(editQty, 0);
 
     const updated = {
       name,
@@ -448,7 +486,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                 type="number"
                 min={1}
                 value={expDays}
-                onChange={(e) => setExpDays(Math.max(1, parseInt(e.target.value || "7", 10)))}
+                onChange={(e) => setExpDays(toPositiveInteger(e.target.value, 7))}
                 className={`border border-stocksense-gray rounded px-2 py-1 w-16 ${
                   !expSoonEnabled && "bg-gray-100 text-gray-400"
                 }`}
@@ -580,7 +618,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                 {/* Right: open drawer */}
                 <button
                   onClick={() => openDrawer(it)}
-                  className="shrink-0 text-gray-300 hover:text-gray-500"
+                  className="shrink-0 text-gray-300 hover:text-gray-500 cursor-pointer"
                   title="Open item"
                 >
                   →
@@ -591,8 +629,11 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
         })}
 
         {filteredItems.length === 0 && (
-          <div className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center text-gray-500">
-            No items match your search.
+          <div className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center">
+            <p className="text-gray-500">No items match your search.</p>
+            <div className="mt-4 flex justify-center">
+              <OpenGlobalAddItemButton />
+            </div>
           </div>
         )}
       </div>

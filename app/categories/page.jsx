@@ -24,7 +24,8 @@ export default async function Page() {
             quantity,
             expiration_date
         )
-    `);
+    `)
+        .order("name", { ascending: true });
 
 
 
@@ -37,12 +38,12 @@ export default async function Page() {
         name: c.name,
         insertedAt: c.inserted_at,
         storageArea: {
-            id: c.storage_area?.id,
-            name: c.storage_area?.name,
+            id: c.storage_area?.id ?? null,
+            name: c.storage_area?.name ?? "Unknown area",
         },
         location: {
-            id: c.storage_area?.location?.id,
-            name: c.storage_area?.location?.name,
+            id: c.storage_area?.location?.id ?? null,
+            name: c.storage_area?.location?.name ?? "Unknown location",
         },
         items: c.items ?? [],
         itemsCount: (c.items ?? []).length,

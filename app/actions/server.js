@@ -2,6 +2,15 @@
 import { createClient } from '@/utils/supabase/server';
 import axios from 'axios';
 import { revalidatePath } from 'next/cache';
+import { toNonNegativeInteger } from '@/utils/pantry/date';
+
+function normalizeName(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function validationError(message) {
+  return { data: null, error: message };
+}
 
 export async function fetchRecipes(ingredients) {
   try {
@@ -32,16 +41,22 @@ export async function getLocations() {
 }
 
 export async function addLocation(name) {
+  const normalizedName = normalizeName(name);
+  if (!normalizedName) return validationError('Location name is required');
+
   const supabase = await createClient();
-  const { data, error } = await supabase.from('locations').insert([{ name }]).select('*');
+  const { data, error } = await supabase.from('locations').insert([{ name: normalizedName }]).select('*');
   if (error) throw error;
   revalidatePath('/');
   return data[0];
 }
 
 export async function updateLocationName(id, newName) {
+  const normalizedName = normalizeName(newName);
+  if (!id || !normalizedName) return validationError('Location name is required');
+
   const supabase = await createClient();
-  const { error } = await supabase.from('locations').update({ name: newName }).eq('id', id);
+  const { error } = await supabase.from('locations').update({ name: normalizedName }).eq('id', id);
   if (error) throw error;
   revalidatePath('/');
 }
@@ -73,11 +88,16 @@ export async function getStorageAreas(locationId) {
 
 // ✅ Add a new storage area
 export async function addStorageArea(locationId, name) {
+  const normalizedName = normalizeName(name);
+  if (!locationId || !normalizedName) {
+    return validationError('Location and storage area name are required');
+  }
+
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from('storage_areas')
-    .insert([{ location_id: locationId, name }])
+    .insert([{ location_id: locationId, name: normalizedName }])
     .select();
 
   if (error) {
@@ -85,17 +105,21 @@ export async function addStorageArea(locationId, name) {
     return { error: error.message };
   }
 
-  revalidatePath(`/location/${locationId}`);
+  revalidatePath(`/locations/${locationId}`);
+  revalidatePath('/areas');
   return { data: data[0] };
 }
 
 // updateStorageArea
 export async function updateStorageArea(id, name) {
+  const normalizedName = normalizeName(name);
+  if (!id || !normalizedName) return validationError('Storage area name is required');
+
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from('storage_areas')
-    .update({ name })
+    .update({ name: normalizedName })
     .eq('id', id)
     .select('*')
     .single();
@@ -116,11 +140,23 @@ export async function deleteStorageArea(id) {
 }
 
 export async function addItem(categoryId, { name, quantity = 0, expiration_date = null }) {
+  const normalizedName = normalizeName(name);
+  if (!categoryId || !normalizedName) {
+    return validationError('Category and item name are required');
+  }
+
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from('items')
-    .insert([{ category_id: categoryId, name, quantity, expiration_date }])
+    .insert([
+      {
+        category_id: categoryId,
+        name: normalizedName,
+        quantity: toNonNegativeInteger(quantity, 0),
+        expiration_date: expiration_date || null,
+      },
+    ])
     .select('*')               
     .single();                 
 
@@ -132,14 +168,209 @@ export async function addItem(categoryId, { name, quantity = 0, expiration_date 
   return { data };            
 }
 
+export async function getInventoryHierarchy() {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('locations')
+    .select(`
+      id,
+      name,
+      storage_areas (
+        id,
+        name,
+        storage_categories (
+          id,
+          name
+        )
+      )
+    `)
+    .order('name', { ascending: true });
+
+  if (error) {
+    console.error('getInventoryHierarchy error:', error);
+    return { data: [], error: error.message };
+  }
+
+  return {
+    data: (data ?? []).map((location) => ({
+      id: location.id,
+      name: location.name,
+      storageAreas: (location.storage_areas ?? [])
+        .map((area) => ({
+          id: area.id,
+          name: area.name,
+          categories: (area.storage_categories ?? []).map((category) => ({
+            id: category.id,
+            name: category.name,
+          })),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    })),
+    error: null,
+  };
+}
+
+export async function addItemWithPath({
+  locationId,
+  locationName,
+  storageAreaId,
+  storageAreaName,
+  categoryId,
+  categoryName,
+  itemName,
+  quantity = 0,
+  expirationDate = null,
+}) {
+  const normalizedItemName = normalizeName(itemName);
+  if (!normalizedItemName) return validationError('Item name is required');
+
+  const supabase = await createClient();
+
+  let finalLocationId = locationId || null;
+  let finalLocationName = null;
+  let createdLocation = false;
+  if (!finalLocationId) {
+    const normalizedLocationName = normalizeName(locationName);
+    if (!normalizedLocationName) return validationError('Location is required');
+
+    const { data, error } = await supabase
+      .from('locations')
+      .insert([{ name: normalizedLocationName }])
+      .select('id, name')
+      .single();
+
+    if (error) {
+      console.error('addItemWithPath location error:', error);
+      return { data: null, error: error.message };
+    }
+
+    finalLocationId = data.id;
+    finalLocationName = data.name;
+    createdLocation = true;
+  } else {
+    const { data } = await supabase
+      .from('locations')
+      .select('name')
+      .eq('id', finalLocationId)
+      .single();
+    finalLocationName = data?.name ?? null;
+  }
+
+  let finalStorageAreaId = storageAreaId || null;
+  let finalStorageAreaName = null;
+  let createdStorageArea = false;
+  if (!finalStorageAreaId) {
+    const normalizedStorageAreaName = normalizeName(storageAreaName);
+    if (!normalizedStorageAreaName) return validationError('Storage area is required');
+
+    const { data, error } = await supabase
+      .from('storage_areas')
+      .insert([{ location_id: finalLocationId, name: normalizedStorageAreaName }])
+      .select('id, name')
+      .single();
+
+    if (error) {
+      console.error('addItemWithPath storage area error:', error);
+      return { data: null, error: error.message };
+    }
+
+    finalStorageAreaId = data.id;
+    finalStorageAreaName = data.name;
+    createdStorageArea = true;
+  } else {
+    const { data } = await supabase
+      .from('storage_areas')
+      .select('name')
+      .eq('id', finalStorageAreaId)
+      .single();
+    finalStorageAreaName = data?.name ?? null;
+  }
+
+  let finalCategoryId = categoryId || null;
+  let finalCategoryName = null;
+  let createdCategory = false;
+  if (!finalCategoryId) {
+    const normalizedCategoryName = normalizeName(categoryName);
+    if (!normalizedCategoryName) return validationError('Category is required');
+
+    const { data, error } = await supabase
+      .from('storage_categories')
+      .insert({ storage_area_id: finalStorageAreaId, name: normalizedCategoryName })
+      .select('id, name')
+      .single();
+
+    if (error) {
+      console.error('addItemWithPath category error:', error);
+      return { data: null, error: error.message };
+    }
+
+    finalCategoryId = data.id;
+    finalCategoryName = data.name;
+    createdCategory = true;
+  } else {
+    const { data } = await supabase
+      .from('storage_categories')
+      .select('name')
+      .eq('id', finalCategoryId)
+      .single();
+    finalCategoryName = data?.name ?? null;
+  }
+
+  const { data, error } = await supabase
+    .from('items')
+    .insert([
+      {
+        category_id: finalCategoryId,
+        name: normalizedItemName,
+        quantity: toNonNegativeInteger(quantity, 0),
+        expiration_date: expirationDate || null,
+      },
+    ])
+    .select('id, name, quantity, expiration_date, category_id')
+    .single();
+
+  if (error) {
+    console.error('addItemWithPath item error:', error);
+    return { data: null, error: error.message };
+  }
+
+  revalidatePath('/');
+  revalidatePath('/locations');
+  revalidatePath('/areas');
+  revalidatePath('/categories');
+  revalidatePath('/items');
+
+  return {
+    data: {
+      ...data,
+      locationId: finalLocationId,
+      locationName: finalLocationName,
+      storageAreaId: finalStorageAreaId,
+      storageAreaName: finalStorageAreaName,
+      categoryId: finalCategoryId,
+      categoryName: finalCategoryName,
+      createdLocation,
+      createdStorageArea,
+      createdCategory,
+    },
+    error: null,
+  };
+}
+
 // actions/server.js
 export async function updateItem(itemId, updates) {
   const supabase = await createClient();
 
   // Normalize keys coming from the client
   const payload = {};
-  if (typeof updates?.name === 'string') payload.name = updates.name.trim();
-  if (updates?.quantity !== undefined) payload.quantity = Number.parseInt(updates.quantity, 10) || 0;
+  if (typeof updates?.name === 'string') {
+    const name = normalizeName(updates.name);
+    if (name) payload.name = name;
+  }
+  if (updates?.quantity !== undefined) {
+    payload.quantity = toNonNegativeInteger(updates.quantity, 0);
+  }
 
   // accept either expiration or expiration_date from client
   const exp = updates?.expiration ?? updates?.expiration_date ?? null;
@@ -199,10 +430,13 @@ export async function getStorageById(storageId) {
 
 // ➕ Add food storage (RLS uses auth.uid())
 export async function addStorage(name) {
+  const normalizedName = normalizeName(name);
+  if (!normalizedName) return validationError('Storage name is required');
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('food_storages')
-    .insert([{ name }])
+    .insert([{ name: normalizedName }])
     .select('*, storage_categories(*, ingredients!fk_category(*))');
 
   if (error) throw error;
@@ -213,10 +447,13 @@ export async function addStorage(name) {
 
 // ✏️ Update food storage name
 export async function updateStorageName(storageId, newName) {
+  const normalizedName = normalizeName(newName);
+  if (!storageId || !normalizedName) return validationError('Storage name is required');
+
   const supabase = await createClient();
   const { error } = await supabase
     .from('food_storages')
-    .update({ name: newName })
+    .update({ name: normalizedName })
     .eq('id', storageId);
 
   if (error) throw error;
@@ -236,10 +473,15 @@ export async function deleteStorage(storageId) {
 }
 
 export async function addCategory(storageAreaId, name) {
+  const normalizedName = normalizeName(name);
+  if (!storageAreaId || !normalizedName) {
+    return validationError('Storage area and category name are required');
+  }
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('storage_categories')
-    .insert({ storage_area_id: storageAreaId, name })
+    .insert({ storage_area_id: storageAreaId, name: normalizedName })
     .select('id, name, storage_area_id, created_at')
     .single();
 
@@ -252,10 +494,13 @@ export async function addCategory(storageAreaId, name) {
 
 
 export async function updateCategoryName(categoryId, name) {
+  const normalizedName = normalizeName(name);
+  if (!categoryId || !normalizedName) return validationError('Category name is required');
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('storage_categories')
-    .update({ name })
+    .update({ name: normalizedName })
     .eq('id', categoryId)
     .select('*')
     .single();
