@@ -49,7 +49,7 @@ export default function MagicLinkSyncPage() {
   }, [router]);
 
   return (
-    <main className="flex justify-center items-center h-screen">
+    <main className="page-enter flex justify-center items-center h-screen">
       <div className="flex flex-col items-center">
         <h1 className="text-2xl font-bold mb-4">🔄 Syncing your session...</h1>
         <p className="text-gray-600 mb-6">Please wait, redirecting shortly.</p>

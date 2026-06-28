@@ -42,8 +42,8 @@ export default async function CategoryDetailPage({ params }) {
   const location = area?.location;
 
   return (
-    <main className="max-w-[900px] mx-auto p-6 pt-8 min-h-[100vh] space-y-5">
-      <nav className="text-sm text-gray-500">
+    <main className="page-enter max-w-[900px] mx-auto p-6 pt-8 min-h-[100vh] space-y-5">
+      <nav className="content-enter text-sm text-gray-500">
         <Link href="/categories" className="hover:underline">
           Categories
         </Link>
@@ -60,7 +60,7 @@ export default async function CategoryDetailPage({ params }) {
         / <span className="text-gray-700">{category.name}</span>
       </nav>
 
-      <header className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm">
+      <header className="content-enter rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-stocksense-teal">
@@ -84,7 +84,7 @@ export default async function CategoryDetailPage({ params }) {
         </div>
       </header>
 
-      <section className="grid grid-cols-1 gap-3">
+      <section className="content-stagger grid grid-cols-1 gap-3">
         {items.map((item) => (
           <div
             key={item.id}

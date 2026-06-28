@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { logoutAction } from "@/app/actions/auth";
 import GlobalAddItemModal from "@/components/GlobalAddItemModal";
+import GlobalItemSearchModal from "@/components/GlobalItemSearchModal";
 import {
   Navbar,
   NavbarBrand,
@@ -30,6 +31,7 @@ import {
   FaSpinner,
   FaHome,
   FaPlus,
+  FaSearch,
 } from "react-icons/fa";
 
 const navItems = [
@@ -51,6 +53,7 @@ export default function Navigation() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [showItemSearchModal, setShowItemSearchModal] = useState(false);
   const [addItemContext, setAddItemContext] = useState(null);
   const [addItemNotice, setAddItemNotice] = useState(null);
 
@@ -155,6 +158,17 @@ export default function Navigation() {
         <NavbarContent justify="end" className="gap-2">
           <NavbarItem className="hidden sm:flex">
             <Button
+              variant="flat"
+              className="rounded-xl border border-stocksense-gray bg-white text-[#0E7488]"
+              onPress={() => setShowItemSearchModal(true)}
+              startContent={<FaSearch />}
+            >
+              Search
+            </Button>
+          </NavbarItem>
+
+          <NavbarItem className="hidden sm:flex">
+            <Button
               className="rounded-xl bg-[#0E7488] text-white"
               onPress={() => {
                 setAddItemContext(null);
@@ -222,7 +236,19 @@ export default function Navigation() {
 
           <div className="mt-3 border-t border-gray-200 pt-3">
             <Button
-              className="w-full justify-start rounded-xl bg-[#0E7488] text-white"
+              variant="flat"
+              className="w-full justify-start rounded-xl border border-stocksense-gray bg-white text-[#0E7488]"
+              onPress={() => {
+                setIsMenuOpen(false);
+                setShowItemSearchModal(true);
+              }}
+              startContent={<FaSearch />}
+            >
+              Search
+            </Button>
+
+            <Button
+              className="mt-2 w-full justify-start rounded-xl bg-[#0E7488] text-white"
               onPress={() => {
                 setIsMenuOpen(false);
                 setAddItemContext(null);
@@ -264,6 +290,11 @@ export default function Navigation() {
         onAdded={({ itemName, destinationName }) =>
           setAddItemNotice({ itemName, destinationName })
         }
+      />
+
+      <GlobalItemSearchModal
+        isOpen={showItemSearchModal}
+        onClose={() => setShowItemSearchModal(false)}
       />
 
       {addItemNotice && (

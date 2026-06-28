@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Input,
   Button,
@@ -15,6 +16,20 @@ import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import { updateStorageArea, deleteStorageArea } from "@/app/actions/server";
 import { containsQuery } from "@/utils/pantry/search";
 import OpenGlobalAddItemButton from "@/components/OpenGlobalAddItemButton";
+
+const pageSectionVariants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
+};
+
+const pageItemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, type: "spring", stiffness: 120 },
+  },
+};
 
 export default function AreasPageClient({ initialAreas }) {
   const [areas, setAreas] = useState(initialAreas ?? []);
@@ -191,9 +206,17 @@ export default function AreasPageClient({ initialAreas }) {
   };
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      variants={pageSectionVariants}
+      initial="hidden"
+      animate="show"
+      className="space-y-6"
+    >
       {/* Header */}
-      <div className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm">
+      <motion.div
+        variants={pageItemVariants}
+        className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm"
+      >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-stocksense-teal">
@@ -216,16 +239,24 @@ export default function AreasPageClient({ initialAreas }) {
             />
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* List */}
-      <div className="grid grid-cols-1 gap-3">
-        {filtered.map((a) => (
-          <button
+      <motion.div variants={pageSectionVariants} className="grid grid-cols-1 gap-3">
+        <AnimatePresence initial={false}>
+          {filtered.map((a) => (
+          <motion.button
             key={a.id}
+            layout
+            variants={pageItemVariants}
+            initial="hidden"
+            animate="show"
+            exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
             onClick={() => openDrawer(a)}
             className="text-left rounded-2xl border border-stocksense-gray bg-white shadow-sm p-4
                        hover:bg-gray-50 transition cursor-pointer"
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.99 }}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -242,11 +273,18 @@ export default function AreasPageClient({ initialAreas }) {
                 </span>
               </div>
             </div>
-          </button>
-        ))}
+          </motion.button>
+          ))}
 
-        {filtered.length === 0 && (
-          <div className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center">
+          {filtered.length === 0 && (
+          <motion.div
+            key="empty"
+            variants={pageItemVariants}
+            initial="hidden"
+            animate="show"
+            exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
+            className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center"
+          >
             <p className="text-gray-500">No storage areas match your search.</p>
             <div className="mt-4 flex justify-center">
               <OpenGlobalAddItemButton
@@ -260,9 +298,10 @@ export default function AreasPageClient({ initialAreas }) {
                 }
               />
             </div>
-          </div>
-        )}
-      </div>
+          </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
 
       {/* Drawer */}
       <Modal
@@ -381,6 +420,6 @@ export default function AreasPageClient({ initialAreas }) {
             : ""
         }
       />
-    </div>
+    </motion.div>
   );
 }

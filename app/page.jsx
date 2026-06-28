@@ -37,7 +37,7 @@ export default async function HomePage() {
     .select('*');
 
   return (
-    <main className="mx-auto max-w-6xl px-5 py-8 space-y-10 pt-8 min-h-[100vh]">
+    <main className="page-enter mx-auto max-w-6xl px-5 py-8 space-y-10 pt-8 min-h-[100vh]">
       <header className='md:text-left text-center'>
         <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-stocksense-teal">Stock Overview</h1>
         <p className="text-gray-500 mt-1">Snapshot of your data and what’s new.</p>

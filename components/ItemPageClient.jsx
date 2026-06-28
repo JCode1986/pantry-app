@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Input,
   Button,
@@ -21,6 +22,20 @@ import {
   toPositiveInteger,
 } from "@/utils/pantry/date";
 import { containsQuery } from "@/utils/pantry/search";
+
+const pageSectionVariants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
+};
+
+const pageItemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, type: "spring", stiffness: 120 },
+  },
+};
 
 export default function ItemsPageClient({ initialItems, moveLocations }) {
   const [items, setItems] = useState(initialItems ?? []);
@@ -123,11 +138,6 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
       return (nameOk || pathOk) && expOk;
     });
   }, [items, normalizedSearch, expSoonEnabled, expDays]);
-
-  const filteredIds = useMemo(
-    () => new Set(filteredItems.map((i) => String(i.id))),
-    [filteredItems]
-  );
 
   const selectedCount = selectedIds.size;
 
@@ -447,9 +457,17 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
 
   // ---- UI ----
   return (
-    <div className="space-y-6">
+    <motion.div
+      variants={pageSectionVariants}
+      initial="hidden"
+      animate="show"
+      className="space-y-6"
+    >
       {/* Header */}
-      <div className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm">
+      <motion.div
+        variants={pageItemVariants}
+        className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm"
+      >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-stocksense-teal">
@@ -504,7 +522,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
               <strong>{totals.total}</strong> {totals.total === 1 ? "Item" : "Items"}
             </span>
             <span className="px-2.5 py-1 rounded-full text-xs bg-[#FFF7ED] text-[#9A3412] border border-[#FED7AA]">
-              <strong>{(items || []).filter((i) => isExpiringSoon(i.expiration_date, expDays)).length}</strong>{" "}
+              <strong>{totals.expSoon}</strong>{" "}
               expiring soon
             </span>
 
@@ -537,8 +555,16 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
         </div>
 
         {/* Bulk actions bar */}
-        {selectedCount > 0 && (
-          <div className="mt-4 rounded-xl border border-[#9FE7D7] bg-[#E6FAF6] p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <AnimatePresence initial={false}>
+          {selectedCount > 0 && (
+          <motion.div
+            layout
+            initial={{ opacity: 0, height: 0, y: -6 }}
+            animate={{ opacity: 1, height: "auto", y: 0 }}
+            exit={{ opacity: 0, height: 0, y: -6 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="mt-4 overflow-hidden rounded-xl border border-[#9FE7D7] bg-[#E6FAF6] p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+          >
             <div className="text-sm text-[#0E7488]">
               Bulk actions for <span className="font-semibold">{selectedCount}</span>{" "}
               item{selectedCount === 1 ? "" : "s"}
@@ -565,23 +591,31 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                 Delete selected
               </button>
             </div>
-          </div>
-        )}
-      </div>
+          </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
 
       {/* List */}
-      <div className="grid grid-cols-1 gap-3">
+      <motion.div variants={pageSectionVariants} className="grid grid-cols-1 gap-3">
+        <AnimatePresence initial={false}>
         {filteredItems.map((it) => {
           const soon = isExpiringSoon(it.expiration_date, expDays);
           const du = daysUntil(it.expiration_date);
           const selected = selectedIds.has(String(it.id));
 
           return (
-            <div
+            <motion.div
               key={it.id}
+              layout
+              variants={pageItemVariants}
+              initial="hidden"
+              animate="show"
+              exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
               className={`rounded-2xl border border-stocksense-gray bg-white shadow-sm p-4 transition ${
                 selected ? "ring-2 ring-rose-200" : "hover:bg-gray-50"
               }`}
+              whileHover={{ y: -1 }}
             >
               <div className="flex items-start justify-between gap-3">
                 {/* Left: checkbox + info */}
@@ -624,19 +658,27 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                   →
                 </button>
               </div>
-            </div>
+            </motion.div>
           );
         })}
 
         {filteredItems.length === 0 && (
-          <div className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center">
+          <motion.div
+            key="empty"
+            variants={pageItemVariants}
+            initial="hidden"
+            animate="show"
+            exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
+            className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center"
+          >
             <p className="text-gray-500">No items match your search.</p>
             <div className="mt-4 flex justify-center">
               <OpenGlobalAddItemButton />
             </div>
-          </div>
+          </motion.div>
         )}
-      </div>
+        </AnimatePresence>
+      </motion.div>
 
       {/* Drawer (single item) */}
       <Modal
@@ -866,6 +908,6 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
               : ""
         }
       />
-    </div>
+    </motion.div>
   );
 }

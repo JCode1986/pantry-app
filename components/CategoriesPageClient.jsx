@@ -1,12 +1,27 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Input, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
 import { FaSearch } from "react-icons/fa";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import { updateCategoryName, deleteCategory } from "@/app/actions/server";
 import { containsQuery } from "@/utils/pantry/search";
 import OpenGlobalAddItemButton from "@/components/OpenGlobalAddItemButton";
+
+const pageSectionVariants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
+};
+
+const pageItemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, type: "spring", stiffness: 120 },
+  },
+};
 
 export default function CategoriesPageClient({ initialCategories }) {
   const [categories, setCategories] = useState(initialCategories ?? []);
@@ -167,9 +182,17 @@ export default function CategoriesPageClient({ initialCategories }) {
   };
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      variants={pageSectionVariants}
+      initial="hidden"
+      animate="show"
+      className="space-y-6"
+    >
       {/* Header */}
-      <div className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm">
+      <motion.div
+        variants={pageItemVariants}
+        className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm"
+      >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-stocksense-teal">
@@ -192,15 +215,23 @@ export default function CategoriesPageClient({ initialCategories }) {
             />
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* List */}
-      <div className="grid grid-cols-1 gap-3">
-        {filtered.map((c) => (
-          <button
+      <motion.div variants={pageSectionVariants} className="grid grid-cols-1 gap-3">
+        <AnimatePresence initial={false}>
+          {filtered.map((c) => (
+          <motion.button
             key={c.id}
+            layout
+            variants={pageItemVariants}
+            initial="hidden"
+            animate="show"
+            exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
             onClick={() => openDrawer(c)}
             className="text-left rounded-2xl border border-stocksense-gray bg-white shadow-sm p-4 hover:bg-gray-50 transition cursor-pointer"
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.99 }}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -218,18 +249,26 @@ export default function CategoriesPageClient({ initialCategories }) {
                 </span>
               </div>
             </div>
-          </button>
-        ))}
+          </motion.button>
+          ))}
 
-        {filtered.length === 0 && (
-          <div className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center">
+          {filtered.length === 0 && (
+          <motion.div
+            key="empty"
+            variants={pageItemVariants}
+            initial="hidden"
+            animate="show"
+            exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
+            className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center"
+          >
             <p className="text-gray-500">No categories match your search.</p>
             <div className="mt-4 flex justify-center">
               <OpenGlobalAddItemButton />
             </div>
-          </div>
-        )}
-      </div>
+          </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
 
       {/* Drawer (HeroUI Modal styled as right drawer) */}
       <Modal
@@ -342,6 +381,6 @@ export default function CategoriesPageClient({ initialCategories }) {
             : ""
         }
       />
-    </div>
+    </motion.div>
   );
 }

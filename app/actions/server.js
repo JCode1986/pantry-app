@@ -12,6 +12,10 @@ function validationError(message) {
   return { data: null, error: message };
 }
 
+function normalizeSearchTerm(value) {
+  return normalizeName(value).replace(/[%_]/g, '').slice(0, 80);
+}
+
 export async function fetchRecipes(ingredients) {
   try {
     const API_KEY = process.env.SPOONACULAR_API_KEY;
@@ -207,6 +211,112 @@ export async function getInventoryHierarchy() {
         }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     })),
+    error: null,
+  };
+}
+
+export async function searchItems(query) {
+  const term = normalizeSearchTerm(query);
+  if (term.length < 2) {
+    return { data: [], error: null };
+  }
+
+  const supabase = await createClient();
+
+  const { data: itemsRaw, error: itemsError } = await supabase
+    .from('items')
+    .select('id, name, quantity, expiration_date, category_id')
+    .ilike('name', `%${term}%`)
+    .order('name', { ascending: true })
+    .limit(50);
+
+  if (itemsError) {
+    console.error('searchItems item error:', itemsError);
+    return { data: [], error: itemsError.message };
+  }
+
+  const items = itemsRaw ?? [];
+  if (items.length === 0) {
+    return { data: [], error: null };
+  }
+
+  const categoryIds = [
+    ...new Set(items.map((item) => item.category_id).filter(Boolean)),
+  ];
+
+  const { data: categoriesRaw, error: categoriesError } = categoryIds.length
+    ? await supabase
+        .from('storage_categories')
+        .select('id, name, storage_area_id')
+        .in('id', categoryIds)
+    : { data: [], error: null };
+
+  if (categoriesError) {
+    console.error('searchItems category error:', categoriesError);
+    return { data: [], error: categoriesError.message };
+  }
+
+  const categories = categoriesRaw ?? [];
+  const areaIds = [
+    ...new Set(categories.map((category) => category.storage_area_id).filter(Boolean)),
+  ];
+
+  const { data: areasRaw, error: areasError } = areaIds.length
+    ? await supabase
+        .from('storage_areas')
+        .select('id, name, location_id')
+        .in('id', areaIds)
+    : { data: [], error: null };
+
+  if (areasError) {
+    console.error('searchItems area error:', areasError);
+    return { data: [], error: areasError.message };
+  }
+
+  const areas = areasRaw ?? [];
+  const locationIds = [
+    ...new Set(areas.map((area) => area.location_id).filter(Boolean)),
+  ];
+
+  const { data: locationsRaw, error: locationsError } = locationIds.length
+    ? await supabase.from('locations').select('id, name').in('id', locationIds)
+    : { data: [], error: null };
+
+  if (locationsError) {
+    console.error('searchItems location error:', locationsError);
+    return { data: [], error: locationsError.message };
+  }
+
+  const categoryMap = new Map(categories.map((category) => [String(category.id), category]));
+  const areaMap = new Map((areasRaw ?? []).map((area) => [String(area.id), area]));
+  const locationMap = new Map(
+    (locationsRaw ?? []).map((location) => [String(location.id), location])
+  );
+
+  return {
+    data: items.map((item) => {
+      const category = item.category_id
+        ? categoryMap.get(String(item.category_id))
+        : null;
+      const area = category?.storage_area_id
+        ? areaMap.get(String(category.storage_area_id))
+        : null;
+      const location = area?.location_id
+        ? locationMap.get(String(area.location_id))
+        : null;
+
+      return {
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity ?? 0,
+        expirationDate: item.expiration_date ?? null,
+        category: category
+          ? { id: category.id, name: category.name }
+          : null,
+        storageArea: area ? { id: area.id, name: area.name } : null,
+        location: location ? { id: location.id, name: location.name } : null,
+      };
+    }),
     error: null,
   };
 }

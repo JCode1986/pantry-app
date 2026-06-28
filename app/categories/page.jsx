@@ -50,7 +50,7 @@ export default async function Page() {
     }));
 
   return (
-    <main className="max-w-[1300px] mx-auto p-6 pt-8 min-h-[100vh]">
+    <main className="page-enter max-w-[1300px] mx-auto p-6 pt-8 min-h-[100vh]">
       <CategoriesPageClient initialCategories={categories} />
     </main>
   );

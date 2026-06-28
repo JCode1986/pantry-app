@@ -27,15 +27,15 @@ export default async function StorageAreaCategoriesPage({ params }) {
     .order('created_at', { ascending: true });
 
   return (
-    <main className="mx-auto max-w-6xl px-5 py-8 space-y-6">
-      <nav className="text-sm text-gray-500">
+    <main className="page-enter mx-auto max-w-6xl px-5 py-8 space-y-6">
+      <nav className="content-enter text-sm text-gray-500">
         <Link href={`/locations/${area?.location_id}`} className="hover:underline">
           {area.locations?.name ?? 'Unknown location'}
         </Link>{' '}
         / <span className="text-gray-700">{area.name}</span>
       </nav>
 
-      <header>
+      <header className="content-enter">
         <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
           {area.name} - Categories
         </h1>

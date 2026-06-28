@@ -89,6 +89,10 @@ export default function LocationsSection({ locations }) {
     hidden: { opacity: 0, y: 10, scale: 0.98 },
     show: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 22 } },
   };
+  const pageItemVariants = {
+    hidden: { opacity: 0, y: 16 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.35, type: 'spring', stiffness: 120 } },
+  };
 
   const handleAdd = async () => {
     if (!locationName.trim()) return;
@@ -98,16 +102,6 @@ export default function LocationsSection({ locations }) {
       { ...newLoc, areasCount: 0, categoriesCount: 0, itemsCount: 0 },
     ]);
     setLocationName('');
-  };
-
-  const handleDelete = async (id) => {
-    if (!confirm('Delete this location?')) return;
-    await deleteLocation(id);
-    setAllLocations((prev) => prev.filter((loc) => loc.id !== id));
-    if (editingId === id) {
-      setEditingId(null);
-      setEditingName('');
-    }
   };
 
   const handleEditSave = async (id) => {
@@ -170,9 +164,17 @@ const closeDeleteDialog = () => {
   };
 
   return (
-    <main className="p-5 max-w-6xl mx-auto min-h-[96.3vh]">
+    <motion.main
+      variants={listVariants}
+      initial="hidden"
+      animate="show"
+      className="page-enter p-5 max-w-6xl mx-auto min-h-[96.3vh]"
+    >
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-2 mt-8">
+      <motion.div
+        variants={pageItemVariants}
+        className="flex flex-col md:flex-row md:items-end md:justify-between gap-2 mt-8"
+      >
         <div className="text-3xl font-bold flex gap-3 items-center justify-center md:justify-start">
           <div className="rounded-xl p-3 text-white bg-gradient-to-br from-[#0E7488] to-[#0B5563] shadow-sm border border-white/10">
             <FaMapMarkedAlt className="h-5 w-5" />
@@ -182,10 +184,13 @@ const closeDeleteDialog = () => {
         <span className="text-sm text-gray-500 text-center md:text-right">
           Total: {allLocations.length}
         </span>
-      </div>
+      </motion.div>
 
       {/* Add Location */}
-      <div className="flex gap-2 my-6 md:justify-start justify-center">
+      <motion.div
+        variants={pageItemVariants}
+        className="flex gap-2 my-6 md:justify-start justify-center"
+      >
         <input
           type="text"
           value={locationName}
@@ -202,10 +207,13 @@ const closeDeleteDialog = () => {
         >
           <FaPlus /> Add
         </motion.button>
-      </div>
+      </motion.div>
 
       {/* List */}
-      <div className="border shadow border-stocksense-gray rounded-lg bg-white overflow-hidden">
+      <motion.div
+        variants={pageItemVariants}
+        className="border shadow border-stocksense-gray rounded-lg bg-white overflow-hidden"
+      >
         <AnimatePresence initial={false}>
           <motion.ul
             variants={listVariants}
@@ -305,7 +313,6 @@ const closeDeleteDialog = () => {
                           <motion.button
                             whileHover={{ y: -1 }}
                             whileTap={{ scale: 0.98 }}
-                            // onClick={() => handleDelete(loc.id)}
                             onClick={() => openDeleteDialog(loc)}
                             className="text-rose-600 hover:text-rose-700 flex items-center gap-1 text-xs md:text-sm cursor-pointer"
                           >
@@ -320,7 +327,7 @@ const closeDeleteDialog = () => {
             )}
           </motion.ul>
         </AnimatePresence>
-      </div>
+      </motion.div>
       <ConfirmDeleteModal
         isOpen={deleteDialog.open}
         isDeleting={deleteDialog.isDeleting}
@@ -333,6 +340,6 @@ const closeDeleteDialog = () => {
         }
         description="This will remove this location and any storage areas, categories, and items associated with it. This action cannot be undone."
       />
-    </main>
+    </motion.main>
   );
 }

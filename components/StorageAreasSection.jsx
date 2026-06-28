@@ -40,6 +40,20 @@ const collapseVariants = {
   open: { height: 'auto', opacity: 1, transition: { duration: 0.25 } },
 };
 
+const pageVariants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
+};
+
+const pageItemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, type: 'spring', stiffness: 120 },
+  },
+};
+
 export default function StorageAreasSection({
   locationId,
   initialStorageAreas,
@@ -735,9 +749,17 @@ export default function StorageAreasSection({
 
   // ---------- UI ----------
   return (
-    <div className="space-y-6 transition-all duration-150">
+    <motion.div
+      variants={pageVariants}
+      initial="hidden"
+      animate="show"
+      className="space-y-6 transition-all duration-150"
+    >
       {/* Top: Title & Tools */}
-      <div className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm">
+      <motion.div
+        variants={pageItemVariants}
+        className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm"
+      >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-stocksense-teal">
@@ -843,10 +865,10 @@ export default function StorageAreasSection({
             </motion.button>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Areas */}
-      <div className="grid grid-cols-1 gap-4">
+      <motion.div variants={pageVariants} className="grid grid-cols-1 gap-4">
         {storageAreas.map((area, aIdx) => (
           <motion.div
             key={area.id}
@@ -1440,7 +1462,7 @@ export default function StorageAreasSection({
             </AnimatePresence>
           </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       <MoveItemsModal
         moveModal={moveModal}
@@ -1461,6 +1483,6 @@ export default function StorageAreasSection({
         description={deleteDescription}
       />
 
-    </div>
+    </motion.div>
   );
 }

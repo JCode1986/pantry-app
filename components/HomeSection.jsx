@@ -68,7 +68,7 @@ export default function HomeSection({ user, storages }) {
       : allStorages.filter((s) => containsQuery(s.name, filter.toLowerCase()));
 
   return (
-    <main className="p-6 max-w-5xl mx-auto mt-20">
+    <main className="page-enter p-6 max-w-5xl mx-auto mt-20">
       <h1 className="text-3xl font-bold mb-6">My Food Storages</h1>
 
       <div className="flex flex-col sm:flex-row sm:justify-between gap-4 mb-6">

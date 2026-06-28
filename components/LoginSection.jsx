@@ -87,7 +87,7 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-[100vh] flex items-center justify-center px-4">
+    <main className="page-enter min-h-[100vh] flex items-center justify-center px-4">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}

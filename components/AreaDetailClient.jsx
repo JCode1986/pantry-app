@@ -29,10 +29,6 @@ import {
 import { containsQuery } from "@/utils/pantry/search";
 import OpenGlobalAddItemButton from "@/components/OpenGlobalAddItemButton";
 
-function cx(...classes) {
-  return classes.filter(Boolean).join(" ");
-}
-
 function StatPill({ label, value }) {
   return (
     <span className="px-2.5 py-1 rounded-full text-xs bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]">
@@ -40,6 +36,20 @@ function StatPill({ label, value }) {
     </span>
   );
 }
+
+const pageVariants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
+};
+
+const pageItemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, type: "spring", stiffness: 120 },
+  },
+};
 
 export default function AreaDetailClient({ area, initialCategories }) {
   const [categories, setCategories] = useState(initialCategories ?? []);
@@ -230,9 +240,9 @@ export default function AreaDetailClient({ area, initialCategories }) {
   // ---------------- UI ----------------
 
   return (
-    <div className="space-y-5">
+    <motion.div variants={pageVariants} initial="hidden" animate="show" className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col gap-3">
+      <motion.div variants={pageItemVariants} className="flex flex-col gap-3">
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <Link href="/areas" className="inline-flex items-center gap-2 hover:text-[#0E7488]">
             <FaChevronLeft className="h-3.5 w-3.5" />
@@ -284,10 +294,11 @@ export default function AreaDetailClient({ area, initialCategories }) {
             />
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Add Category */}
-      <Card className="border border-stocksense-gray shadow-sm">
+      <motion.div variants={pageItemVariants}>
+        <Card className="border border-stocksense-gray shadow-sm">
         <CardBody className="p-4">
           <div className="flex flex-col md:flex-row gap-2 md:items-center">
             <Input
@@ -318,7 +329,8 @@ export default function AreaDetailClient({ area, initialCategories }) {
             </div>
           )}
         </CardBody>
-      </Card>
+        </Card>
+      </motion.div>
 
       {/* Categories Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -486,6 +498,6 @@ export default function AreaDetailClient({ area, initialCategories }) {
           )}
         </ModalContent>
       </Modal>
-    </div>
+    </motion.div>
   );
 }

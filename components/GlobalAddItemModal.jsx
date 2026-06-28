@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Button,
   Input,
@@ -13,7 +14,7 @@ import {
   Select,
   SelectItem,
 } from "@heroui/react";
-import { FaPlus, FaSpinner } from "react-icons/fa";
+import { FaMapMarkerAlt, FaPlus, FaSpinner, FaTags, FaWarehouse } from "react-icons/fa";
 import {
   addItemWithPath,
   getInventoryHierarchy,
@@ -21,6 +22,14 @@ import {
 import { toNonNegativeInteger } from "@/utils/pantry/date";
 
 const NEW_VALUE = "__new__";
+const EMPTY_LIST = [];
+const revealTransition = { duration: 0.2, ease: "easeOut" };
+const revealMotion = {
+  initial: { opacity: 0, height: 0, y: -6 },
+  animate: { opacity: 1, height: "auto", y: 0 },
+  exit: { opacity: 0, height: 0, y: -6 },
+  transition: revealTransition,
+};
 
 const emptyForm = {
   locationName: "",
@@ -41,6 +50,83 @@ function byId(items, id) {
   return (items ?? []).find((item) => String(item.id) === String(id)) ?? null;
 }
 
+function NewPathField({
+  icon: Icon,
+  title,
+  label,
+  value,
+  onValueChange,
+  placeholder,
+  isDisabled,
+}) {
+  return (
+    <motion.div
+      layout
+      {...revealMotion}
+      className="overflow-hidden rounded-xl border border-[#9FE7D7] bg-[#F0FFFB] p-3 shadow-sm"
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0E7488] text-white">
+          <Icon className="h-3.5 w-3.5" />
+        </span>
+        <span className="text-sm font-semibold text-[#0E7488]">{title}</span>
+      </div>
+      <Input
+        label={label}
+        value={value}
+        onValueChange={onValueChange}
+        placeholder={placeholder}
+        isDisabled={isDisabled}
+        variant="bordered"
+        radius="lg"
+        classNames={{
+          inputWrapper: "border-[#9FE7D7] bg-white",
+        }}
+      />
+    </motion.div>
+  );
+}
+
+function getDefaultSelection(locations, context) {
+  const preferredLocationId = context?.locationId
+    ? String(context.locationId)
+    : null;
+  const location =
+    (preferredLocationId
+      ? locations.find((item) => String(item.id) === preferredLocationId)
+      : null) ??
+    locations[0] ??
+    null;
+
+  const storageAreas = location?.storageAreas ?? EMPTY_LIST;
+  const preferredStorageAreaId = context?.storageAreaId
+    ? String(context.storageAreaId)
+    : null;
+  const storageArea =
+    (preferredStorageAreaId
+      ? storageAreas.find((item) => String(item.id) === preferredStorageAreaId)
+      : null) ??
+    storageAreas[0] ??
+    null;
+
+  const categories = storageArea?.categories ?? EMPTY_LIST;
+  const preferredCategoryId = context?.categoryId
+    ? String(context.categoryId)
+    : null;
+  const category =
+    (preferredCategoryId
+      ? categories.find((item) => String(item.id) === preferredCategoryId)
+      : null) ??
+    categories[0] ??
+    null;
+
+  return {
+    locationId: location?.id ?? NEW_VALUE,
+    storageAreaId: storageArea?.id ?? NEW_VALUE,
+    categoryId: category?.id ?? NEW_VALUE,
+  };
+}
+
 export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialContext }) {
   const router = useRouter();
   const [locations, setLocations] = useState([]);
@@ -48,7 +134,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   const [storageAreaId, setStorageAreaId] = useState(NEW_VALUE);
   const [categoryId, setCategoryId] = useState(NEW_VALUE);
   const [form, setForm] = useState(emptyForm);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -57,14 +143,14 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
     [locations, locationId]
   );
 
-  const storageAreas = selectedLocation?.storageAreas ?? [];
+  const storageAreas = selectedLocation?.storageAreas ?? EMPTY_LIST;
 
   const selectedStorageArea = useMemo(
     () => byId(storageAreas, storageAreaId),
     [storageAreas, storageAreaId]
   );
 
-  const categories = selectedStorageArea?.categories ?? [];
+  const categories = selectedStorageArea?.categories ?? EMPTY_LIST;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -82,17 +168,16 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
         setMessage(result.error);
         setLocations([]);
         setLocationId(NEW_VALUE);
+        setStorageAreaId(NEW_VALUE);
+        setCategoryId(NEW_VALUE);
       } else {
         const nextLocations = result?.data ?? [];
-        const preferredLocationId = initialContext?.locationId
-          ? String(initialContext.locationId)
-          : null;
-        const preferredLocation = preferredLocationId
-          ? nextLocations.find((location) => String(location.id) === preferredLocationId)
-          : null;
+        const selection = getDefaultSelection(nextLocations, initialContext);
 
         setLocations(nextLocations);
-        setLocationId(preferredLocation?.id ?? nextLocations[0]?.id ?? NEW_VALUE);
+        setLocationId(selection.locationId);
+        setStorageAreaId(selection.storageAreaId);
+        setCategoryId(selection.categoryId);
       }
 
       setIsLoading(false);
@@ -103,57 +188,37 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
     return () => {
       cancelled = true;
     };
-  }, [initialContext?.locationId, isOpen]);
-
-  useEffect(() => {
-    if (locationId === NEW_VALUE) {
-      setStorageAreaId(NEW_VALUE);
-      setCategoryId(NEW_VALUE);
-      return;
-    }
-
-    if (storageAreas.some((area) => String(area.id) === String(storageAreaId))) {
-      return;
-    }
-
-    const preferredStorageAreaId = initialContext?.storageAreaId
-      ? String(initialContext.storageAreaId)
-      : null;
-    const preferredStorageArea = preferredStorageAreaId
-      ? storageAreas.find((area) => String(area.id) === preferredStorageAreaId)
-      : null;
-
-    setStorageAreaId(preferredStorageArea?.id ?? storageAreas[0]?.id ?? NEW_VALUE);
-  }, [initialContext?.storageAreaId, locationId, storageAreas]);
-
-  useEffect(() => {
-    if (storageAreaId === NEW_VALUE) {
-      setCategoryId(NEW_VALUE);
-      return;
-    }
-
-    if (categories.some((category) => String(category.id) === String(categoryId))) {
-      return;
-    }
-
-    const preferredCategoryId = initialContext?.categoryId
-      ? String(initialContext.categoryId)
-      : null;
-    const preferredCategory = preferredCategoryId
-      ? categories.find((category) => String(category.id) === preferredCategoryId)
-      : null;
-
-    setCategoryId(preferredCategory?.id ?? categories[0]?.id ?? NEW_VALUE);
-  }, [categories, initialContext?.categoryId, storageAreaId]);
+  }, [initialContext, isOpen]);
 
   const updateForm = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const selectLocation = (value) => {
+    const nextLocationId = String(value);
+    const nextLocation = byId(locations, nextLocationId);
+    const nextStorageArea = nextLocation?.storageAreas?.[0] ?? null;
+    const nextCategory = nextStorageArea?.categories?.[0] ?? null;
+
+    setLocationId(nextLocationId);
+    setStorageAreaId(nextStorageArea?.id ?? NEW_VALUE);
+    setCategoryId(nextCategory?.id ?? NEW_VALUE);
+  };
+
+  const selectStorageArea = (value) => {
+    const nextStorageAreaId = String(value);
+    const nextStorageArea = byId(storageAreas, nextStorageAreaId);
+    const nextCategory = nextStorageArea?.categories?.[0] ?? null;
+
+    setStorageAreaId(nextStorageAreaId);
+    setCategoryId(nextCategory?.id ?? NEW_VALUE);
   };
 
   const handleClose = () => {
     if (isSaving) return;
     setForm(emptyForm);
     setMessage("");
+    setIsLoading(true);
     onClose?.();
   };
 
@@ -182,19 +247,26 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
 
     setIsSaving(true);
 
-    const result = await addItemWithPath({
-      locationId: locationId === NEW_VALUE ? null : locationId,
-      locationName: form.locationName,
-      storageAreaId: storageAreaId === NEW_VALUE ? null : storageAreaId,
-      storageAreaName: form.storageAreaName,
-      categoryId: categoryId === NEW_VALUE ? null : categoryId,
-      categoryName: form.categoryName,
-      itemName: form.itemName,
-      quantity: toNonNegativeInteger(form.quantity, 0),
-      expirationDate: form.expirationDate || null,
-    });
-
-    setIsSaving(false);
+    let result;
+    try {
+      result = await addItemWithPath({
+        locationId: locationId === NEW_VALUE ? null : locationId,
+        locationName: form.locationName,
+        storageAreaId: storageAreaId === NEW_VALUE ? null : storageAreaId,
+        storageAreaName: form.storageAreaName,
+        categoryId: categoryId === NEW_VALUE ? null : categoryId,
+        categoryName: form.categoryName,
+        itemName: form.itemName,
+        quantity: toNonNegativeInteger(form.quantity, 0),
+        expirationDate: form.expirationDate || null,
+      });
+    } catch (error) {
+      console.error("addItemWithPath error:", error);
+      setMessage("Could not add item.");
+      return;
+    } finally {
+      setIsSaving(false);
+    }
 
     if (result?.error) {
       setMessage(
@@ -314,6 +386,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
       destinationName: destination || "inventory",
     });
     if (closeAfterAdd) {
+      setIsLoading(true);
       onClose?.();
     }
     router.refresh();
@@ -339,156 +412,188 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
               </span>
             </ModalHeader>
 
-            <ModalBody className="space-y-4">
-              {message && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                  {message}
-                </div>
-              )}
+            <ModalBody className="min-h-[150px] space-y-4">
+              <AnimatePresence initial={false}>
+                {message && (
+                  <motion.div
+                    layout
+                    {...revealMotion}
+                    className="overflow-hidden rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+                  >
+                    {message}
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-              {isLoading ? (
-                <div className="flex min-h-[140px] items-center justify-center rounded-2xl border border-dashed border-stocksense-gray bg-gray-50 text-sm text-gray-500">
-                  <FaSpinner className="mr-2 animate-spin" />
-                  Loading inventory...
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="space-y-2">
-                      <Select
-                        label="Location"
-                        selectedKeys={new Set([String(locationId)])}
-                        onSelectionChange={(keys) => {
-                          const value = Array.from(keys)[0];
-                          if (value) setLocationId(String(value));
-                        }}
+              <AnimatePresence mode="wait" initial={false}>
+                {isLoading ? (
+                  <motion.div
+                    key="loading"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={revealTransition}
+                    className="flex min-h-[150px] items-center justify-center rounded-2xl border border-dashed border-stocksense-gray bg-gray-50 text-sm text-gray-500"
+                  >
+                    <FaSpinner className="mr-2 animate-spin" />
+                    Loading inventory...
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="form"
+                    layout
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={revealTransition}
+                    className="space-y-4"
+                  >
+                    <motion.div layout className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                      <motion.div layout className="space-y-2">
+                        <Select
+                          label="Location"
+                          selectedKeys={new Set([String(locationId)])}
+                          onSelectionChange={(keys) => {
+                            const value = Array.from(keys)[0];
+                            if (value) selectLocation(value);
+                          }}
+                          isDisabled={isSaving}
+                          variant="bordered"
+                          radius="lg"
+                          classNames={{
+                            trigger: "border-stocksense-gray",
+                          }}
+                        >
+                          {locations.map((location) => (
+                            <SelectItem key={String(location.id)}>
+                              {location.name}
+                            </SelectItem>
+                          ))}
+                          <SelectItem key={NEW_VALUE}>+ New location</SelectItem>
+                        </Select>
+                        <AnimatePresence initial={false}>
+                          {locationId === NEW_VALUE && (
+                            <NewPathField
+                              icon={FaMapMarkerAlt}
+                              title="Create location"
+                              label="Location name"
+                              value={form.locationName}
+                              onValueChange={(value) => updateForm("locationName", value)}
+                              placeholder="Home"
+                              isDisabled={isSaving}
+                            />
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+
+                      <motion.div layout className="space-y-2">
+                        <Select
+                          label="Storage area"
+                          selectedKeys={new Set([String(storageAreaId)])}
+                          onSelectionChange={(keys) => {
+                            const value = Array.from(keys)[0];
+                            if (value) selectStorageArea(value);
+                          }}
+                          isDisabled={isSaving || locationId === NEW_VALUE}
+                          variant="bordered"
+                          radius="lg"
+                          classNames={{
+                            trigger: "border-stocksense-gray",
+                          }}
+                        >
+                          {storageAreas.map((area) => (
+                            <SelectItem key={String(area.id)}>
+                              {area.name}
+                            </SelectItem>
+                          ))}
+                          <SelectItem key={NEW_VALUE}>+ New storage area</SelectItem>
+                        </Select>
+                        <AnimatePresence initial={false}>
+                          {storageAreaId === NEW_VALUE && (
+                            <NewPathField
+                              icon={FaWarehouse}
+                              title="Create storage area"
+                              label="Storage area name"
+                              value={form.storageAreaName}
+                              onValueChange={(value) => updateForm("storageAreaName", value)}
+                              placeholder="Pantry"
+                              isDisabled={isSaving}
+                            />
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+
+                      <motion.div layout className="space-y-2">
+                        <Select
+                          label="Category"
+                          selectedKeys={new Set([String(categoryId)])}
+                          onSelectionChange={(keys) => {
+                            const value = Array.from(keys)[0];
+                            if (value) setCategoryId(String(value));
+                          }}
+                          isDisabled={isSaving || storageAreaId === NEW_VALUE}
+                          variant="bordered"
+                          radius="lg"
+                          classNames={{
+                            trigger: "border-stocksense-gray",
+                          }}
+                        >
+                          {categories.map((category) => (
+                            <SelectItem key={String(category.id)}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                          <SelectItem key={NEW_VALUE}>+ New category</SelectItem>
+                        </Select>
+                        <AnimatePresence initial={false}>
+                          {categoryId === NEW_VALUE && (
+                            <NewPathField
+                              icon={FaTags}
+                              title="Create category"
+                              label="Category name"
+                              value={form.categoryName}
+                              onValueChange={(value) => updateForm("categoryName", value)}
+                              placeholder="Snacks"
+                              isDisabled={isSaving}
+                            />
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+                    </motion.div>
+
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_140px_180px]">
+                      <Input
+                        label="Item name"
+                        value={form.itemName}
+                        onValueChange={(value) => updateForm("itemName", value)}
+                        placeholder="Rice"
                         isDisabled={isSaving}
                         variant="bordered"
                         radius="lg"
-                        classNames={{
-                          trigger: "border-stocksense-gray",
-                        }}
-                      >
-                        {locations.map((location) => (
-                          <SelectItem key={String(location.id)}>
-                            {location.name}
-                          </SelectItem>
-                        ))}
-                        <SelectItem key={NEW_VALUE}>+ New location</SelectItem>
-                      </Select>
-                      {locationId === NEW_VALUE && (
-                        <Input
-                          value={form.locationName}
-                          onValueChange={(value) => updateForm("locationName", value)}
-                          placeholder="Home"
-                          isDisabled={isSaving}
-                          variant="bordered"
-                          radius="lg"
-                        />
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Select
-                        label="Storage area"
-                        selectedKeys={new Set([String(storageAreaId)])}
-                        onSelectionChange={(keys) => {
-                          const value = Array.from(keys)[0];
-                          if (value) setStorageAreaId(String(value));
-                        }}
-                        isDisabled={isSaving || locationId === NEW_VALUE}
+                      />
+                      <Input
+                        label="Quantity"
+                        type="number"
+                        min={0}
+                        value={form.quantity}
+                        onValueChange={(value) => updateForm("quantity", value)}
+                        isDisabled={isSaving}
                         variant="bordered"
                         radius="lg"
-                        classNames={{
-                          trigger: "border-stocksense-gray",
-                        }}
-                      >
-                        {storageAreas.map((area) => (
-                          <SelectItem key={String(area.id)}>
-                            {area.name}
-                          </SelectItem>
-                        ))}
-                        <SelectItem key={NEW_VALUE}>+ New storage area</SelectItem>
-                      </Select>
-                      {storageAreaId === NEW_VALUE && (
-                        <Input
-                          value={form.storageAreaName}
-                          onValueChange={(value) => updateForm("storageAreaName", value)}
-                          placeholder="Pantry"
-                          isDisabled={isSaving}
-                          variant="bordered"
-                          radius="lg"
-                        />
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Select
-                        label="Category"
-                        selectedKeys={new Set([String(categoryId)])}
-                        onSelectionChange={(keys) => {
-                          const value = Array.from(keys)[0];
-                          if (value) setCategoryId(String(value));
-                        }}
-                        isDisabled={isSaving || storageAreaId === NEW_VALUE}
+                      />
+                      <Input
+                        label="Expiration"
+                        type="date"
+                        value={form.expirationDate}
+                        onValueChange={(value) => updateForm("expirationDate", value)}
+                        isDisabled={isSaving}
                         variant="bordered"
                         radius="lg"
-                        classNames={{
-                          trigger: "border-stocksense-gray",
-                        }}
-                      >
-                        {categories.map((category) => (
-                          <SelectItem key={String(category.id)}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                        <SelectItem key={NEW_VALUE}>+ New category</SelectItem>
-                      </Select>
-                      {categoryId === NEW_VALUE && (
-                        <Input
-                          value={form.categoryName}
-                          onValueChange={(value) => updateForm("categoryName", value)}
-                          placeholder="Snacks"
-                          isDisabled={isSaving}
-                          variant="bordered"
-                          radius="lg"
-                        />
-                      )}
+                      />
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-[1fr_140px_180px] gap-3">
-                    <Input
-                      label="Item name"
-                      value={form.itemName}
-                      onValueChange={(value) => updateForm("itemName", value)}
-                      placeholder="Rice"
-                      isDisabled={isSaving}
-                      variant="bordered"
-                      radius="lg"
-                    />
-                    <Input
-                      label="Quantity"
-                      type="number"
-                      min={0}
-                      value={form.quantity}
-                      onValueChange={(value) => updateForm("quantity", value)}
-                      isDisabled={isSaving}
-                      variant="bordered"
-                      radius="lg"
-                    />
-                    <Input
-                      label="Expiration"
-                      type="date"
-                      value={form.expirationDate}
-                      onValueChange={(value) => updateForm("expirationDate", value)}
-                      isDisabled={isSaving}
-                      variant="bordered"
-                      radius="lg"
-                    />
-                  </div>
-                </>
-              )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </ModalBody>
 
             <ModalFooter>

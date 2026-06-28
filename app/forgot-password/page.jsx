@@ -43,7 +43,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <main className="min-h-[100vh] flex items-center justify-center px-4 py-10 bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10">
+    <main className="page-enter min-h-[100vh] flex items-center justify-center px-4 py-10 bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
