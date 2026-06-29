@@ -69,7 +69,7 @@ export default async function CategoryDetailPage({ params }) {
             <p className="text-sm text-gray-500 mt-1">
               {location?.name ?? "Unknown location"} / {area?.name ?? "Unknown area"}
             </p>
-            <div className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]">
+            <div className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
               <strong>{items.length}</strong>&nbsp;{items.length === 1 ? "item" : "items"}
             </div>
           </div>

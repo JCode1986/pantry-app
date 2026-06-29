@@ -22,6 +22,7 @@ export default async function HomePage() {
   const { data: recent, error: recentError } = await supabase
     .from('recent_activity')
     .select('*')
+    .order('created_at', { ascending: false })
     .limit(12);
 
   if (recentError) {

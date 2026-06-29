@@ -778,7 +778,7 @@ export default function StorageAreasSection({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search categories or items…"
-                className="pl-9 pr-3 py-2 rounded-xl border border-stocksense-gray focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50 w-72 max-w-full"
+                className="pl-9 pr-3 py-2 rounded-xl border border-stocksense-gray focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50 w-72 max-w-full"
               />
             </div>
 
@@ -814,14 +814,14 @@ export default function StorageAreasSection({
         <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="flex flex-wrap gap-2 items-center">
             <p className="text-gray-500 text-sm">Total for {locationName}:</p>
-            <span className="px-2.5 py-1 rounded-full text-xs bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]">
+            <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
               <strong>{totalAreas}</strong> {totalAreas === 1 ? 'Area' : 'Areas'}
             </span>
-            <span className="px-2.5 py-1 rounded-full text-xs bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]">
+            <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
               <strong>{totalCategories}</strong>{' '}
               {totalCategories === 1 ? 'Category' : 'Categories'}
             </span>
-            <span className="px-2.5 py-1 rounded-full text-xs bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]">
+            <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
               <strong>{totalItems}</strong> {totalItems === 1 ? 'Item' : 'Items'}
             </span>
           </div>
@@ -851,13 +851,13 @@ export default function StorageAreasSection({
               value={newStorageName}
               onChange={(e) => setNewStorageName(e.target.value)}
               placeholder="Add a new storage area (e.g., Pantry, Fridge, Garage shelf)"
-              className="border border-stocksense-gray rounded-xl px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
+              className="border border-stocksense-gray rounded-xl px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
             />
             <motion.button
               whileHover={{ y: -1 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleAddStorageArea}
-              className="rounded-xl px-4 py-2 bg-gradient-to-br from-[#0E7488] to-[#0B5563] text-white shadow hover:brightness-110 cursor-pointer"
+              className="rounded-xl px-4 py-2 bg-[var(--stocksense-brand)] text-white shadow hover:brightness-95 cursor-pointer"
             >
               <span className="inline-flex items-center gap-2 w-max">
                 <FaPlus /> Add Storage
@@ -883,7 +883,7 @@ export default function StorageAreasSection({
                 {area.categories?.length ? (
                   <button
                     onClick={() => toggleArea(area.id)}
-                    className="text-[#0E7488] rounded-lg p-1.5 hover:bg-[#E6FAF6] border border-transparent hover:border-[#9FE7D7]"
+                    className="text-[var(--stocksense-brand)] rounded-lg p-1.5 hover:bg-[var(--stocksense-brand-soft)] border border-transparent hover:border-[var(--stocksense-brand-border)]"
                     aria-label={expandedAreas[area.id] ? 'Collapse area' : 'Expand area'}
                   >
                     <FaChevronUp
@@ -898,7 +898,7 @@ export default function StorageAreasSection({
                   <input
                     value={editingName}
                     onChange={(e) => setEditingName(e.target.value)}
-                    className="border border-stocksense-gray rounded-lg px-3 py-1.5 w-64 max-w-full focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
+                    className="border border-stocksense-gray rounded-lg px-3 py-1.5 w-64 max-w-full focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
                   />
                 ) : (
                   <div className="min-w-0">
@@ -919,7 +919,7 @@ export default function StorageAreasSection({
                   <>
                     <button
                       onClick={() => handleSaveEdit(area.id)}
-                      className="text-emerald-600 cursor-pointer rounded-lg p-2 hover:bg-emerald-50"
+                      className="text-[var(--stocksense-brand)] cursor-pointer rounded-lg p-2 hover:bg-[var(--stocksense-brand-soft)]"
                     >
                       <FaCheck />
                     </button>
@@ -969,13 +969,13 @@ export default function StorageAreasSection({
                     })
                   }
                   placeholder={`Add category in ${area.name} (e.g., Fruits, Tools, Cleaning)`}
-                  className="border border-stocksense-gray rounded-xl px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
+                  className="border border-stocksense-gray rounded-xl px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
                 />
                 <motion.button
                   whileHover={{ y: -1 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => handleAddCategory(area.id)}
-                  className="rounded-xl px-3 py-2 bg-[#0E7488] text-white hover:bg-[#0B5563] cursor-pointer"
+                  className="rounded-xl px-3 py-2 bg-[var(--stocksense-brand)] text-white hover:brightness-95 cursor-pointer"
                 >
                   <span className="inline-flex items-center gap-2 w-max">
                     <FaPlus /> Add Category
@@ -1019,7 +1019,7 @@ export default function StorageAreasSection({
                                 {items.length ? (
                                   <button
                                     onClick={() => toggleCategory(category.id)}
-                                    className="text-[#0E7488] rounded-lg p-1 hover:bg-[#E6FAF6] border border-transparent hover:border-[#9FE7D7]"
+                                    className="text-[var(--stocksense-brand)] rounded-lg p-1 hover:bg-[var(--stocksense-brand-soft)] border border-transparent hover:border-[var(--stocksense-brand-border)]"
                                     aria-label={
                                       expandedCategories[category.id]
                                         ? 'Collapse category'
@@ -1045,7 +1045,7 @@ export default function StorageAreasSection({
                                         [category.id]: e.target.value,
                                       })
                                     }
-                                    className="border border-stocksense-gray rounded-lg px-2.5 py-1.5 w-56 sm:w-64 focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
+                                    className="border border-stocksense-gray rounded-lg px-2.5 py-1.5 w-56 sm:w-64 focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
                                   />
                                 ) : (
                                   <div className="min-w-0">
@@ -1070,7 +1070,7 @@ export default function StorageAreasSection({
                                       onClick={() =>
                                         handleUpdateCategory(category.id, area.id)
                                       }
-                                      className="text-emerald-600 cursor-pointer rounded-lg p-2 hover:bg-emerald-50"
+                                      className="text-[var(--stocksense-brand)] cursor-pointer rounded-lg p-2 hover:bg-[var(--stocksense-brand-soft)]"
                                     >
                                       <FaCheck />
                                     </button>
@@ -1133,7 +1133,7 @@ export default function StorageAreasSection({
                                     })
                                   }
                                   placeholder={`Add Item in ${category.name}`}
-                                  className="border border-stocksense-gray rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
+                                  className="border border-stocksense-gray rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
                                 />
                                 <input
                                   type="number"
@@ -1149,7 +1149,7 @@ export default function StorageAreasSection({
                                     })
                                   }
                                   placeholder="Qty"
-                                  className="border border-stocksense-gray rounded-lg px-3 py-2 w-full sm:w-28 focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
+                                  className="border border-stocksense-gray rounded-lg px-3 py-2 w-full sm:w-28 focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
                                 />
                                 <input
                                   type="date"
@@ -1163,13 +1163,13 @@ export default function StorageAreasSection({
                                       },
                                     })
                                   }
-                                  className="border border-stocksense-gray rounded-lg px-3 py-2 w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
+                                  className="border border-stocksense-gray rounded-lg px-3 py-2 w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
                                 />
                                 <motion.button
                                   whileHover={{ y: -1 }}
                                   whileTap={{ scale: 0.98 }}
                                   onClick={() => handleAddItem(category.id)}
-                                  className="rounded-lg px-3 py-2 bg-[#0E7488] text-white hover:bg-[#0B5563] cursor-pointer"
+                                  className="rounded-lg px-3 py-2 bg-[var(--stocksense-brand)] text-white hover:brightness-95 cursor-pointer"
                                 >
                                   <span className="inline-flex items-center gap-2 w-max">
                                     <FaPlus /> Add Item
@@ -1214,7 +1214,7 @@ export default function StorageAreasSection({
                                             onClick={() =>
                                               openMoveModal(area.id, category.id)
                                             }
-                                            className="text-[#0E7488] border border-[#9FE7D7] bg-[#E6FAF6] hover:bg-[#d5f3ea] px-3 py-1.5 rounded-md cursor-pointer"
+                                            className="text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] hover:brightness-95 px-3 py-1.5 rounded-md cursor-pointer"
                                           >
                                             Move selected items
                                           </button>
@@ -1344,7 +1344,7 @@ export default function StorageAreasSection({
                                                       updated
                                                     );
                                                   }}
-                                                  className="text-emerald-600 cursor-pointer rounded-lg p-2 hover:bg-emerald-50"
+                                                  className="text-[var(--stocksense-brand)] cursor-pointer rounded-lg p-2 hover:bg-[var(--stocksense-brand-soft)]"
                                                 >
                                                   <FaCheck />
                                                 </button>
@@ -1404,7 +1404,7 @@ export default function StorageAreasSection({
                                                       item.id
                                                     )
                                                   }
-                                                  className="text-[#0E7488] cursor-pointer rounded-lg p-2 hover:bg-[#E6FAF6]"
+                                                  className="text-[var(--stocksense-brand)] cursor-pointer rounded-lg p-2 hover:bg-[var(--stocksense-brand-soft)]"
                                                   title="Move item to another category"
                                                 >
                                                   <FaArrowsAlt />

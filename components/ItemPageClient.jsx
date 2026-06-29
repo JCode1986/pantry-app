@@ -11,7 +11,7 @@ import {
   ModalBody,
   ModalFooter,
 } from "@heroui/react";
-import { FaSearch } from "react-icons/fa";
+import { FaBoxOpen, FaChevronLeft, FaChevronRight, FaSearch } from "react-icons/fa";
 import { updateItem, deleteItem, updateItemLocation } from "@/app/actions/server";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import OpenGlobalAddItemButton from "@/components/OpenGlobalAddItemButton";
@@ -37,6 +37,58 @@ const pageItemVariants = {
   },
 };
 
+const ITEMS_PER_PAGE = 25;
+
+function PaginationControls({
+  currentPage,
+  totalPages,
+  startItem,
+  endItem,
+  totalItems,
+  onPrevious,
+  onNext,
+}) {
+  if (totalItems <= ITEMS_PER_PAGE) return null;
+
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-stocksense-gray bg-white px-4 py-3 text-sm text-gray-600 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        Showing <span className="font-semibold text-gray-800">{startItem}</span>
+        {" - "}
+        <span className="font-semibold text-gray-800">{endItem}</span>
+        {" of "}
+        <span className="font-semibold text-gray-800">{totalItems}</span>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 sm:justify-end">
+        <Button
+          size="sm"
+          variant="flat"
+          className="rounded-xl"
+          onPress={onPrevious}
+          isDisabled={currentPage <= 1}
+          startContent={<FaChevronLeft className="h-3 w-3" />}
+        >
+          Previous
+        </Button>
+        <span className="min-w-[88px] text-center text-xs text-gray-500">
+          Page {currentPage} of {totalPages}
+        </span>
+        <Button
+          size="sm"
+          variant="flat"
+          className="rounded-xl"
+          onPress={onNext}
+          isDisabled={currentPage >= totalPages}
+          endContent={<FaChevronRight className="h-3 w-3" />}
+        >
+          Next
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function ItemsPageClient({ initialItems, moveLocations }) {
   const [items, setItems] = useState(initialItems ?? []);
 
@@ -44,6 +96,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
   const [search, setSearch] = useState("");
   const [expSoonEnabled, setExpSoonEnabled] = useState(false);
   const [expDays, setExpDays] = useState(7);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // drawer state
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -138,6 +191,24 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
       return (nameOk || pathOk) && expOk;
     });
   }, [items, normalizedSearch, expSoonEnabled, expDays]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedItems = filteredItems.slice(
+    pageStartIndex,
+    pageStartIndex + ITEMS_PER_PAGE
+  );
+  const startItem = filteredItems.length === 0 ? 0 : pageStartIndex + 1;
+  const endItem = Math.min(pageStartIndex + paginatedItems.length, filteredItems.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [normalizedSearch, expSoonEnabled, expDays]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
 
   const selectedCount = selectedIds.size;
 
@@ -469,13 +540,18 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
         className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm"
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-stocksense-teal">
-              Items
-            </h1>
-            <p className="text-sm text-gray-500">
-              Search and manage items across all locations.
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl p-3 text-white bg-gradient-to-br from-rose-500 to-orange-500 shadow-sm border border-gray-300">
+              <FaBoxOpen className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-stocksense-teal">
+                Items
+              </h1>
+              <p className="text-sm text-gray-500">
+                Search and manage items across all locations.
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -490,7 +566,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
             />
 
             <div className="flex items-center gap-2">
-              <label className="flex items-center gap-2 text-sm">
+              <label className="flex items-center gap-2 text-sm w-max">
                 <input
                   type="checkbox"
                   checked={expSoonEnabled}
@@ -518,7 +594,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
         {/* Stats + select controls */}
         <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="flex flex-wrap gap-2 items-center">
-            <span className="px-2.5 py-1 rounded-full text-xs bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]">
+            <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
               <strong>{totals.total}</strong> {totals.total === 1 ? "Item" : "Items"}
             </span>
             <span className="px-2.5 py-1 rounded-full text-xs bg-[#FFF7ED] text-[#9A3412] border border-[#FED7AA]">
@@ -563,13 +639,13 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
             animate={{ opacity: 1, height: "auto", y: 0 }}
             exit={{ opacity: 0, height: 0, y: -6 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="mt-4 overflow-hidden rounded-xl border border-[#9FE7D7] bg-[#E6FAF6] p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+            className="mt-4 overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
           >
-            <div className="text-sm text-[#0E7488]">
+            <div className="text-sm text-[var(--stocksense-brand)]">
               Bulk actions for <span className="font-semibold">{selectedCount}</span>{" "}
               item{selectedCount === 1 ? "" : "s"}
               {filteredItems.length > 0 && (
-                <span className="text-xs text-[#0E7488]/70">
+                <span className="text-xs text-[var(--stocksense-brand)]/70">
                   {" "}
                   (filtered list: {filteredItems.length})
                 </span>
@@ -579,7 +655,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => openMove("bulk")}
-                className="text-[#0E7488] border border-[#9FE7D7] bg-white hover:bg-[#d5f3ea] px-3 py-1.5 rounded-md cursor-pointer"
+                className="text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)] bg-white hover:bg-[var(--stocksense-brand-soft)] px-3 py-1.5 rounded-md cursor-pointer"
               >
                 Move selected
               </button>
@@ -598,8 +674,18 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
 
       {/* List */}
       <motion.div variants={pageSectionVariants} className="grid grid-cols-1 gap-3">
+        <PaginationControls
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
+          startItem={startItem}
+          endItem={endItem}
+          totalItems={filteredItems.length}
+          onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+          onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+        />
+
         <AnimatePresence initial={false}>
-        {filteredItems.map((it) => {
+        {paginatedItems.map((it) => {
           const soon = isExpiringSoon(it.expiration_date, expDays);
           const du = daysUntil(it.expiration_date);
           const selected = selectedIds.has(String(it.id));
@@ -678,6 +764,18 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
           </motion.div>
         )}
         </AnimatePresence>
+
+        {filteredItems.length > ITEMS_PER_PAGE && (
+          <PaginationControls
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            startItem={startItem}
+            endItem={endItem}
+            totalItems={filteredItems.length}
+            onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+            onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+          />
+        )}
       </motion.div>
 
       {/* Drawer (single item) */}
@@ -736,7 +834,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                       type="date"
                       value={editExp || ""}
                       onChange={(e) => setEditExp(e.target.value)}
-                      className="w-full rounded-xl border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
+                      className="w-full rounded-xl border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
                     />
                   </div>
                 </div>
@@ -744,7 +842,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                 <div className="flex gap-2">
                   <Button
                     onClick={saveEdits}
-                    className="rounded-xl bg-[#0E7488] text-white w-full"
+                    className="rounded-xl bg-[var(--stocksense-brand)] text-white w-full"
                   >
                     Save changes
                   </Button>
@@ -803,7 +901,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                         categoryId: firstCat?.id ?? null,
                       });
                     }}
-                    className="w-full rounded-xl border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
+                    className="w-full rounded-xl border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
                   >
                     {moveLocations.map((l) => (
                       <option key={l.id} value={String(l.id)}>
@@ -830,7 +928,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                         categoryId: firstCat?.id ?? null,
                       }));
                     }}
-                    className="w-full rounded-xl border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
+                    className="w-full rounded-xl border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
                     disabled={!moveTarget.locationId}
                   >
                     <option value="">Select area…</option>
@@ -853,7 +951,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                         categoryId: e.target.value || null,
                       }))
                     }
-                    className="w-full rounded-xl border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
+                    className="w-full rounded-xl border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
                     disabled={!moveTarget.areaId}
                   >
                     <option value="">Select category…</option>
@@ -871,7 +969,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                   Cancel
                 </Button>
                 <Button
-                  className="rounded-xl bg-[#0E7488] text-white"
+                  className="rounded-xl bg-[var(--stocksense-brand)] text-white"
                   onClick={() => {
                     // If user has selected items and the drawer isn't driving the interaction, treat as bulk.
                     if (selectedIds.size > 0 && !drawerOpen) confirmMoveBulk();

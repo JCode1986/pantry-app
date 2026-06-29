@@ -176,7 +176,7 @@ const closeDeleteDialog = () => {
         className="flex flex-col md:flex-row md:items-end md:justify-between gap-2 mt-8"
       >
         <div className="text-3xl font-bold flex gap-3 items-center justify-center md:justify-start">
-          <div className="rounded-xl p-3 text-white bg-gradient-to-br from-[#0E7488] to-[#0B5563] shadow-sm border border-white/10">
+          <div className="rounded-xl p-3 text-white bg-gradient-to-br from-indigo-500 to-violet-500 shadow-sm border border-white/10">
             <FaMapMarkedAlt className="h-5 w-5" />
           </div>
           <h1 className="tracking-tight text-stocksense-teal">My Locations</h1>
@@ -196,14 +196,14 @@ const closeDeleteDialog = () => {
           value={locationName}
           onChange={(e) => setLocationName(e.target.value)}
           placeholder="New location (e.g., Home, Work, Grocery Store)"
-          className="w-full max-w-[500px] rounded-lg border text-sm md:text-base border-stocksense-gray px-3 py-2 outline-none focus:ring-2 focus:ring-stocksense-sky/60 focus:border-stocksense-sky bg-white"
+          className="w-full max-w-[500px] rounded-lg border text-sm md:text-base border-stocksense-gray px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/70 focus:border-[var(--stocksense-brand)] bg-white"
           onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
         />
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={handleAdd}
-          className="bg-[#0E7488] text-white px-4 py-2 rounded shadow-sm hover:bg-[#0B5563] flex items-center gap-2"
+          className="bg-[var(--stocksense-brand)] text-white px-4 py-2 rounded shadow-sm hover:brightness-95 flex items-center gap-2"
         >
           <FaPlus /> Add
         </motion.button>
@@ -248,7 +248,7 @@ const closeDeleteDialog = () => {
                             value={editingName}
                             onChange={(e) => setEditingName(e.target.value)}
                             onKeyDown={(e) => onEditKey(e, loc.id)}
-                            className="text-sm font-medium text-[#2B3A3A] border border-gray-300 rounded px-2 py-1 focus:border-[#0E7488] focus:ring-2 focus:ring-[#9FE7D7]/50"
+                            className="text-sm font-medium text-[#2B3A3A] border border-gray-300 rounded px-2 py-1 focus:border-[var(--stocksense-brand)] focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
                           />
                         ) : (
                           <p className="text-sm font-medium text-[#2B3A3A]">{loc.name}</p>
@@ -276,7 +276,7 @@ const closeDeleteDialog = () => {
                             whileHover={{ y: -1 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => handleEditSave(loc.id)}
-                            className="text-emerald-700 hover:text-emerald-800 flex items-center gap-1 text-xs md:text-sm cursor-pointer"
+                            className="text-[var(--stocksense-brand)] hover:brightness-90 flex items-center gap-1 text-xs md:text-sm cursor-pointer"
                           >
                             <FaCheck /> Save
                           </motion.button>
@@ -295,7 +295,7 @@ const closeDeleteDialog = () => {
                             whileHover={{ y: -1 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => router.push(`/locations/${loc.id}`)}
-                            className="text-[#0E7488] hover:text-[#0B5563] flex items-center gap-1 text-xs md:text-sm cursor-pointer"
+                            className="text-[var(--stocksense-brand)] hover:brightness-90 flex items-center gap-1 text-xs md:text-sm cursor-pointer"
                           >
                             <FaEye /> View
                           </motion.button>

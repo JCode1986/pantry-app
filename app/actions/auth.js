@@ -40,6 +40,67 @@ export async function logoutAction() {
   redirect('/login');
 }
 
+export async function updatePasswordAction({ password }) {
+  const normalizedPassword = typeof password === 'string' ? password : '';
+
+  if (normalizedPassword.length < 6) {
+    return {
+      success: false,
+      error: 'Password must be at least 6 characters.',
+    };
+  }
+
+  const { createClient } = await import('@/utils/supabase/server');
+  const supa = await createClient();
+  const session = await getSession();
+  const accessToken = session?.user?.access_token;
+  const refreshToken = session?.user?.refresh_token;
+
+  if (!accessToken || !refreshToken) {
+    return {
+      success: false,
+      error: 'Your session has expired. Please log in again.',
+    };
+  }
+
+  const { data: sessionData, error: sessionError } = await supa.auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+
+  if (sessionError) {
+    console.error('Password update session restore failed:', sessionError);
+    return {
+      success: false,
+      error: sessionError.message || 'Your session has expired. Please log in again.',
+    };
+  }
+
+  const { data, error } = await supa.auth.updateUser({
+    password: normalizedPassword,
+  });
+
+  if (error) {
+    console.error('Password update failed:', error);
+    return {
+      success: false,
+      error: error.message || 'Could not update password.',
+    };
+  }
+
+  if (sessionData?.session || data?.user) {
+    session.user = {
+      access_token: sessionData?.session?.access_token ?? accessToken,
+      refresh_token: sessionData?.session?.refresh_token ?? refreshToken,
+      expires_at: sessionData?.session?.expires_at ?? session?.user?.expires_at,
+      user: data?.user ?? sessionData?.session?.user ?? session?.user?.user,
+    };
+    await session.save();
+  }
+
+  return { success: true, error: null };
+}
+
 
 /** REFRESH TOKEN – server action, for explicit refresh flows, not layout */
 export async function refreshToken() {

@@ -13,7 +13,7 @@ export default function Loading() {
         transition={{ repeat: Infinity, duration: 1.5 }}
         className="rounded-full p-6"
       >
-        <FaLeaf className="text-stocksense-teal text-4xl" />
+        <FaLeaf className="text-[var(--stocksense-brand)] text-4xl" />
       </motion.div>
 
       {/* Loading Text */}

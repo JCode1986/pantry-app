@@ -12,7 +12,7 @@ export default function OpenGlobalAddItemButton({
   return (
     <Button
       variant={variant}
-      className={className || "rounded-xl bg-[#0E7488] text-white"}
+      className={className || "rounded-xl bg-[var(--stocksense-brand)] text-white"}
       startContent={<FaPlus />}
       onPress={() => {
         window.dispatchEvent(

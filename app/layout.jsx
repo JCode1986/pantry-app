@@ -3,6 +3,7 @@ import "./globals.css";
 import Navigation from "@/components/Navigation";
 import { getSessionForLayout } from "./actions/auth";
 import { Providers } from "@/components/Providers";
+import { getPreferenceBootScript } from "@/utils/appPreferences";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,14 +26,12 @@ export const metadata = {
 export default async function RootLayout({ children }) {
   const session = await getSessionForLayout(); // ✅ read-only
   const token = session?.user?.access_token;
-  // const expiresAt = session?.user?.expires_at;
-  // const now = Math.floor(Date.now() / 1000);
-
-  // treat token as valid only if not expired
-  // const hasValidToken = !!token && (!expiresAt || expiresAt > now);
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: getPreferenceBootScript() }} />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Providers>
           {token && <Navigation />}

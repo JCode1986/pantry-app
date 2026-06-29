@@ -11,7 +11,7 @@ import {
   ModalBody,
   ModalFooter,
 } from "@heroui/react";
-import { FaSearch } from "react-icons/fa";
+import { FaSearch, FaWarehouse } from "react-icons/fa";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import { updateStorageArea, deleteStorageArea } from "@/app/actions/server";
 import { containsQuery } from "@/utils/pantry/search";
@@ -218,13 +218,18 @@ export default function AreasPageClient({ initialAreas }) {
         className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm"
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-stocksense-teal">
-              Storage Areas
-            </h1>
-            <p className="text-sm text-gray-500">
-              View storage areas across all locations. Click one to manage it.
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl p-3 text-white bg-gradient-to-br from-sky-500 to-cyan-500 shadow-sm border border-gray-300">
+              <FaWarehouse className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-stocksense-teal">
+                Storage Areas
+              </h1>
+              <p className="text-sm text-gray-500">
+                View storage areas across all locations. Click one to manage it.
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -265,10 +270,10 @@ export default function AreasPageClient({ initialAreas }) {
               </div>
 
               <div className="shrink-0 flex gap-2">
-                <span className="px-2.5 py-1 rounded-full text-xs bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]">
+                <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
                   {a.categoriesCount} {a.categoriesCount === 1 ? "category" : "categories"}
                 </span>
-                <span className="px-2.5 py-1 rounded-full text-xs bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]">
+                <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
                   {a.itemsCount} {a.itemsCount === 1 ? "item" : "items"}
                 </span>
               </div>
@@ -335,18 +340,18 @@ export default function AreasPageClient({ initialAreas }) {
                       inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
                     }}
                   />
-                  <Button onClick={handleRename} className="rounded-xl bg-[#0E7488] text-white w-full">
+                  <Button onClick={handleRename} className="rounded-xl bg-[var(--stocksense-brand)] text-white w-full">
                     Save name
                   </Button>
                 </div>
 
                 {/* Stats */}
                 <div className="flex gap-2 flex-wrap">
-                  <span className="px-2.5 py-1 rounded-full text-xs bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]">
+                  <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
                     {activeArea?.categoriesCount ?? 0}{" "}
                     {(activeArea?.categoriesCount ?? 0) === 1 ? "category" : "categories"}
                   </span>
-                  <span className="px-2.5 py-1 rounded-full text-xs bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]">
+                  <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
                     {activeArea?.itemsCount ?? 0}{" "}
                     {(activeArea?.itemsCount ?? 0) === 1 ? "item" : "items"}
                   </span>

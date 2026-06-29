@@ -31,7 +31,7 @@ import OpenGlobalAddItemButton from "@/components/OpenGlobalAddItemButton";
 
 function StatPill({ label, value }) {
   return (
-    <span className="px-2.5 py-1 rounded-full text-xs bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]">
+    <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
       <strong>{value}</strong> {label}
     </span>
   );
@@ -244,7 +244,7 @@ export default function AreaDetailClient({ area, initialCategories }) {
       {/* Header */}
       <motion.div variants={pageItemVariants} className="flex flex-col gap-3">
         <div className="flex items-center gap-2 text-sm text-gray-500">
-          <Link href="/areas" className="inline-flex items-center gap-2 hover:text-[#0E7488]">
+          <Link href="/areas" className="inline-flex items-center gap-2 hover:text-[var(--stocksense-brand)]">
             <FaChevronLeft className="h-3.5 w-3.5" />
             Areas
           </Link>
@@ -311,7 +311,7 @@ export default function AreaDetailClient({ area, initialCategories }) {
               isDisabled={isSaving}
             />
             <Button
-              className="rounded-xl bg-[#0E7488] text-white"
+              className="rounded-xl bg-[var(--stocksense-brand)] text-white"
               onPress={handleAddCategory}
               isDisabled={isSaving || !newCategory.trim()}
               startContent={<FaPlus />}
@@ -348,7 +348,7 @@ export default function AreaDetailClient({ area, initialCategories }) {
                   <div className="flex items-start justify-between gap-2">
                     <Link href={`/categories/${cat.id}`} className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <div className="rounded-xl p-2 bg-[#E6FAF6] border border-[#9FE7D7] text-[#0E7488]">
+                        <div className="rounded-xl p-2 bg-[var(--stocksense-brand-soft)] border border-[var(--stocksense-brand-border)] text-[var(--stocksense-brand)]">
                           <FaTag />
                         </div>
                         <div className="min-w-0">
@@ -394,7 +394,7 @@ export default function AreaDetailClient({ area, initialCategories }) {
                   <div className="mt-4">
                     <Link
                       href={`/categories/${cat.id}`}
-                      className="inline-flex items-center gap-2 text-sm text-[#0E7488] hover:underline"
+                      className="inline-flex items-center gap-2 text-sm text-[var(--stocksense-brand)] hover:underline"
                     >
                       View items →
                     </Link>
@@ -450,7 +450,7 @@ export default function AreaDetailClient({ area, initialCategories }) {
                   Cancel
                 </Button>
                 <Button
-                  className="bg-[#0E7488] text-white"
+                  className="bg-[var(--stocksense-brand)] text-white"
                   onPress={handleRename}
                   isDisabled={isSaving || !renameModal.name.trim()}
                 >

@@ -8,7 +8,7 @@ export async function middleware(req) {
   const { pathname } = req.nextUrl;
   const isLoginPage = pathname === "/login";
 
-  const protectedRoots = ["/", "/locations", "/storage-areas", "/areas", "/storage", "/categories", "/items"];
+  const protectedRoots = ["/", "/locations", "/storage-areas", "/areas", "/storage", "/categories", "/items", "/profile"];
   const isProtected = protectedRoots.some(
     (root) => pathname === root || pathname.startsWith(root + "/")
   );

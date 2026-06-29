@@ -120,7 +120,7 @@ export default function MoveItemsModal({
                     : ""
                 }
                 onChange={(event) => handleLocationChange(event.target.value)}
-                className="w-full rounded-lg border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
+                className="w-full rounded-lg border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
               >
                 {safeLocations.map((location) => (
                   <option key={location.id} value={String(location.id)}>
@@ -137,7 +137,7 @@ export default function MoveItemsModal({
               <select
                 value={moveModal.targetAreaId ? String(moveModal.targetAreaId) : ""}
                 onChange={(event) => handleAreaChange(event.target.value)}
-                className="w-full rounded-lg border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50"
+                className="w-full rounded-lg border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
               >
                 <option value="">Select area...</option>
                 {areasForSelectedLocation.map((area) => (
@@ -165,7 +165,7 @@ export default function MoveItemsModal({
                   }))
                 }
                 disabled={!moveModal.targetAreaId}
-                className="w-full rounded-lg border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/50 disabled:bg-gray-50 disabled:text-gray-400"
+                className="w-full rounded-lg border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50 disabled:bg-gray-50 disabled:text-gray-400"
               >
                 <option value="">Select category...</option>
                 {selectedArea?.categories?.map((category) => (
@@ -186,7 +186,7 @@ export default function MoveItemsModal({
               <button
                 onClick={onConfirm}
                 disabled={!moveModal.targetAreaId || !moveModal.targetCategoryId}
-                className="px-3 py-1.5 text-sm rounded-lg bg-[#0E7488] text-white hover:bg-[#0B5563] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                className="px-3 py-1.5 text-sm rounded-lg bg-[var(--stocksense-brand)] text-white hover:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
               >
                 Move
               </button>

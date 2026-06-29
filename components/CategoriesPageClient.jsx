@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Input, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
-import { FaSearch } from "react-icons/fa";
+import { FaSearch, FaTags } from "react-icons/fa";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import { updateCategoryName, deleteCategory } from "@/app/actions/server";
 import { containsQuery } from "@/utils/pantry/search";
@@ -194,13 +194,18 @@ export default function CategoriesPageClient({ initialCategories }) {
         className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm"
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-stocksense-teal">
-              Categories
-            </h1>
-            <p className="text-sm text-gray-500">
-              View categories across all locations. Click one to view details.
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl p-3 text-white bg-gradient-to-br from-emerald-500 to-lime-500 shadow-sm border border-gray-300">
+              <FaTags className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-stocksense-teal">
+                Categories
+              </h1>
+              <p className="text-sm text-gray-500">
+                View categories across all locations. Click one to view details.
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -244,7 +249,7 @@ export default function CategoriesPageClient({ initialCategories }) {
               </div>
 
               <div className="shrink-0">
-                <span className="px-2.5 py-1 rounded-full text-xs bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]">
+                <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
                   {c.itemsCount} {c.itemsCount === 1 ? "item" : "items"}
                 </span>
               </div>
@@ -306,7 +311,7 @@ export default function CategoriesPageClient({ initialCategories }) {
                   />
                   <Button
                     onClick={handleRename}
-                    className="rounded-xl bg-[#0E7488] text-white w-full"
+                    className="rounded-xl bg-[var(--stocksense-brand)] text-white w-full"
                   >
                     Save name
                   </Button>

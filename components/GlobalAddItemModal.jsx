@@ -63,13 +63,13 @@ function NewPathField({
     <motion.div
       layout
       {...revealMotion}
-      className="overflow-hidden rounded-xl border border-[#9FE7D7] bg-[#F0FFFB] p-3 shadow-sm"
+      className="overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3 shadow-sm"
     >
       <div className="mb-2 flex items-center gap-2">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0E7488] text-white">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--stocksense-brand)] text-white">
           <Icon className="h-3.5 w-3.5" />
         </span>
-        <span className="text-sm font-semibold text-[#0E7488]">{title}</span>
+        <span className="text-sm font-semibold text-[var(--stocksense-brand)]">{title}</span>
       </div>
       <Input
         label={label}
@@ -80,7 +80,7 @@ function NewPathField({
         variant="bordered"
         radius="lg"
         classNames={{
-          inputWrapper: "border-[#9FE7D7] bg-white",
+          inputWrapper: "border-[var(--stocksense-brand-border)] bg-white",
         }}
       />
     </motion.div>
@@ -406,7 +406,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
         {() => (
           <>
             <ModalHeader className="flex flex-col gap-1">
-              <span className="text-stocksense-teal">Add item</span>
+              <span className="text-[var(--stocksense-brand)]">Add item</span>
               <span className="text-sm font-normal text-gray-500">
                 Choose where it belongs, or create the missing location, area, or category.
               </span>
@@ -609,7 +609,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                 Add & close
               </Button>
               <Button
-                className="rounded-xl bg-[#0E7488] text-white"
+                className="rounded-xl bg-[var(--stocksense-brand)] text-white"
                 onPress={() => handleSubmit()}
                 isDisabled={isSaving || isLoading}
                 startContent={isSaving ? <FaSpinner className="animate-spin" /> : <FaPlus />}

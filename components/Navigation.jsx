@@ -8,6 +8,11 @@ import { logoutAction } from "@/app/actions/auth";
 import GlobalAddItemModal from "@/components/GlobalAddItemModal";
 import GlobalItemSearchModal from "@/components/GlobalItemSearchModal";
 import {
+  DEFAULT_PREFERENCES,
+  PREFERENCE_STORAGE_KEY,
+  applyAppPreferences,
+} from "@/utils/appPreferences";
+import {
   Navbar,
   NavbarBrand,
   NavbarContent,
@@ -32,6 +37,7 @@ import {
   FaHome,
   FaPlus,
   FaSearch,
+  FaUserCircle,
 } from "react-icons/fa";
 
 const navItems = [
@@ -40,6 +46,7 @@ const navItems = [
   { href: "/areas", label: "Areas", icon: FaWarehouse },
   { href: "/categories", label: "Categories", icon: FaTags },
   { href: "/items", label: "Items", icon: FaBoxOpen },
+  { href: "/profile", label: "Profile", icon: FaUserCircle },
 ];
 
 function cx(...classes) {
@@ -68,8 +75,9 @@ export default function Navigation() {
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
+      localStorage.removeItem(PREFERENCE_STORAGE_KEY);
+      applyAppPreferences(DEFAULT_PREFERENCES);
       await logoutAction();
-      localStorage.clear();
       window.location.href = "/login";
     } catch (err) {
       console.error("Logout failed:", err);
@@ -112,7 +120,7 @@ export default function Navigation() {
         <NavbarContent justify="start" className="gap-3">
           <NavbarMenuToggle
             aria-label={isMenuOpen ? "Close menu" : "Open menu"}
-            className="sm:hidden"
+            className="lg:hidden"
           />
 
         <NavbarBrand>
@@ -129,7 +137,7 @@ export default function Navigation() {
             </Link>
         </NavbarBrand>
 
-          <NavbarContent className="hidden sm:flex gap-2" justify="start">
+          <NavbarContent className="hidden lg:flex gap-2" justify="start">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeHref === item.href;
@@ -141,8 +149,8 @@ export default function Navigation() {
                     className={cx(
                       "inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition",
                       isActive
-                        ? "bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]"
-                        : "text-gray-600 hover:text-[#0E7488] hover:bg-gray-50"
+                        ? "border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
+                        : "text-gray-600 hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
                     )}
                     aria-current={isActive ? "page" : undefined}
                   >
@@ -156,10 +164,10 @@ export default function Navigation() {
         </NavbarContent>
 
         <NavbarContent justify="end" className="gap-2">
-          <NavbarItem className="hidden sm:flex">
+          <NavbarItem className="hidden lg:flex">
             <Button
               variant="flat"
-              className="rounded-xl border border-stocksense-gray bg-white text-[#0E7488]"
+              className="rounded-xl border border-stocksense-gray bg-white text-[var(--stocksense-brand)]"
               onPress={() => setShowItemSearchModal(true)}
               startContent={<FaSearch />}
             >
@@ -167,9 +175,9 @@ export default function Navigation() {
             </Button>
           </NavbarItem>
 
-          <NavbarItem className="hidden sm:flex">
+          <NavbarItem className="hidden lg:flex">
             <Button
-              className="rounded-xl bg-[#0E7488] text-white"
+              className="rounded-xl bg-[var(--stocksense-brand)] text-white"
               onPress={() => {
                 setAddItemContext(null);
                 setShowAddItemModal(true);
@@ -180,7 +188,7 @@ export default function Navigation() {
             </Button>
           </NavbarItem>
 
-          <NavbarItem className="hidden sm:flex">
+          <NavbarItem className="hidden lg:flex">
             <Button
               variant="flat"
               className={cx(
@@ -222,8 +230,8 @@ export default function Navigation() {
                   className={cx(
                     "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition",
                     isActive
-                      ? "bg-[#E6FAF6] text-[#0E7488] border border-[#9FE7D7]"
-                      : "text-gray-700 hover:bg-gray-50"
+                      ? "border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
+                      : "text-gray-700 hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
                   )}
                   aria-current={isActive ? "page" : undefined}
                 >
@@ -237,7 +245,7 @@ export default function Navigation() {
           <div className="mt-3 border-t border-gray-200 pt-3">
             <Button
               variant="flat"
-              className="w-full justify-start rounded-xl border border-stocksense-gray bg-white text-[#0E7488]"
+              className="w-full justify-start rounded-xl border border-stocksense-gray bg-white text-[var(--stocksense-brand)]"
               onPress={() => {
                 setIsMenuOpen(false);
                 setShowItemSearchModal(true);
@@ -248,7 +256,7 @@ export default function Navigation() {
             </Button>
 
             <Button
-              className="mt-2 w-full justify-start rounded-xl bg-[#0E7488] text-white"
+              className="mt-2 w-full justify-start rounded-xl bg-[var(--stocksense-brand)] text-white"
               onPress={() => {
                 setIsMenuOpen(false);
                 setAddItemContext(null);
@@ -298,8 +306,8 @@ export default function Navigation() {
       />
 
       {addItemNotice && (
-        <div className="fixed right-4 top-4 z-50 max-w-sm rounded-xl border border-[#9FE7D7] bg-white px-4 py-3 shadow-lg">
-          <div className="text-sm font-semibold text-stocksense-teal">
+        <div className="fixed right-4 top-4 z-50 max-w-sm rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-4 py-3 shadow-lg">
+          <div className="text-sm font-semibold text-[var(--stocksense-brand)]">
             Item added
           </div>
           <div className="text-sm text-gray-600">

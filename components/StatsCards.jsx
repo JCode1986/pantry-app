@@ -104,7 +104,7 @@ export default function StatsCards({ totals, isLoading = false }) {
                 className="group relative block overflow-hidden rounded-2xl bg-white shadow-sm
                            border border-gray-300
                            hover:shadow-md hover:-translate-y-[1px] transition
-                           focus:outline-none focus:ring-2 focus:ring-[#9FE7D7]/60"
+                           focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/60"
               >
                 {/* gradient accent */}
                 <div
@@ -121,7 +121,7 @@ export default function StatsCards({ totals, isLoading = false }) {
                       >
                         <Icon className="h-5 w-5" />
                       </div>
-                      <h3 className="text-sm md:text-base font-semibold text-stocksense-teal">
+                      <h3 className="text-sm md:text-base font-semibold text-[var(--stocksense-brand)]">
                         {c.label}
                       </h3>
                     </div>
