@@ -1,9 +1,18 @@
 import { createClient } from '@/utils/supabase/server';
+import { getSessionForLayout } from './actions/auth';
+import LandingPage from '@/components/LandingPage';
 import StatsCards from '@/components/StatsCards';
 import RecentActivity from '@/components/RecentActivity';
 import ItemsDonut from '@/components/ItemsDonut';
 
 export default async function HomePage() {
+  const session = await getSessionForLayout();
+  const token = session?.user?.access_token;
+
+  if (!token) {
+    return <LandingPage />;
+  }
+
   const supabase = await createClient();
 
   const getCount = async (table) => {
@@ -41,7 +50,7 @@ export default async function HomePage() {
     <main className="page-enter mx-auto max-w-6xl px-5 py-8 space-y-10 pt-8 min-h-[100vh]">
       <header className='md:text-left text-center'>
         <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-stocksense-teal">Stock Overview</h1>
-        <p className="text-gray-500 mt-1">Snapshot of your data and what’s new.</p>
+        <p className="text-gray-500 mt-1">Snapshot of your data and what is new.</p>
       </header>
 
       <StatsCards totals={{ locations, areas, categories, items }} />

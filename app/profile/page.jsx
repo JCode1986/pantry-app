@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import ProfileClient from "@/components/ProfileClient";
 import { getSessionForLayout } from "@/app/actions/auth";
+import { getUserBillingAction } from "@/app/actions/billing";
 import { getUserPreferencesAction } from "@/app/actions/preferences";
 import { DEFAULT_PREFERENCES } from "@/utils/appPreferences";
 
@@ -41,10 +42,21 @@ export default async function ProfilePage() {
   };
   const preferencesResult = await getUserPreferencesAction();
   const preferences = preferencesResult?.data ?? DEFAULT_PREFERENCES;
+  const billingResult = await getUserBillingAction();
+  const billing = billingResult?.data ?? {
+    planId: "free",
+    status: "free",
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+  };
 
   return (
     <main className="page-enter mx-auto min-h-[100vh] max-w-6xl px-5 py-8">
-      <ProfileClient user={user} initialPreferences={preferences} />
+      <ProfileClient
+        user={user}
+        initialPreferences={preferences}
+        initialBilling={billing}
+      />
     </main>
   );
 }

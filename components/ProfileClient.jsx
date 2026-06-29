@@ -9,9 +9,11 @@ import {
   FaCheckCircle,
   FaClock,
   FaClipboard,
+  FaCreditCard,
   FaEnvelope,
   FaEye,
   FaEyeSlash,
+  FaExternalLinkAlt,
   FaFont,
   FaIdBadge,
   FaKey,
@@ -24,6 +26,15 @@ import {
   FaWarehouse,
 } from "react-icons/fa";
 import { updatePasswordAction } from "@/app/actions/auth";
+import {
+  createBillingPortalSessionAction,
+  createCheckoutSessionAction,
+} from "@/app/actions/billing";
+import {
+  BILLING_INTERVALS,
+  BILLING_PLANS,
+  getBillingPlan,
+} from "@/utils/billingPlans";
 import {
   DEFAULT_PREFERENCES,
   FONT_OPTIONS,
@@ -144,7 +155,142 @@ function AppearancePreview({ theme, font }) {
   );
 }
 
-export default function ProfileClient({ user, initialPreferences = DEFAULT_PREFERENCES }) {
+function formatBillingDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+function BillingPlanButton({
+  plan,
+  interval,
+  currentPlanId,
+  onCheckout,
+  isLoading,
+}) {
+  const isCurrent = currentPlanId === plan.id;
+  const price =
+    interval === BILLING_INTERVALS.yearly ? plan.yearlyPrice : plan.monthlyPrice;
+  const label = interval === BILLING_INTERVALS.yearly ? "yearly" : "monthly";
+
+  return (
+    <Button
+      variant={isCurrent ? "flat" : "solid"}
+      className={`rounded-xl ${
+        isCurrent
+          ? "border border-stocksense-gray bg-white text-gray-600"
+          : "bg-[var(--stocksense-brand)] text-white"
+      }`}
+      isDisabled={isLoading || isCurrent}
+      isLoading={isLoading}
+      onPress={() => onCheckout(plan.id, interval)}
+    >
+      {isCurrent ? "Current plan" : `${price} ${label}`}
+    </Button>
+  );
+}
+
+function BillingSection({ billing, billingError, billingLoading, onCheckout, onPortal }) {
+  const currentPlan = getBillingPlan(billing.planId);
+  const renewalDate = formatBillingDate(billing.currentPeriodEnd);
+  const paidPlans = BILLING_PLANS.filter((plan) => plan.id !== "free");
+
+  return (
+    <motion.section
+      variants={itemVariants}
+      className="rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm"
+    >
+      <div className="flex items-start gap-3">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+          <FaCreditCard className="h-4 w-4" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Billing</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Current plan: {currentPlan.name}
+            {billing.status ? ` (${billing.status})` : ""}.
+          </p>
+          {renewalDate && (
+            <p className="mt-1 text-xs text-gray-500">
+              {billing.cancelAtPeriodEnd ? "Access ends" : "Renews"} on {renewalDate}.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {billingError && (
+        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          {billingError}
+        </div>
+      )}
+
+      <div className="mt-5 space-y-4">
+        {paidPlans.map((plan) => (
+          <div
+            key={plan.id}
+            className="rounded-xl border border-stocksense-gray bg-gray-50/60 p-3"
+          >
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">{plan.name}</h3>
+                <p className="text-xs text-gray-500">{plan.audience}</p>
+              </div>
+              {plan.featured && (
+                <span className="w-max rounded-full bg-[var(--stocksense-brand-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--stocksense-brand)]">
+                  Popular
+                </span>
+              )}
+            </div>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <BillingPlanButton
+                plan={plan}
+                interval={BILLING_INTERVALS.monthly}
+                currentPlanId={billing.planId}
+                onCheckout={onCheckout}
+                isLoading={billingLoading === `${plan.id}:monthly`}
+              />
+              <BillingPlanButton
+                plan={plan}
+                interval={BILLING_INTERVALS.yearly}
+                currentPlanId={billing.planId}
+                onCheckout={onCheckout}
+                isLoading={billingLoading === `${plan.id}:yearly`}
+              />
+            </div>
+          </div>
+        ))}
+
+        <Button
+          variant="flat"
+          className="w-full rounded-xl border border-stocksense-gray bg-white text-gray-700"
+          onPress={onPortal}
+          isLoading={billingLoading === "portal"}
+          isDisabled={billingLoading === "portal"}
+          startContent={<FaExternalLinkAlt className="h-3.5 w-3.5" />}
+        >
+          Manage billing
+        </Button>
+      </div>
+    </motion.section>
+  );
+}
+
+export default function ProfileClient({
+  user,
+  initialPreferences = DEFAULT_PREFERENCES,
+  initialBilling = {
+    planId: "free",
+    status: "free",
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+  },
+}) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -154,6 +300,9 @@ export default function ProfileClient({ user, initialPreferences = DEFAULT_PREFE
   const [preferences, setPreferences] = useState(initialPreferences);
   const [savingPreferences, setSavingPreferences] = useState(false);
   const [appearanceMessage, setAppearanceMessage] = useState(null);
+  const [billing, setBilling] = useState(initialBilling);
+  const [billingLoading, setBillingLoading] = useState(null);
+  const [billingError, setBillingError] = useState(null);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
@@ -172,6 +321,10 @@ export default function ProfileClient({ user, initialPreferences = DEFAULT_PREFE
   useEffect(() => {
     setPreferences(saveStoredPreferences(initialPreferences));
   }, [initialPreferences]);
+
+  useEffect(() => {
+    setBilling(initialBilling);
+  }, [initialBilling]);
 
   const handlePasswordSubmit = async (event) => {
     event.preventDefault();
@@ -260,6 +413,35 @@ export default function ProfileClient({ user, initialPreferences = DEFAULT_PREFE
     updatePreferences({ fontId: String(fontId) });
   };
 
+  const handleCheckout = async (planId, interval) => {
+    const loadingKey = `${planId}:${interval}`;
+    setBillingLoading(loadingKey);
+    setBillingError(null);
+
+    const result = await createCheckoutSessionAction({ planId, interval });
+    if (result?.url) {
+      window.location.href = result.url;
+      return;
+    }
+
+    setBillingError(result?.error || "Could not start checkout.");
+    setBillingLoading(null);
+  };
+
+  const handleBillingPortal = async () => {
+    setBillingLoading("portal");
+    setBillingError(null);
+
+    const result = await createBillingPortalSessionAction();
+    if (result?.url) {
+      window.location.href = result.url;
+      return;
+    }
+
+    setBillingError(result?.error || "Could not open billing portal.");
+    setBillingLoading(null);
+  };
+
   return (
     <motion.div
       variants={sectionVariants}
@@ -288,6 +470,14 @@ export default function ProfileClient({ user, initialPreferences = DEFAULT_PREFE
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
         <div className="space-y-6">
+          <BillingSection
+            billing={billing}
+            billingError={billingError}
+            billingLoading={billingLoading}
+            onCheckout={handleCheckout}
+            onPortal={handleBillingPortal}
+          />
+
           <motion.section
             variants={itemVariants}
             className="rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm"
@@ -501,47 +691,44 @@ export default function ProfileClient({ user, initialPreferences = DEFAULT_PREFE
               </Button>
             )}
           </section>
+
+          <section className="rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-lg font-semibold text-gray-900">Quick actions</h2>
+              <p className="text-sm text-gray-500">
+                Jump back into the inventory views you use most.
+              </p>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
+              <ShortcutButton
+                href="/items"
+                icon={FaBoxOpen}
+                label="Items"
+                description="Search and manage inventory"
+              />
+              <ShortcutButton
+                href="/locations"
+                icon={FaMapMarkedAlt}
+                label="Locations"
+                description="Manage places and storage"
+              />
+              <ShortcutButton
+                href="/areas"
+                icon={FaWarehouse}
+                label="Areas"
+                description="Review storage areas"
+              />
+              <ShortcutButton
+                href="/categories"
+                icon={FaTags}
+                label="Categories"
+                description="Organize item groups"
+              />
+            </div>
+          </section>
         </motion.aside>
       </div>
-
-      <motion.section
-        variants={itemVariants}
-        className="rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm"
-      >
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-semibold text-gray-900">Quick actions</h2>
-          <p className="text-sm text-gray-500">
-            Jump back into the inventory views you use most.
-          </p>
-        </div>
-
-        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <ShortcutButton
-            href="/items"
-            icon={FaBoxOpen}
-            label="Items"
-            description="Search and manage inventory"
-          />
-          <ShortcutButton
-            href="/locations"
-            icon={FaMapMarkedAlt}
-            label="Locations"
-            description="Manage places and storage"
-          />
-          <ShortcutButton
-            href="/areas"
-            icon={FaWarehouse}
-            label="Areas"
-            description="Review storage areas"
-          />
-          <ShortcutButton
-            href="/categories"
-            icon={FaTags}
-            label="Categories"
-            description="Organize item groups"
-          />
-        </div>
-      </motion.section>
     </motion.div>
   );
 }
