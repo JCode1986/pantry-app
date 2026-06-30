@@ -404,7 +404,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
         if (!open) handleClose();
       }}
       placement="center"
-      size="2xl"
+      size="3xl"
       scrollBehavior="inside"
     >
       <ModalContent>

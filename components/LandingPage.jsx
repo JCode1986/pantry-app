@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   FaArrowRight,
@@ -8,6 +9,7 @@ import {
   FaSearch,
 } from 'react-icons/fa';
 import PricingSection from '@/components/PricingSection';
+import WhereKeepLogo from '@/components/WhereKeepLogo';
 
 const features = [
   {
@@ -102,17 +104,22 @@ export default function LandingPage() {
   return (
     <main className="page-enter min-h-[100vh] bg-white text-gray-900">
       <section className="relative overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-px bg-[var(--stocksense-brand-border)]" />
+        <Image
+          src="/wherekeep-hero.jpg"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-center"
+          aria-hidden="true"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-white via-white/88 to-white/12" />
+        <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-white/35" />
 
         <div className="relative mx-auto flex min-h-[88vh] max-w-6xl flex-col px-5 py-6">
           <nav className="flex items-center justify-between gap-4">
             <Link href="/" className="flex items-center gap-3">
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--stocksense-brand)] text-white shadow-sm">
-                <FaMapMarkedAlt className="h-5 w-5" />
-              </span>
-              <span className="text-lg font-semibold tracking-tight text-[var(--stocksense-brand)]">
-                WhereKeep
-              </span>
+              <WhereKeepLogo className="drop-shadow-sm" markClassName="h-14 max-w-[245px]" />
             </Link>
 
             <div className="hidden items-center gap-2 sm:flex">
@@ -161,9 +168,13 @@ export default function LandingPage() {
                 </Link>
               </div>
             </div>
-
-            <InventoryPreview />
           </div>
+        </div>
+      </section>
+
+      <section className="border-t border-gray-200 bg-white">
+        <div className="mx-auto max-w-6xl px-5 py-10">
+          <InventoryPreview />
         </div>
       </section>
 

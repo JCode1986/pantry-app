@@ -8,7 +8,7 @@
   "theme_color": "#0E7488",
   "icons": [
     {
-      "src": "/wherekeep-icon.png",
+      "src": "/wherekeep-app-icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

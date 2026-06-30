@@ -6,6 +6,10 @@ import StatsCards from '@/components/StatsCards';
 import RecentActivity from '@/components/RecentActivity';
 import ItemsDonut from '@/components/ItemsDonut';
 import { createPageMetadata } from '@/utils/metadata';
+import {
+  getActivityFilterOptionsAction,
+  getRecentActivityAction,
+} from '@/app/actions/activity';
 
 export const metadata = createPageMetadata({
   title: 'Household Inventory Tracker',
@@ -13,6 +17,53 @@ export const metadata = createPageMetadata({
     'WhereKeep helps families track pantry, household, and storage inventory across every location.',
   path: '/',
 });
+
+async function getItemsByLocation(supabase) {
+  const [
+    { data: locationsRaw = [], error: locationsError },
+    { data: areasRaw = [], error: areasError },
+    { data: categoriesRaw = [], error: categoriesError },
+    { data: itemsRaw = [], error: itemsError },
+  ] = await Promise.all([
+    supabase.from('locations').select('id, name').order('name', { ascending: true }),
+    supabase.from('storage_areas').select('id, location_id'),
+    supabase.from('storage_categories').select('id, storage_area_id'),
+    supabase.from('items').select('id, category_id'),
+  ]);
+
+  const errors = [locationsError, areasError, categoriesError, itemsError].filter(Boolean);
+  if (errors.length) {
+    console.error('items by location error:', errors);
+    return [];
+  }
+
+  const areaToLocation = new Map(
+    areasRaw.map((area) => [String(area.id), area.location_id])
+  );
+  const categoryToLocation = new Map(
+    categoriesRaw.map((category) => [
+      String(category.id),
+      areaToLocation.get(String(category.storage_area_id)),
+    ])
+  );
+  const countsByLocation = new Map(
+    locationsRaw.map((location) => [String(location.id), 0])
+  );
+
+  for (const item of itemsRaw) {
+    const locationId = categoryToLocation.get(String(item.category_id));
+    if (!locationId) continue;
+
+    const key = String(locationId);
+    countsByLocation.set(key, (countsByLocation.get(key) ?? 0) + 1);
+  }
+
+  return locationsRaw.map((location) => ({
+    location_id: location.id,
+    location_name: location.name,
+    item_count: countsByLocation.get(String(location.id)) ?? 0,
+  }));
+}
 
 export default async function HomePage() {
   const session = await getSessionForLayout();
@@ -40,24 +91,12 @@ export default async function HomePage() {
     getCount('items'),
   ]);
 
-  // Recent activity: latest 12 rows
-  const { data: recent, error: recentError } = await supabase
-    .from('recent_activity')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(12);
+  const [activityResult, activityFiltersResult] = await Promise.all([
+    getRecentActivityAction({ limit: 12 }),
+    getActivityFilterOptionsAction(),
+  ]);
 
-  if (recentError) {
-    console.error('recent_activity error:', recentError);
-  }
-
-  const safeRecent = recent ?? [];
-
-
-  // Donut data: items per location
-  const { data: perLocation = [] } = await supabase
-    .from('items_count_per_location')
-    .select('*');
+  const perLocation = await getItemsByLocation(supabase);
 
   return (
     <main className="page-enter mx-auto max-w-6xl px-5 py-8 space-y-10 pt-8 min-h-[100vh]">
@@ -70,7 +109,13 @@ export default async function HomePage() {
 
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <RecentActivity items={safeRecent} />
+          <RecentActivity
+            items={activityResult.data.items}
+            members={activityFiltersResult.data.members}
+            initialCursor={activityResult.data.nextCursor}
+            initialHasMore={activityResult.data.hasMore}
+            initialError={activityResult.error || activityFiltersResult.error}
+          />
         </div>
         <div className="lg:col-span-1 flex items-start">
           <div className="min-h-[350px] w-full">

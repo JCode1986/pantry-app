@@ -1,12 +1,27 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { Select, SelectItem } from '@heroui/react';
 import {
+  FaBolt,
   FaBoxOpen,
   FaMapMarkedAlt,
   FaTags,
+  FaUserCircle,
   FaWarehouse,
 } from 'react-icons/fa';
+import { getRecentActivityAction } from '@/app/actions/activity';
+
+const PAGE_SIZE = 12;
+const ALL_FILTER = 'all';
+const ACTION_OPTIONS = [
+  { value: ALL_FILTER, label: 'All activity' },
+  { value: 'added', label: 'Added' },
+  { value: 'deleted', label: 'Removed' },
+  { value: 'moved', label: 'Moved' },
+  { value: 'updated', label: 'Updated' },
+];
 
 function label(key) {
   switch (key) {
@@ -324,21 +339,184 @@ function formatTimestamp(value) {
   }).format(date);
 }
 
-export default function RecentActivity({ items = [] }) {
+function actorName(row) {
+  return (
+    row.actor_email ||
+    row.actor_name ||
+    row.user_email ||
+    row.member_email ||
+    (row.actor_user_id ? `User ${String(row.actor_user_id).slice(0, 8)}` : null) ||
+    'Unknown user'
+  );
+}
+
+function memberLabel(member) {
+  if (!member) return 'Unknown user';
+  return member.email || `User ${String(member.userId).slice(0, 8)}`;
+}
+
+function selectedKey(keys) {
+  if (!keys || keys === 'all') return null;
+  return Array.from(keys)[0] ?? null;
+}
+
+export default function RecentActivity({
+  items = [],
+  members = [],
+  initialCursor = null,
+  initialHasMore = false,
+  initialError = null,
+}) {
+  const [activityItems, setActivityItems] = useState(items);
+  const [actorUserId, setActorUserId] = useState(ALL_FILTER);
+  const [action, setAction] = useState(ALL_FILTER);
+  const [cursor, setCursor] = useState(initialCursor);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [error, setError] = useState(initialError);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  const memberOptions = useMemo(
+    () =>
+      members.filter((member) => member?.userId).map((member) => ({
+        value: member.userId,
+        label: memberLabel(member),
+      })),
+    [members]
+  );
+
+  async function loadActivity({
+    nextActorUserId = actorUserId,
+    nextAction = action,
+    mode = 'replace',
+  } = {}) {
+    const append = mode === 'append';
+    if (append) {
+      setIsLoadingMore(true);
+    } else {
+      setIsRefreshing(true);
+      setCursor(null);
+      setHasMore(false);
+    }
+
+    try {
+      const result = await getRecentActivityAction({
+        limit: PAGE_SIZE,
+        action: nextAction,
+        actorUserId: nextActorUserId === ALL_FILTER ? null : nextActorUserId,
+        cursor: append ? cursor : null,
+      });
+
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setError(null);
+      }
+
+      const nextItems = result.data?.items ?? [];
+      setActivityItems((current) => (append ? [...current, ...nextItems] : nextItems));
+      setCursor(result.data?.nextCursor ?? null);
+      setHasMore(Boolean(result.data?.hasMore));
+    } catch (err) {
+      setError(err?.message || 'Could not load recent activity.');
+    } finally {
+      setIsRefreshing(false);
+      setIsLoadingMore(false);
+    }
+  }
+
+  function handleActorChange(keys) {
+    const nextActorUserId = String(selectedKey(keys) || ALL_FILTER);
+    setActorUserId(nextActorUserId);
+    void loadActivity({ nextActorUserId, mode: 'replace' });
+  }
+
+  function handleActionChange(keys) {
+    const nextAction = String(selectedKey(keys) || ALL_FILTER);
+    setAction(nextAction);
+    void loadActivity({ nextAction, mode: 'replace' });
+  }
+
   return (
     <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-gray-200 p-5">
-        <h2 className="text-lg font-semibold text-stocksense-teal">
-          Recent activity
-        </h2>
-        <span className="text-xs text-gray-600">{items.length} items</span>
+      <div className="border-b border-gray-200 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-stocksense-teal">
+            Recent activity
+          </h2>
+          <span className="shrink-0 text-xs text-gray-600">
+            {activityItems.length}
+            {hasMore ? '+' : ''} items
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <Select
+            aria-label="Filter recent activity by user"
+            label={
+              <span className="inline-flex items-center gap-1.5">
+                <FaUserCircle className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+                User
+              </span>
+            }
+            selectedKeys={new Set([actorUserId])}
+            onSelectionChange={handleActorChange}
+            isDisabled={isRefreshing}
+            variant="bordered"
+            radius="lg"
+            classNames={{
+              trigger: "border-gray-200 bg-white",
+              value: "text-gray-700",
+            }}
+          >
+            <SelectItem key={ALL_FILTER}>All users</SelectItem>
+            {memberOptions.map((member) => (
+              <SelectItem key={member.value} textValue={member.label}>
+                {member.label}
+              </SelectItem>
+            ))}
+          </Select>
+
+          <Select
+            aria-label="Filter recent activity by action"
+            label={
+              <span className="inline-flex items-center gap-1.5">
+                <FaBolt className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+                Action
+              </span>
+            }
+            selectedKeys={new Set([action])}
+            onSelectionChange={handleActionChange}
+            isDisabled={isRefreshing}
+            variant="bordered"
+            radius="lg"
+            classNames={{
+              trigger: "border-gray-200 bg-white",
+              value: "text-gray-700",
+            }}
+          >
+            {ACTION_OPTIONS.map((option) => (
+              <SelectItem key={option.value} textValue={option.label}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </Select>
+        </div>
+
+        {error ? (
+          <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+            {error}
+          </p>
+        ) : null}
       </div>
 
       <ul className="divide-y divide-gray-200">
-        {items.length === 0 ? (
-          <li className="p-5 text-sm text-gray-600">No recent activity yet.</li>
+        {activityItems.length === 0 ? (
+          <li className="p-5 text-sm text-gray-600">
+            {isRefreshing ? 'Loading activity...' : 'No activity matches these filters.'}
+          </li>
         ) : (
-          items.map((row, index) => {
+          activityItems.map((row, index) => {
             const action = (row.action || '').toLowerCase();
             const entity = (row.entity_type || 'item').toLowerCase();
 
@@ -365,6 +543,10 @@ export default function RecentActivity({ items = [] }) {
                     <p className="mt-1 whitespace-normal break-words text-xs text-gray-500">
                       {detailLine(row)}
                     </p>
+                    <p className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-500">
+                      <FaUserCircle className="h-3 w-3 shrink-0 text-[var(--stocksense-brand)]" />
+                      <span className="truncate">By {actorName(row)}</span>
+                    </p>
                   </div>
                 </div>
 
@@ -376,6 +558,19 @@ export default function RecentActivity({ items = [] }) {
           })
         )}
       </ul>
+
+      {hasMore ? (
+        <div className="border-t border-gray-200 p-4 text-center">
+          <button
+            type="button"
+            onClick={() => void loadActivity({ mode: 'append' })}
+            disabled={isRefreshing || isLoadingMore}
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 transition hover:border-[var(--stocksense-brand)] hover:text-[var(--stocksense-brand)] disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
+          >
+            {isLoadingMore ? 'Loading...' : 'View more'}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

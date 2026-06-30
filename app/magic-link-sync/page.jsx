@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
+import WhereKeepLoader from '@/components/WhereKeepLoader';
 
 export default function MagicLinkSyncPage() {
   const router = useRouter();
@@ -56,12 +57,11 @@ export default function MagicLinkSyncPage() {
   }, [redirectTo, router]);
 
   return (
-    <main className="page-enter flex justify-center items-center h-screen">
-      <div className="flex flex-col items-center">
-        <h1 className="text-2xl font-bold mb-4">🔄 Syncing your session...</h1>
-        <p className="text-gray-600 mb-6">Please wait, redirecting shortly.</p>
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500 border-solid"></div>
-      </div>
+    <main className="page-enter flex h-screen items-center justify-center px-4">
+      <WhereKeepLoader
+        label="Syncing your session..."
+        detail="Please wait, redirecting shortly."
+      />
     </main>
   );
 }

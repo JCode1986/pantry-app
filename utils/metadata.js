@@ -30,10 +30,10 @@ export function createPageMetadata({
       siteName: siteConfig.name,
       images: [
         {
-          url: "/wherekeep-icon.png",
-          width: 512,
-          height: 512,
-          alt: siteConfig.name,
+          url: "/wherekeep-social-preview.jpg",
+          width: 1200,
+          height: 630,
+          alt: `${siteConfig.name} household inventory preview`,
         },
       ],
       type: "website",
@@ -42,7 +42,7 @@ export function createPageMetadata({
       card: "summary",
       title: socialTitle,
       description,
-      images: ["/wherekeep-icon.png"],
+      images: ["/wherekeep-social-preview.jpg"],
     },
     robots,
   };

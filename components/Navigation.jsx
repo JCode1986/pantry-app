@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { logoutAction } from "@/app/actions/auth";
 import GlobalAddItemModal from "@/components/GlobalAddItemModal";
 import GlobalItemSearchModal from "@/components/GlobalItemSearchModal";
+import WhereKeepLogo from "@/components/WhereKeepLogo";
 import {
   DEFAULT_PREFERENCES,
   PREFERENCE_STORAGE_KEY,
@@ -124,12 +125,7 @@ export default function Navigation() {
 
           <NavbarBrand>
             <Link href="/" className="flex items-center gap-2">
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--stocksense-brand)] text-white shadow-sm">
-                <FaMapMarkedAlt className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <span className="hidden text-base font-semibold tracking-tight text-[var(--stocksense-brand)] sm:inline">
-                WhereKeep
-              </span>
+              <WhereKeepLogo markClassName="h-12 max-w-[210px]" />
             </Link>
           </NavbarBrand>
 

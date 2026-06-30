@@ -5,7 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
 import { login } from '@/app/actions/auth';
-import { FaEye, FaEyeSlash, FaMapMarkedAlt } from 'react-icons/fa';
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
+import Image from 'next/image';
 
 const CREDENTIAL_VALIDATION_ERROR =
   'Enter a valid email and a password with at least 6 characters.';
@@ -139,7 +140,14 @@ export default function LoginPage() {
           <div className="px-6 sm:px-8 pt-6 pb-4 bg-gradient-to-r from-stocksense-teal to-stocksense-sky">
             <div className="flex items-center gap-3">
               <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white">
-                <FaMapMarkedAlt className="h-7 w-7 text-[var(--stocksense-brand)]" aria-hidden="true" />
+                <Image
+                  src="/wherekeep-app-icon.png"
+                  alt=""
+                  width={48}
+                  height={48}
+                  priority
+                  className="rounded-xl"
+                />
               </div>
               <div>
                 <h1 className="text-white text-xl sm:text-2xl font-semibold leading-tight">

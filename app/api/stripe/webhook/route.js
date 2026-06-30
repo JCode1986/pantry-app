@@ -90,11 +90,7 @@ export async function POST(request) {
 
   try {
     if (event.type === "checkout.session.completed") {
-      const session = event.data.object;
-      if (session.mode === "subscription" && session.subscription) {
-        const subscription = await stripe.subscriptions.retrieve(session.subscription);
-        await upsertBillingFromSubscription(subscription, session.metadata);
-      }
+      return NextResponse.json({ received: true });
     }
 
     if (
