@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
 import Link from 'next/link';
-import CategoriesGrid from '@/components/CategoriesGrid';
+import CategoriesGrid from '@/components/categories/CategoriesGrid';
 import { notFound } from 'next/navigation';
 import { createPageMetadata } from '@/utils/metadata';
 

@@ -1,4 +1,4 @@
-import LoginSection from '@/components/LoginSection'
+import LoginSection from '@/components/auth/LoginSection'
 import { createPageMetadata } from '@/utils/metadata';
 
 export const metadata = createPageMetadata({

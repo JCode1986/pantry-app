@@ -1,4 +1,4 @@
-import AreasPageClient from "@/components/AreasPageClient";
+import AreasPageClient from "@/components/areas/AreasPageClient";
 import { createClient } from "@/utils/supabase/server";
 import { createPageMetadata } from "@/utils/metadata";
 

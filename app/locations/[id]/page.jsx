@@ -1,5 +1,5 @@
 import { createClient } from '@/utils/supabase/server';
-import StorageAreasSection from '@/components/StorageAreasSection';
+import StorageAreasSection from '@/components/locations/StorageAreasSection';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createPageMetadata } from '@/utils/metadata';

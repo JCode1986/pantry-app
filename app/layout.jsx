@@ -1,8 +1,8 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Navigation from "@/components/Navigation";
+import Navigation from "@/components/app-shell/Navigation";
 import { getSessionForLayout } from "./actions/auth";
-import { Providers } from "@/components/Providers";
+import { Providers } from "@/components/app-shell/Providers";
 import { getPreferenceBootScript } from "@/utils/appPreferences";
 import { siteConfig } from "@/utils/metadata";
 

@@ -135,7 +135,10 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
       size="2xl"
       scrollBehavior="inside"
     >
-      <ModalContent className={modalContentClass} style={modalContentStyle}>
+      <ModalContent
+        className={`${modalContentClass} overflow-hidden`}
+        style={modalContentStyle}
+      >
         {() => (
           <>
             <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>

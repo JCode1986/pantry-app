@@ -1,6 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { notFound } from "next/navigation";
-import AreaDetailClient from "@/components/AreaDetailClient";
+import AreaDetailClient from "@/components/areas/AreaDetailClient";
 import { createPageMetadata } from "@/utils/metadata";
 
 export async function generateMetadata({ params }) {

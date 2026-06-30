@@ -1,6 +1,5 @@
 'use server';
 import { createClient } from '@/utils/supabase/server';
-import axios from 'axios';
 import { revalidatePath } from 'next/cache';
 import { toNonNegativeInteger } from '@/utils/pantry/date';
 import { getSession } from '@/lib/sessionOptions';
@@ -202,27 +201,6 @@ async function enforceItemLimit(supabase) {
   }
 
   return null;
-}
-
-export async function fetchRecipes(ingredients) {
-  try {
-    const API_KEY = process.env.SPOONACULAR_API_KEY;
-    const response = await axios.get(
-      'https://api.spoonacular.com/recipes/findByIngredients',
-      {
-        params: {
-          apiKey: API_KEY,
-          ingredients: ingredients.join(','),
-          number: 10,
-          ranking: 1,
-        },
-      }
-    );
-    return response.data;
-  } catch (err) {
-    console.error('Error fetching recipes:', err);
-    throw new Error('Failed to fetch recipes');
-  }
 }
 
 export async function getLocations() {
@@ -714,75 +692,6 @@ export async function deleteItem(itemId) {
   const { error } = await supabase.from('items').delete().eq('id', itemId);
   if (error) throw error;
   return { success: true };
-}
-
-// 🛠 Fetch all storages (with categories & ingredients)
-export async function getStorages() {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('food_storages')
-    .select('*, storage_categories(*, ingredients!fk_category(*))')
-    .order('created_at', { ascending: true });
-
-  if (error) throw error;
-  return data;
-}
-
-// 🛠 Fetch a single storage by ID (with nested)
-export async function getStorageById(storageId) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('food_storages')
-    .select('*, storage_categories(*, ingredients!fk_category(*))')
-    .eq('id', storageId)
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-// ➕ Add food storage (RLS uses auth.uid())
-export async function addStorage(name) {
-  const normalizedName = normalizeName(name);
-  if (!normalizedName) return validationError('Storage name is required');
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('food_storages')
-    .insert([{ name: normalizedName }])
-    .select('*, storage_categories(*, ingredients!fk_category(*))');
-
-  if (error) throw error;
-
-  revalidatePath('/');
-  return data[0];
-}
-
-// ✏️ Update food storage name
-export async function updateStorageName(storageId, newName) {
-  const normalizedName = normalizeName(newName);
-  if (!storageId || !normalizedName) return validationError('Storage name is required');
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from('food_storages')
-    .update({ name: normalizedName })
-    .eq('id', storageId);
-
-  if (error) throw error;
-  revalidatePath('/');
-}
-
-// 🗑️ Delete food storage
-export async function deleteStorage(storageId) {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from('food_storages')
-    .delete()
-    .eq('id', storageId);
-
-  if (error) throw error;
-  revalidatePath('/');
 }
 
 export async function addCategory(storageAreaId, name) {

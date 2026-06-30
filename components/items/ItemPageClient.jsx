@@ -30,7 +30,7 @@ import {
   modalHeaderClass,
   modalInputClassNames,
 } from "@/components/modals/modalTheme";
-import OpenGlobalAddItemButton from "@/components/OpenGlobalAddItemButton";
+import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
 import {
   daysUntil,
   isExpiringSoon,

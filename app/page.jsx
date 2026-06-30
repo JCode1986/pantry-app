@@ -1,10 +1,10 @@
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import { getSessionForLayout } from './actions/auth';
-import LandingPage from '@/components/LandingPage';
-import StatsCards from '@/components/StatsCards';
-import RecentActivity from '@/components/RecentActivity';
-import ItemsDonut from '@/components/ItemsDonut';
+import LandingPage from '@/components/marketing/LandingPage';
+import StatsCards from '@/components/dashboard/StatsCards';
+import RecentActivity from '@/components/dashboard/RecentActivity';
+import ItemsDonut from '@/components/dashboard/ItemsDonut';
 import { createPageMetadata } from '@/utils/metadata';
 import {
   getActivityFilterOptionsAction,

@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { logoutAction } from "@/app/actions/auth";
-import GlobalAddItemModal from "@/components/GlobalAddItemModal";
-import GlobalItemSearchModal from "@/components/GlobalItemSearchModal";
+import GlobalAddItemModal from "@/components/items/GlobalAddItemModal";
+import GlobalItemSearchModal from "@/components/items/GlobalItemSearchModal";
 import {
   modalBodyClass,
   modalContentClass,
@@ -13,7 +13,7 @@ import {
   modalFooterClass,
   modalHeaderClass,
 } from "@/components/modals/modalTheme";
-import WhereKeepLogo from "@/components/WhereKeepLogo";
+import WhereKeepLogo from "@/components/ui/WhereKeepLogo";
 import {
   DEFAULT_PREFERENCES,
   PREFERENCE_STORAGE_KEY,
@@ -163,7 +163,34 @@ export default function Navigation() {
         </NavbarContent>
 
         <NavbarContent justify="end" className="gap-2">
-          <NavbarItem className="hidden lg:flex">
+          <NavbarItem key="mobile-actions" className="flex gap-2 lg:hidden">
+            <button
+              type="button"
+              aria-label="Search items"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-stocksense-gray bg-white text-[var(--stocksense-brand)] transition hover:bg-[var(--stocksense-brand-soft)]"
+              onClick={() => {
+                setIsMenuOpen(false);
+                setShowItemSearchModal(true);
+              }}
+            >
+              <FaSearch className="h-4 w-4" />
+            </button>
+
+            <button
+              type="button"
+              aria-label="Add item"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[var(--stocksense-brand)] text-white transition hover:brightness-95"
+              onClick={() => {
+                setIsMenuOpen(false);
+                setAddItemContext(null);
+                setShowAddItemModal(true);
+              }}
+            >
+              <FaPlus className="h-4 w-4" />
+            </button>
+          </NavbarItem>
+
+          <NavbarItem key="desktop-search" className="hidden lg:flex">
             <Button
               variant="flat"
               className="rounded-xl border border-stocksense-gray bg-white text-[var(--stocksense-brand)]"
@@ -174,7 +201,7 @@ export default function Navigation() {
             </Button>
           </NavbarItem>
 
-          <NavbarItem className="hidden lg:flex">
+          <NavbarItem key="desktop-add-item" className="hidden lg:flex">
             <Button
               className="rounded-xl bg-[var(--stocksense-brand)] text-white"
               onPress={() => {
@@ -187,7 +214,7 @@ export default function Navigation() {
             </Button>
           </NavbarItem>
 
-          <NavbarItem className="hidden lg:flex">
+          <NavbarItem key="desktop-logout" className="hidden lg:flex">
             <Button
               variant="flat"
               className={cx(
@@ -244,32 +271,8 @@ export default function Navigation() {
           <div className="mt-3 border-t border-gray-200 pt-3">
             <Button
               variant="flat"
-              className="w-full justify-start rounded-xl border border-stocksense-gray bg-white text-[var(--stocksense-brand)]"
-              onPress={() => {
-                setIsMenuOpen(false);
-                setShowItemSearchModal(true);
-              }}
-              startContent={<FaSearch />}
-            >
-              Search
-            </Button>
-
-            <Button
-              className="mt-2 w-full justify-start rounded-xl bg-[var(--stocksense-brand)] text-white"
-              onPress={() => {
-                setIsMenuOpen(false);
-                setAddItemContext(null);
-                setShowAddItemModal(true);
-              }}
-              startContent={<FaPlus />}
-            >
-              Add Item
-            </Button>
-
-            <Button
-              variant="flat"
               className={cx(
-                "mt-2 w-full justify-start rounded-xl border",
+                "w-full justify-start rounded-xl border",
                 loggingOut
                   ? "cursor-not-allowed opacity-70"
                   : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"

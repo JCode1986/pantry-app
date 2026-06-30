@@ -1,4 +1,4 @@
-import LocationsSection from '@/components/LocationsSection';
+import LocationsSection from '@/components/locations/LocationsSection';
 import { createClient } from '@/utils/supabase/server';
 import { createPageMetadata } from '@/utils/metadata';
 

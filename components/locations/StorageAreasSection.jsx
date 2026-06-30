@@ -34,9 +34,9 @@ import {
   FaBoxOpen,
   FaLayerGroup,
 } from 'react-icons/fa';
-import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
-import MoveItemsModal from './storage/MoveItemsModal';
-import OpenGlobalAddItemButton from './OpenGlobalAddItemButton';
+import ConfirmDeleteModal from '@/components/modals/ConfirmDeleteModal';
+import MoveItemsModal from '@/components/items/MoveItemsModal';
+import OpenGlobalAddItemButton from '@/components/ui/OpenGlobalAddItemButton';
 import {
   daysUntil,
   isExpiringSoon,
@@ -284,16 +284,32 @@ export default function StorageAreasSection({
     ];
   }, [allLocations, locationId, locationName, storageAreas]);
 
-  // initialize expanded for everything on mount / when length changes
+  const expansionSignature = useMemo(
+    () =>
+      (storageAreas || [])
+        .map((area) => `${area.id}:${(area.categories || []).map((c) => c.id).join(',')}`)
+        .join('|'),
+    [storageAreas]
+  );
+
   useEffect(() => {
-    const areaState = Object.fromEntries((storageAreas || []).map((a) => [a.id, true]));
-    const catState = Object.fromEntries(
-      (storageAreas || []).flatMap((a) => (a.categories || []).map((c) => [c.id, true]))
-    );
+    const areaState = {};
+    const catState = {};
+
+    for (const areaGroup of expansionSignature.split('|')) {
+      if (!areaGroup) continue;
+
+      const [areaId, categoryList = ''] = areaGroup.split(':');
+      if (areaId) areaState[areaId] = true;
+
+      for (const categoryId of categoryList.split(',')) {
+        if (categoryId) catState[categoryId] = true;
+      }
+    }
+
     setExpandedAreas(areaState);
     setExpandedCategories(catState);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storageAreas?.length]);
+  }, [expansionSignature]);
 
   const totalAreas = storageAreas?.length || 0;
   const totalCategories = useMemo(

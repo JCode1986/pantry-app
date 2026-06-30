@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import ProfileClient from "@/components/ProfileClient";
+import ProfileClient from "@/components/profile/ProfileClient";
 import { getSessionForLayout } from "@/app/actions/auth";
 import { getUserBillingAction } from "@/app/actions/billing";
 import { getHouseholdSharingAction } from "@/app/actions/household";

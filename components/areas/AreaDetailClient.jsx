@@ -35,7 +35,7 @@ import {
   modalInputClassNames,
 } from "@/components/modals/modalTheme";
 import { containsQuery } from "@/utils/pantry/search";
-import OpenGlobalAddItemButton from "@/components/OpenGlobalAddItemButton";
+import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
 
 function StatPill({ label, value }) {
   return (

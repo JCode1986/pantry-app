@@ -1,4 +1,4 @@
-import CategoriesPageClient from "@/components/CategoriesPageClient";
+import CategoriesPageClient from "@/components/categories/CategoriesPageClient";
 import { createClient } from "@/utils/supabase/server";
 import { createPageMetadata } from "@/utils/metadata";
 

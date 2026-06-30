@@ -2,8 +2,16 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Input, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
-import { FaSearch, FaTags } from "react-icons/fa";
+import {
+  Input,
+  Button,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+} from "@heroui/react";
+import { FaSearch, FaWarehouse } from "react-icons/fa";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import {
   modalBodyClass,
@@ -13,9 +21,9 @@ import {
   modalHeaderClass,
   modalInputClassNames,
 } from "@/components/modals/modalTheme";
-import { updateCategoryName, deleteCategory } from "@/app/actions/server";
+import { updateStorageArea, deleteStorageArea } from "@/app/actions/server";
 import { containsQuery } from "@/utils/pantry/search";
-import OpenGlobalAddItemButton from "@/components/OpenGlobalAddItemButton";
+import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
 
 const pageSectionVariants = {
   hidden: { opacity: 0 },
@@ -31,75 +39,90 @@ const pageItemVariants = {
   },
 };
 
-export default function CategoriesPageClient({ initialCategories }) {
-  const [categories, setCategories] = useState(initialCategories ?? []);
+export default function AreasPageClient({ initialAreas }) {
+  const [areas, setAreas] = useState(initialAreas ?? []);
   const [search, setSearch] = useState("");
 
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [activeCategoryId, setActiveCategoryId] = useState(null);
+  const [activeAreaId, setActiveAreaId] = useState(null);
 
   const [renameValue, setRenameValue] = useState("");
+
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
     payload: null,
     isDeleting: false,
   });
 
-  const activeCategory = useMemo(
-    () => categories.find((c) => String(c.id) === String(activeCategoryId)) || null,
-    [categories, activeCategoryId]
+  const activeArea = useMemo(
+    () => areas.find((a) => String(a.id) === String(activeAreaId)) || null,
+    [areas, activeAreaId]
   );
 
   useEffect(() => {
     const handleItemAdded = (event) => {
       const item = event.detail?.item;
-      if (!item?.categoryId) return;
+      if (!item?.storageAreaId) return;
 
-      setCategories((prev) => {
-        const existingCategory = prev.find(
-          (category) => String(category.id) === String(item.categoryId)
+      setAreas((prev) => {
+        const existingArea = prev.find(
+          (area) => String(area.id) === String(item.storageAreaId)
         );
 
-        const itemSummary = {
-          id: item.id,
-          name: item.name,
-          quantity: item.quantity ?? 0,
-          expiration_date: item.expiration_date ?? null,
-        };
-
-        if (!existingCategory) {
+        if (!existingArea) {
           return [
             ...prev,
             {
-              id: item.categoryId,
-              name: item.categoryName ?? "Category",
-              insertedAt: null,
-              storageArea: {
-                id: item.storageAreaId ?? null,
-                name: item.storageAreaName ?? "Unknown area",
-              },
+              id: item.storageAreaId,
+              name: item.storageAreaName ?? "Storage area",
               location: {
                 id: item.locationId ?? null,
                 name: item.locationName ?? "Unknown location",
               },
-              items: [itemSummary],
+              categories: [
+                {
+                  id: item.categoryId,
+                  name: item.categoryName ?? "Category",
+                  itemsCount: 1,
+                },
+              ],
+              categoriesCount: 1,
               itemsCount: 1,
             },
           ].sort((a, b) => a.name.localeCompare(b.name));
         }
 
-        return prev.map((category) => {
-          if (String(category.id) !== String(item.categoryId)) return category;
-          if ((category.items ?? []).some((i) => String(i.id) === String(item.id))) {
-            return category;
-          }
+        return prev.map((area) => {
+          if (String(area.id) !== String(item.storageAreaId)) return area;
 
-          const items = [...(category.items ?? []), itemSummary];
+          const categories = area.categories ?? [];
+          const existingCategory = categories.find(
+            (category) => String(category.id) === String(item.categoryId)
+          );
+
+          const nextCategories = existingCategory
+            ? categories.map((category) =>
+                String(category.id) === String(item.categoryId)
+                  ? {
+                      ...category,
+                      itemsCount: (category.itemsCount ?? 0) + 1,
+                    }
+                  : category
+              )
+            : [
+                ...categories,
+                {
+                  id: item.categoryId,
+                  name: item.categoryName ?? "Category",
+                  itemsCount: 1,
+                },
+              ];
 
           return {
-            ...category,
-            items,
-            itemsCount: items.length,
+            ...area,
+            categories: nextCategories,
+            categoriesCount: nextCategories.length,
+            itemsCount: (area.itemsCount ?? 0) + 1,
           };
         });
       });
@@ -114,55 +137,56 @@ export default function CategoriesPageClient({ initialCategories }) {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return categories;
+    if (!q) return areas;
 
-    return categories.filter((c) => {
-      const nameMatch = containsQuery(c.name, q);
-      const locMatch = containsQuery(c.location?.name, q);
-      const areaMatch = containsQuery(c.storageArea?.name, q);
-      const itemMatch = (c.items || []).some((i) => containsQuery(i.name, q));
-      return nameMatch || locMatch || areaMatch || itemMatch;
+    return areas.filter((a) => {
+      const areaMatch = containsQuery(a.name, q);
+      const locMatch = containsQuery(a.location?.name, q);
+      const catMatch = (a.categories || []).some((c) =>
+        containsQuery(c.name, q)
+      );
+      return areaMatch || locMatch || catMatch;
     });
-  }, [categories, search]);
+  }, [areas, search]);
 
-  const openDrawer = (cat) => {
-    setActiveCategoryId(cat.id);
-    setRenameValue(cat.name);
+  const openDrawer = (area) => {
+    setActiveAreaId(area.id);
+    setRenameValue(area.name);
     setDrawerOpen(true);
   };
 
   const closeDrawer = () => {
     setDrawerOpen(false);
-    setActiveCategoryId(null);
+    setActiveAreaId(null);
     setRenameValue("");
   };
 
   const handleRename = async () => {
-    if (!activeCategory) return;
+    if (!activeArea) return;
     const name = renameValue.trim();
     if (!name) return;
 
-    const result = await updateCategoryName(activeCategory.id, name);
+    const result = await updateStorageArea(activeArea.id, name);
     if (result?.error) {
-      console.error(result.error);
+      console.error("updateStorageArea error:", result.error);
       return;
     }
 
-    setCategories((prev) =>
-      prev.map((c) => (c.id === activeCategory.id ? { ...c, name } : c))
-    );
+    setAreas((prev) => prev.map((a) => (a.id === activeArea.id ? { ...a, name } : a)));
   };
 
   const openDelete = () => {
-    if (!activeCategory) return;
+    if (!activeArea) return;
+
     setDeleteDialog({
       open: true,
       isDeleting: false,
       payload: {
-        categoryId: activeCategory.id,
-        name: activeCategory.name,
-        storageAreaName: activeCategory.storageArea?.name,
-        locationName: activeCategory.location?.name,
+        areaId: activeArea.id,
+        name: activeArea.name,
+        locationName: activeArea.location?.name,
+        categoriesCount: activeArea.categoriesCount,
+        itemsCount: activeArea.itemsCount,
       },
     });
   };
@@ -175,16 +199,16 @@ export default function CategoriesPageClient({ initialCategories }) {
     if (!deleteDialog.payload) return;
 
     setDeleteDialog((p) => ({ ...p, isDeleting: true }));
-    const { categoryId } = deleteDialog.payload;
+    const { areaId } = deleteDialog.payload;
 
-    const result = await deleteCategory(categoryId);
+    const result = await deleteStorageArea(areaId);
     if (result?.error) {
-      console.error(result.error);
+      console.error("deleteStorageArea error:", result.error);
       closeDelete();
       return;
     }
 
-    setCategories((prev) => prev.filter((c) => c.id !== categoryId));
+    setAreas((prev) => prev.filter((a) => a.id !== areaId));
     closeDelete();
     closeDrawer();
   };
@@ -203,15 +227,15 @@ export default function CategoriesPageClient({ initialCategories }) {
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl p-3 text-white bg-gradient-to-br from-emerald-500 to-lime-500 shadow-sm border border-gray-300">
-              <FaTags className="h-5 w-5" />
+            <div className="rounded-xl p-3 text-white bg-gradient-to-br from-sky-500 to-cyan-500 shadow-sm border border-gray-300">
+              <FaWarehouse className="h-5 w-5" />
             </div>
             <div>
               <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-stocksense-teal">
-                Categories
+                Storage Areas
               </h1>
               <p className="text-sm text-gray-500">
-                View categories across all locations. Click one to view details.
+                View storage areas across all locations. Click one to manage it.
               </p>
             </div>
           </div>
@@ -220,7 +244,7 @@ export default function CategoriesPageClient({ initialCategories }) {
             <Input
               value={search}
               onValueChange={setSearch}
-              placeholder="Search categories, locations, areas, items…"
+              placeholder="Search areas, locations, categories…"
               startContent={<FaSearch className="text-gray-400" />}
               classNames={{
                 inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
@@ -236,32 +260,31 @@ export default function CategoriesPageClient({ initialCategories }) {
         className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
       >
         <AnimatePresence initial={false}>
-          {filtered.map((c) => (
+          {filtered.map((a) => (
           <motion.button
-            key={c.id}
+            key={a.id}
             layout
             variants={pageItemVariants}
             initial="hidden"
             animate="show"
             exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
-            onClick={() => openDrawer(c)}
+            onClick={() => openDrawer(a)}
             className="flex flex-col justify-between rounded-2xl border border-stocksense-gray bg-white p-4 text-left shadow-sm transition hover:bg-gray-50 cursor-pointer"
             whileHover={{ y: -1 }}
             whileTap={{ scale: 0.99 }}
           >
             <div className="flex h-full flex-col justify-between gap-4">
               <div className="min-w-0">
-                <div className="font-semibold text-stocksense-teal truncate">
-                  {c.name}
-                </div>
-                <div className="text-sm text-gray-500 truncate">
-                  {c.location?.name} → {c.storageArea?.name}
-                </div>
+                <div className="font-semibold text-stocksense-teal truncate">{a.name}</div>
+                <div className="text-sm text-gray-500 truncate">{a.location?.name}</div>
               </div>
 
               <div className="flex flex-wrap gap-2">
                 <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
-                  {c.itemsCount} {c.itemsCount === 1 ? "item" : "items"}
+                  {a.categoriesCount} {a.categoriesCount === 1 ? "category" : "categories"}
+                </span>
+                <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
+                  {a.itemsCount} {a.itemsCount === 1 ? "item" : "items"}
                 </span>
               </div>
             </div>
@@ -277,16 +300,25 @@ export default function CategoriesPageClient({ initialCategories }) {
             exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
             className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center sm:col-span-2 lg:col-span-3"
           >
-            <p className="text-gray-500">No categories match your search.</p>
+            <p className="text-gray-500">No storage areas match your search.</p>
             <div className="mt-4 flex justify-center">
-              <OpenGlobalAddItemButton />
+              <OpenGlobalAddItemButton
+                context={
+                  activeArea
+                    ? {
+                        locationId: activeArea.location?.id,
+                        storageAreaId: activeArea.id,
+                      }
+                    : undefined
+                }
+              />
             </div>
           </motion.div>
           )}
         </AnimatePresence>
       </motion.div>
 
-      {/* Drawer (HeroUI Modal styled as right drawer) */}
+      {/* Drawer */}
       <Modal
         isOpen={drawerOpen}
         onOpenChange={(open) => (open ? null : closeDrawer())}
@@ -302,17 +334,15 @@ export default function CategoriesPageClient({ initialCategories }) {
             <>
               <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
                 <div className="text-lg font-semibold text-[var(--stocksense-brand)]">
-                  {activeCategory?.name || "Category"}
+                  {activeArea?.name || "Storage Area"}
                 </div>
-                <div className="text-sm text-gray-500">
-                  {activeCategory?.location?.name} → {activeCategory?.storageArea?.name}
-                </div>
+                <div className="text-sm text-gray-500">{activeArea?.location?.name}</div>
               </ModalHeader>
 
-              <ModalBody className={`space-y-4 ${modalBodyClass}`}>
+              <ModalBody className={`space-y-5 ${modalBodyClass}`}>
                 {/* Rename */}
                 <div className="space-y-2">
-                  <div className="text-xs font-medium text-gray-600">Category name</div>
+                  <div className="text-xs font-medium text-gray-600">Area name</div>
                   <Input
                     value={renameValue}
                     onValueChange={setRenameValue}
@@ -323,43 +353,53 @@ export default function CategoriesPageClient({ initialCategories }) {
                   <Button
                     onClick={handleRename}
                     isDisabled={!renameValue.trim()}
-                    className="rounded-xl bg-[var(--stocksense-brand)] text-white w-full"
+                    className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
                   >
                     Save name
                   </Button>
                 </div>
 
-                {/* Items preview */}
+                {/* Stats */}
+                <div className="flex gap-2 flex-wrap">
+                  <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
+                    {activeArea?.categoriesCount ?? 0}{" "}
+                    {(activeArea?.categoriesCount ?? 0) === 1 ? "category" : "categories"}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
+                    {activeArea?.itemsCount ?? 0}{" "}
+                    {(activeArea?.itemsCount ?? 0) === 1 ? "item" : "items"}
+                  </span>
+                </div>
+
+                {/* Categories preview */}
                 <div>
                   <div className="text-sm font-semibold text-stocksense-teal mb-2">
-                    Items ({activeCategory?.itemsCount ?? 0})
+                    Categories
                   </div>
 
                   <div className="space-y-2">
-                    {(activeCategory?.items || []).slice(0, 8).map((it) => (
+                    {(activeArea?.categories || []).slice(0, 10).map((c) => (
                       <div
-                        key={it.id}
-                        className="rounded-xl border border-stocksense-gray bg-white p-3 flex justify-between gap-3"
+                        key={c.id}
+                        className="rounded-xl border border-stocksense-gray bg-white p-3 flex items-start justify-between gap-3"
                       >
                         <div className="min-w-0">
-                          <div className="font-medium text-stocksense-teal truncate">{it.name}</div>
+                          <div className="font-medium text-stocksense-teal truncate">{c.name}</div>
                           <div className="text-sm text-gray-500 truncate">
-                            Qty: {it.quantity ?? 0} • Exp: {it.expiration_date || "—"}
+                            {c.itemsCount} {c.itemsCount === 1 ? "item" : "items"}
                           </div>
                         </div>
                       </div>
                     ))}
 
-                    {(activeCategory?.items || []).length === 0 && (
+                    {(activeArea?.categories || []).length === 0 && (
                       <div className="text-sm text-gray-500">
-                        No items in this category yet.
+                        No categories in this area yet.
                       </div>
                     )}
 
-                    {(activeCategory?.items || []).length > 8 && (
-                      <div className="text-xs text-gray-400">
-                        Showing first 8 items…
-                      </div>
+                    {(activeArea?.categories || []).length > 10 && (
+                      <div className="text-xs text-gray-400">Showing first 10 categories…</div>
                     )}
                   </div>
                 </div>
@@ -369,11 +409,8 @@ export default function CategoriesPageClient({ initialCategories }) {
                 <Button variant="light" className="rounded-xl" onClick={closeDrawer}>
                   Close
                 </Button>
-                <Button
-                  className="rounded-xl bg-rose-600 text-white"
-                  onClick={openDelete}
-                >
-                  Delete category
+                <Button className="rounded-xl bg-rose-600 text-white" onClick={openDelete}>
+                  Delete area
                 </Button>
               </ModalFooter>
             </>
@@ -389,12 +426,16 @@ export default function CategoriesPageClient({ initialCategories }) {
         onConfirm={confirmDelete}
         title={
           deleteDialog.payload
-            ? `Delete category "${deleteDialog.payload.name}"?`
-            : "Delete category?"
+            ? `Delete storage area "${deleteDialog.payload.name}"?`
+            : "Delete storage area?"
         }
         description={
           deleteDialog.payload
-            ? `This will delete "${deleteDialog.payload.name}" in ${deleteDialog.payload.locationName} → ${deleteDialog.payload.storageAreaName}, including all items inside it. This cannot be undone.`
+            ? `This will remove "${deleteDialog.payload.name}" in ${deleteDialog.payload.locationName}, including ${deleteDialog.payload.categoriesCount} categor${
+                deleteDialog.payload.categoriesCount === 1 ? "y" : "ies"
+              } and ${deleteDialog.payload.itemsCount} item${
+                deleteDialog.payload.itemsCount === 1 ? "" : "s"
+              }. This action cannot be undone.`
             : ""
         }
       />

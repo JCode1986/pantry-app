@@ -8,8 +8,8 @@ import {
   FaMapMarkedAlt,
   FaSearch,
 } from 'react-icons/fa';
-import PricingSection from '@/components/PricingSection';
-import WhereKeepLogo from '@/components/WhereKeepLogo';
+import PricingSection from '@/components/marketing/PricingSection';
+import WhereKeepLogo from '@/components/ui/WhereKeepLogo';
 
 const features = [
   {

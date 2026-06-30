@@ -1,4 +1,4 @@
-import AcceptInviteClient from "@/components/AcceptInviteClient";
+import AcceptInviteClient from "@/components/auth/AcceptInviteClient";
 import { getSessionForLayout } from "@/app/actions/auth";
 import { getHouseholdInvitePreviewAction } from "@/app/actions/household";
 import { createPageMetadata } from "@/utils/metadata";

@@ -1,4 +1,4 @@
-import ItemsPageClient from "@/components/ItemPageClient";
+import ItemsPageClient from "@/components/items/ItemPageClient";
 import { createClient } from "@/utils/supabase/server";
 import { createPageMetadata } from "@/utils/metadata";
 

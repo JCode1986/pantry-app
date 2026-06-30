@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
-import OpenGlobalAddItemButton from "@/components/OpenGlobalAddItemButton";
+import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
 import { createPageMetadata } from "@/utils/metadata";
 
 export async function generateMetadata({ params }) {
