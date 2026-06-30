@@ -2,6 +2,13 @@
 
 import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/modal";
 import { Button } from "@heroui/button";
+import {
+  modalBodyClass,
+  modalContentClass,
+  modalContentStyle,
+  modalFooterClass,
+  modalHeaderClass,
+} from "@/components/modals/modalTheme";
 
 
 // import {
@@ -35,16 +42,16 @@ export default function ConfirmDeleteModal({
       placement="center"
       className="max-w-md"
     >
-      <ModalContent>
+      <ModalContent className={modalContentClass} style={modalContentStyle}>
         {(close) => (
           <>
-            <ModalHeader className="text-base font-semibold text-rose-700">
+            <ModalHeader className={modalHeaderClass}>
               {title}
             </ModalHeader>
-            <ModalBody>
+            <ModalBody className={modalBodyClass}>
               <p className="text-sm text-gray-600">{description}</p>
             </ModalBody>
-            <ModalFooter>
+            <ModalFooter className={modalFooterClass}>
               <Button
                 variant="flat"
                 color="default"

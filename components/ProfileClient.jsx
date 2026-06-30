@@ -486,7 +486,7 @@ function SharingSection({
                       Remove
                     </Button>
                   ) : (
-                    <FaCheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />
+                    <FaCheckCircle className="h-4 w-4 shrink-0 text-[var(--stocksense-brand)]" />
                   )}
                 </div>
               ))}

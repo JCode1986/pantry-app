@@ -13,6 +13,14 @@ import {
 } from "@heroui/react";
 import { FaSearch, FaWarehouse } from "react-icons/fa";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
+import {
+  modalBodyClass,
+  modalContentClass,
+  modalContentStyle,
+  modalFooterClass,
+  modalHeaderClass,
+  modalInputClassNames,
+} from "@/components/modals/modalTheme";
 import { updateStorageArea, deleteStorageArea } from "@/app/actions/server";
 import { containsQuery } from "@/utils/pantry/search";
 import OpenGlobalAddItemButton from "@/components/OpenGlobalAddItemButton";
@@ -247,7 +255,10 @@ export default function AreasPageClient({ initialAreas }) {
       </motion.div>
 
       {/* List */}
-      <motion.div variants={pageSectionVariants} className="grid grid-cols-1 gap-3">
+      <motion.div
+        variants={pageSectionVariants}
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+      >
         <AnimatePresence initial={false}>
           {filtered.map((a) => (
           <motion.button
@@ -258,18 +269,17 @@ export default function AreasPageClient({ initialAreas }) {
             animate="show"
             exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
             onClick={() => openDrawer(a)}
-            className="text-left rounded-2xl border border-stocksense-gray bg-white shadow-sm p-4
-                       hover:bg-gray-50 transition cursor-pointer"
+            className="flex flex-col justify-between rounded-2xl border border-stocksense-gray bg-white p-4 text-left shadow-sm transition hover:bg-gray-50 cursor-pointer"
             whileHover={{ y: -1 }}
             whileTap={{ scale: 0.99 }}
           >
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex h-full flex-col justify-between gap-4">
               <div className="min-w-0">
                 <div className="font-semibold text-stocksense-teal truncate">{a.name}</div>
                 <div className="text-sm text-gray-500 truncate">{a.location?.name}</div>
               </div>
 
-              <div className="shrink-0 flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
                   {a.categoriesCount} {a.categoriesCount === 1 ? "category" : "categories"}
                 </span>
@@ -288,7 +298,7 @@ export default function AreasPageClient({ initialAreas }) {
             initial="hidden"
             animate="show"
             exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
-            className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center"
+            className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center sm:col-span-2 lg:col-span-3"
           >
             <p className="text-gray-500">No storage areas match your search.</p>
             <div className="mt-4 flex justify-center">
@@ -319,28 +329,32 @@ export default function AreasPageClient({ initialAreas }) {
           wrapper: "items-stretch justify-end",
         }}
       >
-        <ModalContent>
+        <ModalContent className={modalContentClass} style={modalContentStyle}>
           {() => (
             <>
-              <ModalHeader className="flex flex-col gap-1">
-                <div className="text-stocksense-teal font-semibold text-lg">
+              <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
+                <div className="text-lg font-semibold text-[var(--stocksense-brand)]">
                   {activeArea?.name || "Storage Area"}
                 </div>
                 <div className="text-sm text-gray-500">{activeArea?.location?.name}</div>
               </ModalHeader>
 
-              <ModalBody className="space-y-5">
+              <ModalBody className={`space-y-5 ${modalBodyClass}`}>
                 {/* Rename */}
                 <div className="space-y-2">
                   <div className="text-xs font-medium text-gray-600">Area name</div>
                   <Input
                     value={renameValue}
                     onValueChange={setRenameValue}
-                    classNames={{
-                      inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
-                    }}
+                    variant="bordered"
+                    radius="lg"
+                    classNames={modalInputClassNames}
                   />
-                  <Button onClick={handleRename} className="rounded-xl bg-[var(--stocksense-brand)] text-white w-full">
+                  <Button
+                    onClick={handleRename}
+                    isDisabled={!renameValue.trim()}
+                    className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
+                  >
                     Save name
                   </Button>
                 </div>
@@ -391,7 +405,7 @@ export default function AreasPageClient({ initialAreas }) {
                 </div>
               </ModalBody>
 
-              <ModalFooter>
+              <ModalFooter className={modalFooterClass}>
                 <Button variant="light" className="rounded-xl" onClick={closeDrawer}>
                   Close
                 </Button>

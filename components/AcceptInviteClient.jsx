@@ -66,7 +66,7 @@ export default function AcceptInviteClient({
             <div className="space-y-4">
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-700">
                 <div className="flex items-center gap-2 font-semibold">
-                  <FaCheckCircle className="h-4 w-4" />
+                  <FaCheckCircle className="h-4 w-4 text-[var(--stocksense-brand)]" />
                   You joined {preview?.householdName ?? "this household"}.
                 </div>
                 <p className="mt-1">

@@ -26,6 +26,14 @@ import {
   updateCategoryName,
   deleteCategory,
 } from "@/app/actions/server";
+import {
+  modalBodyClass,
+  modalContentClass,
+  modalContentStyle,
+  modalFooterClass,
+  modalHeaderClass,
+  modalInputClassNames,
+} from "@/components/modals/modalTheme";
 import { containsQuery } from "@/utils/pantry/search";
 import OpenGlobalAddItemButton from "@/components/OpenGlobalAddItemButton";
 
@@ -431,11 +439,11 @@ export default function AreaDetailClient({ area, initialCategories }) {
         onOpenChange={(open) => setRenameModal((p) => ({ ...p, open }))}
         placement="center"
       >
-        <ModalContent>
+        <ModalContent className={modalContentClass} style={modalContentStyle}>
           {(onClose) => (
             <>
-              <ModalHeader>Rename category</ModalHeader>
-              <ModalBody>
+              <ModalHeader className={modalHeaderClass}>Rename category</ModalHeader>
+              <ModalBody className={modalBodyClass}>
                 <Input
                   value={renameModal.name}
                   onValueChange={(v) => setRenameModal((p) => ({ ...p, name: v }))}
@@ -443,9 +451,10 @@ export default function AreaDetailClient({ area, initialCategories }) {
                   radius="lg"
                   label="Category name"
                   isDisabled={isSaving}
+                  classNames={modalInputClassNames}
                 />
               </ModalBody>
-              <ModalFooter>
+              <ModalFooter className={modalFooterClass}>
                 <Button variant="light" onPress={onClose} isDisabled={isSaving}>
                   Cancel
                 </Button>
@@ -468,17 +477,17 @@ export default function AreaDetailClient({ area, initialCategories }) {
         onOpenChange={(open) => setDeleteModal((p) => ({ ...p, open }))}
         placement="center"
       >
-        <ModalContent>
+        <ModalContent className={modalContentClass} style={modalContentStyle}>
           {(onClose) => (
             <>
-              <ModalHeader>Delete category</ModalHeader>
-              <ModalBody>
+              <ModalHeader className={modalHeaderClass}>Delete category</ModalHeader>
+              <ModalBody className={modalBodyClass}>
                 <p className="text-sm text-gray-600">
                   Delete <span className="font-semibold">{deleteModal.name}</span>? This will remove
                   the category and its items.
                 </p>
               </ModalBody>
-              <ModalFooter>
+              <ModalFooter className={modalFooterClass}>
                 <Button
                   variant="light"
                   onPress={onClose}

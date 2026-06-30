@@ -22,6 +22,14 @@ import {
   FaWarehouse,
 } from "react-icons/fa";
 import { searchItems } from "@/app/actions/server";
+import {
+  modalBodyClass,
+  modalContentClass,
+  modalContentStyle,
+  modalFooterClass,
+  modalHeaderClass,
+  modalInputClassNames,
+} from "@/components/modals/modalTheme";
 
 function itemPath(item) {
   const parts = [
@@ -127,17 +135,17 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
       size="2xl"
       scrollBehavior="inside"
     >
-      <ModalContent>
+      <ModalContent className={modalContentClass} style={modalContentStyle}>
         {() => (
           <>
-            <ModalHeader className="flex flex-col gap-1">
+            <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
               <span className="text-[var(--stocksense-brand)]">Find item</span>
               <span className="text-sm font-normal text-gray-500">
                 Search item names across every location, area, and category.
               </span>
             </ModalHeader>
 
-            <ModalBody className="space-y-4">
+            <ModalBody className={`space-y-4 ${modalBodyClass}`}>
               <Input
                 autoFocus
                 value={query}
@@ -147,9 +155,7 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
                 endContent={isSearching ? <FaSpinner className="animate-spin text-gray-400" /> : null}
                 variant="bordered"
                 radius="lg"
-                classNames={{
-                  inputWrapper: "border-stocksense-gray",
-                }}
+                classNames={modalInputClassNames}
               />
 
               <div className="text-sm text-gray-500">{resultSummary}</div>
@@ -220,7 +226,7 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
               </div>
             </ModalBody>
 
-            <ModalFooter>
+            <ModalFooter className={modalFooterClass}>
               <Button variant="light" className="rounded-xl" onPress={onClose}>
                 Close
               </Button>

@@ -4,6 +4,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+  Button,
+  Input,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+} from '@heroui/react';
+import {
   addStorageArea,
   updateStorageArea,
   deleteStorageArea,
@@ -19,11 +28,11 @@ import {
   FaPlus,
   FaEdit,
   FaTrash,
-  FaCheck,
-  FaTimes,
   FaChevronUp,
   FaSearch,
-  FaArrowsAlt 
+  FaArrowsAlt,
+  FaBoxOpen,
+  FaLayerGroup,
 } from 'react-icons/fa';
 import ConfirmDeleteModal from './modals/ConfirmDeleteModal';
 import MoveItemsModal from './storage/MoveItemsModal';
@@ -55,6 +64,30 @@ const pageItemVariants = {
   },
 };
 
+const modalContentStyle = {
+  fontFamily: 'var(--stocksense-font-family)',
+};
+
+const modalContentClass =
+  'border border-[var(--stocksense-brand-border)] bg-white text-gray-700';
+
+const modalHeaderClass =
+  'border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-base font-semibold text-[var(--stocksense-brand)]';
+
+const modalBodyClass = 'pt-5';
+
+const modalFooterClass = 'border-t border-[var(--stocksense-brand-border)] bg-white';
+
+const modalInputClassNames = {
+  inputWrapper:
+    'border-[var(--stocksense-brand-border)] bg-white focus-within:border-[var(--stocksense-brand)]',
+  label: 'text-gray-600',
+  input: 'text-gray-800',
+};
+
+const modalPrimaryButtonClass =
+  'bg-[var(--stocksense-brand)] text-white hover:brightness-95';
+
 export default function StorageAreasSection({
   locationId,
   initialStorageAreas,
@@ -63,15 +96,32 @@ export default function StorageAreasSection({
   allLocations,
 }) {
   const [storageAreas, setStorageAreas] = useState(initialStorageAreas ?? []);
-  const [newStorageName, setNewStorageName] = useState('');
-  const [editingId, setEditingId] = useState(null);
-  const [editingName, setEditingName] = useState('');
-
-  const [newCategoryName, setNewCategoryName] = useState({});
-  const [editingCategoryName, setEditingCategoryName] = useState({});
-
-  const [newItemData, setNewItemData] = useState({});
-  const [editingItem, setEditingItem] = useState({});
+  const [areaModal, setAreaModal] = useState({
+    open: false,
+    mode: 'create',
+    areaId: null,
+    name: '',
+    locationName: '',
+  });
+  const [categoryModal, setCategoryModal] = useState({
+    open: false,
+    mode: 'create',
+    areaId: null,
+    categoryId: null,
+    areaName: '',
+    name: '',
+  });
+  const [itemModal, setItemModal] = useState({
+    open: false,
+    mode: 'create',
+    areaId: null,
+    categoryId: null,
+    itemId: null,
+    categoryName: '',
+    name: '',
+    quantity: '',
+    expirationDate: '',
+  });
   const [limitNotice, setLimitNotice] = useState(null);
 
   const [expandedAreas, setExpandedAreas] = useState({});
@@ -282,25 +332,77 @@ export default function StorageAreasSection({
     (storageAreas || []).length > 0 &&
     (storageAreas || []).every((a) => expandedAreas[a.id]);
 
+  // ---------- Modal helpers ----------
+  const closeAreaModal = () =>
+    setAreaModal({
+      open: false,
+      mode: 'create',
+      areaId: null,
+      name: '',
+      locationName: '',
+    });
+
+  const closeCategoryModal = () =>
+    setCategoryModal({
+      open: false,
+      mode: 'create',
+      areaId: null,
+      categoryId: null,
+      areaName: '',
+      name: '',
+    });
+
+  const closeItemModal = () =>
+    setItemModal({
+      open: false,
+      mode: 'create',
+      areaId: null,
+      categoryId: null,
+      itemId: null,
+      categoryName: '',
+      name: '',
+      quantity: '',
+      expirationDate: '',
+    });
+
   // ---------- Storage Area CRUD ----------
-  const handleAddStorageArea = async () => {
-    if (!newStorageName.trim()) return;
-    const result = await addStorageArea(locationId, newStorageName.trim());
+  const openCreateAreaModal = () =>
+    setAreaModal({
+      open: true,
+      mode: 'create',
+      areaId: null,
+      name: '',
+      locationName,
+    });
+
+  const openEditAreaModal = (area) =>
+    setAreaModal({
+      open: true,
+      mode: 'edit',
+      areaId: area.id,
+      name: area.name,
+      locationName,
+    });
+
+  const submitAreaModal = async () => {
+    const name = areaModal.name.trim();
+    if (!name) return;
+
+    if (areaModal.mode === 'edit') {
+      const result = await updateStorageArea(areaModal.areaId, name);
+      if (!result?.error) {
+        setStorageAreas((prev) =>
+          prev.map((a) => (a.id === areaModal.areaId ? { ...a, name } : a))
+        );
+        closeAreaModal();
+      }
+      return;
+    }
+
+    const result = await addStorageArea(locationId, name);
     if (result?.data) {
       setStorageAreas((prev) => [...prev, { ...result.data, categories: [] }]);
-      setNewStorageName('');
-    }
-  };
-
-  const handleSaveEdit = async (id) => {
-    if (!editingName.trim()) return;
-    const result = await updateStorageArea(id, editingName.trim());
-    if (!result?.error) {
-      setStorageAreas((prev) =>
-        prev.map((a) => (a.id === id ? { ...a, name: editingName.trim() } : a))
-      );
-      setEditingId(null);
-      setEditingName('');
+      closeAreaModal();
     }
   };
 
@@ -314,11 +416,51 @@ export default function StorageAreasSection({
   };
 
   // ---------- Category CRUD ----------
-  const handleAddCategory = async (storageAreaId) => {
-    const name = (newCategoryName[storageAreaId] || '').trim();
+  const openCreateCategoryModal = (area) =>
+    setCategoryModal({
+      open: true,
+      mode: 'create',
+      areaId: area.id,
+      categoryId: null,
+      areaName: area.name,
+      name: '',
+    });
+
+  const openEditCategoryModal = (area, category) =>
+    setCategoryModal({
+      open: true,
+      mode: 'edit',
+      areaId: area.id,
+      categoryId: category.id,
+      areaName: area.name,
+      name: category.name,
+    });
+
+  const submitCategoryModal = async () => {
+    const name = categoryModal.name.trim();
     if (!name) return;
 
-    const result = await addCategory(storageAreaId, name);
+    if (categoryModal.mode === 'edit') {
+      const result = await updateCategoryName(categoryModal.categoryId, name);
+      if (!result?.error) {
+        setStorageAreas((prev) =>
+          prev.map((a) =>
+            a.id === categoryModal.areaId
+              ? {
+                  ...a,
+                  categories: a.categories.map((c) =>
+                    c.id === categoryModal.categoryId ? { ...c, name } : c
+                  ),
+                }
+              : a
+          )
+        );
+        closeCategoryModal();
+      }
+      return;
+    }
+
+    const result = await addCategory(categoryModal.areaId, name);
     if (result?.error) {
       console.error('addCategory error:', result.error);
       alert(result.error.message || 'Failed to add category');
@@ -328,38 +470,13 @@ export default function StorageAreasSection({
     if (result?.data) {
       setStorageAreas((prev) =>
         prev.map((a) =>
-          a.id === storageAreaId
+          a.id === categoryModal.areaId
             ? { ...a, categories: [...(a.categories || []), result.data] }
             : a
         )
       );
-      setNewCategoryName((prev) => ({ ...prev, [storageAreaId]: '' }));
+      closeCategoryModal();
       setExpandedCategories((prev) => ({ ...prev, [result.data.id]: true }));
-    }
-  };
-
-  const handleUpdateCategory = async (categoryId, storageAreaId) => {
-    const name = (editingCategoryName[categoryId] || '').trim();
-    if (!name) return;
-    const result = await updateCategoryName(categoryId, name);
-    if (!result?.error) {
-      setStorageAreas((prev) =>
-        prev.map((a) =>
-          a.id === storageAreaId
-            ? {
-                ...a,
-                categories: a.categories.map((c) =>
-                  c.id === categoryId ? { ...c, name } : c
-                ),
-              }
-            : a
-        )
-      );
-      setEditingCategoryName((prev) => {
-        const next = { ...prev };
-        delete next[categoryId];
-        return next;
-      });
     }
   };
 
@@ -382,18 +499,73 @@ export default function StorageAreasSection({
   };
 
   // ---------- Item CRUD ----------
-  const handleAddItem = async (categoryId) => {
-    const item = newItemData[categoryId];
-    if (!item?.name?.trim()) return;
+  const openCreateItemModal = (area, category) =>
+    setItemModal({
+      open: true,
+      mode: 'create',
+      areaId: area.id,
+      categoryId: category.id,
+      itemId: null,
+      categoryName: category.name,
+      name: '',
+      quantity: '',
+      expirationDate: '',
+    });
+
+  const openEditItemModal = (area, category, item) =>
+    setItemModal({
+      open: true,
+      mode: 'edit',
+      areaId: area.id,
+      categoryId: category.id,
+      itemId: item.id,
+      categoryName: category.name,
+      name: item.name,
+      quantity: String(item.quantity ?? 0),
+      expirationDate: item.expiration_date || '',
+    });
+
+  const submitItemModal = async () => {
+    if (!itemModal.name.trim()) return;
     setLimitNotice(null);
 
     const payload = {
-      name: item.name.trim(),
-      quantity: toNonNegativeInteger(item.quantity, 0),
-      expiration_date: item.expiration || null,
+      name: itemModal.name.trim(),
+      quantity: toNonNegativeInteger(itemModal.quantity, 0),
+      expiration_date: itemModal.expirationDate || null,
     };
 
-    const result = await addItem(categoryId, payload);
+    if (itemModal.mode === 'edit') {
+      const { data, error } = await updateItem(itemModal.itemId, payload);
+      if (error) {
+        console.error(error);
+        return;
+      }
+
+      setStorageAreas((prev) =>
+        prev.map((area) =>
+          area.id === itemModal.areaId
+            ? {
+                ...area,
+                categories: area.categories.map((cat) =>
+                  cat.id === itemModal.categoryId
+                    ? {
+                        ...cat,
+                        items: cat.items.map((it) =>
+                          it.id === itemModal.itemId ? data : it
+                        ),
+                      }
+                    : cat
+                ),
+              }
+            : area
+        )
+      );
+      closeItemModal();
+      return;
+    }
+
+    const result = await addItem(itemModal.categoryId, payload);
     if (result?.error) {
       setLimitNotice({
         message:
@@ -412,44 +584,14 @@ export default function StorageAreasSection({
       prev.map((area) => ({
         ...area,
         categories: (area.categories || []).map((cat) =>
-          cat.id === categoryId
+          cat.id === itemModal.categoryId
             ? { ...cat, items: [...(cat.items || []), created] }
             : cat
         ),
       }))
     );
 
-    setNewItemData((prev) => ({ ...prev, [categoryId]: {} }));
-  };
-
-  const handleUpdateItem = async (itemId, categoryId, storageAreaId, updated) => {
-    const { data, error } = await updateItem(itemId, updated);
-    if (error) {
-      console.error(error);
-      return;
-    }
-
-    setStorageAreas((prev) =>
-      prev.map((area) =>
-        area.id === storageAreaId
-          ? {
-              ...area,
-              categories: area.categories.map((cat) =>
-                cat.id === categoryId
-                  ? {
-                      ...cat,
-                      items: cat.items.map((it) =>
-                        it.id === itemId ? data : it
-                      ),
-                    }
-                  : cat
-              ),
-            }
-          : area
-      )
-    );
-
-    setEditingItem((prev) => ({ ...prev, [itemId]: undefined }));
+    closeItemModal();
   };
 
   const performDeleteItem = async (itemId, categoryId, storageAreaId) => {
@@ -634,8 +776,9 @@ export default function StorageAreasSection({
     } = moveModal;
 
     if (!targetCategoryId || itemIds.length === 0) return;
+    if (String(targetCategoryId) === String(sourceCategoryId)) return;
 
-    // 🔎 Find source area/category in current state
+    // Find source area/category in current state
     const sourceArea = storageAreas.find(
       (a) => String(a.id) === String(sourceAreaId)
     );
@@ -784,36 +927,34 @@ export default function StorageAreasSection({
         </motion.div>
       )}
 
-      {/* Top: Title & Tools */}
+      {/* Top: Summary & tools */}
       <motion.div
         variants={pageItemVariants}
         className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm"
       >
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col gap-4">
           <div>
             <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-stocksense-teal">
-              Storage &amp; Inventory
+              Inventory overview
             </h1>
-            <p className="text-sm text-gray-500">
-              Add areas, group items by categories, and keep tabs on what’s expiring.
-            </p>
+            <p className="text-sm text-gray-500">{locationName}</p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
             {/* Search */}
-            <div className="relative">
+            <div className="relative min-w-0">
               <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-3.5 w-3.5" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search categories or items…"
-                className="pl-9 pr-3 py-2 rounded-xl border border-stocksense-gray focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50 w-72 max-w-full"
+                placeholder="Search categories or items..."
+                className="h-11 w-full rounded-xl border border-stocksense-gray pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
               />
             </div>
 
             {/* Expiring filter */}
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+              <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input
                   type="checkbox"
                   checked={expSoonEnabled}
@@ -839,65 +980,81 @@ export default function StorageAreasSection({
           </div>
         </div>
 
-        {/* Stats + Add new area */}
-        <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="flex flex-wrap gap-2 items-center">
-            <p className="text-gray-500 text-sm">Total for {locationName}:</p>
-            <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
-              <strong>{totalAreas}</strong> {totalAreas === 1 ? 'Area' : 'Areas'}
-            </span>
-            <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
-              <strong>{totalCategories}</strong>{' '}
-              {totalCategories === 1 ? 'Category' : 'Categories'}
-            </span>
-            <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
-              <strong>{totalItems}</strong> {totalItems === 1 ? 'Item' : 'Items'}
-            </span>
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              Areas
+            </p>
+            <p className="mt-1 text-2xl font-semibold text-stocksense-teal">
+              {totalAreas}
+            </p>
+          </div>
+          <div className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              Categories
+            </p>
+            <p className="mt-1 text-2xl font-semibold text-stocksense-teal">
+              {totalCategories}
+            </p>
+          </div>
+          <div className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              Items
+            </p>
+            <p className="mt-1 text-2xl font-semibold text-stocksense-teal">
+              {totalItems}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap gap-2">
+            <OpenGlobalAddItemButton
+              context={{
+                locationId,
+              }}
+            />
+            <button
+              onClick={openCreateAreaModal}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 py-2 text-sm font-medium text-[var(--stocksense-brand)] hover:brightness-95"
+            >
+              <FaPlus /> New storage area
+            </button>
           </div>
 
           <button
             onClick={allAreasExpanded ? collapseAllAreas : expandAllAreas}
-            className="rounded-xl border border-stocksense-gray px-3 py-1.5 text-xs hover:bg-gray-50 cursor-pointer flex justify-between gap-2 items-center max-w-[150px] w-full"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-stocksense-gray px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer"
           >
-            {allAreasExpanded ? 'Collapse all Areas' : 'Expand all Areas'}
+            {allAreasExpanded ? 'Collapse all' : 'Expand all'}
             <FaChevronUp
               className={`${
                 allAreasExpanded ? '' : 'rotate-180'
               } transition-all duration-150 cursor-pointer`}
             />
           </button>
-          <OpenGlobalAddItemButton
-            context={{
-              locationId,
-            }}
-          />
         </div>
 
-        {/* Add area */}
-        <div className="mt-4">
-          <div className="flex gap-2 sm:gap-3">
-            <input
-              value={newStorageName}
-              onChange={(e) => setNewStorageName(e.target.value)}
-              placeholder="Add a new storage area (e.g., Pantry, Fridge, Garage shelf)"
-              className="border border-stocksense-gray rounded-xl px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
-            />
-            <motion.button
-              whileHover={{ y: -1 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleAddStorageArea}
-              className="rounded-xl px-4 py-2 bg-[var(--stocksense-brand)] text-white shadow hover:brightness-95 cursor-pointer"
-            >
-              <span className="inline-flex items-center gap-2 w-max">
-                <FaPlus /> Add Storage
-              </span>
-            </motion.button>
-          </div>
-        </div>
       </motion.div>
 
       {/* Areas */}
       <motion.div variants={pageVariants} className="grid grid-cols-1 gap-4">
+        {storageAreas.length === 0 && (
+          <motion.div
+            variants={pageItemVariants}
+            className="rounded-2xl border border-dashed border-stocksense-gray bg-white p-8 text-center shadow-sm"
+          >
+            <h2 className="text-lg font-semibold text-stocksense-teal">
+              No storage areas yet
+            </h2>
+            <button
+              onClick={openCreateAreaModal}
+              className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--stocksense-brand)] px-4 py-2 text-sm font-medium text-white hover:brightness-95"
+            >
+              <FaPlus /> New storage area
+            </button>
+          </motion.div>
+        )}
         {storageAreas.map((area, aIdx) => (
           <motion.div
             key={area.id}
@@ -907,8 +1064,8 @@ export default function StorageAreasSection({
             className="rounded-2xl border border-stocksense-gray bg-white shadow-sm"
           >
             {/* Area header */}
-            <div className="p-4 md:p-5 flex items-start gap-3">
-              <div className="flex items-center gap-3 min-w-0">
+            <div className="p-4 md:p-5 flex items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-1 items-center gap-3">
                 {area.categories?.length ? (
                   <button
                     onClick={() => toggleArea(area.id)}
@@ -923,93 +1080,44 @@ export default function StorageAreasSection({
                   </button>
                 ) : null}
 
-                {editingId === area.id ? (
-                  <input
-                    value={editingName}
-                    onChange={(e) => setEditingName(e.target.value)}
-                    className="border border-stocksense-gray rounded-lg px-3 py-1.5 w-64 max-w-full focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
-                  />
-                ) : (
-                  <div className="min-w-0">
-                    <h2 className="text-lg font-semibold text-stocksense-teal truncate">
-                      {area.name}{' '}
-                      <span className="text-sm text-gray-400 font-medium">(Area)</span>
-                    </h2>
-                    <p className="text-xs text-gray-500">
-                      {area.categories?.length || 0}{' '}
-                      {area.categories?.length === 1 ? 'category' : 'categories'}
-                    </p>
-                  </div>
-                )}
+                <div className="min-w-0">
+                  <h2 className="text-lg font-semibold text-stocksense-teal truncate">
+                    {area.name}{' '}
+                    <span className="text-sm text-gray-400 font-medium">(Area)</span>
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    {area.categories?.length || 0}{' '}
+                    {area.categories?.length === 1 ? 'category' : 'categories'}
+                  </p>
+                </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 shrink-0">
-                {editingId === area.id ? (
-                  <>
-                    <button
-                      onClick={() => handleSaveEdit(area.id)}
-                      className="text-[var(--stocksense-brand)] cursor-pointer rounded-lg p-2 hover:bg-[var(--stocksense-brand-soft)]"
-                    >
-                      <FaCheck />
-                    </button>
-                    <button
-                      onClick={() => setEditingId(null)}
-                      className="text-gray-600 cursor-pointer rounded-lg p-2 hover:bg-gray-50"
-                    >
-                      <FaTimes />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => {
-                        setEditingId(area.id);
-                        setEditingName(area.name);
-                      }}
-                      className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
-                    >
-                      <FaEdit />
-                    </button>
-                    <button
-                      onClick={() =>
-                        openDeleteDialog('area', {
-                          areaId: area.id,
-                          name: area.name,
-                        })
-                      }
-                      className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
-                    >
-                      <FaTrash />
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Add category */}
-            <div className="px-4 md:px-5 pb-4">
-              <div className="flex gap-2">
-                <input
-                  value={newCategoryName[area.id] || ''}
-                  onChange={(e) =>
-                    setNewCategoryName({
-                      ...newCategoryName,
-                      [area.id]: e.target.value,
+              <div className="flex flex-wrap justify-end gap-2 shrink-0">
+                <button
+                  onClick={() => openCreateCategoryModal(area)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-2 text-sm font-medium text-[var(--stocksense-brand)] hover:brightness-95"
+                >
+                  <FaLayerGroup /> New category
+                </button>
+                <button
+                  onClick={() => openEditAreaModal(area)}
+                  className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
+                  title="Edit storage area"
+                >
+                  <FaEdit />
+                </button>
+                <button
+                  onClick={() =>
+                    openDeleteDialog('area', {
+                      areaId: area.id,
+                      name: area.name,
                     })
                   }
-                  placeholder={`Add category in ${area.name} (e.g., Fruits, Tools, Cleaning)`}
-                  className="border border-stocksense-gray rounded-xl px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
-                />
-                <motion.button
-                  whileHover={{ y: -1 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => handleAddCategory(area.id)}
-                  className="rounded-xl px-3 py-2 bg-[var(--stocksense-brand)] text-white hover:brightness-95 cursor-pointer"
+                  className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
+                  title="Delete storage area"
                 >
-                  <span className="inline-flex items-center gap-2 w-max">
-                    <FaPlus /> Add Category
-                  </span>
-                </motion.button>
+                  <FaTrash />
+                </button>
               </div>
             </div>
 
@@ -1025,6 +1133,15 @@ export default function StorageAreasSection({
                   className="overflow-hidden"
                 >
                   <div className="px-4 md:px-5 pb-5 space-y-3">
+                    {(area.categories || []).filter((c) =>
+                      filterCategoryVisible(c)
+                    ).length === 0 && (
+                      <div className="rounded-xl border border-dashed border-stocksense-gray bg-gray-50 px-4 py-5 text-center text-sm text-gray-500">
+                        {search || expSoonEnabled
+                          ? 'No matching categories or items.'
+                          : 'No categories yet.'}
+                      </div>
+                    )}
                     {(area.categories || [])
                       .filter((c) => filterCategoryVisible(c))
                       .map((category, cIdx) => {
@@ -1044,7 +1161,7 @@ export default function StorageAreasSection({
                           >
                             {/* Category header */}
                             <div className="p-3 sm:p-4 flex items-start justify-between gap-3">
-                              <div className="flex items-center gap-2 min-w-0">
+                              <div className="flex min-w-0 flex-1 items-center gap-2">
                                 {items.length ? (
                                   <button
                                     onClick={() => toggleCategory(category.id)}
@@ -1065,145 +1182,48 @@ export default function StorageAreasSection({
                                   </button>
                                 ) : null}
 
-                                {editingCategoryName[category.id] !== undefined ? (
-                                  <input
-                                    value={editingCategoryName[category.id]}
-                                    onChange={(e) =>
-                                      setEditingCategoryName({
-                                        ...editingCategoryName,
-                                        [category.id]: e.target.value,
-                                      })
-                                    }
-                                    className="border border-stocksense-gray rounded-lg px-2.5 py-1.5 w-56 sm:w-64 focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
-                                  />
-                                ) : (
-                                  <div className="min-w-0">
-                                    <h3 className="font-medium text-stocksense-teal truncate">
-                                      {category.name}{' '}
-                                      <span className="text-gray-400 text-sm">
-                                        (Category)
-                                      </span>
-                                    </h3>
-                                    <p className="text-xs text-gray-500">
-                                      {items.length}{' '}
-                                      {items.length === 1 ? 'item' : 'items'}
-                                    </p>
-                                  </div>
-                                )}
+                                <div className="min-w-0">
+                                  <h3 className="font-medium text-stocksense-teal truncate">
+                                    {category.name}{' '}
+                                    <span className="text-gray-400 text-sm">
+                                      (Category)
+                                    </span>
+                                  </h3>
+                                  <p className="text-xs text-gray-500">
+                                    {items.length}{' '}
+                                    {items.length === 1 ? 'item' : 'items'}
+                                  </p>
+                                </div>
                               </div>
 
-                              <div className="flex flex-wrap gap-2 shrink-0">
-                                {editingCategoryName[category.id] !== undefined ? (
-                                  <>
-                                    <button
-                                      onClick={() =>
-                                        handleUpdateCategory(category.id, area.id)
-                                      }
-                                      className="text-[var(--stocksense-brand)] cursor-pointer rounded-lg p-2 hover:bg-[var(--stocksense-brand-soft)]"
-                                    >
-                                      <FaCheck />
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        setEditingCategoryName({
-                                          ...editingCategoryName,
-                                          [category.id]: undefined,
-                                        })
-                                      }
-                                      className="text-gray-600 cursor-pointer rounded-lg p-2 hover:bg-gray-50"
-                                    >
-                                      <FaTimes />
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <button
-                                      onClick={() =>
-                                        setEditingCategoryName({
-                                          ...editingCategoryName,
-                                          [category.id]: category.name,
-                                        })
-                                      }
-                                      className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
-                                    >
-                                      <FaEdit />
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        openDeleteDialog('category', {
-                                          categoryId: category.id,
-                                          storageAreaId: area.id,
-                                          name: category.name,
-                                          areaName: area.name,
-                                        })
-                                      }
-                                      className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
-                                    >
-                                      <FaTrash />
-                                    </button>
-
-                                  </>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Add item row */}
-                            <div className="px-3 sm:px-4 pb-3">
-                              <div className="flex flex-col sm:flex-row gap-2">
-                                <input
-                                  value={newItemData[category.id]?.name || ''}
-                                  onChange={(e) =>
-                                    setNewItemData({
-                                      ...newItemData,
-                                      [category.id]: {
-                                        ...newItemData[category.id],
-                                        name: e.target.value,
-                                      },
-                                    })
-                                  }
-                                  placeholder={`Add Item in ${category.name}`}
-                                  className="border border-stocksense-gray rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
-                                />
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={newItemData[category.id]?.quantity || ''}
-                                  onChange={(e) =>
-                                    setNewItemData({
-                                      ...newItemData,
-                                      [category.id]: {
-                                        ...newItemData[category.id],
-                                        quantity: e.target.value,
-                                      },
-                                    })
-                                  }
-                                  placeholder="Qty"
-                                  className="border border-stocksense-gray rounded-lg px-3 py-2 w-full sm:w-28 focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
-                                />
-                                <input
-                                  type="date"
-                                  value={newItemData[category.id]?.expiration || ''}
-                                  onChange={(e) =>
-                                    setNewItemData({
-                                      ...newItemData,
-                                      [category.id]: {
-                                        ...newItemData[category.id],
-                                        expiration: e.target.value,
-                                      },
-                                    })
-                                  }
-                                  className="border border-stocksense-gray rounded-lg px-3 py-2 w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
-                                />
-                                <motion.button
-                                  whileHover={{ y: -1 }}
-                                  whileTap={{ scale: 0.98 }}
-                                  onClick={() => handleAddItem(category.id)}
-                                  className="rounded-lg px-3 py-2 bg-[var(--stocksense-brand)] text-white hover:brightness-95 cursor-pointer"
+                              <div className="flex flex-wrap justify-end gap-2 shrink-0">
+                                <button
+                                  onClick={() => openCreateItemModal(area, category)}
+                                  className="inline-flex items-center gap-2 rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-2 text-sm font-medium text-[var(--stocksense-brand)] hover:brightness-95"
                                 >
-                                  <span className="inline-flex items-center gap-2 w-max">
-                                    <FaPlus /> Add Item
-                                  </span>
-                                </motion.button>
+                                  <FaBoxOpen /> Add item
+                                </button>
+                                <button
+                                  onClick={() => openEditCategoryModal(area, category)}
+                                  className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
+                                  title="Edit category"
+                                >
+                                  <FaEdit />
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    openDeleteDialog('category', {
+                                      categoryId: category.id,
+                                      storageAreaId: area.id,
+                                      name: category.name,
+                                      areaName: area.name,
+                                    })
+                                  }
+                                  className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
+                                  title="Delete category"
+                                >
+                                  <FaTrash />
+                                </button>
                               </div>
                             </div>
 
@@ -1296,185 +1316,82 @@ export default function StorageAreasSection({
                                             duration: 0.18,
                                             delay: iIdx * 0.015,
                                           }}
-                                          className={`flex justify-between items-center border border-stocksense-gray rounded-xl px-3 py-2 bg-white ${
+                                          className={`flex flex-col gap-3 border border-stocksense-gray rounded-xl px-3 py-2 bg-white sm:flex-row sm:items-center sm:justify-between ${
                                             selected ? 'ring-2 ring-rose-200' : ''
                                           }`}
                                         >
-                                          {editingItem[item.id] !== undefined ? (
-                                            <div className="flex flex-col sm:flex-row gap-2 w-full">
+                                          <>
+                                            <div className="flex items-start gap-3 min-w-0">
                                               <input
-                                                value={editingItem[item.id].name}
-                                                onChange={(e) =>
-                                                  setEditingItem((prev) => ({
-                                                    ...prev,
-                                                    [item.id]: {
-                                                      ...prev[item.id],
-                                                      name: e.target.value,
-                                                    },
-                                                  }))
+                                                type="checkbox"
+                                                checked={selected}
+                                                onChange={() =>
+                                                  toggleSelectItem(
+                                                    category.id,
+                                                    item.id
+                                                  )
                                                 }
-                                                className="border border-stocksense-gray rounded-lg px-2 py-1 w-full sm:w-1/3"
+                                                className="mt-1"
                                               />
-                                              <input
-                                                type="number"
-                                                min="0"
-                                                value={editingItem[item.id].quantity}
-                                                onChange={(e) =>
-                                                  setEditingItem((prev) => ({
-                                                    ...prev,
-                                                    [item.id]: {
-                                                      ...prev[item.id],
-                                                      quantity: e.target.value,
-                                                    },
-                                                  }))
-                                                }
-                                                className="border border-stocksense-gray rounded-lg px-2 py-1 w-full sm:w-24"
-                                              />
-                                              <input
-                                                type="date"
-                                                value={
-                                                  editingItem[item.id].expiration_date ||
-                                                  ''
-                                                }
-                                                onChange={(e) =>
-                                                  setEditingItem((prev) => ({
-                                                    ...prev,
-                                                    [item.id]: {
-                                                      ...prev[item.id],
-                                                      expiration_date: e.target.value,
-                                                    },
-                                                  }))
-                                                }
-                                                className="border border-stocksense-gray rounded-lg px-2 py-1 w-full sm:w-48"
-                                              />
-                                              <div className="flex gap-2 items-center">
-                                                <button
-                                                  onClick={() => {
-                                                    const e =
-                                                      editingItem[item.id] || {};
-                                                    const updated = {
-                                                      name:
-                                                        (e.name ?? '').trim() ||
-                                                        item.name,
-                                                      quantity:
-                                                        toNonNegativeInteger(
-                                                          e.quantity,
-                                                          item.quantity ?? 0
-                                                        ),
-                                                      expiration_date:
-                                                        e.expiration_date ??
-                                                        item.expiration_date ??
-                                                        null,
-                                                    };
-                                                    handleUpdateItem(
-                                                      item.id,
-                                                      category.id,
-                                                      area.id,
-                                                      updated
-                                                    );
-                                                  }}
-                                                  className="text-[var(--stocksense-brand)] cursor-pointer rounded-lg p-2 hover:bg-[var(--stocksense-brand-soft)]"
-                                                >
-                                                  <FaCheck />
-                                                </button>
-                                                <button
-                                                  onClick={() =>
-                                                    setEditingItem((prev) => ({
-                                                      ...prev,
-                                                      [item.id]: undefined,
-                                                    }))
-                                                  }
-                                                  className="text-gray-600 cursor-pointer rounded-lg p-2 hover:bg-gray-50"
-                                                >
-                                                  <FaTimes />
-                                                </button>
+                                              <div className="min-w-0">
+                                                <p className="font-medium text-stocksense-teal truncate">
+                                                  {item.name}
+                                                  {soon && (
+                                                    <span className="ml-2 text-[10px] uppercase tracking-wide bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
+                                                      {daysUntil(item.expiration_date) < 0
+                                                        ? 'Expired'
+                                                        : 'Soon'}
+                                                    </span>
+                                                  )}
+                                                </p>
+                                                <p className="text-sm text-gray-500 truncate">
+                                                  Qty: {item.quantity} | Exp:{' '}
+                                                  {item.expiration_date || '-'}
+                                                </p>
                                               </div>
                                             </div>
-                                          ) : (
-                                            <>
-                                              <div className="flex items-start gap-3 min-w-0">
-                                                <input
-                                                  type="checkbox"
-                                                  checked={selected}
-                                                  onChange={() =>
-                                                    toggleSelectItem(
-                                                      category.id,
-                                                      item.id
-                                                    )
-                                                  }
-                                                  className="mt-1"
-                                                />
-                                                <div className="min-w-0">
-                                                  <p className="font-medium text-stocksense-teal truncate">
-                                                    {item.name}
-                                                    {soon && (
-                                                      <span className="ml-2 text-[10px] uppercase tracking-wide bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
-                                                        {daysUntil(
-                                                          item.expiration_date
-                                                        ) < 0
-                                                          ? 'Expired'
-                                                          : 'Soon'}
-                                                      </span>
-                                                    )}
-                                                  </p>
-                                                  <p className="text-sm text-gray-500 truncate">
-                                                    Qty: {item.quantity} • Exp:{' '}
-                                                    {item.expiration_date || '—'}
-                                                  </p>
-                                                </div>
-                                              </div>
-                                              <div className="flex gap-2 items-center shrink-0">
-                                                {/* Move single item */}
-                                                <button
-                                                  onClick={() =>
-                                                    openMoveModal(
-                                                      area.id,
-                                                      category.id,
-                                                      item.id
-                                                    )
-                                                  }
-                                                  className="text-[var(--stocksense-brand)] cursor-pointer rounded-lg p-2 hover:bg-[var(--stocksense-brand-soft)]"
-                                                  title="Move item to another category"
-                                                >
-                                                  <FaArrowsAlt />
-                                                </button>
+                                            <div className="flex items-center gap-2 self-end shrink-0 sm:self-auto">
+                                              <button
+                                                onClick={() =>
+                                                  openMoveModal(
+                                                    area.id,
+                                                    category.id,
+                                                    item.id
+                                                  )
+                                                }
+                                                className="text-[var(--stocksense-brand)] cursor-pointer rounded-lg p-2 hover:bg-[var(--stocksense-brand-soft)]"
+                                                title="Move item to another category"
+                                              >
+                                                <FaArrowsAlt />
+                                              </button>
 
-                                                <button
-                                                  onClick={() =>
-                                                    setEditingItem((prev) => ({
-                                                      ...prev,
-                                                      [item.id]: {
-                                                        name: item.name,
-                                                        quantity: item.quantity,
-                                                        expiration_date:
-                                                          item.expiration_date ||
-                                                          '',
-                                                      },
-                                                    }))
-                                                  }
-                                                  className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
-                                                >
-                                                  <FaEdit />
-                                                </button>
-                                                <button
-                                                  onClick={() =>
-                                                    openDeleteDialog('item', {
-                                                      itemId: item.id,
-                                                      itemName: item.name,
-                                                      categoryId: category.id,
-                                                      storageAreaId: area.id,
-                                                      categoryName: category.name,
-                                                      areaName: area.name,
-                                                    })
-                                                  }
-                                                  className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
-                                                >
-                                                  <FaTrash />
-                                                </button>
-
-                                              </div>
-                                            </>
-                                          )}
+                                              <button
+                                                onClick={() =>
+                                                  openEditItemModal(area, category, item)
+                                                }
+                                                className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
+                                                title="Edit item"
+                                              >
+                                                <FaEdit />
+                                              </button>
+                                              <button
+                                                onClick={() =>
+                                                  openDeleteDialog('item', {
+                                                    itemId: item.id,
+                                                    itemName: item.name,
+                                                    categoryId: category.id,
+                                                    storageAreaId: area.id,
+                                                    categoryName: category.name,
+                                                    areaName: area.name,
+                                                  })
+                                                }
+                                                className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
+                                                title="Delete item"
+                                              >
+                                                <FaTrash />
+                                              </button>
+                                            </div>
+                                          </>
                                         </motion.div>
                                       );
                                     })}
@@ -1492,6 +1409,153 @@ export default function StorageAreasSection({
           </motion.div>
         ))}
       </motion.div>
+
+      <Modal
+        isOpen={areaModal.open}
+        onOpenChange={(open) => !open && closeAreaModal()}
+        placement="center"
+        backdrop="blur"
+      >
+        <ModalContent className={modalContentClass} style={modalContentStyle}>
+          <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
+            {areaModal.mode === 'edit'
+              ? `Edit storage area in ${areaModal.locationName || locationName}`
+              : `Create new storage in ${areaModal.locationName || locationName}`}
+          </ModalHeader>
+          <ModalBody className={modalBodyClass}>
+            <Input
+              label="Storage area name"
+              value={areaModal.name}
+              onValueChange={(name) => setAreaModal((prev) => ({ ...prev, name }))}
+              variant="bordered"
+              radius="lg"
+              classNames={modalInputClassNames}
+              autoFocus
+            />
+          </ModalBody>
+          <ModalFooter className={modalFooterClass}>
+            <Button variant="light" radius="lg" onPress={closeAreaModal}>
+              Cancel
+            </Button>
+            <Button
+              color="primary"
+              radius="lg"
+              onPress={submitAreaModal}
+              isDisabled={!areaModal.name.trim()}
+              className={modalPrimaryButtonClass}
+            >
+              {areaModal.mode === 'edit' ? 'Save changes' : 'Add area'}
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal
+        isOpen={categoryModal.open}
+        onOpenChange={(open) => !open && closeCategoryModal()}
+        placement="center"
+        backdrop="blur"
+      >
+        <ModalContent className={modalContentClass} style={modalContentStyle}>
+          <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
+            {categoryModal.mode === 'edit'
+              ? `Edit category in ${categoryModal.areaName || 'storage area'}`
+              : `Create new category in ${categoryModal.areaName || 'storage area'}`}
+          </ModalHeader>
+          <ModalBody className={modalBodyClass}>
+            <Input
+              label="Category name"
+              value={categoryModal.name}
+              onValueChange={(name) =>
+                setCategoryModal((prev) => ({ ...prev, name }))
+              }
+              variant="bordered"
+              radius="lg"
+              classNames={modalInputClassNames}
+              autoFocus
+            />
+          </ModalBody>
+          <ModalFooter className={modalFooterClass}>
+            <Button variant="light" radius="lg" onPress={closeCategoryModal}>
+              Cancel
+            </Button>
+            <Button
+              color="primary"
+              radius="lg"
+              onPress={submitCategoryModal}
+              isDisabled={!categoryModal.name.trim()}
+              className={modalPrimaryButtonClass}
+            >
+              {categoryModal.mode === 'edit' ? 'Save changes' : 'Add category'}
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal
+        isOpen={itemModal.open}
+        onOpenChange={(open) => !open && closeItemModal()}
+        placement="center"
+        backdrop="blur"
+      >
+        <ModalContent className={modalContentClass} style={modalContentStyle}>
+          <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
+            {itemModal.mode === 'edit'
+              ? `Edit item in ${itemModal.categoryName || 'category'}`
+              : `Create new item in ${itemModal.categoryName || 'category'}`}
+          </ModalHeader>
+          <ModalBody className={`space-y-3 ${modalBodyClass}`}>
+            <Input
+              label="Item name"
+              value={itemModal.name}
+              onValueChange={(name) => setItemModal((prev) => ({ ...prev, name }))}
+              variant="bordered"
+              radius="lg"
+              classNames={modalInputClassNames}
+              autoFocus
+            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Input
+                type="number"
+                min="0"
+                label="Quantity"
+                value={itemModal.quantity}
+                onValueChange={(quantity) =>
+                  setItemModal((prev) => ({ ...prev, quantity }))
+                }
+                variant="bordered"
+                radius="lg"
+                classNames={modalInputClassNames}
+              />
+              <Input
+                type="date"
+                label="Expiration date"
+                value={itemModal.expirationDate}
+                onValueChange={(expirationDate) =>
+                  setItemModal((prev) => ({ ...prev, expirationDate }))
+                }
+                variant="bordered"
+                radius="lg"
+                classNames={modalInputClassNames}
+              />
+            </div>
+          </ModalBody>
+          <ModalFooter className={modalFooterClass}>
+            <Button variant="light" radius="lg" onPress={closeItemModal}>
+              Cancel
+            </Button>
+            <Button
+              color="primary"
+              radius="lg"
+              onPress={submitItemModal}
+              isDisabled={!itemModal.name.trim()}
+              className={modalPrimaryButtonClass}
+            >
+              {itemModal.mode === 'edit' ? 'Save changes' : 'Add item'}
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
 
       <MoveItemsModal
         moveModal={moveModal}

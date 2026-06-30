@@ -10,10 +10,26 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
+  Select,
+  SelectItem,
 } from "@heroui/react";
-import { FaBoxOpen, FaChevronLeft, FaChevronRight, FaSearch } from "react-icons/fa";
+import {
+  FaBoxOpen,
+  FaChevronLeft,
+  FaChevronRight,
+  FaEdit,
+  FaSearch,
+} from "react-icons/fa";
 import { updateItem, deleteItem, updateItemLocation } from "@/app/actions/server";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
+import {
+  modalBodyClass,
+  modalContentClass,
+  modalContentStyle,
+  modalFooterClass,
+  modalHeaderClass,
+  modalInputClassNames,
+} from "@/components/modals/modalTheme";
 import OpenGlobalAddItemButton from "@/components/OpenGlobalAddItemButton";
 import {
   daysUntil,
@@ -130,6 +146,22 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
     () => items.find((i) => String(i.id) === String(activeItemId)) || null,
     [items, activeItemId]
   );
+
+  const hasItemEditChanges = useMemo(() => {
+    if (!activeItem) return false;
+
+    const name = editName.trim();
+    if (!name) return false;
+
+    const quantity = toNonNegativeInteger(editQty, 0);
+    const expirationDate = editExp ? editExp : null;
+
+    return (
+      name !== (activeItem.name || "") ||
+      quantity !== (activeItem.quantity ?? 0) ||
+      expirationDate !== (activeItem.expiration_date ?? null)
+    );
+  }, [activeItem, editExp, editName, editQty]);
 
   useEffect(() => {
     const handleItemAdded = (event) => {
@@ -260,6 +292,11 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
     }
   };
 
+  const getSelectedValue = (keys) => {
+    const value = Array.from(keys)[0];
+    return value ? String(value) : "";
+  };
+
   // ---- drawer helpers ----
   const openDrawer = (it) => {
     setActiveItemId(it.id);
@@ -310,6 +347,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
           : x
       )
     );
+    closeDrawer();
   };
 
   // ---- move helpers (single + bulk) ----
@@ -357,9 +395,29 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
 
   const currentCategories = currentArea?.categories || [];
 
+  const canConfirmMove = useMemo(() => {
+    if (!moveTarget.categoryId) return false;
+
+    const targetCategoryId = String(moveTarget.categoryId);
+
+    if (drawerOpen && activeItem) {
+      const currentCategoryId = activeItem.category?.id ?? activeItem.category_id;
+      return String(currentCategoryId) !== targetCategoryId;
+    }
+
+    if (selectedIds.size === 0) return false;
+
+    return items.some((item) => {
+      if (!selectedIds.has(String(item.id))) return false;
+      const currentCategoryId = item.category?.id ?? item.category_id;
+      return String(currentCategoryId) !== targetCategoryId;
+    });
+  }, [activeItem, drawerOpen, items, moveTarget.categoryId, selectedIds]);
+
   const confirmMoveSingle = async () => {
     if (!activeItem) return;
     if (!moveTarget.categoryId) return;
+    if (!canConfirmMove) return;
 
     const result = await updateItemLocation(activeItem.id, {
       categoryId: moveTarget.categoryId,
@@ -392,12 +450,13 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
       )
     );
 
-    setMoveModalOpen(false);
+    closeDrawer();
   };
 
   const confirmMoveBulk = async () => {
     if (!moveTarget.categoryId) return;
     if (selectedIds.size === 0) return;
+    if (!canConfirmMove) return;
 
     const ids = Array.from(selectedIds);
 
@@ -673,7 +732,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
       </motion.div>
 
       {/* List */}
-      <motion.div variants={pageSectionVariants} className="grid grid-cols-1 gap-3">
+      <motion.div variants={pageSectionVariants} className="space-y-4">
         <PaginationControls
           currentPage={safeCurrentPage}
           totalPages={totalPages}
@@ -684,6 +743,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
           onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
         />
 
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <AnimatePresence initial={false}>
         {paginatedItems.map((it) => {
           const soon = isExpiringSoon(it.expiration_date, expDays);
@@ -698,12 +758,12 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
               initial="hidden"
               animate="show"
               exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
-              className={`rounded-2xl border border-stocksense-gray bg-white shadow-sm p-4 transition ${
+              className={`rounded-2xl border border-stocksense-gray bg-white p-4 shadow-sm transition ${
                 selected ? "ring-2 ring-rose-200" : "hover:bg-gray-50"
               }`}
               whileHover={{ y: -1 }}
             >
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex h-full items-start justify-between gap-3">
                 {/* Left: checkbox + info */}
                 <div className="flex items-start gap-3 min-w-0">
                   <input
@@ -713,7 +773,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                     className="mt-1 w-5 h-5 cursor-pointer"
                   />
 
-                  <button onClick={() => openDrawer(it)} className="text-left min-w-0">
+                  <button onClick={() => openDrawer(it)} className="min-w-0 text-left">
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="font-semibold text-stocksense-teal truncate">{it.name}</div>
 
@@ -735,13 +795,14 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                   </button>
                 </div>
 
-                {/* Right: open drawer */}
+                {/* Right: edit item */}
                 <button
                   onClick={() => openDrawer(it)}
-                  className="shrink-0 text-gray-300 hover:text-gray-500 cursor-pointer"
-                  title="Open item"
+                  className="flex shrink-0 items-center gap-1 rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-2.5 py-1 text-xs font-medium text-[var(--stocksense-brand)] hover:brightness-95 cursor-pointer"
+                  title="Edit item"
                 >
-                  →
+                  <FaEdit className="h-3 w-3" />
+                  Edit
                 </button>
               </div>
             </motion.div>
@@ -755,7 +816,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
             initial="hidden"
             animate="show"
             exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
-            className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center"
+            className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center sm:col-span-2 lg:col-span-3"
           >
             <p className="text-gray-500">No items match your search.</p>
             <div className="mt-4 flex justify-center">
@@ -764,6 +825,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
           </motion.div>
         )}
         </AnimatePresence>
+        </div>
 
         {filteredItems.length > ITEMS_PER_PAGE && (
           <PaginationControls
@@ -789,11 +851,11 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
           wrapper: "items-stretch justify-end",
         }}
       >
-        <ModalContent>
+        <ModalContent className={modalContentClass} style={modalContentStyle}>
           {() => (
             <>
-              <ModalHeader className="flex flex-col gap-1">
-                <div className="text-stocksense-teal font-semibold text-lg">
+              <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
+                <div className="text-lg font-semibold text-[var(--stocksense-brand)]">
                   {activeItem?.name || "Item"}
                 </div>
                 <div className="text-sm text-gray-500">
@@ -802,15 +864,15 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                 </div>
               </ModalHeader>
 
-              <ModalBody className="space-y-5">
+              <ModalBody className={`space-y-5 ${modalBodyClass}`}>
                 <div className="space-y-2">
                   <div className="text-xs font-medium text-gray-600">Item name</div>
                   <Input
                     value={editName}
                     onValueChange={setEditName}
-                    classNames={{
-                      inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
-                    }}
+                    variant="bordered"
+                    radius="lg"
+                    classNames={modalInputClassNames}
                   />
                 </div>
 
@@ -822,9 +884,9 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                       onValueChange={setEditQty}
                       type="number"
                       min={0}
-                      classNames={{
-                        inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
-                      }}
+                      variant="bordered"
+                      radius="lg"
+                      classNames={modalInputClassNames}
                     />
                   </div>
 
@@ -834,7 +896,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                       type="date"
                       value={editExp || ""}
                       onChange={(e) => setEditExp(e.target.value)}
-                      className="w-full rounded-xl border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
+                      className="w-full rounded-xl border border-[var(--stocksense-brand-border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
                     />
                   </div>
                 </div>
@@ -842,20 +904,21 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                 <div className="flex gap-2">
                   <Button
                     onClick={saveEdits}
+                    isDisabled={!hasItemEditChanges}
                     className="rounded-xl bg-[var(--stocksense-brand)] text-white w-full"
                   >
                     Save changes
                   </Button>
                   <Button
                     onClick={() => openMove("single")}
-                    className="rounded-xl border border-stocksense-gray bg-white w-full"
+                    className="w-full rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
                   >
                     Move
                   </Button>
                 </div>
               </ModalBody>
 
-              <ModalFooter>
+              <ModalFooter className={modalFooterClass}>
                 <Button variant="light" className="rounded-xl" onClick={closeDrawer}>
                   Close
                 </Button>
@@ -870,11 +933,11 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
 
       {/* Move Modal (single + bulk) */}
       <Modal isOpen={moveModalOpen} onOpenChange={setMoveModalOpen} size="md">
-        <ModalContent>
+        <ModalContent className={modalContentClass} style={modalContentStyle}>
           {() => (
             <>
-              <ModalHeader className="flex flex-col gap-1">
-                <div className="text-stocksense-teal font-semibold text-lg">
+              <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
+                <div className="text-lg font-semibold text-[var(--stocksense-brand)]">
                   Move {selectedCount > 0 && !drawerOpen ? `${selectedCount} items` : "item"}
                 </div>
                 <div className="text-sm text-gray-500">
@@ -882,89 +945,104 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                 </div>
               </ModalHeader>
 
-              <ModalBody className="space-y-4">
-                {/* Location */}
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-gray-600">Location</label>
-                  <select
-                    value={moveTarget.locationId ? String(moveTarget.locationId) : ""}
-                    onChange={(e) => {
-                      const locId = e.target.value || null;
-                      const loc =
-                        moveLocations.find((l) => String(l.id) === String(locId)) || moveLocations[0];
-                      const firstArea = loc?.storage_areas?.[0] || null;
-                      const firstCat = firstArea?.categories?.[0] || null;
+              <ModalBody className={`space-y-4 ${modalBodyClass}`}>
+                <Select
+                  label="Location"
+                  selectedKeys={
+                    moveTarget.locationId
+                      ? new Set([String(moveTarget.locationId)])
+                      : new Set()
+                  }
+                  onSelectionChange={(keys) => {
+                    const locId = getSelectedValue(keys) || null;
+                    const loc =
+                      moveLocations.find((l) => String(l.id) === String(locId)) ||
+                      moveLocations[0];
+                    const firstArea = loc?.storage_areas?.[0] || null;
+                    const firstCat = firstArea?.categories?.[0] || null;
 
-                      setMoveTarget({
-                        locationId: loc?.id ?? null,
-                        areaId: firstArea?.id ?? null,
-                        categoryId: firstCat?.id ?? null,
-                      });
-                    }}
-                    className="w-full rounded-xl border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
-                  >
-                    {moveLocations.map((l) => (
-                      <option key={l.id} value={String(l.id)}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                    setMoveTarget({
+                      locationId: loc?.id ?? null,
+                      areaId: firstArea?.id ?? null,
+                      categoryId: firstCat?.id ?? null,
+                    });
+                  }}
+                  variant="bordered"
+                  radius="lg"
+                  classNames={{
+                    trigger: "border-[var(--stocksense-brand-border)] bg-white shadow-none",
+                  }}
+                >
+                  {moveLocations.map((location) => (
+                    <SelectItem key={String(location.id)}>
+                      {location.name}
+                    </SelectItem>
+                  ))}
+                </Select>
 
-                {/* Area */}
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-gray-600">Storage area</label>
-                  <select
-                    value={moveTarget.areaId ? String(moveTarget.areaId) : ""}
-                    onChange={(e) => {
-                      const areaId = e.target.value || null;
-                      const area =
-                        currentAreas.find((a) => String(a.id) === String(areaId)) || currentAreas[0];
-                      const firstCat = area?.categories?.[0] || null;
+                <Select
+                  label="Storage area"
+                  placeholder="Select area..."
+                  selectedKeys={
+                    moveTarget.areaId
+                      ? new Set([String(moveTarget.areaId)])
+                      : new Set()
+                  }
+                  onSelectionChange={(keys) => {
+                    const areaId = getSelectedValue(keys) || null;
+                    const area =
+                      currentAreas.find((a) => String(a.id) === String(areaId)) ||
+                      currentAreas[0];
+                    const firstCat = area?.categories?.[0] || null;
 
-                      setMoveTarget((prev) => ({
-                        ...prev,
-                        areaId: area?.id ?? null,
-                        categoryId: firstCat?.id ?? null,
-                      }));
-                    }}
-                    className="w-full rounded-xl border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
-                    disabled={!moveTarget.locationId}
-                  >
-                    <option value="">Select area…</option>
-                    {currentAreas.map((a) => (
-                      <option key={a.id} value={String(a.id)}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                    setMoveTarget((prev) => ({
+                      ...prev,
+                      areaId: area?.id ?? null,
+                      categoryId: firstCat?.id ?? null,
+                    }));
+                  }}
+                  isDisabled={!moveTarget.locationId}
+                  variant="bordered"
+                  radius="lg"
+                  classNames={{
+                    trigger: "border-[var(--stocksense-brand-border)] bg-white shadow-none",
+                  }}
+                >
+                  {currentAreas.map((area) => (
+                    <SelectItem key={String(area.id)}>{area.name}</SelectItem>
+                  ))}
+                </Select>
 
-                {/* Category */}
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-gray-600">Category</label>
-                  <select
-                    value={moveTarget.categoryId ? String(moveTarget.categoryId) : ""}
-                    onChange={(e) =>
-                      setMoveTarget((prev) => ({
-                        ...prev,
-                        categoryId: e.target.value || null,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
-                    disabled={!moveTarget.areaId}
-                  >
-                    <option value="">Select category…</option>
-                    {currentCategories.map((c) => (
-                      <option key={c.id} value={String(c.id)}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <Select
+                  label="Category"
+                  placeholder="Select category..."
+                  selectedKeys={
+                    moveTarget.categoryId
+                      ? new Set([String(moveTarget.categoryId)])
+                      : new Set()
+                  }
+                  onSelectionChange={(keys) =>
+                    setMoveTarget((prev) => ({
+                      ...prev,
+                      categoryId: getSelectedValue(keys) || null,
+                    }))
+                  }
+                  isDisabled={!moveTarget.areaId}
+                  variant="bordered"
+                  radius="lg"
+                  classNames={{
+                    trigger: "border-[var(--stocksense-brand-border)] bg-white shadow-none",
+                  }}
+                >
+                  {currentCategories.map((category) => (
+                    <SelectItem key={String(category.id)}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </Select>
               </ModalBody>
 
-              <ModalFooter>
+              <ModalFooter className={modalFooterClass}>
                 <Button variant="light" className="rounded-xl" onClick={() => setMoveModalOpen(false)}>
                   Cancel
                 </Button>
@@ -975,7 +1053,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                     if (selectedIds.size > 0 && !drawerOpen) confirmMoveBulk();
                     else confirmMoveSingle();
                   }}
-                  disabled={!moveTarget.categoryId}
+                  isDisabled={!canConfirmMove}
                 >
                   Move
                 </Button>

@@ -179,7 +179,7 @@ export default function StorageSection({ storage, categories }) {
                   <div className="flex gap-2 ml-2">
                     <button
                       onClick={() => handleUpdateCategory(category.id)}
-                      className="text-green-600 hover:text-green-800"
+                      className="text-[var(--stocksense-brand)] hover:brightness-90"
                     >
                       <FaCheck />
                     </button>
@@ -258,7 +258,7 @@ export default function StorageSection({ storage, categories }) {
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleUpdateIngredient(ingredient.id)}
-                          className="text-green-600 hover:text-green-800"
+                          className="text-[var(--stocksense-brand)] hover:brightness-90"
                         >
                           <FaCheck />
                         </button>

@@ -4,6 +4,7 @@ import axios from 'axios';
 import { revalidatePath } from 'next/cache';
 import { toNonNegativeInteger } from '@/utils/pantry/date';
 import { getSession } from '@/lib/sessionOptions';
+import { createAdminClient } from '@/utils/supabase/admin';
 import {
   getHouseholdBilling,
   getHouseholdForUser,
@@ -27,6 +28,122 @@ function upgradeLimitError(message) {
 
 function normalizeSearchTerm(value) {
   return normalizeName(value).replace(/[%_]/g, '').slice(0, 80);
+}
+
+function compactPath(path) {
+  if (!path) return null;
+
+  return {
+    location: path.location ?? null,
+    area: path.area ?? null,
+    category: path.category ?? null,
+    location_id: path.location_id ?? null,
+    storage_area_id: path.storage_area_id ?? null,
+    category_id: path.category_id ?? null,
+  };
+}
+
+async function getCategoryPath(supabase, categoryId) {
+  if (!categoryId) return null;
+
+  const { data: category, error: categoryError } = await supabase
+    .from('storage_categories')
+    .select('id, name, storage_area_id')
+    .eq('id', categoryId)
+    .single();
+
+  if (categoryError || !category) return null;
+
+  const { data: area } = category.storage_area_id
+    ? await supabase
+        .from('storage_areas')
+        .select('id, name, location_id')
+        .eq('id', category.storage_area_id)
+        .single()
+    : { data: null };
+
+  const { data: location } = area?.location_id
+    ? await supabase
+        .from('locations')
+        .select('id, name')
+        .eq('id', area.location_id)
+        .single()
+    : { data: null };
+
+  return {
+    location: location?.name ?? null,
+    area: area?.name ?? null,
+    category: category.name ?? null,
+    location_id: location?.id ?? null,
+    storage_area_id: area?.id ?? null,
+    category_id: category.id,
+  };
+}
+
+async function recordItemMoveActivity({
+  startedAt,
+  user,
+  household,
+  item,
+  fromPath,
+  toPath,
+}) {
+  if (!item?.id || !fromPath || !toPath) return;
+
+  try {
+    const admin = createAdminClient();
+    const changes = {
+      category_id: {
+        from: fromPath.category_id,
+        to: toPath.category_id,
+      },
+      from: compactPath(fromPath),
+      to: compactPath(toPath),
+    };
+
+    const payload = {
+      household_id: household?.id ?? null,
+      actor_user_id: user?.id ?? null,
+      actor_email: user?.email ?? null,
+      entity_type: 'item',
+      entity_id: item.id,
+      action: 'moved',
+      name_at_event: item.name,
+      item_name: item.name,
+      location_name: toPath.location,
+      storage_area_name: toPath.area,
+      category_name: toPath.category,
+      quantity: item.quantity ?? 0,
+      expiration_date: item.expiration_date ?? null,
+      changes,
+    };
+
+    const { data: existing, error: existingError } = await admin
+      .from('activity_events')
+      .select('id')
+      .eq('entity_type', 'item')
+      .eq('entity_id', item.id)
+      .in('action', ['moved', 'updated'])
+      .gte('created_at', startedAt)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (existingError) throw existingError;
+
+    if (existing?.[0]?.id) {
+      const { error } = await admin
+        .from('activity_events')
+        .update(payload)
+        .eq('id', existing[0].id);
+      if (error) throw error;
+      return;
+    }
+
+    const { error } = await admin.from('activity_events').insert(payload);
+    if (error) throw error;
+  } catch (err) {
+    console.error('recordItemMoveActivity error:', err);
+  }
 }
 
 async function getCurrentUser() {
@@ -716,6 +833,7 @@ export async function deleteCategory(categoryId) {
 
 export async function updateItemLocation(itemId, values) {
   const supabase = await createClient();
+  const startedAt = new Date(Date.now() - 5000).toISOString();
 
   const { categoryId, category_id } = values || {};
 
@@ -731,6 +849,28 @@ export async function updateItemLocation(itemId, values) {
   }
 
   // Only update category_id – nothing else
+  const { user, household } = await getCurrentHouseholdContext();
+
+  const { data: existingItem, error: existingItemError } = await supabase
+    .from('items')
+    .select('id, name, quantity, expiration_date, category_id')
+    .eq('id', itemId)
+    .single();
+
+  if (existingItemError) {
+    console.error('updateItemLocation existing item error:', existingItemError);
+    return { data: null, error: existingItemError };
+  }
+
+  if (String(existingItem.category_id) === String(newCategoryId)) {
+    return { data: existingItem, error: null };
+  }
+
+  const [fromPath, toPath] = await Promise.all([
+    getCategoryPath(supabase, existingItem.category_id),
+    getCategoryPath(supabase, newCategoryId),
+  ]);
+
   const { data, error } = await supabase
     .from('items')
     .update({ category_id: newCategoryId })
@@ -742,6 +882,22 @@ export async function updateItemLocation(itemId, values) {
     console.error('updateItemLocation DB error:', error);
     return { data: null, error };
   }
+
+  await recordItemMoveActivity({
+    startedAt,
+    user,
+    household,
+    item: {
+      ...existingItem,
+      category_id: newCategoryId,
+    },
+    fromPath,
+    toPath,
+  });
+
+  revalidatePath('/');
+  revalidatePath('/items');
+  revalidatePath('/locations');
 
   return { data, error: null };
 }

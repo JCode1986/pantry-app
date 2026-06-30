@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { Select, SelectItem } from "@heroui/react";
+import { modalContentStyle } from "@/components/modals/modalTheme";
 
 function createClosedMoveModal(currentLocationId) {
   return {
@@ -48,6 +50,10 @@ export default function MoveItemsModal({
     );
   }, [areasForSelectedLocation, moveModal.targetAreaId]);
 
+  const canMove =
+    Boolean(moveModal.targetAreaId && moveModal.targetCategoryId) &&
+    String(moveModal.targetCategoryId) !== String(moveModal.sourceCategoryId);
+
   const closeModal = () => {
     setMoveModal(createClosedMoveModal(currentLocationId));
   };
@@ -87,6 +93,11 @@ export default function MoveItemsModal({
     }));
   };
 
+  const getSelectedValue = (keys) => {
+    const value = Array.from(keys)[0];
+    return value ? String(value) : "";
+  };
+
   return (
     <AnimatePresence>
       {moveModal.open && (
@@ -100,9 +111,10 @@ export default function MoveItemsModal({
             initial={{ scale: 0.95, opacity: 0, y: 10 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 10 }}
-            className="w-full max-w-md rounded-2xl bg-white shadow-xl border border-stocksense-gray p-5 space-y-4"
+            className="w-full max-w-md rounded-2xl border border-[var(--stocksense-brand-border)] bg-white p-5 text-gray-700 shadow-xl space-y-4"
+            style={modalContentStyle}
           >
-            <h2 className="text-lg font-semibold text-stocksense-teal">
+            <h2 className="text-lg font-semibold text-[var(--stocksense-brand)]">
               Move {moveModal.itemIds.length} item
               {moveModal.itemIds.length > 1 ? "s" : ""}
             </h2>
@@ -112,80 +124,90 @@ export default function MoveItemsModal({
             </p>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-600">Location</label>
-              <select
-                value={
+              <Select
+                label="Location"
+                selectedKeys={
                   moveModal.targetLocationId
-                    ? String(moveModal.targetLocationId)
-                    : ""
+                    ? new Set([String(moveModal.targetLocationId)])
+                    : new Set()
                 }
-                onChange={(event) => handleLocationChange(event.target.value)}
-                className="w-full rounded-lg border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
+                onSelectionChange={(keys) => handleLocationChange(getSelectedValue(keys))}
+                variant="bordered"
+                radius="lg"
+                classNames={{
+                  trigger: "border-[var(--stocksense-brand-border)] bg-white shadow-none",
+                }}
               >
                 {safeLocations.map((location) => (
-                  <option key={location.id} value={String(location.id)}>
+                  <SelectItem key={String(location.id)}>
                     {location.name}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-600">
-                Storage area
-              </label>
-              <select
-                value={moveModal.targetAreaId ? String(moveModal.targetAreaId) : ""}
-                onChange={(event) => handleAreaChange(event.target.value)}
-                className="w-full rounded-lg border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
-              >
-                <option value="">Select area...</option>
-                {areasForSelectedLocation.map((area) => (
-                  <option key={area.id} value={String(area.id)}>
-                    {area.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-600">
-                Category
-              </label>
-              <select
-                value={
-                  moveModal.targetCategoryId
-                    ? String(moveModal.targetCategoryId)
-                    : ""
+              <Select
+                label="Storage area"
+                placeholder="Select area..."
+                selectedKeys={
+                  moveModal.targetAreaId
+                    ? new Set([String(moveModal.targetAreaId)])
+                    : new Set()
                 }
-                onChange={(event) =>
+                onSelectionChange={(keys) => handleAreaChange(getSelectedValue(keys))}
+                variant="bordered"
+                radius="lg"
+                classNames={{
+                  trigger: "border-[var(--stocksense-brand-border)] bg-white shadow-none",
+                }}
+              >
+                {areasForSelectedLocation.map((area) => (
+                  <SelectItem key={String(area.id)}>{area.name}</SelectItem>
+                ))}
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Select
+                label="Category"
+                placeholder="Select category..."
+                selectedKeys={
+                  moveModal.targetCategoryId
+                    ? new Set([String(moveModal.targetCategoryId)])
+                    : new Set()
+                }
+                onSelectionChange={(keys) =>
                   setMoveModal((prev) => ({
                     ...prev,
-                    targetCategoryId: event.target.value || null,
+                    targetCategoryId: getSelectedValue(keys) || null,
                   }))
                 }
-                disabled={!moveModal.targetAreaId}
-                className="w-full rounded-lg border border-stocksense-gray px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50 disabled:bg-gray-50 disabled:text-gray-400"
+                isDisabled={!moveModal.targetAreaId}
+                variant="bordered"
+                radius="lg"
+                classNames={{
+                  trigger: "border-[var(--stocksense-brand-border)] bg-white shadow-none",
+                }}
               >
-                <option value="">Select category...</option>
                 {selectedArea?.categories?.map((category) => (
-                  <option key={category.id} value={String(category.id)}>
+                  <SelectItem key={String(category.id)}>
                     {category.name}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={closeModal}
-                className="px-3 py-1.5 text-sm rounded-lg border border-stocksense-gray hover:bg-gray-50 cursor-pointer"
+                className="cursor-pointer rounded-lg border border-[var(--stocksense-brand-border)] px-3 py-1.5 text-sm text-[var(--stocksense-brand)] hover:bg-[var(--stocksense-brand-soft)]"
               >
                 Cancel
               </button>
               <button
                 onClick={onConfirm}
-                disabled={!moveModal.targetAreaId || !moveModal.targetCategoryId}
+                disabled={!canMove}
                 className="px-3 py-1.5 text-sm rounded-lg bg-[var(--stocksense-brand)] text-white hover:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
               >
                 Move

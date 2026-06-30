@@ -5,6 +5,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Input, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
 import { FaSearch, FaTags } from "react-icons/fa";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
+import {
+  modalBodyClass,
+  modalContentClass,
+  modalContentStyle,
+  modalFooterClass,
+  modalHeaderClass,
+  modalInputClassNames,
+} from "@/components/modals/modalTheme";
 import { updateCategoryName, deleteCategory } from "@/app/actions/server";
 import { containsQuery } from "@/utils/pantry/search";
 import OpenGlobalAddItemButton from "@/components/OpenGlobalAddItemButton";
@@ -223,7 +231,10 @@ export default function CategoriesPageClient({ initialCategories }) {
       </motion.div>
 
       {/* List */}
-      <motion.div variants={pageSectionVariants} className="grid grid-cols-1 gap-3">
+      <motion.div
+        variants={pageSectionVariants}
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+      >
         <AnimatePresence initial={false}>
           {filtered.map((c) => (
           <motion.button
@@ -234,11 +245,11 @@ export default function CategoriesPageClient({ initialCategories }) {
             animate="show"
             exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
             onClick={() => openDrawer(c)}
-            className="text-left rounded-2xl border border-stocksense-gray bg-white shadow-sm p-4 hover:bg-gray-50 transition cursor-pointer"
+            className="flex flex-col justify-between rounded-2xl border border-stocksense-gray bg-white p-4 text-left shadow-sm transition hover:bg-gray-50 cursor-pointer"
             whileHover={{ y: -1 }}
             whileTap={{ scale: 0.99 }}
           >
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex h-full flex-col justify-between gap-4">
               <div className="min-w-0">
                 <div className="font-semibold text-stocksense-teal truncate">
                   {c.name}
@@ -248,7 +259,7 @@ export default function CategoriesPageClient({ initialCategories }) {
                 </div>
               </div>
 
-              <div className="shrink-0">
+              <div className="flex flex-wrap gap-2">
                 <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
                   {c.itemsCount} {c.itemsCount === 1 ? "item" : "items"}
                 </span>
@@ -264,7 +275,7 @@ export default function CategoriesPageClient({ initialCategories }) {
             initial="hidden"
             animate="show"
             exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
-            className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center"
+            className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center sm:col-span-2 lg:col-span-3"
           >
             <p className="text-gray-500">No categories match your search.</p>
             <div className="mt-4 flex justify-center">
@@ -286,11 +297,11 @@ export default function CategoriesPageClient({ initialCategories }) {
           wrapper: "items-stretch justify-end",
         }}
       >
-        <ModalContent>
+        <ModalContent className={modalContentClass} style={modalContentStyle}>
           {() => (
             <>
-              <ModalHeader className="flex flex-col gap-1">
-                <div className="text-stocksense-teal font-semibold text-lg">
+              <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
+                <div className="text-lg font-semibold text-[var(--stocksense-brand)]">
                   {activeCategory?.name || "Category"}
                 </div>
                 <div className="text-sm text-gray-500">
@@ -298,19 +309,20 @@ export default function CategoriesPageClient({ initialCategories }) {
                 </div>
               </ModalHeader>
 
-              <ModalBody className="space-y-4">
+              <ModalBody className={`space-y-4 ${modalBodyClass}`}>
                 {/* Rename */}
                 <div className="space-y-2">
                   <div className="text-xs font-medium text-gray-600">Category name</div>
                   <Input
                     value={renameValue}
                     onValueChange={setRenameValue}
-                    classNames={{
-                      inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
-                    }}
+                    variant="bordered"
+                    radius="lg"
+                    classNames={modalInputClassNames}
                   />
                   <Button
                     onClick={handleRename}
+                    isDisabled={!renameValue.trim()}
                     className="rounded-xl bg-[var(--stocksense-brand)] text-white w-full"
                   >
                     Save name
@@ -353,7 +365,7 @@ export default function CategoriesPageClient({ initialCategories }) {
                 </div>
               </ModalBody>
 
-              <ModalFooter>
+              <ModalFooter className={modalFooterClass}>
                 <Button variant="light" className="rounded-xl" onClick={closeDrawer}>
                   Close
                 </Button>

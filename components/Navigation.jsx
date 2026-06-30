@@ -6,6 +6,13 @@ import { useEffect, useMemo, useState } from "react";
 import { logoutAction } from "@/app/actions/auth";
 import GlobalAddItemModal from "@/components/GlobalAddItemModal";
 import GlobalItemSearchModal from "@/components/GlobalItemSearchModal";
+import {
+  modalBodyClass,
+  modalContentClass,
+  modalContentStyle,
+  modalFooterClass,
+  modalHeaderClass,
+} from "@/components/modals/modalTheme";
 import WhereKeepLogo from "@/components/WhereKeepLogo";
 import {
   DEFAULT_PREFERENCES,
@@ -314,18 +321,18 @@ export default function Navigation() {
         onOpenChange={setShowLogoutModal}
         placement="center"
       >
-        <ModalContent>
+        <ModalContent className={modalContentClass} style={modalContentStyle}>
           {(onClose) => (
             <>
-              <ModalHeader className="flex flex-col gap-1">
+              <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
                 Confirm logout
               </ModalHeader>
-              <ModalBody>
+              <ModalBody className={modalBodyClass}>
                 <p className="text-sm text-gray-600">
                   Are you sure you want to log out?
                 </p>
               </ModalBody>
-              <ModalFooter>
+              <ModalFooter className={modalFooterClass}>
                 <Button
                   variant="light"
                   className="rounded-xl"

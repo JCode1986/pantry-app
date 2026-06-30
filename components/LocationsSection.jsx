@@ -3,6 +3,15 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
+  Button,
+  Input,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+} from '@heroui/react';
+import {
   addLocation,
   deleteLocation,
   updateLocationName,
@@ -11,8 +20,6 @@ import {
   FaPlus,
   FaTrash,
   FaEdit,
-  FaCheck,
-  FaTimes,
   FaEye,
   FaMapMarkedAlt,
   FaMapMarkerAlt,
@@ -21,14 +28,37 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import ConfirmDeleteModal from '@/components/modals/ConfirmDeleteModal';
 
+const modalContentStyle = {
+  fontFamily: 'var(--stocksense-font-family)',
+};
+
+const modalContentClass =
+  'border border-[var(--stocksense-brand-border)] bg-white text-gray-700';
+
+const modalHeaderClass =
+  'border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-base font-semibold text-[var(--stocksense-brand)]';
+
+const modalFooterClass =
+  'border-t border-[var(--stocksense-brand-border)] bg-white';
+
+const modalInputClassNames = {
+  inputWrapper:
+    'border-[var(--stocksense-brand-border)] bg-white focus-within:border-[var(--stocksense-brand)]',
+  label: 'text-gray-600',
+  input: 'text-gray-800',
+};
+
 export default function LocationsSection({ locations }) {
   const router = useRouter();
   const [allLocations, setAllLocations] = useState(locations);
-  const [locationName, setLocationName] = useState('');
+  const [locationModal, setLocationModal] = useState({
+    open: false,
+    mode: 'create',
+    locationId: null,
+    name: '',
+  });
   const [message, setMessage] = useState('');
   const [upgradeHref, setUpgradeHref] = useState('');
-  const [editingId, setEditingId] = useState(null);
-  const [editingName, setEditingName] = useState('');
 
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
@@ -97,11 +127,68 @@ export default function LocationsSection({ locations }) {
     show: { opacity: 1, y: 0, transition: { duration: 0.35, type: 'spring', stiffness: 120 } },
   };
 
-  const handleAdd = async () => {
-    if (!locationName.trim()) return;
+  const totalAreas = allLocations.reduce(
+    (sum, location) => sum + (location.areasCount ?? 0),
+    0
+  );
+  const totalCategories = allLocations.reduce(
+    (sum, location) => sum + (location.categoriesCount ?? 0),
+    0
+  );
+  const totalItems = allLocations.reduce(
+    (sum, location) => sum + (location.itemsCount ?? 0),
+    0
+  );
+
+  const closeLocationModal = () => {
+    setLocationModal({
+      open: false,
+      mode: 'create',
+      locationId: null,
+      name: '',
+    });
+  };
+
+  const openCreateLocationModal = () => {
     setMessage('');
     setUpgradeHref('');
-    const result = await addLocation(locationName.trim());
+    setLocationModal({
+      open: true,
+      mode: 'create',
+      locationId: null,
+      name: '',
+    });
+  };
+
+  const openEditLocationModal = (location) => {
+    setMessage('');
+    setUpgradeHref('');
+    setLocationModal({
+      open: true,
+      mode: 'edit',
+      locationId: location.id,
+      name: location.name,
+    });
+  };
+
+  const handleSubmitLocation = async () => {
+    const name = locationModal.name.trim();
+    if (!name) return;
+    setMessage('');
+    setUpgradeHref('');
+
+    if (locationModal.mode === 'edit') {
+      await updateLocationName(locationModal.locationId, name);
+      setAllLocations((prev) =>
+        prev.map((loc) =>
+          loc.id === locationModal.locationId ? { ...loc, name } : loc
+        )
+      );
+      closeLocationModal();
+      return;
+    }
+
+    const result = await addLocation(name);
     if (result?.error) {
       setMessage(result.error);
       setUpgradeHref(result.upgradeHref || '');
@@ -115,42 +202,22 @@ export default function LocationsSection({ locations }) {
       ...allLocations,
       { ...newLoc, areasCount: 0, categoriesCount: 0, itemsCount: 0 },
     ]);
-    setLocationName('');
-  };
-
-  const handleEditSave = async (id) => {
-    const name = editingName.trim();
-    if (!name) return;
-    // optimistic
-    setAllLocations((prev) => prev.map((loc) => (loc.id === id ? { ...loc, name } : loc)));
-    await updateLocationName(id, name);
-    setEditingId(null);
-    setEditingName('');
-  };
-
-  const handleEditCancel = () => {
-    setEditingId(null);
-    setEditingName('');
-  };
-
-  const onEditKey = (e, id) => {
-    if (e.key === 'Enter') handleEditSave(id);
-    if (e.key === 'Escape') handleEditCancel();
+    closeLocationModal();
   };
 
   // Open the delete modal for a given location
-const openDeleteDialog = (loc) => {
-  setDeleteDialog({
-    open: true,
-    isDeleting: false,
-    locationId: loc.id,
-    name: loc.name,
-  });
-};
+  const openDeleteDialog = (loc) => {
+    setDeleteDialog({
+      open: true,
+      isDeleting: false,
+      locationId: loc.id,
+      name: loc.name,
+    });
+  };
 
-const closeDeleteDialog = () => {
-  setDeleteDialog((prev) => ({ ...prev, open: false, isDeleting: false }));
-};
+  const closeDeleteDialog = () => {
+    setDeleteDialog((prev) => ({ ...prev, open: false, isDeleting: false }));
+  };
 
   const handleConfirmDelete = async () => {
     const { locationId } = deleteDialog;
@@ -162,11 +229,6 @@ const closeDeleteDialog = () => {
       await deleteLocation(locationId);
 
       setAllLocations((prev) => prev.filter((loc) => loc.id !== locationId));
-
-      if (editingId === locationId) {
-        setEditingId(null);
-        setEditingName('');
-      }
     } finally {
       setDeleteDialog({
         open: false,
@@ -182,86 +244,99 @@ const closeDeleteDialog = () => {
       variants={listVariants}
       initial="hidden"
       animate="show"
-      className="page-enter p-5 max-w-6xl mx-auto min-h-[96.3vh]"
+      className="page-enter mx-auto max-w-6xl px-5 py-8 min-h-[96.3vh]"
     >
-      {/* Header */}
       <motion.div
         variants={pageItemVariants}
-        className="flex flex-col md:flex-row md:items-end md:justify-between gap-2 mt-8"
+        className="rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm"
       >
-        <div className="text-3xl font-bold flex gap-3 items-center justify-center md:justify-start">
-          <div className="rounded-xl p-3 text-white bg-gradient-to-br from-indigo-500 to-violet-500 shadow-sm border border-white/10">
-            <FaMapMarkedAlt className="h-5 w-5" />
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="flex gap-3">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+              <FaMapMarkedAlt className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Household inventory
+              </p>
+              <h1 className="text-2xl font-semibold tracking-tight text-stocksense-teal md:text-3xl">
+                Locations
+              </h1>
+              <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                Start with the places where inventory lives, then organize each
+                one by storage area, category, and item.
+              </p>
+            </div>
           </div>
-          <h1 className="tracking-tight text-stocksense-teal">My Locations</h1>
-        </div>
-        <span className="text-sm text-gray-500 text-center md:text-right">
-          Total: {allLocations.length}
-        </span>
-      </motion.div>
 
-      {/* Add Location */}
-      <motion.div
-        variants={pageItemVariants}
-        className="my-6 space-y-2"
-      >
-        {message && (
-          <div className="max-w-[640px] rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            {message}
-            {upgradeHref && (
-              <Link
-                href={upgradeHref}
-                className="ml-2 font-semibold underline underline-offset-2"
-              >
-                View plans
-              </Link>
-            )}
-          </div>
-        )}
-        <div className="flex gap-2 md:justify-start justify-center">
-          <input
-            type="text"
-            value={locationName}
-            onChange={(e) => setLocationName(e.target.value)}
-            placeholder="New location (e.g., Home, Work, Grocery Store)"
-            className="w-full max-w-[500px] rounded-lg border text-sm md:text-base border-stocksense-gray px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/70 focus:border-[var(--stocksense-brand)] bg-white"
-            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-          />
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleAdd}
-            className="bg-[var(--stocksense-brand)] text-white px-4 py-2 rounded shadow-sm hover:brightness-95 flex items-center gap-2"
+          <Button
+            onPress={openCreateLocationModal}
+            radius="lg"
+            className="bg-[var(--stocksense-brand)] px-5 text-white"
+            startContent={<FaPlus />}
           >
-            <FaPlus /> Add
-          </motion.button>
+            New location
+          </Button>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-4">
+          {[
+            ['Locations', allLocations.length],
+            ['Areas', totalAreas],
+            ['Categories', totalCategories],
+            ['Items', totalItems],
+          ].map(([label, value]) => (
+            <div
+              key={label}
+              className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 py-3"
+            >
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                {label}
+              </p>
+              <p className="mt-1 text-2xl font-semibold text-stocksense-teal">
+                {value}
+              </p>
+            </div>
+          ))}
         </div>
       </motion.div>
 
-      {/* List */}
-      <motion.div
-        variants={pageItemVariants}
-        className="border shadow border-stocksense-gray rounded-lg bg-white overflow-hidden"
-      >
+      {message && (
+        <motion.div
+          variants={pageItemVariants}
+          className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+        >
+          {message}
+          {upgradeHref && (
+            <Link
+              href={upgradeHref}
+              className="ml-2 font-semibold underline underline-offset-2"
+            >
+              View plans
+            </Link>
+          )}
+        </motion.div>
+      )}
+
+      <motion.div variants={pageItemVariants} className="mt-6">
         <AnimatePresence initial={false}>
           <motion.ul
             variants={listVariants}
             initial="hidden"
             animate="show"
-            className="divide-y divide-gray-200 dark:divide-zinc-800"
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
           >
             {allLocations.length === 0 ? (
-              <li className="p-5 text-gray-600 dark:text-gray-400 text-sm">
-                No locations yet — add your first one above.
+              <li className="rounded-2xl border border-stocksense-gray bg-white p-5 text-sm text-gray-600 shadow-sm sm:col-span-2 lg:col-span-3">
+                No locations yet. Create your first location to start organizing inventory.
               </li>
             ) : (
-              allLocations.map((loc, idx) => {
-                const isEditing = editingId === loc.id;
+              allLocations.map((loc) => {
                 return (
                   <motion.li
                     key={loc.id}
                     variants={itemVariants}
-                    className="flex items-start justify-between gap-3 p-4 text-gray-700 dark:text-gray-300"
+                    className="flex flex-col justify-between gap-4 rounded-2xl border border-stocksense-gray bg-white p-4 text-gray-700 shadow-sm transition hover:bg-gray-50 dark:text-gray-300"
                   >
                     {/* Left: icon + content */}
                     <div className="flex items-start gap-3 min-w-0">
@@ -270,85 +345,50 @@ const closeDeleteDialog = () => {
                       </div>
 
                       <div className="min-w-0">
-                        {/* Name / Edit field */}
-                        {isEditing ? (
-                          <input
-                            autoFocus
-                            value={editingName}
-                            onChange={(e) => setEditingName(e.target.value)}
-                            onKeyDown={(e) => onEditKey(e, loc.id)}
-                            className="text-sm font-medium text-[#2B3A3A] border border-gray-300 rounded px-2 py-1 focus:border-[var(--stocksense-brand)] focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
-                          />
-                        ) : (
-                          <p className="text-sm font-medium text-[#2B3A3A]">{loc.name}</p>
-                        )}
+                        <p className="text-sm font-medium text-[#2B3A3A]">{loc.name}</p>
 
                         {/* Counts */}
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 whitespace-normal break-words">
-                          <span className="font-medium">{loc.areasCount ?? 0}</span> Areas ·{' '}
-                          <span className="font-medium">{loc.categoriesCount ?? 0}</span> Categories ·{' '}
+                          <span className="font-medium">{loc.areasCount ?? 0}</span> Areas |{' '}
+                          <span className="font-medium">{loc.categoriesCount ?? 0}</span> Categories |{' '}
                           <span className="font-medium">{loc.itemsCount ?? 0}</span> Items
                         </p>
                       </div>
                     </div>
 
                     {/* Right: meta + actions */}
-                    <div className="flex flex-col items-end gap-2 shrink-0 text-right">
+                    <div className="mt-auto flex flex-col gap-3">
                       <span className="text-[11px] leading-5 text-gray-500 dark:text-gray-400">
                         Created:{' '}
                         {loc.created_at ? new Date(loc.created_at).toLocaleString() : ''}
                       </span>
 
-                      {isEditing ? (
-                        <div className="flex gap-3">
-                          <motion.button
-                            whileHover={{ y: -1 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => handleEditSave(loc.id)}
-                            className="text-[var(--stocksense-brand)] hover:brightness-90 flex items-center gap-1 text-xs md:text-sm cursor-pointer"
-                          >
-                            <FaCheck /> Save
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ y: -1 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={handleEditCancel}
-                            className="text-gray-600 hover:text-gray-700 flex items-center gap-1 text-xs md:text-sm cursor-pointer"
-                          >
-                            <FaTimes /> Cancel
-                          </motion.button>
-                        </div>
-                      ) : (
-                        <div className="flex gap-3">
-                          <motion.button
-                            whileHover={{ y: -1 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => router.push(`/locations/${loc.id}`)}
-                            className="text-[var(--stocksense-brand)] hover:brightness-90 flex items-center gap-1 text-xs md:text-sm cursor-pointer"
-                          >
-                            <FaEye /> View
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ y: -1 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => {
-                              setEditingId(loc.id);
-                              setEditingName(loc.name);
-                            }}
-                            className="text-amber-600 hover:text-amber-700 flex items-center gap-1 text-xs md:text-sm cursor-pointer"
-                          >
-                            <FaEdit /> Edit
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ y: -1 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => openDeleteDialog(loc)}
-                            className="text-rose-600 hover:text-rose-700 flex items-center gap-1 text-xs md:text-sm cursor-pointer"
-                          >
-                            <FaTrash /> Delete
-                          </motion.button>
-                        </div>
-                      )}
+                      <div className="flex flex-wrap gap-x-3 gap-y-2">
+                        <motion.button
+                          whileHover={{ y: -1 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => router.push(`/locations/${loc.id}`)}
+                          className="text-[var(--stocksense-brand)] hover:brightness-90 flex items-center gap-1 text-xs md:text-sm cursor-pointer"
+                        >
+                          <FaEye /> View
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ y: -1 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => openEditLocationModal(loc)}
+                          className="text-amber-600 hover:text-amber-700 flex items-center gap-1 text-xs md:text-sm cursor-pointer"
+                        >
+                          <FaEdit /> Edit
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ y: -1 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => openDeleteDialog(loc)}
+                          className="text-rose-600 hover:text-rose-700 flex items-center gap-1 text-xs md:text-sm cursor-pointer"
+                        >
+                          <FaTrash /> Delete
+                        </motion.button>
+                      </div>
                     </div>
                   </motion.li>
                 );
@@ -357,6 +397,47 @@ const closeDeleteDialog = () => {
           </motion.ul>
         </AnimatePresence>
       </motion.div>
+      <Modal
+        isOpen={locationModal.open}
+        onOpenChange={(open) => !open && closeLocationModal()}
+        placement="center"
+        backdrop="blur"
+      >
+        <ModalContent className={modalContentClass} style={modalContentStyle}>
+          <ModalHeader className={modalHeaderClass}>
+            {locationModal.mode === 'edit'
+              ? `Edit location ${locationModal.name || ''}`
+              : 'Create new location'}
+          </ModalHeader>
+          <ModalBody className="pt-5">
+            <Input
+              label="Location name"
+              value={locationModal.name}
+              onValueChange={(name) =>
+                setLocationModal((prev) => ({ ...prev, name }))
+              }
+              variant="bordered"
+              radius="lg"
+              classNames={modalInputClassNames}
+              autoFocus
+            />
+          </ModalBody>
+          <ModalFooter className={modalFooterClass}>
+            <Button variant="light" radius="lg" onPress={closeLocationModal}>
+              Cancel
+            </Button>
+            <Button
+              radius="lg"
+              onPress={handleSubmitLocation}
+              isDisabled={!locationModal.name.trim()}
+              className="bg-[var(--stocksense-brand)] text-white"
+            >
+              {locationModal.mode === 'edit' ? 'Save changes' : 'Add location'}
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
       <ConfirmDeleteModal
         isOpen={deleteDialog.open}
         isDeleting={deleteDialog.isDeleting}

@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
 import StorageAreasSection from '@/components/StorageAreasSection';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createPageMetadata } from '@/utils/metadata';
 
@@ -108,10 +109,28 @@ export default async function Page({ params }) {
   }));
 
   return (
-    <main className="page-enter max-w-[1300px] mx-auto p-6 pt-8 min-h-[100vh]">
-      <h1 className="text-3xl font-bold mb-6 text-center md:text-left">
-        {location.name}
-      </h1>
+    <main className="page-enter max-w-[1300px] mx-auto px-5 py-8 min-h-[100vh]">
+      <header className="mb-6 rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm">
+        <Link
+          href="/locations"
+          className="inline-flex items-center text-sm font-medium text-[var(--stocksense-brand)] hover:underline"
+        >
+          Back to locations
+        </Link>
+        <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Location
+            </p>
+            <h1 className="text-3xl font-semibold tracking-tight text-stocksense-teal">
+              {location.name}
+            </h1>
+          </div>
+          <p className="max-w-xl text-sm text-gray-500">
+            Organize this location by storage area, category, and item.
+          </p>
+        </div>
+      </header>
       <StorageAreasSection
         locationName={location?.name}
         locationId={location.id}
