@@ -1,6 +1,17 @@
 import { notFound } from 'next/navigation';
 import StorageSection from '@/components/StorageSection';
 import { getStorageById } from '@/app/actions/server';
+import { createPageMetadata } from '@/utils/metadata';
+
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+
+  return createPageMetadata({
+    title: 'Storage',
+    description: 'Manage a storage space and its inventory categories.',
+    path: `/storage/${id}`,
+  });
+}
 
 export default async function StoragePage({ params }) {
   const { id } = await params;

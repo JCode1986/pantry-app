@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import {
   FaArrowRight,
@@ -103,30 +102,16 @@ export default function LandingPage() {
   return (
     <main className="page-enter min-h-[100vh] bg-white text-gray-900">
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.06]">
-          <Image
-            src="/stocksense-logo-2.png"
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover object-center"
-          />
-        </div>
+        <div className="absolute inset-x-0 top-0 h-px bg-[var(--stocksense-brand-border)]" />
 
         <div className="relative mx-auto flex min-h-[88vh] max-w-6xl flex-col px-5 py-6">
           <nav className="flex items-center justify-between gap-4">
             <Link href="/" className="flex items-center gap-3">
-              <Image
-                src="/icon.png"
-                alt="StockSense"
-                width={44}
-                height={44}
-                className="rounded-xl"
-                priority
-              />
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--stocksense-brand)] text-white shadow-sm">
+                <FaMapMarkedAlt className="h-5 w-5" />
+              </span>
               <span className="text-lg font-semibold tracking-tight text-[var(--stocksense-brand)]">
-                StockSense
+                WhereKeep
               </span>
             </Link>
 
@@ -149,7 +134,7 @@ export default function LandingPage() {
           <div className="grid flex-1 content-center gap-10 py-14">
             <div className="max-w-3xl">
               <h1 className="text-4xl font-semibold tracking-tight text-[var(--stocksense-brand)] sm:text-5xl md:text-6xl">
-                StockSense
+                WhereKeep
               </h1>
               <p className="mt-5 max-w-2xl text-xl font-medium text-gray-800 sm:text-2xl">
                 Know what you have, where it is, and what needs attention.

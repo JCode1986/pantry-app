@@ -3,17 +3,24 @@ export const BILLING_INTERVALS = {
   yearly: "yearly",
 };
 
+export const ACTIVE_BILLING_STATUSES = ["active", "trialing"];
+
 export const BILLING_PLANS = [
   {
     id: "free",
     name: "Free",
-    audience: "Try StockSense",
+    audience: "Try WhereKeep",
     description: "For getting your first inventory organized.",
     monthlyPrice: "$0",
     yearlyPrice: "$0",
     monthlyPriceIdEnv: null,
     yearlyPriceIdEnv: null,
     cta: "Current free plan",
+    limits: {
+      users: 1,
+      locations: 1,
+      items: 50,
+    },
     features: [
       "1 user",
       "1 location",
@@ -33,6 +40,11 @@ export const BILLING_PLANS = [
     yearlyPriceIdEnv: "STRIPE_PLUS_YEARLY_PRICE_ID",
     featured: true,
     cta: "Start Plus",
+    limits: {
+      users: 1,
+      locations: null,
+      items: null,
+    },
     features: [
       "Unlimited items",
       "Unlimited locations, areas, and categories",
@@ -52,6 +64,11 @@ export const BILLING_PLANS = [
     monthlyPriceIdEnv: "STRIPE_FAMILY_MONTHLY_PRICE_ID",
     yearlyPriceIdEnv: "STRIPE_FAMILY_YEARLY_PRICE_ID",
     cta: "Start Family",
+    limits: {
+      users: 5,
+      locations: null,
+      items: null,
+    },
     features: [
       "Everything in Plus",
       "3-5 household members",
@@ -65,6 +82,25 @@ export const BILLING_PLANS = [
 
 export function getBillingPlan(planId) {
   return BILLING_PLANS.find((plan) => plan.id === planId) || BILLING_PLANS[0];
+}
+
+export function getEffectivePlanId(billing = {}) {
+  const planId = billing?.plan_id || billing?.planId || "free";
+  const status = billing?.status || "free";
+
+  if (planId !== "free" && ACTIVE_BILLING_STATUSES.includes(status)) {
+    return planId;
+  }
+
+  return "free";
+}
+
+export function getEffectiveBillingPlan(billing = {}) {
+  return getBillingPlan(getEffectivePlanId(billing));
+}
+
+export function getEffectivePlanLimits(billing = {}) {
+  return getEffectiveBillingPlan(billing).limits;
 }
 
 export function getStripePriceId(planId, interval) {

@@ -5,14 +5,19 @@ import { supabase } from "@/lib/supabaseClient";
 import { redirect } from "next/navigation";
 
 /** LOGIN – server action */
-export async function login({ email, password }) {
+export async function login({ email, password, redirectTo = "/" }) {
   const { createClient } = await import('@/utils/supabase/server');
   const supa = await createClient();
   const session = await getSession();
 
   const { data, error } = await supa.auth.signInWithPassword({ email, password });
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    return {
+      success: false,
+      error: error.message || "Invalid login credentials.",
+    };
+  }
 
   session.user = {
     access_token: data.session.access_token,
@@ -22,7 +27,12 @@ export async function login({ email, password }) {
   };
   await session.save();
 
-  redirect("/");
+  const safeRedirect =
+    typeof redirectTo === "string" && redirectTo.startsWith("/") && !redirectTo.startsWith("//")
+      ? redirectTo
+      : "/";
+
+  redirect(safeRedirect);
 }
 
 export async function logoutAction() {
@@ -76,8 +86,14 @@ export async function updatePasswordAction({ password }) {
     };
   }
 
+  const nextUserMetadata = {
+    ...(sessionData?.session?.user?.user_metadata ?? session?.user?.user?.user_metadata ?? {}),
+    requires_password_setup: false,
+  };
+
   const { data, error } = await supa.auth.updateUser({
     password: normalizedPassword,
+    data: nextUserMetadata,
   });
 
   if (error) {

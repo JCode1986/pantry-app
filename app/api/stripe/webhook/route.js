@@ -4,21 +4,21 @@ import { getStripe } from "@/utils/stripe";
 
 export const runtime = "nodejs";
 
-function planFromMetadata(subscription) {
-  return subscription?.metadata?.planId || "free";
+function planFromMetadata(subscription, fallbackMetadata = {}) {
+  return subscription?.metadata?.planId || fallbackMetadata.planId || "free";
 }
 
-async function upsertBillingFromSubscription(subscription) {
-  const userId = subscription?.metadata?.userId;
+async function upsertBillingFromSubscription(subscription, fallbackMetadata = {}) {
+  const userId = subscription?.metadata?.userId || fallbackMetadata.userId;
   if (!userId) return;
 
   const item = subscription.items?.data?.[0];
   const supabase = createAdminClient();
 
-  await supabase.from("user_billing").upsert(
+  const { error } = await supabase.from("user_billing").upsert(
     {
       user_id: userId,
-      plan_id: planFromMetadata(subscription),
+      plan_id: planFromMetadata(subscription, fallbackMetadata),
       status: subscription.status,
       stripe_customer_id: subscription.customer,
       stripe_subscription_id: subscription.id,
@@ -31,6 +31,10 @@ async function upsertBillingFromSubscription(subscription) {
     },
     { onConflict: "user_id" }
   );
+
+  if (error) {
+    throw new Error(error.message || "Failed to update user billing.");
+  }
 }
 
 async function markSubscriptionDeleted(subscription) {
@@ -38,7 +42,7 @@ async function markSubscriptionDeleted(subscription) {
   if (!userId) return;
 
   const supabase = createAdminClient();
-  await supabase
+  const { error } = await supabase
     .from("user_billing")
     .update({
       plan_id: "free",
@@ -52,6 +56,10 @@ async function markSubscriptionDeleted(subscription) {
       updated_at: new Date().toISOString(),
     })
     .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(error.message || "Failed to cancel user billing.");
+  }
 }
 
 export async function POST(request) {
@@ -80,23 +88,35 @@ export async function POST(request) {
     );
   }
 
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
-    if (session.mode === "subscription" && session.subscription) {
-      const subscription = await stripe.subscriptions.retrieve(session.subscription);
-      await upsertBillingFromSubscription(subscription);
+  try {
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
+      if (session.mode === "subscription" && session.subscription) {
+        const subscription = await stripe.subscriptions.retrieve(session.subscription);
+        await upsertBillingFromSubscription(subscription, session.metadata);
+      }
     }
-  }
 
-  if (
-    event.type === "customer.subscription.created" ||
-    event.type === "customer.subscription.updated"
-  ) {
-    await upsertBillingFromSubscription(event.data.object);
-  }
+    if (
+      event.type === "customer.subscription.created" ||
+      event.type === "customer.subscription.updated"
+    ) {
+      await upsertBillingFromSubscription(event.data.object);
+    }
 
-  if (event.type === "customer.subscription.deleted") {
-    await markSubscriptionDeleted(event.data.object);
+    if (event.type === "customer.subscription.deleted") {
+      await markSubscriptionDeleted(event.data.object);
+    }
+  } catch (err) {
+    console.error("Stripe webhook handler failed:", {
+      eventType: event.type,
+      message: err?.message,
+    });
+
+    return NextResponse.json(
+      { error: err?.message || "Webhook handler failed." },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ received: true });

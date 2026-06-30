@@ -2,8 +2,16 @@ import { redirect } from "next/navigation";
 import ProfileClient from "@/components/ProfileClient";
 import { getSessionForLayout } from "@/app/actions/auth";
 import { getUserBillingAction } from "@/app/actions/billing";
+import { getHouseholdSharingAction } from "@/app/actions/household";
 import { getUserPreferencesAction } from "@/app/actions/preferences";
 import { DEFAULT_PREFERENCES } from "@/utils/appPreferences";
+import { createPageMetadata } from "@/utils/metadata";
+
+export const metadata = createPageMetadata({
+  title: "Profile",
+  description: "Manage account security, appearance, billing, and family sharing.",
+  path: "/profile",
+});
 
 function formatAccountDate(value) {
   if (!value) return "Not available";
@@ -39,6 +47,7 @@ export default async function ProfilePage() {
     emailConfirmed: Boolean(account.email_confirmed_at || account.confirmed_at),
     createdAtLabel: formatAccountDate(account.created_at),
     lastSignInLabel: formatAccountDate(account.last_sign_in_at),
+    requiresPasswordSetup: Boolean(account.user_metadata?.requires_password_setup),
   };
   const preferencesResult = await getUserPreferencesAction();
   const preferences = preferencesResult?.data ?? DEFAULT_PREFERENCES;
@@ -46,9 +55,12 @@ export default async function ProfilePage() {
   const billing = billingResult?.data ?? {
     planId: "free",
     status: "free",
+    stripePriceId: null,
     currentPeriodEnd: null,
     cancelAtPeriodEnd: false,
+    hasStripeCustomer: false,
   };
+  const sharingResult = await getHouseholdSharingAction();
 
   return (
     <main className="page-enter mx-auto min-h-[100vh] max-w-6xl px-5 py-8">
@@ -56,6 +68,8 @@ export default async function ProfilePage() {
         user={user}
         initialPreferences={preferences}
         initialBilling={billing}
+        initialSharing={sharingResult?.data ?? null}
+        initialSharingError={sharingResult?.error ?? null}
       />
     </main>
   );

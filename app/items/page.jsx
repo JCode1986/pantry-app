@@ -1,5 +1,12 @@
 import ItemsPageClient from "@/components/ItemPageClient";
 import { createClient } from "@/utils/supabase/server";
+import { createPageMetadata } from "@/utils/metadata";
+
+export const metadata = createPageMetadata({
+  title: "Items",
+  description: "Search, filter, move, and manage inventory items across all locations.",
+  path: "/items",
+});
 
 export default async function Page() {
   const supabase = await createClient();

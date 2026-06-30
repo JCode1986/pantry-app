@@ -1,0 +1,17 @@
+{
+  "name": "WhereKeep",
+  "short_name": "WhereKeep",
+  "description": "Know what you have, where it is, and what needs attention.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0E7488",
+  "icons": [
+    {
+      "src": "/wherekeep-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

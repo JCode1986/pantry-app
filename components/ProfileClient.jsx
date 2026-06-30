@@ -9,6 +9,7 @@ import {
   FaCheckCircle,
   FaClock,
   FaClipboard,
+  FaCopy,
   FaCreditCard,
   FaEnvelope,
   FaEye,
@@ -22,7 +23,10 @@ import {
   FaRedo,
   FaShieldAlt,
   FaTags,
+  FaTimesCircle,
   FaUserCircle,
+  FaUserFriends,
+  FaUserPlus,
   FaWarehouse,
 } from "react-icons/fa";
 import { updatePasswordAction } from "@/app/actions/auth";
@@ -31,8 +35,14 @@ import {
   createCheckoutSessionAction,
 } from "@/app/actions/billing";
 import {
+  createHouseholdInviteAction,
+  removeHouseholdMemberAction,
+  revokeHouseholdInviteAction,
+} from "@/app/actions/household";
+import {
   BILLING_INTERVALS,
   BILLING_PLANS,
+  getEffectivePlanId,
   getBillingPlan,
 } from "@/utils/billingPlans";
 import {
@@ -79,6 +89,28 @@ function StatusMessage({ type, children }) {
       role={isSuccess ? "status" : "alert"}
     >
       {children}
+    </motion.div>
+  );
+}
+
+function PasswordSetupNotice() {
+  return (
+    <motion.div
+      variants={itemVariants}
+      className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 shadow-sm"
+      role="alert"
+    >
+      <div className="flex items-start gap-3">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-amber-700 shadow-sm">
+          <FaKey className="h-4 w-4" />
+        </div>
+        <div>
+          <h2 className="text-base font-semibold">Set a password to continue</h2>
+          <p className="mt-1 text-sm text-amber-800">
+            You joined through an invite link. Use the Change password form below before using the dashboard.
+          </p>
+        </div>
+      </div>
     </motion.div>
   );
 }
@@ -197,12 +229,14 @@ function BillingPlanButton({
 }
 
 function BillingSection({ billing, billingError, billingLoading, onCheckout, onPortal }) {
-  const currentPlan = getBillingPlan(billing.planId);
+  const currentPlanId = getEffectivePlanId(billing);
+  const currentPlan = getBillingPlan(currentPlanId);
   const renewalDate = formatBillingDate(billing.currentPeriodEnd);
   const paidPlans = BILLING_PLANS.filter((plan) => plan.id !== "free");
 
   return (
     <motion.section
+      id="billing"
       variants={itemVariants}
       className="rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm"
     >
@@ -216,13 +250,22 @@ function BillingSection({ billing, billingError, billingLoading, onCheckout, onP
             Current plan: {currentPlan.name}
             {billing.status ? ` (${billing.status})` : ""}.
           </p>
-          {renewalDate && (
-            <p className="mt-1 text-xs text-gray-500">
-              {billing.cancelAtPeriodEnd ? "Access ends" : "Renews"} on {renewalDate}.
-            </p>
-          )}
         </div>
       </div>
+
+      {renewalDate && (
+        <div
+          className={`mt-4 rounded-xl border px-3 py-2 text-sm ${
+            billing.cancelAtPeriodEnd
+              ? "border-amber-200 bg-amber-50 text-amber-800"
+              : "border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
+          }`}
+        >
+          {billing.cancelAtPeriodEnd
+            ? `Your plan is canceled and access ends on ${renewalDate}.`
+            : `Your plan renews on ${renewalDate}.`}
+        </div>
+      )}
 
       {billingError && (
         <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
@@ -241,28 +284,38 @@ function BillingSection({ billing, billingError, billingLoading, onCheckout, onP
                 <h3 className="text-sm font-semibold text-gray-900">{plan.name}</h3>
                 <p className="text-xs text-gray-500">{plan.audience}</p>
               </div>
-              {plan.featured && (
+              {currentPlanId === plan.id ? (
+                <span className="w-max rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                  Current plan
+                </span>
+              ) : plan.featured && (
                 <span className="w-max rounded-full bg-[var(--stocksense-brand-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--stocksense-brand)]">
                   Popular
                 </span>
               )}
             </div>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <BillingPlanButton
-                plan={plan}
-                interval={BILLING_INTERVALS.monthly}
-                currentPlanId={billing.planId}
-                onCheckout={onCheckout}
-                isLoading={billingLoading === `${plan.id}:monthly`}
-              />
-              <BillingPlanButton
-                plan={plan}
-                interval={BILLING_INTERVALS.yearly}
-                currentPlanId={billing.planId}
-                onCheckout={onCheckout}
-                isLoading={billingLoading === `${plan.id}:yearly`}
-              />
-            </div>
+            {currentPlanId === plan.id ? (
+              <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                This plan is active. Use Manage billing for card, renewal, or cancellation changes.
+              </p>
+            ) : (
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <BillingPlanButton
+                  plan={plan}
+                  interval={BILLING_INTERVALS.monthly}
+                  currentPlanId={currentPlanId}
+                  onCheckout={onCheckout}
+                  isLoading={billingLoading === `${plan.id}:monthly`}
+                />
+                <BillingPlanButton
+                  plan={plan}
+                  interval={BILLING_INTERVALS.yearly}
+                  currentPlanId={currentPlanId}
+                  onCheckout={onCheckout}
+                  isLoading={billingLoading === `${plan.id}:yearly`}
+                />
+              </div>
+            )}
           </div>
         ))}
 
@@ -271,12 +324,222 @@ function BillingSection({ billing, billingError, billingLoading, onCheckout, onP
           className="w-full rounded-xl border border-stocksense-gray bg-white text-gray-700"
           onPress={onPortal}
           isLoading={billingLoading === "portal"}
-          isDisabled={billingLoading === "portal"}
+          isDisabled={billingLoading === "portal" || !billing.hasStripeCustomer}
           startContent={<FaExternalLinkAlt className="h-3.5 w-3.5" />}
         >
-          Manage billing
+          {billing.hasStripeCustomer ? "Manage billing" : "Billing portal available after checkout"}
         </Button>
       </div>
+    </motion.section>
+  );
+}
+
+function SharingSection({
+  sharing,
+  sharingError,
+  sharingMessage,
+  inviteEmail,
+  onInviteEmailChange,
+  onCreateInvite,
+  onCopyInvite,
+  onRevokeInvite,
+  onRemoveMember,
+  copiedInviteId,
+  loading,
+}) {
+  const isFamily = sharing?.effectivePlanId === "family";
+  const isOwner = sharing?.currentUserRole === "owner";
+  const members = sharing?.members ?? [];
+  const invites = sharing?.invites ?? [];
+  const maxMembers = sharing?.maxMembers ?? null;
+  const memberLimitLabel =
+    maxMembers === null
+      ? `${sharing?.memberCount ?? members.length} members`
+      : `${sharing?.memberCount ?? members.length}/${maxMembers} members`;
+
+  return (
+    <motion.section
+      variants={itemVariants}
+      className="rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm"
+    >
+      <div className="flex items-start gap-3">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+          <FaUserFriends className="h-4 w-4" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Family sharing</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Share one inventory with the people in your household.
+          </p>
+        </div>
+      </div>
+
+      {sharingError && (
+        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          {sharingError}
+        </div>
+      )}
+
+      {sharing && (
+        <div className="mt-5 space-y-4">
+          <div className="rounded-xl border border-stocksense-gray bg-gray-50/60 px-3 py-3">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-gray-900">
+                  {sharing.household?.name ?? "My Household"}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {isFamily ? `Family plan active - ${memberLimitLabel}` : "Family plan required for invites"}
+                </div>
+              </div>
+              <span className="w-max rounded-full bg-[var(--stocksense-brand-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--stocksense-brand)]">
+                {isOwner ? "Owner" : "Member"}
+              </span>
+            </div>
+          </div>
+
+          {!isFamily && isOwner && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+              Upgrade to Family to invite up to 5 household members.{" "}
+              <Link href="#billing" className="font-semibold underline">
+                View Family plan
+              </Link>
+            </div>
+          )}
+
+          {isFamily && !isOwner && (
+            <div className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-3 text-sm text-[var(--stocksense-brand)]">
+              You can view and manage this shared inventory. Only the household owner can invite new members.
+            </div>
+          )}
+
+          {isFamily && isOwner && (
+            <form onSubmit={onCreateInvite} className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
+                <Input
+                  label="Invite by email"
+                  type="email"
+                  value={inviteEmail}
+                  onValueChange={onInviteEmailChange}
+                  isDisabled={loading === "invite" || !sharing.canInvite}
+                  classNames={{
+                    inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
+                  }}
+                />
+                <Button
+                  type="submit"
+                  className="h-14 rounded-xl bg-[var(--stocksense-brand)] px-5 text-white sm:self-end"
+                  isLoading={loading === "invite"}
+                  isDisabled={loading === "invite" || !sharing.canInvite}
+                  startContent={<FaUserPlus className="h-3.5 w-3.5" />}
+                >
+                  Send invite
+                </Button>
+              </div>
+
+              {!sharing.canInvite && (
+                <p className="text-xs text-amber-700">
+                  This household is at the Family member limit.
+                </p>
+              )}
+            </form>
+          )}
+
+          {sharingMessage && (
+            <div
+              className={`rounded-xl border px-3 py-2 text-sm ${
+                sharingMessage.type === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-rose-200 bg-rose-50 text-rose-700"
+              }`}
+              role={sharingMessage.type === "success" ? "status" : "alert"}
+            >
+              {sharingMessage.text}
+            </div>
+          )}
+
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Members</h3>
+            <div className="mt-3 space-y-2">
+              {members.map((member) => (
+                <div
+                  key={member.userId}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-stocksense-gray bg-white px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-gray-800">
+                      {member.email}
+                    </div>
+                    <div className="text-xs capitalize text-gray-500">
+                      {member.role}
+                    </div>
+                  </div>
+                  {isOwner && member.role !== "owner" ? (
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      className="shrink-0 rounded-lg border border-rose-200 bg-rose-50 text-rose-700"
+                      onPress={() => onRemoveMember(member)}
+                      isLoading={loading === `remove:${member.userId}`}
+                      startContent={<FaTimesCircle className="h-3.5 w-3.5" />}
+                    >
+                      Remove
+                    </Button>
+                  ) : (
+                    <FaCheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {isOwner && invites.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">Pending invites</h3>
+              <div className="mt-3 space-y-2">
+                {invites.map((invite) => (
+                  <div
+                    key={invite.id}
+                    className="rounded-xl border border-stocksense-gray bg-white px-3 py-3"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-gray-800">
+                          {invite.email}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Expires {formatBillingDate(invite.expiresAt) ?? "soon"}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 gap-2">
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          className="rounded-lg border border-stocksense-gray bg-white text-gray-700"
+                          onPress={() => onCopyInvite(invite)}
+                          startContent={<FaCopy className="h-3.5 w-3.5" />}
+                        >
+                          {copiedInviteId === invite.id ? "Copied" : "Copy"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          className="rounded-lg border border-rose-200 bg-rose-50 text-rose-700"
+                          onPress={() => onRevokeInvite(invite.id)}
+                          isLoading={loading === `revoke:${invite.id}`}
+                          startContent={<FaTimesCircle className="h-3.5 w-3.5" />}
+                        >
+                          Revoke
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </motion.section>
   );
 }
@@ -287,13 +550,20 @@ export default function ProfileClient({
   initialBilling = {
     planId: "free",
     status: "free",
+    stripePriceId: null,
     currentPeriodEnd: null,
     cancelAtPeriodEnd: false,
+    hasStripeCustomer: false,
   },
+  initialSharing = null,
+  initialSharingError = null,
 }) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [requiresPasswordSetup, setRequiresPasswordSetup] = useState(
+    Boolean(user?.requiresPasswordSetup)
+  );
   const [submitted, setSubmitted] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [copiedUserId, setCopiedUserId] = useState(false);
@@ -303,6 +573,12 @@ export default function ProfileClient({
   const [billing, setBilling] = useState(initialBilling);
   const [billingLoading, setBillingLoading] = useState(null);
   const [billingError, setBillingError] = useState(null);
+  const [sharing, setSharing] = useState(initialSharing);
+  const [sharingError, setSharingError] = useState(initialSharingError);
+  const [sharingMessage, setSharingMessage] = useState(null);
+  const [sharingLoading, setSharingLoading] = useState(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [copiedInviteId, setCopiedInviteId] = useState(null);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
@@ -315,7 +591,7 @@ export default function ProfileClient({
 
   const initials = useMemo(() => {
     const email = user?.email || "";
-    return email.slice(0, 2).toUpperCase() || "SS";
+    return email.slice(0, 2).toUpperCase() || "WK";
   }, [user?.email]);
 
   useEffect(() => {
@@ -325,6 +601,15 @@ export default function ProfileClient({
   useEffect(() => {
     setBilling(initialBilling);
   }, [initialBilling]);
+
+  useEffect(() => {
+    setRequiresPasswordSetup(Boolean(user?.requiresPasswordSetup));
+  }, [user?.requiresPasswordSetup]);
+
+  useEffect(() => {
+    setSharing(initialSharing);
+    setSharingError(initialSharingError);
+  }, [initialSharing, initialSharingError]);
 
   const handlePasswordSubmit = async (event) => {
     event.preventDefault();
@@ -356,6 +641,7 @@ export default function ProfileClient({
       setConfirmPassword("");
       setSubmitted(false);
       setSuccess("Password updated successfully.");
+      setRequiresPasswordSetup(false);
     } catch (err) {
       setError(err?.message || "Could not update password.");
     } finally {
@@ -442,6 +728,108 @@ export default function ProfileClient({
     setBillingLoading(null);
   };
 
+  const handleCreateInvite = async (event) => {
+    event.preventDefault();
+    setSharingLoading("invite");
+    setSharingError(null);
+    setSharingMessage(null);
+
+    const result = await createHouseholdInviteAction(inviteEmail);
+    setSharingLoading(null);
+
+    if (result?.error) {
+      setSharingMessage({ type: "error", text: result.error });
+      return;
+    }
+
+    const invite = result?.data?.invite;
+    if (invite) {
+      setSharing((current) => ({
+        ...current,
+        invites: [invite, ...(current?.invites ?? [])],
+      }));
+      setInviteEmail("");
+      const sentExistingUserLink = result?.data?.emailType === "magic_link";
+      setSharingMessage({
+        type: result?.data?.emailSent ? "success" : "error",
+        text: result?.data?.emailSent
+          ? sentExistingUserLink
+            ? "Invite email sent as a login link because that email already has an account. They will land on the invite after signing in."
+            : "Invite email sent. You can also copy the invite link below."
+          : `Invite link created, but the email was not sent: ${result?.data?.emailError || "Unknown email error"}. Copy the invite link below and send it manually.`,
+      });
+    }
+  };
+
+  const handleCopyInvite = async (invite) => {
+    if (!invite?.link || !navigator?.clipboard) return;
+
+    await navigator.clipboard.writeText(invite.link);
+    setCopiedInviteId(invite.id);
+    window.setTimeout(() => setCopiedInviteId(null), 1800);
+  };
+
+  const handleRevokeInvite = async (inviteId) => {
+    setSharingLoading(`revoke:${inviteId}`);
+    setSharingMessage(null);
+
+    const result = await revokeHouseholdInviteAction(inviteId);
+    setSharingLoading(null);
+
+    if (result?.error) {
+      setSharingMessage({ type: "error", text: result.error });
+      return;
+    }
+
+    setSharing((current) => ({
+      ...current,
+      invites: (current?.invites ?? []).filter((invite) => invite.id !== inviteId),
+    }));
+  };
+
+  const handleRemoveMember = async (member) => {
+    if (!member?.userId) return;
+
+    const confirmed = window.confirm(
+      `Remove ${member.email} from this household? They will lose access to the shared inventory.`
+    );
+
+    if (!confirmed) return;
+
+    setSharingLoading(`remove:${member.userId}`);
+    setSharingMessage(null);
+
+    const result = await removeHouseholdMemberAction(member.userId);
+    setSharingLoading(null);
+
+    if (result?.error) {
+      setSharingMessage({ type: "error", text: result.error });
+      return;
+    }
+
+    setSharing((current) => {
+      const nextMembers = (current?.members ?? []).filter(
+        (item) => item.userId !== member.userId
+      );
+      const nextMemberCount = nextMembers.length;
+
+      return {
+        ...current,
+        members: nextMembers,
+        memberCount: nextMemberCount,
+        canInvite:
+          current?.currentUserRole === "owner" &&
+          current?.effectivePlanId === "family" &&
+          (current?.maxMembers === null || nextMemberCount < current?.maxMembers),
+      };
+    });
+
+    setSharingMessage({
+      type: "success",
+      text: `${member.email} was removed from this household.`,
+    });
+  };
+
   return (
     <motion.div
       variants={sectionVariants}
@@ -462,11 +850,13 @@ export default function ProfileClient({
               Profile
             </h1>
             <p className="mt-1 break-words text-sm text-gray-500">
-              Manage your account security and StockSense preferences.
+              Manage your account security and WhereKeep preferences.
             </p>
           </div>
         </div>
       </motion.header>
+
+      {requiresPasswordSetup && <PasswordSetupNotice />}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
         <div className="space-y-6">
@@ -478,7 +868,22 @@ export default function ProfileClient({
             onPortal={handleBillingPortal}
           />
 
+          <SharingSection
+            sharing={sharing}
+            sharingError={sharingError}
+            sharingMessage={sharingMessage}
+            inviteEmail={inviteEmail}
+            onInviteEmailChange={setInviteEmail}
+            onCreateInvite={handleCreateInvite}
+            onCopyInvite={handleCopyInvite}
+            onRevokeInvite={handleRevokeInvite}
+            onRemoveMember={handleRemoveMember}
+            copiedInviteId={copiedInviteId}
+            loading={sharingLoading}
+          />
+
           <motion.section
+            id="change-password"
             variants={itemVariants}
             className="rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm"
           >
@@ -662,7 +1067,7 @@ export default function ProfileClient({
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Account details</h2>
                 <p className="mt-1 text-sm text-gray-500">
-                  Basic details tied to this StockSense account.
+                  Basic details tied to this WhereKeep account.
                 </p>
               </div>
             </div>

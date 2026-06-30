@@ -1,5 +1,12 @@
 import CategoriesPageClient from "@/components/CategoriesPageClient";
 import { createClient } from "@/utils/supabase/server";
+import { createPageMetadata } from "@/utils/metadata";
+
+export const metadata = createPageMetadata({
+    title: "Categories",
+    description: "Organize inventory categories across every location and storage area.",
+    path: "/categories",
+});
 
 export default async function Page() {
     const supabase = await createClient();

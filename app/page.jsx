@@ -1,9 +1,18 @@
 import { createClient } from '@/utils/supabase/server';
+import { redirect } from 'next/navigation';
 import { getSessionForLayout } from './actions/auth';
 import LandingPage from '@/components/LandingPage';
 import StatsCards from '@/components/StatsCards';
 import RecentActivity from '@/components/RecentActivity';
 import ItemsDonut from '@/components/ItemsDonut';
+import { createPageMetadata } from '@/utils/metadata';
+
+export const metadata = createPageMetadata({
+  title: 'Household Inventory Tracker',
+  description:
+    'WhereKeep helps families track pantry, household, and storage inventory across every location.',
+  path: '/',
+});
 
 export default async function HomePage() {
   const session = await getSessionForLayout();
@@ -11,6 +20,10 @@ export default async function HomePage() {
 
   if (!token) {
     return <LandingPage />;
+  }
+
+  if (session?.user?.user?.user_metadata?.requires_password_setup) {
+    redirect('/profile?setup=password');
   }
 
   const supabase = await createClient();

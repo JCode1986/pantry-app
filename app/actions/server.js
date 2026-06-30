@@ -3,6 +3,11 @@ import { createClient } from '@/utils/supabase/server';
 import axios from 'axios';
 import { revalidatePath } from 'next/cache';
 import { toNonNegativeInteger } from '@/utils/pantry/date';
+import { getSession } from '@/lib/sessionOptions';
+import {
+  getHouseholdBilling,
+  getHouseholdForUser,
+} from '@/utils/households';
 
 function normalizeName(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -12,8 +17,74 @@ function validationError(message) {
   return { data: null, error: message };
 }
 
+function upgradeLimitError(message) {
+  return {
+    data: null,
+    error: message,
+    upgradeHref: '/profile#billing',
+  };
+}
+
 function normalizeSearchTerm(value) {
   return normalizeName(value).replace(/[%_]/g, '').slice(0, 80);
+}
+
+async function getCurrentUser() {
+  const session = await getSession();
+  return session?.user?.user ?? null;
+}
+
+async function getCurrentHouseholdContext() {
+  const user = await getCurrentUser();
+  if (!user?.id) return { user: null, household: null };
+
+  const { household } = await getHouseholdForUser({
+    userId: user.id,
+    email: user.email,
+    createIfMissing: true,
+  });
+
+  return { user, household };
+}
+
+async function getCurrentPlanLimits() {
+  const { household } = await getCurrentHouseholdContext();
+  const { limits } = await getHouseholdBilling(household);
+
+  return limits;
+}
+
+async function countRows(supabase, table) {
+  const { count, error } = await supabase
+    .from(table)
+    .select('*', { count: 'exact', head: true });
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
+async function enforceLocationLimit(supabase) {
+  const limits = await getCurrentPlanLimits();
+  if (limits.locations === null) return null;
+
+  const locationCount = await countRows(supabase, 'locations');
+  if (locationCount >= limits.locations) {
+    return `Free plan includes ${limits.locations} location. Upgrade to Plus or Family for unlimited locations.`;
+  }
+
+  return null;
+}
+
+async function enforceItemLimit(supabase) {
+  const limits = await getCurrentPlanLimits();
+  if (limits.items === null) return null;
+
+  const itemCount = await countRows(supabase, 'items');
+  if (itemCount >= limits.items) {
+    return `Free plan includes ${limits.items} items. Upgrade to Plus or Family for unlimited items.`;
+  }
+
+  return null;
 }
 
 export async function fetchRecipes(ingredients) {
@@ -49,10 +120,17 @@ export async function addLocation(name) {
   if (!normalizedName) return validationError('Location name is required');
 
   const supabase = await createClient();
-  const { data, error } = await supabase.from('locations').insert([{ name: normalizedName }]).select('*');
+  const { household } = await getCurrentHouseholdContext();
+  const limitError = await enforceLocationLimit(supabase);
+  if (limitError) return upgradeLimitError(limitError);
+
+  const { data, error } = await supabase
+    .from('locations')
+    .insert([{ name: normalizedName, household_id: household?.id }])
+    .select('*');
   if (error) throw error;
   revalidatePath('/');
-  return data[0];
+  return { data: data[0], error: null };
 }
 
 export async function updateLocationName(id, newName) {
@@ -150,6 +228,8 @@ export async function addItem(categoryId, { name, quantity = 0, expiration_date 
   }
 
   const supabase = await createClient();
+  const limitError = await enforceItemLimit(supabase);
+  if (limitError) return upgradeLimitError(limitError);
 
   const { data, error } = await supabase
     .from('items')
@@ -336,6 +416,9 @@ export async function addItemWithPath({
   if (!normalizedItemName) return validationError('Item name is required');
 
   const supabase = await createClient();
+  const { household } = await getCurrentHouseholdContext();
+  const itemLimitError = await enforceItemLimit(supabase);
+  if (itemLimitError) return upgradeLimitError(itemLimitError);
 
   let finalLocationId = locationId || null;
   let finalLocationName = null;
@@ -344,9 +427,12 @@ export async function addItemWithPath({
     const normalizedLocationName = normalizeName(locationName);
     if (!normalizedLocationName) return validationError('Location is required');
 
+    const locationLimitError = await enforceLocationLimit(supabase);
+    if (locationLimitError) return upgradeLimitError(locationLimitError);
+
     const { data, error } = await supabase
       .from('locations')
-      .insert([{ name: normalizedLocationName }])
+      .insert([{ name: normalizedLocationName, household_id: household?.id }])
       .select('id, name')
       .single();
 

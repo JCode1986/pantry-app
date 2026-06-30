@@ -2,6 +2,39 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import OpenGlobalAddItemButton from "@/components/OpenGlobalAddItemButton";
+import { createPageMetadata } from "@/utils/metadata";
+
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data: category } = await supabase
+    .from("storage_categories")
+    .select(
+      `
+      name,
+      storage_area:storage_areas!fk_storage_area (
+        name,
+        location:locations ( name )
+      )
+    `
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  const name = category?.name ?? "Category";
+  const areaName = category?.storage_area?.name;
+  const locationName = category?.storage_area?.location?.name;
+  const description =
+    areaName && locationName
+      ? `View items in ${name}, stored in ${areaName} at ${locationName}.`
+      : `View and manage items in ${name}.`;
+
+  return createPageMetadata({
+    title: name,
+    description,
+    path: `/categories/${id}`,
+  });
+}
 
 export default async function CategoryDetailPage({ params }) {
   const { id } = await params;

@@ -9,7 +9,7 @@ export default function PricingSection({ showHeading = true }) {
         {showHeading && (
           <div className="mb-7 max-w-2xl">
             <h2 className="text-2xl font-semibold tracking-tight text-gray-900">
-              Choose the right StockSense plan.
+              Choose the right WhereKeep plan.
             </h2>
             <p className="mt-2 text-sm leading-6 text-gray-600">
               Start free, then upgrade when you need unlimited inventory or

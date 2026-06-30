@@ -61,8 +61,10 @@ export async function getUserBillingAction() {
       data: {
         planId: "free",
         status: "free",
+        stripePriceId: null,
         currentPeriodEnd: null,
         cancelAtPeriodEnd: false,
+        hasStripeCustomer: false,
       },
       error,
     };
@@ -72,8 +74,10 @@ export async function getUserBillingAction() {
     data: {
       planId: billing?.plan_id || "free",
       status: billing?.status || "free",
+      stripePriceId: billing?.stripe_price_id || null,
       currentPeriodEnd: billing?.current_period_end || null,
       cancelAtPeriodEnd: Boolean(billing?.cancel_at_period_end),
+      hasStripeCustomer: Boolean(billing?.stripe_customer_id),
     },
     error: null,
   };

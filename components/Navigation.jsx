@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { logoutAction } from "@/app/actions/auth";
@@ -123,19 +122,16 @@ export default function Navigation() {
             className="lg:hidden"
           />
 
-        <NavbarBrand>
-            <Link href="/">
-                <div className="relative h-[120px] w-[130px]">
-                    <Image
-                        src="/stocksense-logo-2.png"
-                        alt="StockSense logo"
-                        fill
-                        sizes="130px"
-                        priority
-                    />
-                </div>
+          <NavbarBrand>
+            <Link href="/" className="flex items-center gap-2">
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--stocksense-brand)] text-white shadow-sm">
+                <FaMapMarkedAlt className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <span className="hidden text-base font-semibold tracking-tight text-[var(--stocksense-brand)] sm:inline">
+                WhereKeep
+              </span>
             </Link>
-        </NavbarBrand>
+          </NavbarBrand>
 
           <NavbarContent className="hidden lg:flex gap-2" justify="start">
             {navItems.map((item) => {

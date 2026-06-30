@@ -1,6 +1,28 @@
 import { createClient } from "@/utils/supabase/server";
 import { notFound } from "next/navigation";
 import AreaDetailClient from "@/components/AreaDetailClient";
+import { createPageMetadata } from "@/utils/metadata";
+
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data: area } = await supabase
+    .from("storage_areas")
+    .select("name, location:locations(name)")
+    .eq("id", id)
+    .maybeSingle();
+
+  const name = area?.name ?? "Storage Area";
+  const locationName = area?.location?.name;
+
+  return createPageMetadata({
+    title: name,
+    description: locationName
+      ? `Manage categories and items in ${name} at ${locationName}.`
+      : `Manage categories and items in ${name}.`,
+    path: `/areas/${id}`,
+  });
+}
 
 export default async function Page({ params }) {
   const supabase = await createClient();

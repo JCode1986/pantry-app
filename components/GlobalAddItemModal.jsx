@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -137,6 +138,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [upgradeHref, setUpgradeHref] = useState("");
 
   const selectedLocation = useMemo(
     () => byId(locations, locationId),
@@ -160,6 +162,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
     const loadHierarchy = async () => {
       setIsLoading(true);
       setMessage("");
+      setUpgradeHref("");
 
       const result = await getInventoryHierarchy();
       if (cancelled) return;
@@ -218,6 +221,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
     if (isSaving) return;
     setForm(emptyForm);
     setMessage("");
+    setUpgradeHref("");
     setIsLoading(true);
     onClose?.();
   };
@@ -274,6 +278,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
           ? result.error
           : result.error?.message ?? "Could not add item."
       );
+      setUpgradeHref(result.upgradeHref || "");
       return;
     }
 
@@ -420,8 +425,17 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                     {...revealMotion}
                     className="overflow-hidden rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
                   >
-                    {message}
-                  </motion.div>
+                      {message}
+                      {upgradeHref && (
+                        <Link
+                          href={upgradeHref}
+                          onClick={handleClose}
+                          className="ml-2 font-semibold underline underline-offset-2"
+                        >
+                          View plans
+                        </Link>
+                      )}
+                    </motion.div>
                 )}
               </AnimatePresence>
 

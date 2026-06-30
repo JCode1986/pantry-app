@@ -4,6 +4,7 @@ import Navigation from "@/components/Navigation";
 import { getSessionForLayout } from "./actions/auth";
 import { Providers } from "@/components/Providers";
 import { getPreferenceBootScript } from "@/utils/appPreferences";
+import { siteConfig } from "@/utils/metadata";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,11 +17,63 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "StockSense",
-  icons: {
-    icon: "/icon.png",
-    apple: "/icon.png",
+  metadataBase: new URL(siteConfig.url),
+  applicationName: siteConfig.name,
+  title: {
+    default: siteConfig.name,
+    template: `%s | ${siteConfig.name}`,
   },
+  description: siteConfig.description,
+  keywords: [
+    "inventory tracker",
+    "household inventory",
+    "pantry app",
+    "expiration tracking",
+    "storage organization",
+  ],
+  authors: [{ name: siteConfig.name }],
+  creator: siteConfig.name,
+  publisher: siteConfig.name,
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/wherekeep-icon.png",
+    apple: "/wherekeep-icon.png",
+  },
+  openGraph: {
+    title: siteConfig.name,
+    description: siteConfig.description,
+    url: siteConfig.url,
+    siteName: siteConfig.name,
+    images: [
+      {
+        url: "/wherekeep-icon.png",
+        width: 512,
+        height: 512,
+        alt: siteConfig.name,
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: siteConfig.name,
+    description: siteConfig.description,
+    images: ["/wherekeep-icon.png"],
+  },
+  appleWebApp: {
+    capable: true,
+    title: siteConfig.name,
+    statusBarStyle: "default",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#0E7488",
 };
 
 export default async function RootLayout({ children }) {

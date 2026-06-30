@@ -5,8 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
 import { login } from '@/app/actions/auth';
-import { FaEye, FaEyeSlash } from 'react-icons/fa';
-import Image from 'next/image';
+import { FaEye, FaEyeSlash, FaMapMarkedAlt } from 'react-icons/fa';
 
 const CREDENTIAL_VALIDATION_ERROR =
   'Enter a valid email and a password with at least 6 characters.';
@@ -14,6 +13,7 @@ const CREDENTIAL_VALIDATION_ERROR =
 export default function LoginPage() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/';
+  const confirmed = searchParams.get('confirmed') === '1';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -57,6 +57,12 @@ export default function LoginPage() {
     }
   }, [emailValid, error, password.length, validationSubmitted]);
 
+  useEffect(() => {
+    if (confirmed) {
+      setSuccessMessage('Email confirmed. Log in to continue.');
+    }
+  }, [confirmed]);
+
   const handleSignIn = async (e) => {
     e.preventDefault();
     if (!validateCredentials()) return;
@@ -66,7 +72,10 @@ export default function LoginPage() {
     setSuccessMessage(null);
 
     try {
-      await login({ email, password, redirectTo });
+      const result = await login({ email, password, redirectTo });
+      if (result?.error) {
+        setError(result.error);
+      }
     } catch (err) {
       setError(err?.message || 'Unable to sign in.');
     } finally {
@@ -74,7 +83,10 @@ export default function LoginPage() {
     }
   };
 
-  const handleSignUp = async () => {
+  const handleSignUp = async (event) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+
     if (!validateCredentials()) return;
 
     setSignupLoading(true);
@@ -87,8 +99,8 @@ export default function LoginPage() {
       options: {
         emailRedirectTo:
           typeof window !== 'undefined'
-            ? `${window.location.origin}/magic-link-sync`
-            : 'http://localhost:3000/magic-link-sync',
+            ? `${window.location.origin}/magic-link-sync?redirectTo=${encodeURIComponent('/login?confirmed=1')}`
+            : 'http://localhost:3000/magic-link-sync?redirectTo=%2Flogin%3Fconfirmed%3D1',
       },
     });
 
@@ -126,18 +138,12 @@ export default function LoginPage() {
           {/* Header */}
           <div className="px-6 sm:px-8 pt-6 pb-4 bg-gradient-to-r from-stocksense-teal to-stocksense-sky">
             <div className="flex items-center gap-3">
-              <div className="relative h-[120px] w-[130px] bg-white rounded-full">
-                <Image
-                    src="/stocksense-logo-2.png"
-                    alt="StockSense logo"
-                    fill
-                    sizes="130px"
-                    priority
-                  />
+              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white">
+                <FaMapMarkedAlt className="h-7 w-7 text-[var(--stocksense-brand)]" aria-hidden="true" />
               </div>
               <div>
                 <h1 className="text-white text-xl sm:text-2xl font-semibold leading-tight">
-                  Welcome to StockSense
+                  Welcome to WhereKeep
                 </h1>
                 <p className="text-white/80 text-xs sm:text-sm">Sign in to manage your items.</p>
               </div>

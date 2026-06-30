@@ -3,7 +3,7 @@ export const PREFERENCE_STORAGE_KEY = "stocksense.preferences";
 export const THEME_OPTIONS = [
   {
     id: "stocksense",
-    label: "StockSense",
+    label: "WhereKeep",
     description: "Teal, sky, and lime",
     swatch: "#0E7488",
     soft: "#E6FAF6",

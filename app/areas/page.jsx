@@ -1,5 +1,12 @@
 import AreasPageClient from "@/components/AreasPageClient";
 import { createClient } from "@/utils/supabase/server";
+import { createPageMetadata } from "@/utils/metadata";
+
+export const metadata = createPageMetadata({
+  title: "Areas",
+  description: "Review and manage storage areas across all household locations.",
+  path: "/areas",
+});
 
 export default async function Page() {
   const supabase = await createClient();

@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 
 export default function MagicLinkSyncPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('redirectTo') || '/';
 
   useEffect(() => {
     const syncSession = async () => {
@@ -38,7 +40,12 @@ export default function MagicLinkSyncPage() {
         }
 
         // ✅ Redirect to homepage (or dashboard)
-        router.push('/');
+        const safeRedirect =
+          redirectTo.startsWith('/') && !redirectTo.startsWith('//')
+            ? redirectTo
+            : '/';
+
+        router.push(safeRedirect);
       } catch (err) {
         console.error('Sync error:', err);
         router.push('/login?error=sync-exception');
@@ -46,7 +53,7 @@ export default function MagicLinkSyncPage() {
     };
 
     syncSession();
-  }, [router]);
+  }, [redirectTo, router]);
 
   return (
     <main className="page-enter flex justify-center items-center h-screen">

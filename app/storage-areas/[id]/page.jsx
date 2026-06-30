@@ -2,6 +2,25 @@ import { createClient } from '@/utils/supabase/server';
 import Link from 'next/link';
 import CategoriesGrid from '@/components/CategoriesGrid';
 import { notFound } from 'next/navigation';
+import { createPageMetadata } from '@/utils/metadata';
+
+export async function generateMetadata({ params }) {
+  const supabase = await createClient();
+  const { id } = await params;
+  const { data: area } = await supabase
+    .from('storage_areas')
+    .select('name, locations(name)')
+    .eq('id', id)
+    .maybeSingle();
+
+  const name = area?.name ?? 'Storage Area';
+
+  return createPageMetadata({
+    title: `${name} Categories`,
+    description: `View categories inside ${name}.`,
+    path: `/storage-areas/${id}`,
+  });
+}
 
 export default async function StorageAreaCategoriesPage({ params }) {
   const supabase = await createClient();

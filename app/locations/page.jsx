@@ -1,5 +1,12 @@
 import LocationsSection from '@/components/LocationsSection';
 import { createClient } from '@/utils/supabase/server';
+import { createPageMetadata } from '@/utils/metadata';
+
+export const metadata = createPageMetadata({
+  title: 'Locations',
+  description: 'Create and manage inventory locations for your household.',
+  path: '/locations',
+});
 
 export default async function Home() {
   const supabase = await createClient();

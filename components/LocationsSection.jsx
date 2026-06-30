@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   addLocation,
   deleteLocation,
@@ -24,6 +25,8 @@ export default function LocationsSection({ locations }) {
   const router = useRouter();
   const [allLocations, setAllLocations] = useState(locations);
   const [locationName, setLocationName] = useState('');
+  const [message, setMessage] = useState('');
+  const [upgradeHref, setUpgradeHref] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState('');
 
@@ -96,7 +99,18 @@ export default function LocationsSection({ locations }) {
 
   const handleAdd = async () => {
     if (!locationName.trim()) return;
-    const newLoc = await addLocation(locationName.trim());
+    setMessage('');
+    setUpgradeHref('');
+    const result = await addLocation(locationName.trim());
+    if (result?.error) {
+      setMessage(result.error);
+      setUpgradeHref(result.upgradeHref || '');
+      return;
+    }
+
+    const newLoc = result?.data ?? result;
+    if (!newLoc?.id) return;
+
     setAllLocations([
       ...allLocations,
       { ...newLoc, areasCount: 0, categoriesCount: 0, itemsCount: 0 },
@@ -189,24 +203,39 @@ const closeDeleteDialog = () => {
       {/* Add Location */}
       <motion.div
         variants={pageItemVariants}
-        className="flex gap-2 my-6 md:justify-start justify-center"
+        className="my-6 space-y-2"
       >
-        <input
-          type="text"
-          value={locationName}
-          onChange={(e) => setLocationName(e.target.value)}
-          placeholder="New location (e.g., Home, Work, Grocery Store)"
-          className="w-full max-w-[500px] rounded-lg border text-sm md:text-base border-stocksense-gray px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/70 focus:border-[var(--stocksense-brand)] bg-white"
-          onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-        />
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={handleAdd}
-          className="bg-[var(--stocksense-brand)] text-white px-4 py-2 rounded shadow-sm hover:brightness-95 flex items-center gap-2"
-        >
-          <FaPlus /> Add
-        </motion.button>
+        {message && (
+          <div className="max-w-[640px] rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            {message}
+            {upgradeHref && (
+              <Link
+                href={upgradeHref}
+                className="ml-2 font-semibold underline underline-offset-2"
+              >
+                View plans
+              </Link>
+            )}
+          </div>
+        )}
+        <div className="flex gap-2 md:justify-start justify-center">
+          <input
+            type="text"
+            value={locationName}
+            onChange={(e) => setLocationName(e.target.value)}
+            placeholder="New location (e.g., Home, Work, Grocery Store)"
+            className="w-full max-w-[500px] rounded-lg border text-sm md:text-base border-stocksense-gray px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/70 focus:border-[var(--stocksense-brand)] bg-white"
+            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+          />
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleAdd}
+            className="bg-[var(--stocksense-brand)] text-white px-4 py-2 rounded shadow-sm hover:brightness-95 flex items-center gap-2"
+          >
+            <FaPlus /> Add
+          </motion.button>
+        </div>
       </motion.div>
 
       {/* List */}

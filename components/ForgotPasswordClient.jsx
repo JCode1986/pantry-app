@@ -1,10 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
 
-export default function ForgotPasswordPage() {
+export default function ForgotPasswordClient() {
   const [email, setEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
@@ -104,6 +105,8 @@ export default function ForgotPasswordPage() {
                 <input
                   id="email"
                   type="email"
+                  autoComplete="email"
+                  inputMode="email"
                   placeholder="you@domain.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -125,14 +128,14 @@ export default function ForgotPasswordPage() {
                         : 'bg-stocksense-teal hover:bg-stocksense-tealDark'
                     }`}
                 >
-                  {sending ? 'Sending…' : 'Send reset link'}
+                  {sending ? 'Sending...' : 'Send reset link'}
                 </button>
               </motion.div>
 
               <motion.div variants={item} className="text-center">
-                <a href="/login" className="text-sm text-stocksense-teal hover:text-stocksense-tealDark">
+                <Link href="/login" className="text-sm text-stocksense-teal hover:text-stocksense-tealDark">
                   Back to Login
-                </a>
+                </Link>
               </motion.div>
             </form>
           </motion.div>

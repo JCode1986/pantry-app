@@ -1,8 +1,27 @@
 import { createClient } from '@/utils/supabase/server';
 import StorageAreasSection from '@/components/StorageAreasSection';
 import { notFound } from 'next/navigation';
+import { createPageMetadata } from '@/utils/metadata';
 
 // export const dynamic = 'force-dynamic'; // optional if you want fresh data on each request
+
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data: location } = await supabase
+    .from('locations')
+    .select('name')
+    .eq('id', id)
+    .maybeSingle();
+
+  const name = location?.name ?? 'Location';
+
+  return createPageMetadata({
+    title: name,
+    description: `Manage storage areas, categories, and items in ${name}.`,
+    path: `/locations/${id}`,
+  });
+}
 
 export default async function Page({ params }) {
   const supabase = await createClient();

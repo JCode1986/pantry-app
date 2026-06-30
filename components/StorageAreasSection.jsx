@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   addStorageArea,
@@ -71,6 +72,7 @@ export default function StorageAreasSection({
 
   const [newItemData, setNewItemData] = useState({});
   const [editingItem, setEditingItem] = useState({});
+  const [limitNotice, setLimitNotice] = useState(null);
 
   const [expandedAreas, setExpandedAreas] = useState({});
   const [expandedCategories, setExpandedCategories] = useState({});
@@ -383,6 +385,7 @@ export default function StorageAreasSection({
   const handleAddItem = async (categoryId) => {
     const item = newItemData[categoryId];
     if (!item?.name?.trim()) return;
+    setLimitNotice(null);
 
     const payload = {
       name: item.name.trim(),
@@ -390,11 +393,20 @@ export default function StorageAreasSection({
       expiration_date: item.expiration || null,
     };
 
-    const { data: created, error } = await addItem(categoryId, payload);
-    if (error) {
-      console.error(error);
+    const result = await addItem(categoryId, payload);
+    if (result?.error) {
+      setLimitNotice({
+        message:
+          typeof result.error === 'string'
+            ? result.error
+            : result.error?.message || 'Could not add item.',
+        upgradeHref: result.upgradeHref,
+      });
       return;
     }
+
+    const created = result?.data;
+    if (!created) return;
 
     setStorageAreas((prev) =>
       prev.map((area) => ({
@@ -755,6 +767,23 @@ export default function StorageAreasSection({
       animate="show"
       className="space-y-6 transition-all duration-150"
     >
+      {limitNotice && (
+        <motion.div
+          variants={pageItemVariants}
+          className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+        >
+          {limitNotice.message}
+          {limitNotice.upgradeHref && (
+            <Link
+              href={limitNotice.upgradeHref}
+              className="ml-2 font-semibold underline underline-offset-2"
+            >
+              View plans
+            </Link>
+          )}
+        </motion.div>
+      )}
+
       {/* Top: Title & Tools */}
       <motion.div
         variants={pageItemVariants}
