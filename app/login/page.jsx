@@ -1,5 +1,11 @@
 import LoginSection from '@/components/LoginSection'
-import React from 'react'
+import { createPageMetadata } from '@/utils/metadata';
+
+export const metadata = createPageMetadata({
+  title: 'Log In',
+  description: 'Log in or create a WhereKeep account to manage your household inventory.',
+  path: '/login',
+});
 
 export default function page() {
   return (

@@ -1,55 +1,96 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
 import { login } from '@/app/actions/auth';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
+import Image from 'next/image';
+
+const CREDENTIAL_VALIDATION_ERROR =
+  'Enter a valid email and a password with at least 6 characters.';
 
 export default function LoginPage() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/';
+  const confirmed = searchParams.get('confirmed') === '1';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const [showPw, setShowPw] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [signupLoading, setSignupLoading] = useState(false);
+  const [validationSubmitted, setValidationSubmitted] = useState(false);
 
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+  const isBusy = loginLoading || signupLoading;
 
   // basic front-end validity guard
   const emailValid = useMemo(
     () => /\S+@\S+\.\S+/.test(email.trim()),
     [email]
   );
-  const canSubmit = emailValid && password.length >= 6 && !loading;
+  const showEmailValidation = validationSubmitted && !emailValid;
+  const showPasswordValidation = validationSubmitted && password.length < 6;
+
+  const validateCredentials = () => {
+    setValidationSubmitted(true);
+
+    if (!emailValid || password.length < 6) {
+      setError(CREDENTIAL_VALIDATION_ERROR);
+      return false;
+    }
+
+    return true;
+  };
+
+  useEffect(() => {
+    if (
+      validationSubmitted &&
+      emailValid &&
+      password.length >= 6 &&
+      error === CREDENTIAL_VALIDATION_ERROR
+    ) {
+      setError(null);
+    }
+  }, [emailValid, error, password.length, validationSubmitted]);
+
+  useEffect(() => {
+    if (confirmed) {
+      setSuccessMessage('Email confirmed. Log in to continue.');
+    }
+  }, [confirmed]);
 
   const handleSignIn = async (e) => {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (!validateCredentials()) return;
 
-    setLoading(true);
+    setLoginLoading(true);
     setError(null);
     setSuccessMessage(null);
 
     try {
-      await login({ email, password, redirectTo });
+      const result = await login({ email, password, redirectTo });
+      if (result?.error) {
+        setError(result.error);
+      }
     } catch (err) {
       setError(err?.message || 'Unable to sign in.');
     } finally {
-      setLoading(false);
+      setLoginLoading(false);
     }
   };
 
-  const handleSignUp = async () => {
-    if (!emailValid || password.length < 6) {
-      setError('Enter a valid email and a password with at least 6 characters.');
-      return;
-    }
-    setLoading(true);
+  const handleSignUp = async (event) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+
+    if (!validateCredentials()) return;
+
+    setSignupLoading(true);
     setError(null);
     setSuccessMessage(null);
 
@@ -59,8 +100,8 @@ export default function LoginPage() {
       options: {
         emailRedirectTo:
           typeof window !== 'undefined'
-            ? `${window.location.origin}/magic-link-sync`
-            : 'http://localhost:3000/magic-link-sync',
+            ? `${window.location.origin}/magic-link-sync?redirectTo=${encodeURIComponent('/login?confirmed=1')}`
+            : 'http://localhost:3000/magic-link-sync?redirectTo=%2Flogin%3Fconfirmed%3D1',
       },
     });
 
@@ -69,7 +110,7 @@ export default function LoginPage() {
     } else {
       setSuccessMessage('Success! Check your email to confirm your account.');
     }
-    setLoading(false);
+    setSignupLoading(false);
   };
 
   // motion variants
@@ -86,7 +127,7 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-[100vh] flex items-center justify-center px-4">
+    <main className="page-enter min-h-[100vh] flex items-center justify-center px-4">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -98,15 +139,21 @@ export default function LoginPage() {
           {/* Header */}
           <div className="px-6 sm:px-8 pt-6 pb-4 bg-gradient-to-r from-stocksense-teal to-stocksense-sky">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-white/15 grid place-items-center">
-                {/* mini mark */}
-                <span className="text-white font-bold text-lg">SS</span>
+              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white">
+                <Image
+                  src="/wherekeep-app-icon.png"
+                  alt=""
+                  width={48}
+                  height={48}
+                  priority
+                  className="rounded-xl"
+                />
               </div>
               <div>
                 <h1 className="text-white text-xl sm:text-2xl font-semibold leading-tight">
-                  Welcome to StockSense
+                  Welcome to WhereKeep
                 </h1>
-                <p className="text-white/80 text-xs sm:text-sm">Sign in to manage your pantry.</p>
+                <p className="text-white/80 text-xs sm:text-sm">Sign in to manage your items.</p>
               </div>
             </div>
           </div>
@@ -165,7 +212,7 @@ export default function LoginPage() {
                   required
                   className="w-full rounded-lg border border-stocksense-gray px-3 py-2 outline-none focus:ring-2 focus:ring-stocksense-sky/60 focus:border-stocksense-sky bg-white"
                 />
-                {!emailValid && email.length > 0 && (
+                {showEmailValidation && (
                   <p className="text-xs text-amber-700">Please enter a valid email.</p>
                 )}
               </motion.div>
@@ -206,7 +253,7 @@ export default function LoginPage() {
                     className="w-full rounded-lg border border-stocksense-gray px-3 py-2 outline-none focus:ring-2 focus:ring-stocksense-sky/60 focus:border-stocksense-sky bg-white pr-10"
                   />
                 </div>
-                {password.length > 0 && password.length < 6 && (
+                {showPasswordValidation && (
                   <p className="text-xs text-amber-700">Min length is 6 characters.</p>
                 )}
               </motion.div>
@@ -215,12 +262,12 @@ export default function LoginPage() {
               <motion.div variants={item} className="space-y-3 pt-2">
                 <button
                   type="submit"
-                  disabled={!canSubmit}
+                  disabled={isBusy}
                   className={`w-full inline-flex items-center cursor-pointer justify-center rounded-lg px-4 py-2.5 text-white font-medium transition
-                    ${canSubmit ? 'bg-stocksense-teal hover:bg-stocksense-tealDark' : 'bg-stocksense-teal/50 cursor-not-allowed'}
+                    ${!isBusy ? 'bg-stocksense-teal hover:bg-stocksense-tealDark' : 'bg-stocksense-teal/50 cursor-not-allowed'}
                   `}
                 >
-                  {loading ? (
+                  {loginLoading ? (
                     <span className="inline-flex items-center gap-2">
                       <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
@@ -244,10 +291,10 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={handleSignUp}
-                  disabled={loading}
+                  disabled={isBusy}
                   className="w-full cursor-pointer inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-white font-medium transition bg-stocksense-sky hover:bg-stocksense-teal disabled:opacity-60"
                 >
-                  {loading ? 'Signing up…' : 'Create account'}
+                  {signupLoading ? 'Signing up…' : 'Create account'}
                 </button>
               </motion.div>
 

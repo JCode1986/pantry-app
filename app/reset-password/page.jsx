@@ -57,7 +57,7 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <main className="min-h-[100vh] flex items-center justify-center px-4 py-10 bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10">
+    <main className="page-enter min-h-[100vh] flex items-center justify-center px-4 py-10 bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -68,7 +68,7 @@ export default function ResetPasswordPage() {
           <div className="px-6 sm:px-8 pt-6 pb-4 bg-gradient-to-r from-stocksense-teal to-stocksense-sky">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-white/15 grid place-items-center">
-                <span className="text-white font-bold text-lg">SS</span>
+                <span className="text-white font-bold text-lg">WK</span>
               </div>
               <div>
                 <h1 className="text-white text-xl sm:text-2xl font-semibold leading-tight">

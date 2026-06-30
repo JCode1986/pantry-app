@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   addCategory,
   updateCategoryName,
@@ -10,6 +11,20 @@ import {
   deleteIngredient
 } from '@/app/actions/server';
 import { FaPlus, FaTrash, FaEdit, FaCheck, FaTimes } from 'react-icons/fa';
+
+const sectionVariants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, type: 'spring', stiffness: 120 },
+  },
+};
 
 export default function StorageSection({ storage, categories }) {
   const [allCategories, setAllCategories] = useState(categories);
@@ -108,11 +123,18 @@ export default function StorageSection({ storage, categories }) {
   };
 
   return (
-    <main className="max-w-4xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">🍱 {storage.name}</h1>
+    <motion.main
+      variants={sectionVariants}
+      initial="hidden"
+      animate="show"
+      className="page-enter max-w-4xl mx-auto p-6"
+    >
+      <motion.h1 variants={itemVariants} className="text-3xl font-bold mb-6">
+        🍱 {storage.name}
+      </motion.h1>
 
       {/* Add Category */}
-      <div className="flex gap-2 mb-6">
+      <motion.div variants={itemVariants} className="flex gap-2 mb-6">
         <input
           type="text"
           value={newCategoryName}
@@ -126,14 +148,25 @@ export default function StorageSection({ storage, categories }) {
         >
           <FaPlus /> Add
         </button>
-      </div>
+      </motion.div>
 
       {/* Categories */}
       {allCategories.length === 0 ? (
-        <p className="text-gray-500">No categories yet. Add one above.</p>
+        <motion.p variants={itemVariants} className="text-gray-500">
+          No categories yet. Add one above.
+        </motion.p>
       ) : (
-        allCategories.map(category => (
-          <div key={category.id} className="border rounded mb-4 p-4 shadow">
+        <AnimatePresence initial={false}>
+          {allCategories.map(category => (
+          <motion.div
+            key={category.id}
+            layout
+            variants={itemVariants}
+            initial="hidden"
+            animate="show"
+            exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
+            className="border rounded mb-4 p-4 shadow"
+          >
             <div className="flex justify-between items-center mb-2">
               {editingCategoryId === category.id ? (
                 <>
@@ -146,7 +179,7 @@ export default function StorageSection({ storage, categories }) {
                   <div className="flex gap-2 ml-2">
                     <button
                       onClick={() => handleUpdateCategory(category.id)}
-                      className="text-green-600 hover:text-green-800"
+                      className="text-[var(--stocksense-brand)] hover:brightness-90"
                     >
                       <FaCheck />
                     </button>
@@ -225,7 +258,7 @@ export default function StorageSection({ storage, categories }) {
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleUpdateIngredient(ingredient.id)}
-                          className="text-green-600 hover:text-green-800"
+                          className="text-[var(--stocksense-brand)] hover:brightness-90"
                         >
                           <FaCheck />
                         </button>
@@ -315,9 +348,10 @@ export default function StorageSection({ storage, categories }) {
                 </button>
               </div>
             </div>
-          </div>
-        ))
+          </motion.div>
+          ))}
+        </AnimatePresence>
       )}
-    </main>
+    </motion.main>
   );
 }

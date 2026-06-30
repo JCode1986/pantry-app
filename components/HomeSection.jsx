@@ -1,7 +1,9 @@
 'use client';
 import { useState } from 'react';
+import { Select, SelectItem } from '@heroui/react';
 import { FaPlus, FaTrash, FaEdit, FaCheck, FaTimes } from 'react-icons/fa';
 import { addStorage, deleteStorage, updateStorageName } from '@/app/actions/server';
+import { containsQuery } from '@/utils/pantry/search';
 
 export default function HomeSection({ user, storages }) {
   const [allStorages, setAllStorages] = useState(storages || []);
@@ -64,13 +66,11 @@ export default function HomeSection({ user, storages }) {
   const filteredStorages =
     filter === 'All'
       ? allStorages
-      : allStorages.filter((s) =>
-          s.name.toLowerCase().includes(filter.toLowerCase())
-        );
+      : allStorages.filter((s) => containsQuery(s.name, filter.toLowerCase()));
 
   return (
-    <main className="p-6 max-w-5xl mx-auto mt-20">
-      <h1 className="text-3xl font-bold mb-6">🍱 My Food Storages</h1>
+    <main className="page-enter p-6 max-w-5xl mx-auto mt-20">
+      <h1 className="text-3xl font-bold mb-6">My Food Storages</h1>
 
       <div className="flex flex-col sm:flex-row sm:justify-between gap-4 mb-6">
         {/* Add Storage */}
@@ -93,16 +93,25 @@ export default function HomeSection({ user, storages }) {
         {/* Filter Dropdown */}
         <div className="flex items-center gap-2">
           <label className="font-medium">Filter:</label>
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="w-full sm:w-[200px] border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-blue-300"
+          <Select
+            aria-label="Filter storages"
+            selectedKeys={new Set([filter])}
+            onSelectionChange={(keys) => {
+              const value = Array.from(keys)[0];
+              if (value) setFilter(String(value));
+            }}
+            className="w-full sm:w-[200px]"
+            variant="bordered"
+            radius="lg"
+            classNames={{
+              trigger: "border-stocksense-gray bg-white shadow-none",
+            }}
           >
-            <option>All</option>
+            <SelectItem key="All">All</SelectItem>
             {allStorages?.map((s) => (
-              <option key={s.id}>{s.name}</option>
+              <SelectItem key={s.name}>{s.name}</SelectItem>
             ))}
-          </select>
+          </Select>
         </div>
       </div>
 
@@ -147,7 +156,7 @@ export default function HomeSection({ user, storages }) {
                     <>
                       <button
                         onClick={() => saveEditHandler(storage.id)}
-                        className="text-green-600 hover:text-green-800 flex items-center gap-1"
+                        className="text-[var(--stocksense-brand)] hover:brightness-90 flex items-center gap-1"
                       >
                         <FaCheck /> Save
                       </button>

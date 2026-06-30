@@ -9,17 +9,21 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@heroui/react": "^2.8.5",
+    "@heroui/system": "^2.4.23",
+    "@heroui/theme": "^2.4.23",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.50.5",
     "axios": "^1.10.0",
-    "framer-motion": "^12.23.1",
+    "framer-motion": "^12.23.26",
     "iron-session": "^8.0.4",
-    "next": "15.3.5",
+    "next": "^15.5.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-icons": "^5.5.0",
-    "recharts": "^3.1.2"
+    "recharts": "^3.1.2",
+    "stripe": "^22.3.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
