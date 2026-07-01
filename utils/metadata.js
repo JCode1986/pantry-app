@@ -7,6 +7,15 @@ export const siteConfig = {
     "Know what you have, where it is, and what needs attention.",
 };
 
+export const NO_INDEX_ROBOTS = {
+  index: false,
+  follow: false,
+  googleBot: {
+    index: false,
+    follow: false,
+  },
+};
+
 export function createPageMetadata({
   title,
   description = siteConfig.description,

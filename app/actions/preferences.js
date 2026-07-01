@@ -6,16 +6,25 @@ import {
   DEFAULT_PREFERENCES,
   normalizePreferences,
 } from "@/utils/appPreferences";
+import {
+  getHouseholdBilling,
+  getHouseholdForUser,
+} from "@/utils/households";
+
+const APPEARANCE_UPGRADE_MESSAGE =
+  "Appearance customization requires a Plus or Family plan.";
 
 async function createAuthedClient() {
   const session = await getSession();
   const accessToken = session?.user?.access_token;
   const refreshToken = session?.user?.refresh_token;
-  const userId = session?.user?.user?.id;
+  const user = session?.user?.user;
+  const userId = user?.id;
 
   if (!accessToken || !refreshToken || !userId) {
     return {
       supabase: null,
+      user: null,
       userId: null,
       error: "Your session has expired. Please log in again.",
     };
@@ -30,21 +39,50 @@ async function createAuthedClient() {
   if (error) {
     return {
       supabase: null,
+      user: null,
       userId: null,
       error: error.message || "Your session has expired. Please log in again.",
     };
   }
 
-  return { supabase, userId, error: null };
+  return { supabase, user, userId, error: null };
+}
+
+async function canCustomizeAppearance(user) {
+  const { household } = await getHouseholdForUser({
+    userId: user?.id,
+    email: user?.email,
+    createIfMissing: true,
+  });
+  const billing = await getHouseholdBilling(household);
+
+  return billing.effectivePlanId !== "free";
 }
 
 export async function getUserPreferencesAction() {
-  const { supabase, userId, error } = await createAuthedClient();
+  const { supabase, user, userId, error } = await createAuthedClient();
 
   if (error) {
     return {
       data: DEFAULT_PREFERENCES,
       error,
+    };
+  }
+
+  try {
+    const hasAppearanceAccess = await canCustomizeAppearance(user);
+
+    if (!hasAppearanceAccess) {
+      return {
+        data: DEFAULT_PREFERENCES,
+        error: null,
+      };
+    }
+  } catch (err) {
+    console.error("getUserPreferencesAction billing error:", err);
+    return {
+      data: DEFAULT_PREFERENCES,
+      error: err?.message || "Could not verify appearance access.",
     };
   }
 
@@ -73,10 +111,27 @@ export async function getUserPreferencesAction() {
 
 export async function updateUserPreferencesAction(preferences) {
   const normalized = normalizePreferences(preferences);
-  const { supabase, userId, error } = await createAuthedClient();
+  const { supabase, user, userId, error } = await createAuthedClient();
 
   if (error) {
     return { data: normalized, error };
+  }
+
+  try {
+    const hasAppearanceAccess = await canCustomizeAppearance(user);
+
+    if (!hasAppearanceAccess) {
+      return {
+        data: DEFAULT_PREFERENCES,
+        error: APPEARANCE_UPGRADE_MESSAGE,
+      };
+    }
+  } catch (err) {
+    console.error("updateUserPreferencesAction billing error:", err);
+    return {
+      data: normalized,
+      error: err?.message || "Could not verify appearance access.",
+    };
   }
 
   const { data, error: upsertError } = await supabase

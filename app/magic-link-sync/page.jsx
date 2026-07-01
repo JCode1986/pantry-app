@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import WhereKeepLoader from '@/components/WhereKeepLoader';
+import WhereKeepLoader from '@/components/ui/WhereKeepLoader';
 
 export default function MagicLinkSyncPage() {
   const router = useRouter();

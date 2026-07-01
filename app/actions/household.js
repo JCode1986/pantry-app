@@ -6,12 +6,15 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { getSession } from "@/lib/sessionOptions";
 import { createAdminClient } from "@/utils/supabase/admin";
 import {
+  HOUSEHOLD_ROLES,
+  canManageHousehold,
   createInviteToken,
   getHouseholdBilling,
   getHouseholdForUser,
   getHouseholdMemberCount,
   getInviteExpirationDate,
   isValidInviteEmail,
+  normalizeHouseholdRole,
   normalizeInviteEmail,
 } from "@/utils/households";
 
@@ -74,7 +77,7 @@ function serializeMember(member) {
   return {
     userId: member.user_id,
     email: member.email || "Unknown email",
-    role: member.role,
+    role: normalizeHouseholdRole(member.role),
     joinedAt: member.joined_at,
   };
 }
@@ -83,6 +86,7 @@ function serializeInvite(invite, appUrl) {
   return {
     id: invite.id,
     email: invite.email,
+    role: normalizeHouseholdRole(invite.role),
     status: invite.status,
     expiresAt: invite.expires_at,
     createdAt: invite.created_at,
@@ -131,7 +135,7 @@ async function sendExistingUserInviteEmail({ email, redirectTo }) {
   return { sent: true, emailType: "magic_link", error: null };
 }
 
-async function sendInviteEmail({ admin, email, householdName, inviteToken, appUrl }) {
+async function sendInviteEmail({ admin, email, householdName, inviteToken, appUrl, role }) {
   const acceptPath = `/invite/${inviteToken}`;
   const redirectTo = `${appUrl}/magic-link-sync?redirectTo=${encodeURIComponent(acceptPath)}`;
 
@@ -140,6 +144,7 @@ async function sendInviteEmail({ admin, email, householdName, inviteToken, appUr
     data: {
       household_name: householdName,
       household_invite_token: inviteToken,
+      household_invite_role: normalizeHouseholdRole(role),
     },
   });
 
@@ -174,7 +179,7 @@ export async function getHouseholdSharingAction() {
           .order("joined_at", { ascending: true }),
         admin
           .from("household_invites")
-          .select("id, email, status, token, expires_at, created_at")
+          .select("id, email, role, status, token, expires_at, created_at")
           .eq("household_id", household.id)
           .eq("status", "pending")
           .order("created_at", { ascending: false }),
@@ -186,7 +191,7 @@ export async function getHouseholdSharingAction() {
     const billing = await getHouseholdBilling(household);
     const maxMembers = billing.limits.users ?? null;
     const memberCount = members?.length ?? 0;
-    const isOwner = member.role === "owner" && household.owner_id === context.user.id;
+    const isOwner = canManageHousehold(member, household, context.user.id);
     const canInvite =
       isOwner &&
       billing.effectivePlanId === "family" &&
@@ -214,17 +219,21 @@ export async function getHouseholdSharingAction() {
   }
 }
 
-export async function createHouseholdInviteAction(email) {
+export async function createHouseholdInviteAction(email, role = HOUSEHOLD_ROLES.EDITOR) {
   const normalizedEmail = normalizeInviteEmail(email);
   if (!isValidInviteEmail(normalizedEmail)) {
     return actionError("Enter a valid email address.");
+  }
+  const inviteRole = normalizeHouseholdRole(role, HOUSEHOLD_ROLES.EDITOR);
+  if (inviteRole === HOUSEHOLD_ROLES.OWNER) {
+    return actionError("Invites can be sent as Editor or Viewer. Ownership stays with the account holder.");
   }
 
   const context = await getAuthedHousehold({ createIfMissing: true });
   if (context.error) return actionError(context.error);
 
   const { user, household, member } = context;
-  if (member.role !== "owner" || household.owner_id !== user.id) {
+  if (!canManageHousehold(member, household, user.id)) {
     return actionError("Only the household owner can invite members.");
   }
 
@@ -266,11 +275,12 @@ export async function createHouseholdInviteAction(email) {
       .insert({
         household_id: household.id,
         email: normalizedEmail,
+        role: inviteRole,
         token,
         invited_by: user.id,
         expires_at: getInviteExpirationDate(),
       })
-      .select("id, email, status, token, expires_at, created_at")
+      .select("id, email, role, status, token, expires_at, created_at")
       .single();
 
     if (inviteError) throw inviteError;
@@ -283,6 +293,7 @@ export async function createHouseholdInviteAction(email) {
       householdName: household.name,
       inviteToken: token,
       appUrl,
+      role: inviteRole,
     });
 
     return {
@@ -306,7 +317,7 @@ export async function revokeHouseholdInviteAction(inviteId) {
   if (context.error) return actionError(context.error);
 
   const { user, household, member } = context;
-  if (member.role !== "owner" || household.owner_id !== user.id) {
+  if (!canManageHousehold(member, household, user.id)) {
     return actionError("Only the household owner can revoke invites.");
   }
 
@@ -335,7 +346,7 @@ export async function removeHouseholdMemberAction(memberUserId) {
   if (context.error) return actionError(context.error);
 
   const { user, household, member } = context;
-  if (member.role !== "owner" || household.owner_id !== user.id) {
+  if (!canManageHousehold(member, household, user.id)) {
     return actionError("Only the household owner can remove members.");
   }
 
@@ -380,6 +391,7 @@ export async function removeHouseholdMemberAction(memberUserId) {
     revalidatePath("/areas");
     revalidatePath("/categories");
     revalidatePath("/items");
+    revalidatePath("/shopping-list");
 
     return {
       data: {
@@ -393,6 +405,57 @@ export async function removeHouseholdMemberAction(memberUserId) {
   }
 }
 
+export async function updateHouseholdMemberRoleAction(memberUserId, role) {
+  if (!memberUserId) return actionError("Member is required.");
+
+  const nextRole = normalizeHouseholdRole(role, HOUSEHOLD_ROLES.VIEWER);
+  if (nextRole === HOUSEHOLD_ROLES.OWNER) {
+    return actionError("Ownership cannot be reassigned here.");
+  }
+
+  const context = await getAuthedHousehold({ createIfMissing: true });
+  if (context.error) return actionError(context.error);
+
+  const { user, household, member } = context;
+  if (!canManageHousehold(member, household, user.id)) {
+    return actionError("Only the household owner can change member roles.");
+  }
+
+  if (memberUserId === user.id) {
+    return actionError("The household owner role cannot be changed.");
+  }
+
+  try {
+    const admin = createAdminClient();
+    const { data: updatedMember, error } = await admin
+      .from("household_members")
+      .update({ role: nextRole })
+      .eq("household_id", household.id)
+      .eq("user_id", memberUserId)
+      .neq("role", "owner")
+      .select("user_id, email, role, joined_at")
+      .single();
+
+    if (error) throw error;
+
+    revalidatePath("/profile");
+    revalidatePath("/");
+    revalidatePath("/locations");
+    revalidatePath("/areas");
+    revalidatePath("/categories");
+    revalidatePath("/items");
+    revalidatePath("/shopping-list");
+    revalidatePath("/shopping-list");
+
+    return {
+      data: { member: serializeMember(updatedMember) },
+      error: null,
+    };
+  } catch (err) {
+    return actionError(err?.message || "Could not update member role.");
+  }
+}
+
 export async function getHouseholdInvitePreviewAction(token) {
   if (!token) return actionError("Invite link is missing.");
 
@@ -400,7 +463,7 @@ export async function getHouseholdInvitePreviewAction(token) {
     const admin = createAdminClient();
     const { data: invite, error } = await admin
       .from("household_invites")
-      .select("email, status, expires_at, households(name)")
+      .select("email, role, status, expires_at, households(name)")
       .eq("token", token)
       .maybeSingle();
 
@@ -410,6 +473,7 @@ export async function getHouseholdInvitePreviewAction(token) {
     return {
       data: {
         email: invite.email,
+        role: normalizeHouseholdRole(invite.role),
         status: invite.status,
         expiresAt: invite.expires_at,
         householdName: invite.households?.name || "Household",
@@ -431,7 +495,7 @@ export async function acceptHouseholdInviteAction(token) {
     const admin = createAdminClient();
     const { data: invite, error: inviteError } = await admin
       .from("household_invites")
-      .select("id, household_id, email, status, expires_at, households(id, owner_id, name)")
+      .select("id, household_id, email, role, status, expires_at, households(id, owner_id, name)")
       .eq("token", token)
       .maybeSingle();
 
@@ -509,7 +573,7 @@ export async function acceptHouseholdInviteAction(token) {
           household_id: invite.household_id,
           user_id: user.id,
           email: normalizeInviteEmail(user.email),
-          role: "member",
+          role: normalizeHouseholdRole(invite.role),
         },
         { onConflict: "user_id" }
       );

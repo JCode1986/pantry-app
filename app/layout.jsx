@@ -1,10 +1,14 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Navigation from "@/components/Navigation";
+import Navigation from "@/components/app-shell/Navigation";
 import { getSessionForLayout } from "./actions/auth";
-import { Providers } from "@/components/Providers";
+import { Providers } from "@/components/app-shell/Providers";
 import { getPreferenceBootScript } from "@/utils/appPreferences";
 import { siteConfig } from "@/utils/metadata";
+import {
+  canEditHouseholdInventory,
+  getHouseholdForUser,
+} from "@/utils/households";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -79,6 +83,20 @@ export const viewport = {
 export default async function RootLayout({ children }) {
   const session = await getSessionForLayout(); // ✅ read-only
   const token = session?.user?.access_token;
+  let canEditInventory = true;
+
+  if (token && session?.user?.user?.id) {
+    try {
+      const { member } = await getHouseholdForUser({
+        userId: session.user.user.id,
+        email: session.user.user.email,
+        createIfMissing: true,
+      });
+      canEditInventory = canEditHouseholdInventory(member);
+    } catch (err) {
+      console.error("Navigation household role error:", err);
+    }
+  }
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -87,7 +105,7 @@ export default async function RootLayout({ children }) {
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Providers>
-          {token && <Navigation />}
+          {token && <Navigation canEditInventory={canEditInventory} />}
           <div className="bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10">
             {children}
           </div>

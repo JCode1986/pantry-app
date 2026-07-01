@@ -1,14 +1,19 @@
 'use server';
 import { createClient } from '@/utils/supabase/server';
-import axios from 'axios';
 import { revalidatePath } from 'next/cache';
 import { toNonNegativeInteger } from '@/utils/pantry/date';
 import { getSession } from '@/lib/sessionOptions';
 import { createAdminClient } from '@/utils/supabase/admin';
 import {
+  canEditHouseholdInventory,
   getHouseholdBilling,
   getHouseholdForUser,
 } from '@/utils/households';
+import {
+  INVENTORY_IMAGE_BUCKET,
+  INVENTORY_IMAGE_ENTITY,
+  getInventoryImageUrl,
+} from '@/utils/inventoryImages';
 
 function normalizeName(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -26,8 +31,111 @@ function upgradeLimitError(message) {
   };
 }
 
+function revalidateInventoryPaths(extraPaths = []) {
+  const paths = [
+    '/',
+    '/locations',
+    '/areas',
+    '/categories',
+    '/items',
+    '/shopping-list',
+    ...extraPaths,
+  ];
+
+  for (const path of [...new Set(paths.filter(Boolean))]) {
+    revalidatePath(path);
+  }
+}
+
 function normalizeSearchTerm(value) {
-  return normalizeName(value).replace(/[%_]/g, '').slice(0, 80);
+  return normalizeName(value).replace(/[%,_]/g, '').slice(0, 80);
+}
+
+function normalizeBarcode(value) {
+  return typeof value === 'string'
+    ? value.trim().replace(/[^0-9A-Za-z._-]/g, '').slice(0, 80)
+    : '';
+}
+
+function normalizeImageEntityType(value) {
+  return Object.values(INVENTORY_IMAGE_ENTITY).includes(value) ? value : null;
+}
+
+function imageExtension(file) {
+  const type = file?.type || '';
+  if (type === 'image/jpeg') return 'jpg';
+  if (type === 'image/png') return 'png';
+  if (type === 'image/webp') return 'webp';
+  if (type === 'image/gif') return 'gif';
+  return null;
+}
+
+function imageExtensionFromContentType(contentType) {
+  const type = (contentType || '').split(';')[0].trim().toLowerCase();
+  if (type === 'image/jpeg') return 'jpg';
+  if (type === 'image/png') return 'png';
+  if (type === 'image/webp') return 'webp';
+  if (type === 'image/gif') return 'gif';
+  return null;
+}
+
+function allowedProductImageUrl(value) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    if (url.protocol !== 'https:') return null;
+    if (host === 'images.openfoodfacts.org' || host.endsWith('.openfoodfacts.org')) {
+      return url.toString();
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+async function importRemoteItemImage({ householdId, itemId, imageUrl }) {
+  const safeImageUrl = allowedProductImageUrl(imageUrl);
+  if (!householdId || !itemId || !safeImageUrl) return null;
+
+  try {
+    const response = await fetch(safeImageUrl, {
+      headers: {
+        'User-Agent': 'WhereKeep inventory image import (contact: support@wherekeep.app)',
+      },
+    });
+
+    if (!response.ok) return null;
+
+    const extension = imageExtensionFromContentType(response.headers.get('content-type'));
+    if (!extension) return null;
+
+    const bytes = await response.arrayBuffer();
+    if (bytes.byteLength > 5 * 1024 * 1024) return null;
+
+    const admin = createAdminClient();
+    const path = `${householdId}/${INVENTORY_IMAGE_ENTITY.ITEM}/${itemId}.${extension}`;
+    const { error: uploadError } = await admin.storage
+      .from(INVENTORY_IMAGE_BUCKET)
+      .upload(path, bytes, {
+        contentType: response.headers.get('content-type') || `image/${extension}`,
+        upsert: true,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { error: updateError } = await admin
+      .from('items')
+      .update({ image_path: path })
+      .eq('id', itemId);
+
+    if (updateError) throw updateError;
+
+    return path;
+  } catch (err) {
+    console.error('importRemoteItemImage error:', err);
+    return null;
+  }
 }
 
 function compactPath(path) {
@@ -65,7 +173,7 @@ async function getCategoryPath(supabase, categoryId) {
   const { data: location } = area?.location_id
     ? await supabase
         .from('locations')
-        .select('id, name')
+    .select('id, name, image_path')
         .eq('id', area.location_id)
         .single()
     : { data: null };
@@ -153,15 +261,35 @@ async function getCurrentUser() {
 
 async function getCurrentHouseholdContext() {
   const user = await getCurrentUser();
-  if (!user?.id) return { user: null, household: null };
+  if (!user?.id) return { user: null, household: null, member: null };
 
-  const { household } = await getHouseholdForUser({
+  const { household, member } = await getHouseholdForUser({
     userId: user.id,
     email: user.email,
     createIfMissing: true,
   });
 
-  return { user, household };
+  return { user, household, member };
+}
+
+async function requireInventoryEditor() {
+  const context = await getCurrentHouseholdContext();
+
+  if (!context.user?.id) {
+    return {
+      ...context,
+      error: 'Your session has expired. Please log in again.',
+    };
+  }
+
+  if (!canEditHouseholdInventory(context.member)) {
+    return {
+      ...context,
+      error: 'You have view-only access to this household inventory.',
+    };
+  }
+
+  return { ...context, error: null };
 }
 
 async function getCurrentPlanLimits() {
@@ -204,24 +332,216 @@ async function enforceItemLimit(supabase) {
   return null;
 }
 
-export async function fetchRecipes(ingredients) {
-  try {
-    const API_KEY = process.env.SPOONACULAR_API_KEY;
-    const response = await axios.get(
-      'https://api.spoonacular.com/recipes/findByIngredients',
-      {
-        params: {
-          apiKey: API_KEY,
-          ingredients: ingredients.join(','),
-          number: 10,
-          ranking: 1,
+async function getImageEntityRecord(admin, entityType, entityId) {
+  if (entityType === INVENTORY_IMAGE_ENTITY.LOCATION) {
+    const { data, error } = await admin
+      .from('locations')
+      .select('id, household_id, image_path')
+      .eq('id', entityId)
+      .maybeSingle();
+
+    return { data, error };
+  }
+
+  if (entityType === INVENTORY_IMAGE_ENTITY.STORAGE_AREA) {
+    const { data, error } = await admin
+      .from('storage_areas')
+      .select('id, image_path, location_id')
+      .eq('id', entityId)
+      .maybeSingle();
+
+    if (error || !data) return { data, error };
+    if (!data.location_id) return { data: null, error: null };
+
+    const { data: location, error: locationError } = await admin
+      .from('locations')
+      .select('household_id')
+      .eq('id', data.location_id)
+      .maybeSingle();
+
+    if (locationError) return { data: null, error: locationError };
+
+    return {
+      data: {
+        id: data.id,
+        image_path: data.image_path,
+        household_id: location?.household_id,
+      },
+      error: null,
+    };
+  }
+
+  if (entityType === INVENTORY_IMAGE_ENTITY.ITEM) {
+    const { data, error } = await admin
+      .from('items')
+      .select('id, image_path, category_id')
+      .eq('id', entityId)
+      .maybeSingle();
+
+    if (error || !data) return { data, error };
+
+    const { data: category, error: categoryError } = await admin
+      .from('storage_categories')
+      .select('storage_area_id')
+      .eq('id', data.category_id)
+      .maybeSingle();
+
+    if (categoryError) return { data: null, error: categoryError };
+    if (!category?.storage_area_id) return { data: null, error: null };
+
+    const { data: area, error: areaError } = await admin
+      .from('storage_areas')
+      .select('location_id')
+      .eq('id', category?.storage_area_id)
+      .maybeSingle();
+
+    if (areaError) return { data: null, error: areaError };
+    if (!area?.location_id) return { data: null, error: null };
+
+    const { data: location, error: locationError } = await admin
+      .from('locations')
+      .select('household_id')
+      .eq('id', area?.location_id)
+      .maybeSingle();
+
+    if (locationError) return { data: null, error: locationError };
+
+    if (data) {
+      return {
+        data: {
+          id: data.id,
+          image_path: data.image_path,
+          household_id: location?.household_id,
         },
-      }
+        error: null,
+      };
+    }
+
+    return { data, error };
+  }
+
+  return { data: null, error: new Error('Unsupported image entity type') };
+}
+
+function imageEntityTable(entityType) {
+  if (entityType === INVENTORY_IMAGE_ENTITY.LOCATION) return 'locations';
+  if (entityType === INVENTORY_IMAGE_ENTITY.STORAGE_AREA) return 'storage_areas';
+  if (entityType === INVENTORY_IMAGE_ENTITY.ITEM) return 'items';
+  return null;
+}
+
+export async function uploadInventoryImage(entityType, entityId, formData) {
+  const normalizedType = normalizeImageEntityType(entityType);
+  if (!normalizedType || !entityId) {
+    return validationError('Image target is required.');
+  }
+
+  const { household, error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
+
+  const file = formData?.get('image');
+  if (!file || typeof file.arrayBuffer !== 'function') {
+    return validationError('Choose an image to upload.');
+  }
+
+  const extension = imageExtension(file);
+  if (!extension) {
+    return validationError('Upload a JPG, PNG, WebP, or GIF image.');
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    return validationError('Images must be 5 MB or smaller.');
+  }
+
+  try {
+    const admin = createAdminClient();
+    const { data: record, error: lookupError } = await getImageEntityRecord(
+      admin,
+      normalizedType,
+      entityId
     );
-    return response.data;
+
+    if (lookupError) throw lookupError;
+    if (!record || record.household_id !== household?.id) {
+      return validationError('You do not have access to update this image.');
+    }
+
+    const path = `${household.id}/${normalizedType}/${entityId}.${extension}`;
+    const bytes = await file.arrayBuffer();
+    const { error: uploadError } = await admin.storage
+      .from(INVENTORY_IMAGE_BUCKET)
+      .upload(path, bytes, {
+        contentType: file.type,
+        upsert: true,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const table = imageEntityTable(normalizedType);
+    const { error: updateError } = await admin
+      .from(table)
+      .update({ image_path: path })
+      .eq('id', entityId);
+
+    if (updateError) throw updateError;
+
+    if (record.image_path && record.image_path !== path) {
+      await admin.storage.from(INVENTORY_IMAGE_BUCKET).remove([record.image_path]);
+    }
+
+    revalidateInventoryPaths();
+    return {
+      data: {
+        imagePath: path,
+        imageUrl: await getInventoryImageUrl(path),
+      },
+      error: null,
+    };
   } catch (err) {
-    console.error('Error fetching recipes:', err);
-    throw new Error('Failed to fetch recipes');
+    console.error('uploadInventoryImage error:', err);
+    return { data: null, error: err?.message || 'Could not upload image.' };
+  }
+}
+
+export async function removeInventoryImage(entityType, entityId) {
+  const normalizedType = normalizeImageEntityType(entityType);
+  if (!normalizedType || !entityId) {
+    return validationError('Image target is required.');
+  }
+
+  const { household, error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
+
+  try {
+    const admin = createAdminClient();
+    const { data: record, error: lookupError } = await getImageEntityRecord(
+      admin,
+      normalizedType,
+      entityId
+    );
+
+    if (lookupError) throw lookupError;
+    if (!record || record.household_id !== household?.id) {
+      return validationError('You do not have access to update this image.');
+    }
+
+    const table = imageEntityTable(normalizedType);
+    const { error: updateError } = await admin
+      .from(table)
+      .update({ image_path: null })
+      .eq('id', entityId);
+
+    if (updateError) throw updateError;
+
+    if (record.image_path) {
+      await admin.storage.from(INVENTORY_IMAGE_BUCKET).remove([record.image_path]);
+    }
+
+    revalidateInventoryPaths();
+    return { data: { imagePath: null, imageUrl: null }, error: null };
+  } catch (err) {
+    console.error('removeInventoryImage error:', err);
+    return { data: null, error: err?.message || 'Could not remove image.' };
   }
 }
 
@@ -237,7 +557,8 @@ export async function addLocation(name) {
   if (!normalizedName) return validationError('Location name is required');
 
   const supabase = await createClient();
-  const { household } = await getCurrentHouseholdContext();
+  const { household, error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
   const limitError = await enforceLocationLimit(supabase);
   if (limitError) return upgradeLimitError(limitError);
 
@@ -246,7 +567,7 @@ export async function addLocation(name) {
     .insert([{ name: normalizedName, household_id: household?.id }])
     .select('*');
   if (error) throw error;
-  revalidatePath('/');
+  revalidateInventoryPaths();
   return { data: data[0], error: null };
 }
 
@@ -254,17 +575,23 @@ export async function updateLocationName(id, newName) {
   const normalizedName = normalizeName(newName);
   if (!id || !normalizedName) return validationError('Location name is required');
 
+  const { error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
+
   const supabase = await createClient();
   const { error } = await supabase.from('locations').update({ name: normalizedName }).eq('id', id);
   if (error) throw error;
-  revalidatePath('/');
+  revalidateInventoryPaths();
 }
 
 export async function deleteLocation(id) {
+  const { error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
+
   const supabase = await createClient();
   const { error } = await supabase.from('locations').delete().eq('id', id);
   if (error) throw error;
-  revalidatePath('/');
+  revalidateInventoryPaths();
 }
 
 // ✅ Fetch all storage areas for a location
@@ -292,6 +619,9 @@ export async function addStorageArea(locationId, name) {
     return validationError('Location and storage area name are required');
   }
 
+  const { error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
+
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -304,8 +634,7 @@ export async function addStorageArea(locationId, name) {
     return { error: error.message };
   }
 
-  revalidatePath(`/locations/${locationId}`);
-  revalidatePath('/areas');
+  revalidateInventoryPaths([`/locations/${locationId}`]);
   return { data: data[0] };
 }
 
@@ -313,6 +642,9 @@ export async function addStorageArea(locationId, name) {
 export async function updateStorageArea(id, name) {
   const normalizedName = normalizeName(name);
   if (!id || !normalizedName) return validationError('Storage area name is required');
+
+  const { error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
 
   const supabase = await createClient();
 
@@ -323,11 +655,16 @@ export async function updateStorageArea(id, name) {
     .select('*')
     .single();
 
-  return error ? { error } : { data };
+  if (error) return { error };
+  revalidateInventoryPaths();
+  return { data };
 }
 
 // deleteStorageArea
 export async function deleteStorageArea(id) {
+  const { error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
+
   const supabase = await createClient();
 
   const { error } = await supabase
@@ -335,14 +672,90 @@ export async function deleteStorageArea(id) {
     .delete()
     .eq('id', id);
 
-  return error ? { error } : { success: true };
+  if (error) return { error };
+  revalidateInventoryPaths();
+  return { success: true };
 }
 
-export async function addItem(categoryId, { name, quantity = 0, expiration_date = null }) {
+export async function lookupProductByBarcode(barcode) {
+  const normalizedBarcode = normalizeBarcode(barcode);
+  if (normalizedBarcode.length < 4) {
+    return validationError('Enter a valid barcode.');
+  }
+
+  try {
+    const endpoint = new URL(
+      `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(normalizedBarcode)}.json`
+    );
+    endpoint.searchParams.set(
+      'fields',
+      'code,product_name,product_name_en,generic_name,brands,image_front_url,image_url'
+    );
+
+    const response = await fetch(endpoint.toString(), {
+      headers: {
+        'User-Agent': 'WhereKeep barcode lookup (contact: support@wherekeep.app)',
+      },
+      next: { revalidate: 60 * 60 * 24 },
+    });
+
+    if (!response.ok) {
+      return validationError('Could not look up that barcode right now.');
+    }
+
+    const payload = await response.json();
+    const product = payload?.product;
+
+    if (payload?.status !== 1 || !product) {
+      return {
+        data: {
+          barcode: normalizedBarcode,
+          found: false,
+          name: '',
+          brand: '',
+          imageUrl: null,
+        },
+        error: null,
+      };
+    }
+
+    const name =
+      normalizeName(product.product_name_en) ||
+      normalizeName(product.product_name) ||
+      normalizeName(product.generic_name);
+    const brand = normalizeName(product.brands);
+    const imageUrl =
+      allowedProductImageUrl(product.image_front_url) ||
+      allowedProductImageUrl(product.image_url);
+
+    return {
+      data: {
+        barcode: normalizeBarcode(product.code) || normalizedBarcode,
+        found: Boolean(name || imageUrl),
+        name,
+        brand,
+        imageUrl,
+      },
+      error: null,
+    };
+  } catch (err) {
+    console.error('lookupProductByBarcode error:', err);
+    return validationError('Product lookup is unavailable right now.');
+  }
+}
+
+export async function addItem(
+  categoryId,
+  { name, quantity = 0, expiration_date = null, barcode = '', productImageUrl = null }
+) {
   const normalizedName = normalizeName(name);
+  const normalizedBarcode = normalizeBarcode(barcode);
   if (!categoryId || !normalizedName) {
     return validationError('Category and item name are required');
   }
+
+  const { household, error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
 
   const supabase = await createClient();
   const limitError = await enforceItemLimit(supabase);
@@ -356,6 +769,7 @@ export async function addItem(categoryId, { name, quantity = 0, expiration_date 
         name: normalizedName,
         quantity: toNonNegativeInteger(quantity, 0),
         expiration_date: expiration_date || null,
+        barcode: normalizedBarcode || null,
       },
     ])
     .select('*')               
@@ -366,7 +780,20 @@ export async function addItem(categoryId, { name, quantity = 0, expiration_date 
     return { error };
   }
 
-  return { data };            
+  const imagePath = await importRemoteItemImage({
+    householdId: household?.id,
+    itemId: data.id,
+    imageUrl: productImageUrl,
+  });
+
+  revalidateInventoryPaths();
+  return {
+    data: {
+      ...data,
+      image_path: imagePath ?? data.image_path ?? null,
+      imageUrl: imagePath ? await getInventoryImageUrl(imagePath) : null,
+    },
+  };
 }
 
 export async function getInventoryHierarchy() {
@@ -422,8 +849,8 @@ export async function searchItems(query) {
 
   const { data: itemsRaw, error: itemsError } = await supabase
     .from('items')
-    .select('id, name, quantity, expiration_date, category_id')
-    .ilike('name', `%${term}%`)
+    .select('id, name, quantity, expiration_date, category_id, image_path, barcode')
+    .or(`name.ilike.%${term}%,barcode.ilike.%${term}%`)
     .order('name', { ascending: true })
     .limit(50);
 
@@ -461,7 +888,7 @@ export async function searchItems(query) {
   const { data: areasRaw, error: areasError } = areaIds.length
     ? await supabase
         .from('storage_areas')
-        .select('id, name, location_id')
+        .select('id, name, location_id, image_path')
         .in('id', areaIds)
     : { data: [], error: null };
 
@@ -476,7 +903,7 @@ export async function searchItems(query) {
   ];
 
   const { data: locationsRaw, error: locationsError } = locationIds.length
-    ? await supabase.from('locations').select('id, name').in('id', locationIds)
+    ? await supabase.from('locations').select('id, name, image_path').in('id', locationIds)
     : { data: [], error: null };
 
   if (locationsError) {
@@ -491,7 +918,7 @@ export async function searchItems(query) {
   );
 
   return {
-    data: items.map((item) => {
+    data: await Promise.all(items.map(async (item) => {
       const category = item.category_id
         ? categoryMap.get(String(item.category_id))
         : null;
@@ -507,13 +934,27 @@ export async function searchItems(query) {
         name: item.name,
         quantity: item.quantity ?? 0,
         expirationDate: item.expiration_date ?? null,
+        barcode: item.barcode ?? null,
+        imageUrl: await getInventoryImageUrl(item.image_path),
         category: category
           ? { id: category.id, name: category.name }
           : null,
-        storageArea: area ? { id: area.id, name: area.name } : null,
-        location: location ? { id: location.id, name: location.name } : null,
+        storageArea: area
+          ? {
+              id: area.id,
+              name: area.name,
+              imageUrl: await getInventoryImageUrl(area.image_path),
+            }
+          : null,
+        location: location
+          ? {
+              id: location.id,
+              name: location.name,
+              imageUrl: await getInventoryImageUrl(location.image_path),
+            }
+          : null,
       };
-    }),
+    })),
     error: null,
   };
 }
@@ -528,12 +969,16 @@ export async function addItemWithPath({
   itemName,
   quantity = 0,
   expirationDate = null,
+  barcode = '',
+  productImageUrl = null,
 }) {
   const normalizedItemName = normalizeName(itemName);
+  const normalizedBarcode = normalizeBarcode(barcode);
   if (!normalizedItemName) return validationError('Item name is required');
 
   const supabase = await createClient();
-  const { household } = await getCurrentHouseholdContext();
+  const { household, error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
   const itemLimitError = await enforceItemLimit(supabase);
   if (itemLimitError) return upgradeLimitError(itemLimitError);
 
@@ -550,7 +995,7 @@ export async function addItemWithPath({
     const { data, error } = await supabase
       .from('locations')
       .insert([{ name: normalizedLocationName, household_id: household?.id }])
-      .select('id, name')
+      .select('id, name, image_path')
       .single();
 
     if (error) {
@@ -638,9 +1083,10 @@ export async function addItemWithPath({
         name: normalizedItemName,
         quantity: toNonNegativeInteger(quantity, 0),
         expiration_date: expirationDate || null,
+        barcode: normalizedBarcode || null,
       },
     ])
-    .select('id, name, quantity, expiration_date, category_id')
+    .select('id, name, quantity, expiration_date, category_id, image_path, barcode')
     .single();
 
   if (error) {
@@ -648,15 +1094,19 @@ export async function addItemWithPath({
     return { data: null, error: error.message };
   }
 
-  revalidatePath('/');
-  revalidatePath('/locations');
-  revalidatePath('/areas');
-  revalidatePath('/categories');
-  revalidatePath('/items');
+  const imagePath = await importRemoteItemImage({
+    householdId: household?.id,
+    itemId: data.id,
+    imageUrl: productImageUrl,
+  });
+
+  revalidateInventoryPaths();
 
   return {
     data: {
       ...data,
+      image_path: imagePath ?? data.image_path ?? null,
+      imageUrl: imagePath ? await getInventoryImageUrl(imagePath) : null,
       locationId: finalLocationId,
       locationName: finalLocationName,
       storageAreaId: finalStorageAreaId,
@@ -673,6 +1123,9 @@ export async function addItemWithPath({
 
 // actions/server.js
 export async function updateItem(itemId, updates) {
+  const { error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
+
   const supabase = await createClient();
 
   // Normalize keys coming from the client
@@ -683,6 +1136,11 @@ export async function updateItem(itemId, updates) {
   }
   if (updates?.quantity !== undefined) {
     payload.quantity = toNonNegativeInteger(updates.quantity, 0);
+  }
+
+  if (updates?.barcode !== undefined) {
+    const barcode = normalizeBarcode(updates.barcode);
+    payload.barcode = barcode || null;
   }
 
   // accept either expiration or expiration_date from client
@@ -705,84 +1163,20 @@ export async function updateItem(itemId, updates) {
     return { error: error.message };
   }
 
+  revalidateInventoryPaths();
   return { data };
 }
 
 
 export async function deleteItem(itemId) {
+  const { error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
+
   const supabase = await createClient();
   const { error } = await supabase.from('items').delete().eq('id', itemId);
   if (error) throw error;
+  revalidateInventoryPaths();
   return { success: true };
-}
-
-// 🛠 Fetch all storages (with categories & ingredients)
-export async function getStorages() {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('food_storages')
-    .select('*, storage_categories(*, ingredients!fk_category(*))')
-    .order('created_at', { ascending: true });
-
-  if (error) throw error;
-  return data;
-}
-
-// 🛠 Fetch a single storage by ID (with nested)
-export async function getStorageById(storageId) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('food_storages')
-    .select('*, storage_categories(*, ingredients!fk_category(*))')
-    .eq('id', storageId)
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-// ➕ Add food storage (RLS uses auth.uid())
-export async function addStorage(name) {
-  const normalizedName = normalizeName(name);
-  if (!normalizedName) return validationError('Storage name is required');
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('food_storages')
-    .insert([{ name: normalizedName }])
-    .select('*, storage_categories(*, ingredients!fk_category(*))');
-
-  if (error) throw error;
-
-  revalidatePath('/');
-  return data[0];
-}
-
-// ✏️ Update food storage name
-export async function updateStorageName(storageId, newName) {
-  const normalizedName = normalizeName(newName);
-  if (!storageId || !normalizedName) return validationError('Storage name is required');
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from('food_storages')
-    .update({ name: normalizedName })
-    .eq('id', storageId);
-
-  if (error) throw error;
-  revalidatePath('/');
-}
-
-// 🗑️ Delete food storage
-export async function deleteStorage(storageId) {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from('food_storages')
-    .delete()
-    .eq('id', storageId);
-
-  if (error) throw error;
-  revalidatePath('/');
 }
 
 export async function addCategory(storageAreaId, name) {
@@ -790,6 +1184,9 @@ export async function addCategory(storageAreaId, name) {
   if (!storageAreaId || !normalizedName) {
     return validationError('Storage area and category name are required');
   }
+
+  const { error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -802,6 +1199,7 @@ export async function addCategory(storageAreaId, name) {
     console.error('addCategory error:', error);
     return { data: null, error };
   }
+  revalidateInventoryPaths();
   return { data, error: null };
 }
 
@@ -809,6 +1207,9 @@ export async function addCategory(storageAreaId, name) {
 export async function updateCategoryName(categoryId, name) {
   const normalizedName = normalizeName(name);
   if (!categoryId || !normalizedName) return validationError('Category name is required');
+
+  const { error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -818,20 +1219,30 @@ export async function updateCategoryName(categoryId, name) {
     .select('*')
     .single();
 
-  return error ? { error } : { data };
+  if (error) return { error };
+  revalidateInventoryPaths();
+  return { data };
 }
 
 export async function deleteCategory(categoryId) {
+  const { error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
+
   const supabase = await createClient();
   const { error } = await supabase
     .from('storage_categories')
     .delete()
     .eq('id', categoryId);
 
-  return error ? { error } : { success: true };
+  if (error) return { error };
+  revalidateInventoryPaths();
+  return { success: true };
 }
 
 export async function updateItemLocation(itemId, values) {
+  const { error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
+
   const supabase = await createClient();
   const startedAt = new Date(Date.now() - 5000).toISOString();
 
@@ -895,9 +1306,7 @@ export async function updateItemLocation(itemId, values) {
     toPath,
   });
 
-  revalidatePath('/');
-  revalidatePath('/items');
-  revalidatePath('/locations');
+  revalidateInventoryPaths();
 
   return { data, error: null };
 }

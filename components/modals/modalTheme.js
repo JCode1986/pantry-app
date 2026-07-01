@@ -19,3 +19,14 @@ export const modalInputClassNames = {
   label: "text-gray-600",
   input: "text-gray-800",
 };
+
+export const themedSelectClassNames = {
+  trigger:
+    "border-[var(--stocksense-brand-border)] bg-white shadow-none data-[hover=true]:border-[var(--stocksense-brand)] data-[open=true]:border-[var(--stocksense-brand)] data-[focus=true]:border-[var(--stocksense-brand)]",
+  label: "text-gray-600 group-data-[focus=true]:text-[var(--stocksense-brand)]",
+  value: "text-gray-800",
+  selectorIcon: "text-[var(--stocksense-brand)]",
+  popoverContent:
+    "border border-[var(--stocksense-brand-border)] bg-white text-gray-700 shadow-lg",
+  listbox: "text-gray-700",
+};

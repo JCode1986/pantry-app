@@ -1,4 +1,4 @@
-import WhereKeepLoader from "@/components/WhereKeepLoader";
+import WhereKeepLoader from "@/components/ui/WhereKeepLoader";
 
 export default function Loading() {
   return (

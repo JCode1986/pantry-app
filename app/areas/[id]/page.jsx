@@ -1,7 +1,9 @@
 import { createClient } from "@/utils/supabase/server";
 import { notFound } from "next/navigation";
-import AreaDetailClient from "@/components/AreaDetailClient";
-import { createPageMetadata } from "@/utils/metadata";
+import AreaDetailClient from "@/components/areas/AreaDetailClient";
+import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
+import { getCanEditInventoryForUser } from "@/utils/households";
+import { getInventoryImageUrl } from "@/utils/inventoryImages";
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
@@ -21,12 +23,17 @@ export async function generateMetadata({ params }) {
       ? `Manage categories and items in ${name} at ${locationName}.`
       : `Manage categories and items in ${name}.`,
     path: `/areas/${id}`,
+    robots: NO_INDEX_ROBOTS,
   });
 }
 
 export default async function Page({ params }) {
   const supabase = await createClient();
   const { id } = await params;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const canEditInventory = await getCanEditInventoryForUser(user);
 
   // 1) Fetch area + its location
   const { data: area, error: areaError } = await supabase
@@ -35,6 +42,7 @@ export default async function Page({ params }) {
       `
       id,
       name,
+      image_path,
       location_id,
       location:locations (
         id,
@@ -81,18 +89,21 @@ export default async function Page({ params }) {
   };
 
   return (
-    <main className="page-enter max-w-[1300px] mx-auto p-6 pt-8 min-h-[100vh]">
+    <main className="page-enter max-w-[1500px] mx-auto p-6 pt-8 min-h-[100vh]">
       <AreaDetailClient
         area={{
           id: area.id,
           name: area.name,
           location: {
-            id: area.location?.id ?? null,
-            name: area.location?.name ?? "Unknown location",
-          },
-        }}
+          id: area.location?.id ?? null,
+          name: area.location?.name ?? "Unknown location",
+        },
+        image_path: area.image_path ?? null,
+        imageUrl: await getInventoryImageUrl(area.image_path),
+      }}
         initialCategories={categories}
         totals={totals}
+        canEditInventory={canEditInventory}
       />
     </main>
   );
