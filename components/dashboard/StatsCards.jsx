@@ -3,54 +3,77 @@
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Skeleton } from '@heroui/react';
-import { FaMapMarkedAlt, FaWarehouse, FaTags, FaBoxOpen } from 'react-icons/fa';
+import {
+  FaBoxOpen,
+  FaMapMarkedAlt,
+  FaShoppingBasket,
+  FaTags,
+  FaWarehouse,
+} from 'react-icons/fa';
 
 const cards = [
   {
     key: 'locations',
     label: 'Locations',
     icon: FaMapMarkedAlt,
-    accent: 'from-indigo-500 to-violet-500',
+    accent: 'var(--entity-location-accent)',
+    accentSoft: 'var(--entity-location-soft)',
+    accentBorder: 'var(--entity-location-border)',
     href: '/locations',
   },
   {
     key: 'areas',
     label: 'Storage Areas',
     icon: FaWarehouse,
-    accent: 'from-sky-500 to-cyan-500',
+    accent: 'var(--entity-area-accent)',
+    accentSoft: 'var(--entity-area-soft)',
+    accentBorder: 'var(--entity-area-border)',
     href: '/areas',
   },
   {
     key: 'categories',
     label: 'Categories',
     icon: FaTags,
-    accent: 'from-emerald-500 to-lime-500',
+    accent: 'var(--entity-category-accent)',
+    accentSoft: 'var(--entity-category-soft)',
+    accentBorder: 'var(--entity-category-border)',
     href: '/categories',
   },
   {
     key: 'items',
     label: 'Items',
     icon: FaBoxOpen,
-    accent: 'from-rose-500 to-orange-500',
+    accent: 'var(--entity-item-accent)',
+    accentSoft: 'var(--entity-item-soft)',
+    accentBorder: 'var(--entity-item-border)',
     href: '/items',
+  },
+  {
+    key: 'shoppingListItems',
+    label: 'Shopping List',
+    icon: FaShoppingBasket,
+    accent: 'var(--entity-shopping-accent)',
+    accentSoft: 'var(--entity-shopping-soft)',
+    accentBorder: 'var(--entity-shopping-border)',
+    href: '/shopping-list',
   },
 ];
 
-function SkeletonCard({ accent }) {
+function SkeletonCard({ accent, accentSoft, accentBorder }) {
   return (
     <div className="relative overflow-hidden rounded-2xl bg-white shadow-sm border border-gray-300">
       {/* gradient accent */}
       <div
-        className={`pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full
-                    bg-gradient-to-br ${accent} opacity-20 blur-2xl`}
+        className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full opacity-30 blur-2xl"
+        style={{ background: accentSoft }}
       />
 
       <div className="p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div
-              className={`rounded-xl p-3 bg-gradient-to-br ${accent}
-                          shadow-sm border border-gray-300`}
+              className="rounded-xl p-3 shadow-sm border"
+              style={{ background: accent, borderColor: accentBorder }}
             >
               <Skeleton className="h-5 w-5 rounded-md bg-white/40" />
             </div>
@@ -79,7 +102,7 @@ function SkeletonCard({ accent }) {
 
 export default function StatsCards({ totals, isLoading = false }) {
   return (
-    <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       {cards.map((c, idx) => {
         const Icon = c.icon;
         const value = totals?.[c.key] ?? 0;
@@ -97,7 +120,11 @@ export default function StatsCards({ totals, isLoading = false }) {
             }}
           >
             {isLoading ? (
-              <SkeletonCard accent={c.accent} />
+              <SkeletonCard
+                accent={c.accent}
+                accentSoft={c.accentSoft}
+                accentBorder={c.accentBorder}
+              />
             ) : (
               <Link
                 href={c.href}
@@ -108,16 +135,23 @@ export default function StatsCards({ totals, isLoading = false }) {
               >
                 {/* gradient accent */}
                 <div
-                  className={`pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full
-                              bg-gradient-to-br ${c.accent} opacity-20 blur-2xl`}
+                  className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full opacity-30 blur-2xl"
+                  style={{ background: c.accentSoft }}
+                />
+                <div
+                  className="absolute inset-x-0 top-0 h-1"
+                  style={{ background: c.accent }}
                 />
 
                 <div className="p-5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div
-                        className={`rounded-xl p-3 text-white bg-gradient-to-br ${c.accent}
-                                    shadow-sm border border-gray-300`}
+                        className="rounded-xl p-3 text-white shadow-sm border"
+                        style={{
+                          background: c.accent,
+                          borderColor: c.accentBorder,
+                        }}
                       >
                         <Icon className="h-5 w-5" />
                       </div>

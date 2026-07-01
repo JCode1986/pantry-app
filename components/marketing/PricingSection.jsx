@@ -2,18 +2,33 @@ import Link from "next/link";
 import { FaCheck } from "react-icons/fa";
 import { BILLING_PLANS } from "@/utils/billingPlans";
 
+function getPlanCta(plan) {
+  if (plan.id === "free") return "Start free";
+  if (plan.id === "plus") return "Unlock unlimited";
+  return "Invite your household";
+}
+
+function getPlanBadge(plan) {
+  if (plan.id === "free") return "Try it";
+  if (plan.id === "plus") return "Most popular";
+  return "Shared access";
+}
+
 export default function PricingSection({ showHeading = true }) {
   return (
-    <section className="border-y border-gray-200 bg-white">
+    <section id="pricing" className="border-y border-gray-200 bg-gray-50">
       <div className="mx-auto max-w-6xl px-5 py-12">
         {showHeading && (
-          <div className="mb-7 max-w-2xl">
+          <div className="mx-auto mb-8 max-w-3xl text-center">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--stocksense-brand)]">
+              Pricing
+            </div>
             <h2 className="text-2xl font-semibold tracking-tight text-gray-900">
-              Choose the right WhereKeep plan.
+              Pricing that follows the moment of value.
             </h2>
-            <p className="mt-2 text-sm leading-6 text-gray-600">
-              Start free, then upgrade when you need unlimited inventory or
-              shared household access.
+            <p className="mt-3 text-sm leading-6 text-gray-600 sm:text-base">
+              Free is enough to organize the first shelf. Plus is for serious
+              household tracking, and Family is for controlled shared access.
             </p>
           </div>
         )}
@@ -22,22 +37,29 @@ export default function PricingSection({ showHeading = true }) {
           {BILLING_PLANS.map((plan) => (
             <article
               key={plan.id}
-              className={`rounded-xl border bg-white p-5 shadow-sm ${
+              className={`relative overflow-hidden rounded-xl border bg-white p-5 shadow-sm ${
                 plan.featured
                   ? "border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]"
                   : "border-gray-200"
               }`}
             >
+              {plan.featured && (
+                <div className="absolute inset-x-0 top-0 h-1 bg-[var(--stocksense-brand)]" />
+              )}
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">{plan.name}</h3>
                   <p className="mt-1 text-sm text-gray-500">{plan.audience}</p>
                 </div>
-                {plan.featured && (
-                  <span className="rounded-full bg-[var(--stocksense-brand-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--stocksense-brand)]">
-                    Popular
-                  </span>
-                )}
+                <span
+                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                    plan.featured
+                      ? "bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
+                      : "bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  {getPlanBadge(plan)}
+                </span>
               </div>
 
               <p className="mt-4 text-sm leading-6 text-gray-600">
@@ -51,12 +73,15 @@ export default function PricingSection({ showHeading = true }) {
                 <span className="text-sm text-gray-500"> /mo</span>
                 {plan.yearlyPrice !== "$0" && (
                   <div className="mt-1 text-xs text-gray-500">
-                    or {plan.yearlyPrice}/yr
+                    or {plan.yearlyPrice}/yr for a lower annual cost
                   </div>
                 )}
               </div>
 
-              <ul className="mt-5 space-y-2">
+              <div className="mt-5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Includes
+              </div>
+              <ul className="mt-2 space-y-2">
                 {plan.features.map((feature) => (
                   <li key={feature} className="flex gap-2 text-sm text-gray-600">
                     <FaCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--stocksense-brand)]" />
@@ -70,10 +95,10 @@ export default function PricingSection({ showHeading = true }) {
                 className={`mt-6 inline-flex w-full items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
                   plan.featured
                     ? "bg-[var(--stocksense-brand)] text-white hover:brightness-95"
-                    : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                  : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
                 }`}
               >
-                {plan.id === "free" ? "Start free" : plan.cta}
+                {getPlanCta(plan)}
               </Link>
             </article>
           ))}

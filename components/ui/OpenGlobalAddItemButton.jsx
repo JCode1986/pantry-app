@@ -8,7 +8,10 @@ export default function OpenGlobalAddItemButton({
   className = "",
   variant,
   context,
+  canEditInventory = true,
 }) {
+  if (!canEditInventory) return null;
+
   return (
     <Button
       variant={variant}

@@ -38,6 +38,7 @@ import {
   createHouseholdInviteAction,
   removeHouseholdMemberAction,
   revokeHouseholdInviteAction,
+  updateHouseholdMemberRoleAction,
 } from "@/app/actions/household";
 import {
   BILLING_INTERVALS,
@@ -54,6 +55,8 @@ import {
   saveStoredPreferences,
 } from "@/utils/appPreferences";
 import { updateUserPreferencesAction } from "@/app/actions/preferences";
+import { themedSelectClassNames } from "@/components/modals/modalTheme";
+import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 
 const sectionVariants = {
   hidden: { opacity: 0 },
@@ -71,6 +74,25 @@ const itemVariants = {
     transition: { duration: 0.32, type: "spring", stiffness: 130 },
   },
 };
+
+const HOUSEHOLD_ROLE_OPTIONS = [
+  {
+    id: "editor",
+    label: "Editor",
+    description: "Can add, edit, move, delete, and manage shopping list items.",
+  },
+  {
+    id: "viewer",
+    label: "Viewer",
+    description: "Can view inventory, shopping list, and recent activity only.",
+  },
+];
+
+function formatHouseholdRole(role) {
+  if (role === "owner") return "Owner";
+  if (role === "viewer") return "Viewer";
+  return "Editor";
+}
 
 function StatusMessage({ type, children }) {
   const isSuccess = type === "success";
@@ -339,11 +361,14 @@ function SharingSection({
   sharingError,
   sharingMessage,
   inviteEmail,
+  inviteRole,
   onInviteEmailChange,
+  onInviteRoleChange,
   onCreateInvite,
   onCopyInvite,
   onRevokeInvite,
   onRemoveMember,
+  onUpdateMemberRole,
   copiedInviteId,
   loading,
 }) {
@@ -393,7 +418,7 @@ function SharingSection({
                 </div>
               </div>
               <span className="w-max rounded-full bg-[var(--stocksense-brand-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--stocksense-brand)]">
-                {isOwner ? "Owner" : "Member"}
+                {formatHouseholdRole(sharing.currentUserRole)}
               </span>
             </div>
           </div>
@@ -409,13 +434,15 @@ function SharingSection({
 
           {isFamily && !isOwner && (
             <div className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-3 text-sm text-[var(--stocksense-brand)]">
-              You can view and manage this shared inventory. Only the household owner can invite new members.
+              {sharing.currentUserRole === "viewer"
+                ? "You have view-only access. You can browse inventory, shopping list, and activity without changing household data."
+                : "You can view and manage this shared inventory. Only the household owner can invite new members."}
             </div>
           )}
 
           {isFamily && isOwner && (
             <form onSubmit={onCreateInvite} className="space-y-3">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_220px_auto]">
                 <Input
                   label="Invite by email"
                   type="email"
@@ -426,9 +453,27 @@ function SharingSection({
                     inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
                   }}
                 />
+                <Select
+                  label="Role"
+                  selectedKeys={new Set([inviteRole])}
+                  onSelectionChange={(keys) => {
+                    const value = Array.from(keys)[0];
+                    if (value) onInviteRoleChange(String(value));
+                  }}
+                  isDisabled={loading === "invite" || !sharing.canInvite}
+                  variant="bordered"
+                  radius="lg"
+                  classNames={themedSelectClassNames}
+                >
+                  {HOUSEHOLD_ROLE_OPTIONS.map((role) => (
+                    <SelectItem key={role.id} textValue={role.label}>
+                      {role.label} - {role.description}
+                    </SelectItem>
+                  ))}
+                </Select>
                 <Button
                   type="submit"
-                  className="h-14 rounded-xl bg-[var(--stocksense-brand)] px-5 text-white sm:self-end"
+                  className="h-14 rounded-xl bg-[var(--stocksense-brand)] px-5 text-white lg:self-end"
                   isLoading={loading === "invite"}
                   isDisabled={loading === "invite" || !sharing.canInvite}
                   startContent={<FaUserPlus className="h-3.5 w-3.5" />}
@@ -471,20 +516,40 @@ function SharingSection({
                       {member.email}
                     </div>
                     <div className="text-xs capitalize text-gray-500">
-                      {member.role}
+                      {formatHouseholdRole(member.role)}
                     </div>
                   </div>
                   {isOwner && member.role !== "owner" ? (
-                    <Button
-                      size="sm"
-                      variant="flat"
-                      className="shrink-0 rounded-lg border border-rose-200 bg-rose-50 text-rose-700"
-                      onPress={() => onRemoveMember(member)}
-                      isLoading={loading === `remove:${member.userId}`}
-                      startContent={<FaTimesCircle className="h-3.5 w-3.5" />}
-                    >
-                      Remove
-                    </Button>
+                    <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+                      <Select
+                        aria-label={`Role for ${member.email}`}
+                        size="sm"
+                        selectedKeys={new Set([member.role === "viewer" ? "viewer" : "editor"])}
+                        onSelectionChange={(keys) => {
+                          const value = Array.from(keys)[0];
+                          if (value) onUpdateMemberRole(member, String(value));
+                        }}
+                        isDisabled={loading === `role:${member.userId}`}
+                        variant="bordered"
+                        radius="lg"
+                        className="w-36"
+                        classNames={themedSelectClassNames}
+                      >
+                        {HOUSEHOLD_ROLE_OPTIONS.map((role) => (
+                          <SelectItem key={role.id}>{role.label}</SelectItem>
+                        ))}
+                      </Select>
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        className="rounded-lg border border-rose-200 bg-rose-50 text-rose-700"
+                        onPress={() => onRemoveMember(member)}
+                        isLoading={loading === `remove:${member.userId}`}
+                        startContent={<FaTimesCircle className="h-3.5 w-3.5" />}
+                      >
+                        Remove
+                      </Button>
+                    </div>
                   ) : (
                     <FaCheckCircle className="h-4 w-4 shrink-0 text-[var(--stocksense-brand)]" />
                   )}
@@ -508,7 +573,8 @@ function SharingSection({
                           {invite.email}
                         </div>
                         <div className="text-xs text-gray-500">
-                          Expires {formatBillingDate(invite.expiresAt) ?? "soon"}
+                          {formatHouseholdRole(invite.role)} access - Expires{" "}
+                          {formatBillingDate(invite.expiresAt) ?? "soon"}
                         </div>
                       </div>
                       <div className="flex shrink-0 gap-2">
@@ -578,7 +644,9 @@ export default function ProfileClient({
   const [sharingMessage, setSharingMessage] = useState(null);
   const [sharingLoading, setSharingLoading] = useState(null);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("editor");
   const [copiedInviteId, setCopiedInviteId] = useState(null);
+  const [removeMemberCandidate, setRemoveMemberCandidate] = useState(null);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
@@ -588,6 +656,9 @@ export default function ProfileClient({
   const showConfirmError = submitted && passwordValid && !passwordsMatch;
   const selectedTheme = getThemeById(preferences.themeId);
   const selectedFont = getFontById(preferences.fontId);
+  const effectivePlanId = getEffectivePlanId(billing);
+  const appearancePlanId = sharing?.effectivePlanId || effectivePlanId;
+  const canCustomizeAppearance = appearancePlanId !== "free";
 
   const initials = useMemo(() => {
     const email = user?.email || "";
@@ -658,6 +729,16 @@ export default function ProfileClient({
   };
 
   const updatePreferences = async (nextPreferences) => {
+    if (!canCustomizeAppearance) {
+      const defaults = saveStoredPreferences(DEFAULT_PREFERENCES);
+      setPreferences(defaults);
+      setAppearanceMessage({
+        type: "error",
+        text: "Appearance customization requires a Plus or Family plan.",
+      });
+      return;
+    }
+
     const normalized = saveStoredPreferences({
       ...preferences,
       ...nextPreferences,
@@ -734,7 +815,7 @@ export default function ProfileClient({
     setSharingError(null);
     setSharingMessage(null);
 
-    const result = await createHouseholdInviteAction(inviteEmail);
+    const result = await createHouseholdInviteAction(inviteEmail, inviteRole);
     setSharingLoading(null);
 
     if (result?.error) {
@@ -749,6 +830,7 @@ export default function ProfileClient({
         invites: [invite, ...(current?.invites ?? [])],
       }));
       setInviteEmail("");
+      setInviteRole("editor");
       const sentExistingUserLink = result?.data?.emailType === "magic_link";
       setSharingMessage({
         type: result?.data?.emailSent ? "success" : "error",
@@ -787,20 +869,27 @@ export default function ProfileClient({
     }));
   };
 
-  const handleRemoveMember = async (member) => {
+  const handleRequestRemoveMember = (member) => {
     if (!member?.userId) return;
+    setSharingMessage(null);
+    setRemoveMemberCandidate(member);
+  };
 
-    const confirmed = window.confirm(
-      `Remove ${member.email} from this household? They will lose access to the shared inventory.`
-    );
+  const handleCancelRemoveMember = () => {
+    if (sharingLoading?.startsWith("remove:")) return;
+    setRemoveMemberCandidate(null);
+  };
 
-    if (!confirmed) return;
+  const handleConfirmRemoveMember = async () => {
+    const member = removeMemberCandidate;
+    if (!member?.userId) return;
 
     setSharingLoading(`remove:${member.userId}`);
     setSharingMessage(null);
 
     const result = await removeHouseholdMemberAction(member.userId);
     setSharingLoading(null);
+    setRemoveMemberCandidate(null);
 
     if (result?.error) {
       setSharingMessage({ type: "error", text: result.error });
@@ -827,6 +916,36 @@ export default function ProfileClient({
     setSharingMessage({
       type: "success",
       text: `${member.email} was removed from this household.`,
+    });
+  };
+
+  const handleUpdateMemberRole = async (member, role) => {
+    if (!member?.userId || !role || member.role === role) return;
+
+    setSharingLoading(`role:${member.userId}`);
+    setSharingMessage(null);
+
+    const result = await updateHouseholdMemberRoleAction(member.userId, role);
+    setSharingLoading(null);
+
+    if (result?.error) {
+      setSharingMessage({ type: "error", text: result.error });
+      return;
+    }
+
+    const updatedMember = result?.data?.member;
+    if (!updatedMember) return;
+
+    setSharing((current) => ({
+      ...current,
+      members: (current?.members ?? []).map((item) =>
+        item.userId === updatedMember.userId ? updatedMember : item
+      ),
+    }));
+
+    setSharingMessage({
+      type: "success",
+      text: `${updatedMember.email} is now a ${formatHouseholdRole(updatedMember.role).toLowerCase()}.`,
     });
   };
 
@@ -873,11 +992,14 @@ export default function ProfileClient({
             sharingError={sharingError}
             sharingMessage={sharingMessage}
             inviteEmail={inviteEmail}
+            inviteRole={inviteRole}
             onInviteEmailChange={setInviteEmail}
+            onInviteRoleChange={setInviteRole}
             onCreateInvite={handleCreateInvite}
             onCopyInvite={handleCopyInvite}
             onRevokeInvite={handleRevokeInvite}
-            onRemoveMember={handleRemoveMember}
+            onRemoveMember={handleRequestRemoveMember}
+            onUpdateMemberRole={handleUpdateMemberRole}
             copiedInviteId={copiedInviteId}
             loading={sharingLoading}
           />
@@ -987,18 +1109,25 @@ export default function ProfileClient({
             </div>
 
             <div className="mt-5 space-y-5">
+              {!canCustomizeAppearance && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+                  Theme and font customization is included with Plus and Family.{" "}
+                  <Link href="#billing" className="font-semibold underline">
+                    View plans
+                  </Link>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Select
                   label="Color theme"
                   selectedKeys={new Set([preferences.themeId])}
                   onSelectionChange={handleThemeChange}
-                  isDisabled={savingPreferences}
+                  isDisabled={savingPreferences || !canCustomizeAppearance}
                   variant="bordered"
                   radius="lg"
                   startContent={<FaPalette className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />}
-                  classNames={{
-                    trigger: "border-stocksense-gray",
-                  }}
+                  classNames={themedSelectClassNames}
                 >
                   {THEME_OPTIONS.map((theme) => (
                     <SelectItem key={theme.id} textValue={theme.label}>
@@ -1011,13 +1140,11 @@ export default function ProfileClient({
                   label="Font family"
                   selectedKeys={new Set([preferences.fontId])}
                   onSelectionChange={handleFontChange}
-                  isDisabled={savingPreferences}
+                  isDisabled={savingPreferences || !canCustomizeAppearance}
                   variant="bordered"
                   radius="lg"
                   startContent={<FaFont className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />}
-                  classNames={{
-                    trigger: "border-stocksense-gray",
-                  }}
+                  classNames={themedSelectClassNames}
                 >
                   {FONT_OPTIONS.map((font) => (
                     <SelectItem key={font.id} textValue={font.label}>
@@ -1034,6 +1161,7 @@ export default function ProfileClient({
                 className="rounded-xl border border-stocksense-gray bg-white text-gray-700"
                 onPress={() => updatePreferences(DEFAULT_PREFERENCES)}
                 isLoading={savingPreferences}
+                isDisabled={savingPreferences || !canCustomizeAppearance}
                 startContent={<FaRedo className="h-3.5 w-3.5" />}
               >
                 Reset appearance
@@ -1134,6 +1262,24 @@ export default function ProfileClient({
           </section>
         </motion.aside>
       </div>
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(removeMemberCandidate)}
+        title="Remove household member?"
+        description={
+          removeMemberCandidate
+            ? `${removeMemberCandidate.email} will lose access to this household's shared inventory, shopping list, and recent activity. Their account will not be deleted.`
+            : ""
+        }
+        confirmLabel="Remove member"
+        cancelLabel="Keep member"
+        isDeleting={
+          Boolean(removeMemberCandidate?.userId) &&
+          sharingLoading === `remove:${removeMemberCandidate.userId}`
+        }
+        onConfirm={handleConfirmRemoveMember}
+        onCancel={handleCancelRemoveMember}
+      />
     </motion.div>
   );
 }

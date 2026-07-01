@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
 import { login } from '@/app/actions/auth';
@@ -12,6 +12,7 @@ const CREDENTIAL_VALIDATION_ERROR =
   'Enter a valid email and a password with at least 6 characters.';
 
 export default function LoginPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/';
   const confirmed = searchParams.get('confirmed') === '1';
@@ -76,6 +77,12 @@ export default function LoginPage() {
       const result = await login({ email, password, redirectTo });
       if (result?.error) {
         setError(result.error);
+        return;
+      }
+
+      if (result?.success) {
+        router.replace(result.redirectTo || '/');
+        router.refresh();
       }
     } catch (err) {
       setError(err?.message || 'Unable to sign in.');

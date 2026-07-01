@@ -14,7 +14,16 @@ export async function middleware(req) {
   const isInvitePage = pathname === "/invite" || pathname.startsWith("/invite/");
   const isMagicLinkSyncPage = pathname === "/magic-link-sync";
 
-  const protectedRoots = ["/locations", "/storage-areas", "/areas", "/storage", "/categories", "/items", "/profile"];
+  const protectedRoots = [
+    "/locations",
+    "/storage-areas",
+    "/areas",
+    "/storage",
+    "/categories",
+    "/items",
+    "/shopping-list",
+    "/profile",
+  ];
   const isProtected = protectedRoots.some(
     (root) => pathname === root || pathname.startsWith(root + "/")
   );

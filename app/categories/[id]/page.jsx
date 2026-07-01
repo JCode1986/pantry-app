@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
-import { createPageMetadata } from "@/utils/metadata";
+import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
+import { getCanEditInventoryForUser } from "@/utils/households";
+import { getInventoryImageUrl } from "@/utils/inventoryImages";
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
@@ -33,12 +35,17 @@ export async function generateMetadata({ params }) {
     title: name,
     description,
     path: `/categories/${id}`,
+    robots: NO_INDEX_ROBOTS,
   });
 }
 
 export default async function CategoryDetailPage({ params }) {
   const { id } = await params;
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const canEditInventory = await getCanEditInventoryForUser(user);
 
   const { data: category, error } = await supabase
     .from("storage_categories")
@@ -58,7 +65,8 @@ export default async function CategoryDetailPage({ params }) {
         id,
         name,
         quantity,
-        expiration_date
+        expiration_date,
+        image_path
       )
     `
     )
@@ -70,12 +78,17 @@ export default async function CategoryDetailPage({ params }) {
     notFound();
   }
 
-  const items = category.items ?? [];
+  const items = await Promise.all(
+    (category.items ?? []).map(async (item) => ({
+      ...item,
+      imageUrl: await getInventoryImageUrl(item.image_path),
+    }))
+  );
   const area = category.storage_area;
   const location = area?.location;
 
   return (
-    <main className="page-enter max-w-[900px] mx-auto p-6 pt-8 min-h-[100vh] space-y-5">
+    <main className="page-enter max-w-[1500px] mx-auto p-6 pt-8 min-h-[100vh] space-y-5">
       <nav className="content-enter text-sm text-gray-500">
         <Link href="/categories" className="hover:underline">
           Categories
@@ -107,13 +120,15 @@ export default async function CategoryDetailPage({ params }) {
             </div>
           </div>
 
-          <OpenGlobalAddItemButton
-            context={{
-              locationId: location?.id,
-              storageAreaId: area?.id,
-              categoryId: category.id,
-            }}
-          />
+          {canEditInventory && (
+            <OpenGlobalAddItemButton
+              context={{
+                locationId: location?.id,
+                storageAreaId: area?.id,
+                categoryId: category.id,
+              }}
+            />
+          )}
         </div>
       </header>
 
@@ -121,13 +136,24 @@ export default async function CategoryDetailPage({ params }) {
         {items.map((item) => (
           <div
             key={item.id}
-            className="rounded-2xl border border-stocksense-gray bg-white shadow-sm p-4"
+            className="flex items-start gap-3 rounded-2xl border border-stocksense-gray bg-white p-4 shadow-sm"
           >
-            <div className="font-semibold text-stocksense-teal truncate">
-              {item.name}
-            </div>
-            <div className="text-sm text-gray-500 mt-1">
-              Qty: {item.quantity ?? 0} / Exp: {item.expiration_date || "None"}
+            {item.imageUrl && (
+              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
+                <img
+                  src={item.imageUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="truncate font-semibold text-stocksense-teal">
+                {item.name}
+              </div>
+              <div className="mt-1 text-sm text-gray-500">
+                Qty: {item.quantity ?? 0} / Exp: {item.expiration_date || "None"}
+              </div>
             </div>
           </div>
         ))}

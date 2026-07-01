@@ -5,12 +5,13 @@ import { getUserBillingAction } from "@/app/actions/billing";
 import { getHouseholdSharingAction } from "@/app/actions/household";
 import { getUserPreferencesAction } from "@/app/actions/preferences";
 import { DEFAULT_PREFERENCES } from "@/utils/appPreferences";
-import { createPageMetadata } from "@/utils/metadata";
+import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
 
 export const metadata = createPageMetadata({
   title: "Profile",
   description: "Manage account security, appearance, billing, and family sharing.",
   path: "/profile",
+  robots: NO_INDEX_ROBOTS,
 });
 
 function formatAccountDate(value) {
@@ -63,7 +64,7 @@ export default async function ProfilePage() {
   const sharingResult = await getHouseholdSharingAction();
 
   return (
-    <main className="page-enter mx-auto min-h-[100vh] max-w-6xl px-5 py-8">
+    <main className="page-enter mx-auto min-h-[100vh] max-w-[1500px] px-5 py-8">
       <ProfileClient
         user={user}
         initialPreferences={preferences}

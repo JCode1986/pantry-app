@@ -1,13 +1,10 @@
-import { createPageMetadata } from '@/utils/metadata';
+import { createPageMetadata, NO_INDEX_ROBOTS } from '@/utils/metadata';
 
 export const metadata = createPageMetadata({
   title: 'Syncing Session',
   description: 'Securely syncing your WhereKeep sign-in session.',
   path: '/magic-link-sync',
-  robots: {
-    index: false,
-    follow: false,
-  },
+  robots: NO_INDEX_ROBOTS,
 });
 
 export default function MagicLinkSyncLayout({ children }) {

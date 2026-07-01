@@ -2,23 +2,65 @@ import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import { getSessionForLayout } from './actions/auth';
 import LandingPage from '@/components/marketing/LandingPage';
-import StatsCards from '@/components/dashboard/StatsCards';
-import RecentActivity from '@/components/dashboard/RecentActivity';
-import ItemsDonut from '@/components/dashboard/ItemsDonut';
-import { createPageMetadata } from '@/utils/metadata';
-import {
-  getActivityFilterOptionsAction,
-  getRecentActivityAction,
-} from '@/app/actions/activity';
+import { createPageMetadata, siteConfig } from '@/utils/metadata';
+import { BILLING_PLANS } from '@/utils/billingPlans';
 
 export const metadata = createPageMetadata({
   title: 'Household Inventory Tracker',
   description:
-    'WhereKeep helps families track pantry, household, and storage inventory across every location.',
+    'WhereKeep helps households track inventory with barcode-assisted entry, photos, shopping lists, recent activity, and shared access roles.',
   path: '/',
 });
 
-async function getItemsByLocation(supabase) {
+function countBy(items, resolveKey) {
+  const counts = new Map();
+
+  for (const item of items) {
+    const key = resolveKey(item);
+    if (!key) continue;
+    counts.set(String(key), (counts.get(String(key)) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
+function mapBreakdown(rows, counts) {
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    item_count: counts.get(String(row.id)) ?? 0,
+  }));
+}
+
+function LandingStructuredData() {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: siteConfig.name,
+    url: siteConfig.url,
+    description: siteConfig.description,
+    applicationCategory: "LifestyleApplication",
+    operatingSystem: "Web",
+    inLanguage: "en-US",
+    offers: BILLING_PLANS.map((plan) => ({
+      "@type": "Offer",
+      name: plan.name,
+      category: plan.id,
+      price: plan.monthlyPrice.replace("$", ""),
+      priceCurrency: "USD",
+      description: plan.description,
+    })),
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+    />
+  );
+}
+
+async function getItemBreakdowns(supabase) {
   const [
     { data: locationsRaw = [], error: locationsError },
     { data: areasRaw = [], error: areasError },
@@ -26,43 +68,47 @@ async function getItemsByLocation(supabase) {
     { data: itemsRaw = [], error: itemsError },
   ] = await Promise.all([
     supabase.from('locations').select('id, name').order('name', { ascending: true }),
-    supabase.from('storage_areas').select('id, location_id'),
-    supabase.from('storage_categories').select('id, storage_area_id'),
+    supabase.from('storage_areas').select('id, name, location_id').order('name', { ascending: true }),
+    supabase.from('storage_categories').select('id, name, storage_area_id').order('name', { ascending: true }),
     supabase.from('items').select('id, category_id'),
   ]);
 
   const errors = [locationsError, areasError, categoriesError, itemsError].filter(Boolean);
   if (errors.length) {
-    console.error('items by location error:', errors);
-    return [];
+    console.error('item breakdowns error:', errors);
+    return {
+      byLocation: [],
+      byStorageArea: [],
+      byCategory: [],
+    };
   }
 
   const areaToLocation = new Map(
     areasRaw.map((area) => [String(area.id), area.location_id])
   );
+  const categoryToArea = new Map(
+    categoriesRaw.map((category) => [String(category.id), category.storage_area_id])
+  );
   const categoryToLocation = new Map(
-    categoriesRaw.map((category) => [
-      String(category.id),
-      areaToLocation.get(String(category.storage_area_id)),
-    ])
-  );
-  const countsByLocation = new Map(
-    locationsRaw.map((location) => [String(location.id), 0])
+    categoriesRaw.map((category) => {
+      const areaId = categoryToArea.get(String(category.id));
+      return [String(category.id), areaToLocation.get(String(areaId))];
+    })
   );
 
-  for (const item of itemsRaw) {
-    const locationId = categoryToLocation.get(String(item.category_id));
-    if (!locationId) continue;
+  const countsByLocation = countBy(itemsRaw, (item) =>
+    categoryToLocation.get(String(item.category_id))
+  );
+  const countsByStorageArea = countBy(itemsRaw, (item) =>
+    categoryToArea.get(String(item.category_id))
+  );
+  const countsByCategory = countBy(itemsRaw, (item) => item.category_id);
 
-    const key = String(locationId);
-    countsByLocation.set(key, (countsByLocation.get(key) ?? 0) + 1);
-  }
-
-  return locationsRaw.map((location) => ({
-    location_id: location.id,
-    location_name: location.name,
-    item_count: countsByLocation.get(String(location.id)) ?? 0,
-  }));
+  return {
+    byLocation: mapBreakdown(locationsRaw, countsByLocation),
+    byStorageArea: mapBreakdown(areasRaw, countsByStorageArea),
+    byCategory: mapBreakdown(categoriesRaw, countsByCategory),
+  };
 }
 
 export default async function HomePage() {
@@ -70,12 +116,29 @@ export default async function HomePage() {
   const token = session?.user?.access_token;
 
   if (!token) {
-    return <LandingPage />;
+    return (
+      <>
+        <LandingStructuredData />
+        <LandingPage />
+      </>
+    );
   }
 
   if (session?.user?.user?.user_metadata?.requires_password_setup) {
     redirect('/profile?setup=password');
   }
+
+  const [
+    { default: StatsCards },
+    { default: RecentActivity },
+    { default: ItemsDonut },
+    { getActivityFilterOptionsAction, getRecentActivityAction },
+  ] = await Promise.all([
+    import('@/components/dashboard/StatsCards'),
+    import('@/components/dashboard/RecentActivity'),
+    import('@/components/dashboard/ItemsDonut'),
+    import('@/app/actions/activity'),
+  ]);
 
   const supabase = await createClient();
 
@@ -84,11 +147,12 @@ export default async function HomePage() {
     return count ?? 0;
   };
 
-  const [locations, areas, categories, items] = await Promise.all([
+  const [locations, areas, categories, items, shoppingListItems] = await Promise.all([
     getCount('locations'),
     getCount('storage_areas'),
     getCount('storage_categories'),
     getCount('items'),
+    getCount('shopping_list_items'),
   ]);
 
   const [activityResult, activityFiltersResult] = await Promise.all([
@@ -96,31 +160,56 @@ export default async function HomePage() {
     getActivityFilterOptionsAction(),
   ]);
 
-  const perLocation = await getItemsByLocation(supabase);
+  const itemBreakdowns = await getItemBreakdowns(supabase);
 
   return (
-    <main className="page-enter mx-auto max-w-6xl px-5 py-8 space-y-10 pt-8 min-h-[100vh]">
+    <main className="page-enter mx-auto max-w-[1500px] px-5 py-8 space-y-10 pt-8 min-h-[100vh]">
       <header className='md:text-left text-center'>
         <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-stocksense-teal">Stock Overview</h1>
         <p className="text-gray-500 mt-1">Snapshot of your data and what is new.</p>
       </header>
 
-      <StatsCards totals={{ locations, areas, categories, items }} />
+      <StatsCards
+        totals={{ locations, areas, categories, items, shoppingListItems }}
+      />
 
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <RecentActivity
             items={activityResult.data.items}
             members={activityFiltersResult.data.members}
+            effectivePlanId={activityFiltersResult.data.effectivePlanId}
             initialCursor={activityResult.data.nextCursor}
             initialHasMore={activityResult.data.hasMore}
             initialError={activityResult.error || activityFiltersResult.error}
           />
         </div>
-        <div className="lg:col-span-1 flex items-start">
-          <div className="min-h-[350px] w-full">
-            <ItemsDonut data={perLocation} />
-          </div>    
+        <div className="lg:col-span-1">
+          <div className="w-full space-y-6">
+            <ItemsDonut
+              title="Items by location"
+              data={itemBreakdowns.byLocation}
+              groupSingular="location"
+              groupPlural="locations"
+              tooltip="Shows how many items are stored under each location."
+            />
+            <ItemsDonut
+              title="Items by storage areas"
+              data={itemBreakdowns.byStorageArea}
+              emptyText="No storage area data available."
+              groupSingular="storage area"
+              groupPlural="storage areas"
+              tooltip="Shows how many items are stored under each storage area."
+            />
+            <ItemsDonut
+              title="Items by category"
+              data={itemBreakdowns.byCategory}
+              emptyText="No category data available."
+              groupSingular="category"
+              groupPlural="categories"
+              tooltip="Shows how many items are stored under each category."
+            />
+          </div>
         </div>
       </section>
     </main>

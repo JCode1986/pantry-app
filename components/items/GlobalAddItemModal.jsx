@@ -15,12 +15,25 @@ import {
   Select,
   SelectItem,
 } from "@heroui/react";
-import { FaMapMarkerAlt, FaPlus, FaSpinner, FaTags, FaWarehouse } from "react-icons/fa";
+import {
+  FaBarcode,
+  FaCheckCircle,
+  FaMapMarkerAlt,
+  FaPlus,
+  FaSearch,
+  FaSpinner,
+  FaTags,
+  FaWarehouse,
+} from "react-icons/fa";
 import {
   addItemWithPath,
   getInventoryHierarchy,
+  lookupProductByBarcode,
 } from "@/app/actions/server";
 import { toNonNegativeInteger } from "@/utils/pantry/date";
+import { emitItemAdded } from "@/utils/clientEvents";
+import { themedSelectClassNames } from "@/components/modals/modalTheme";
+import BarcodeScannerModal from "@/components/items/BarcodeScannerModal";
 
 const NEW_VALUE = "__new__";
 const EMPTY_LIST = [];
@@ -37,15 +50,23 @@ const emptyForm = {
   storageAreaName: "",
   categoryName: "",
   itemName: "",
+  barcode: "",
   quantity: "1",
   expirationDate: "",
 };
 
 const emptyItemFields = {
   itemName: "",
+  barcode: "",
   quantity: "1",
   expirationDate: "",
 };
+
+function cleanBarcode(value) {
+  return typeof value === "string"
+    ? value.trim().replace(/[^0-9A-Za-z._-]/g, "").slice(0, 80)
+    : "";
+}
 
 function byId(items, id) {
   return (items ?? []).find((item) => String(item.id) === String(id)) ?? null;
@@ -139,6 +160,10 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [upgradeHref, setUpgradeHref] = useState("");
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isLookingUpBarcode, setIsLookingUpBarcode] = useState(false);
+  const [barcodeMessage, setBarcodeMessage] = useState("");
+  const [productPreview, setProductPreview] = useState(null);
 
   const selectedLocation = useMemo(
     () => byId(locations, locationId),
@@ -197,6 +222,65 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const updateBarcode = (value) => {
+    const barcode = cleanBarcode(value);
+    setForm((prev) => ({ ...prev, barcode }));
+    setBarcodeMessage("");
+    if (barcode !== productPreview?.barcode) {
+      setProductPreview(null);
+    }
+  };
+
+  const lookupBarcode = async (barcodeValue) => {
+    const barcode = cleanBarcode(barcodeValue ?? form.barcode);
+
+    if (!barcode) {
+      setBarcodeMessage("Enter or scan a barcode first.");
+      return;
+    }
+
+    setIsScannerOpen(false);
+    setIsLookingUpBarcode(true);
+    setBarcodeMessage("");
+    setProductPreview(null);
+    setForm((prev) => ({ ...prev, barcode }));
+
+    let result;
+    try {
+      result = await lookupProductByBarcode(barcode);
+    } catch (error) {
+      console.error("lookupProductByBarcode error:", error);
+      setBarcodeMessage("Product lookup is unavailable right now.");
+      setIsLookingUpBarcode(false);
+      return;
+    }
+
+    setIsLookingUpBarcode(false);
+
+    if (result?.error) {
+      setBarcodeMessage(
+        typeof result.error === "string"
+          ? result.error
+          : result.error?.message ?? "Could not look up that barcode."
+      );
+      return;
+    }
+
+    const product = result?.data;
+    if (!product?.found) {
+      setBarcodeMessage("No product match found. You can still add it manually.");
+      return;
+    }
+
+    setProductPreview(product);
+    setForm((prev) => ({
+      ...prev,
+      barcode: product.barcode || barcode,
+      itemName: prev.itemName.trim() ? prev.itemName : product.name || prev.itemName,
+    }));
+    setBarcodeMessage(product.name ? "Product details added." : "Product image found.");
+  };
+
   const selectLocation = (value) => {
     const nextLocationId = String(value);
     const nextLocation = byId(locations, nextLocationId);
@@ -222,6 +306,9 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
     setForm(emptyForm);
     setMessage("");
     setUpgradeHref("");
+    setBarcodeMessage("");
+    setProductPreview(null);
+    setIsScannerOpen(false);
     setIsLoading(true);
     onClose?.();
   };
@@ -261,6 +348,8 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
         categoryId: categoryId === NEW_VALUE ? null : categoryId,
         categoryName: form.categoryName,
         itemName: form.itemName,
+        barcode: form.barcode,
+        productImageUrl: productPreview?.imageUrl ?? null,
         quantity: toNonNegativeInteger(form.quantity, 0),
         expirationDate: form.expirationDate || null,
       });
@@ -363,13 +452,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
     setStorageAreaId(added.storageAreaId ?? NEW_VALUE);
     setCategoryId(added.categoryId ?? NEW_VALUE);
 
-    window.dispatchEvent(
-      new CustomEvent("stocksense:item-added", {
-        detail: {
-          item: added,
-        },
-      })
-    );
+    emitItemAdded(added);
 
     const addedName = form.itemName.trim();
     const destination =
@@ -385,6 +468,8 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
       categoryName: "",
       ...emptyItemFields,
     }));
+    setProductPreview(null);
+    setBarcodeMessage("");
     setMessage("");
     onAdded?.({
       itemName: addedName,
@@ -398,18 +483,19 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onOpenChange={(open) => {
-        if (!open) handleClose();
-      }}
-      placement="center"
-      size="3xl"
-      scrollBehavior="inside"
-    >
-      <ModalContent>
-        {() => (
-          <>
+    <>
+      <Modal
+        isOpen={isOpen}
+        onOpenChange={(open) => {
+          if (!open) handleClose();
+        }}
+        placement="center"
+        size="3xl"
+        scrollBehavior="inside"
+      >
+        <ModalContent>
+          {() => (
+            <>
             <ModalHeader className="flex flex-col gap-1">
               <span className="text-[var(--stocksense-brand)]">Add item</span>
               <span className="text-sm font-normal text-gray-500">
@@ -474,9 +560,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                           isDisabled={isSaving}
                           variant="bordered"
                           radius="lg"
-                          classNames={{
-                            trigger: "border-stocksense-gray",
-                          }}
+                          classNames={themedSelectClassNames}
                         >
                           {locations.map((location) => (
                             <SelectItem key={String(location.id)}>
@@ -511,9 +595,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                           isDisabled={isSaving || locationId === NEW_VALUE}
                           variant="bordered"
                           radius="lg"
-                          classNames={{
-                            trigger: "border-stocksense-gray",
-                          }}
+                          classNames={themedSelectClassNames}
                         >
                           {storageAreas.map((area) => (
                             <SelectItem key={String(area.id)}>
@@ -548,9 +630,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                           isDisabled={isSaving || storageAreaId === NEW_VALUE}
                           variant="bordered"
                           radius="lg"
-                          classNames={{
-                            trigger: "border-stocksense-gray",
-                          }}
+                          classNames={themedSelectClassNames}
                         >
                           {categories.map((category) => (
                             <SelectItem key={String(category.id)}>
@@ -574,6 +654,81 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                         </AnimatePresence>
                       </motion.div>
                     </motion.div>
+
+                    <div className="rounded-2xl border border-stocksense-gray bg-white p-3 shadow-sm">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_190px]">
+                        <Input
+                          label="Barcode"
+                          value={form.barcode}
+                          onValueChange={updateBarcode}
+                          placeholder="Scan or enter UPC / EAN"
+                          isDisabled={isSaving || isLookingUpBarcode}
+                          variant="bordered"
+                          radius="lg"
+                          startContent={<FaBarcode className="text-gray-400" />}
+                        />
+                        <div className="grid grid-cols-2 gap-2 md:grid-cols-1">
+                          <Button
+                            className="rounded-xl bg-[var(--stocksense-brand)] text-white"
+                            onPress={() => setIsScannerOpen(true)}
+                            isDisabled={isSaving || isLookingUpBarcode}
+                            startContent={<FaBarcode />}
+                          >
+                            Scan
+                          </Button>
+                          <Button
+                            variant="flat"
+                            className="rounded-xl"
+                            onPress={() => lookupBarcode()}
+                            isDisabled={isSaving || isLookingUpBarcode || !form.barcode}
+                            startContent={
+                              isLookingUpBarcode ? (
+                                <FaSpinner className="animate-spin" />
+                              ) : (
+                                <FaSearch />
+                              )
+                            }
+                          >
+                            Lookup
+                          </Button>
+                        </div>
+                      </div>
+
+                      {(barcodeMessage || productPreview) && (
+                        <div className="mt-3 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3">
+                          {productPreview ? (
+                            <div className="flex items-center gap-3">
+                              {productPreview.imageUrl && (
+                                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-white">
+                                  <img
+                                    src={productPreview.imageUrl}
+                                    alt=""
+                                    className="h-full w-full object-cover"
+                                  />
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 text-sm font-semibold text-[var(--stocksense-brand)]">
+                                  <FaCheckCircle className="h-3.5 w-3.5 shrink-0" />
+                                  <span className="truncate">
+                                    {productPreview.name || "Product found"}
+                                  </span>
+                                </div>
+                                <div className="mt-0.5 text-xs text-gray-600">
+                                  {[productPreview.brand, productPreview.barcode]
+                                    .filter(Boolean)
+                                    .join(" • ")}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-[var(--stocksense-brand)]">
+                              {barcodeMessage}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
 
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_140px_180px]">
                       <Input
@@ -631,9 +786,15 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                 {isSaving ? "Adding..." : "Add another"}
               </Button>
             </ModalFooter>
-          </>
-        )}
-      </ModalContent>
-    </Modal>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+      <BarcodeScannerModal
+        isOpen={isScannerOpen}
+        onOpenChange={setIsScannerOpen}
+        onScan={lookupBarcode}
+      />
+    </>
   );
 }

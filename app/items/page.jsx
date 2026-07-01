@@ -1,20 +1,27 @@
 import ItemsPageClient from "@/components/items/ItemPageClient";
 import { createClient } from "@/utils/supabase/server";
-import { createPageMetadata } from "@/utils/metadata";
+import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
+import { getCanEditInventoryForUser } from "@/utils/households";
+import { getInventoryImageUrl } from "@/utils/inventoryImages";
 
 export const metadata = createPageMetadata({
   title: "Items",
   description: "Search, filter, move, and manage inventory items across all locations.",
   path: "/items",
+  robots: NO_INDEX_ROBOTS,
 });
 
 export default async function Page() {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const canEditInventory = await getCanEditInventoryForUser(user);
 
   // 1) Fetch items (no embeds)
   const { data: itemsRaw, error: itemsError } = await supabase
     .from("items")
-    .select("id, name, quantity, expiration_date, category_id")
+    .select("id, name, quantity, expiration_date, category_id, image_path, barcode")
     .order("name", { ascending: true });
 
   if (itemsError) {
@@ -45,7 +52,7 @@ export default async function Page() {
   // 3) Fetch storage areas (no embeds)
   const { data: areasRaw, error: areasError } = await supabase
     .from("storage_areas")
-    .select("id, name, location_id")
+    .select("id, name, location_id, image_path")
     .order("name", { ascending: true });
 
   if (areasError) {
@@ -59,7 +66,7 @@ export default async function Page() {
   // 4) Fetch locations (no embeds)
   const { data: locationsRaw, error: locationsError } = await supabase
     .from("locations")
-    .select("id, name")
+    .select("id, name, image_path")
     .order("name", { ascending: true });
 
   if (locationsError) {
@@ -104,7 +111,7 @@ export default async function Page() {
   }));
 
   // ---- Normalize items for UI ----
-  const items = (itemsRaw ?? []).map((it) => {
+  const items = await Promise.all((itemsRaw ?? []).map(async (it) => {
     const cat = it.category_id ? categoryMap.get(String(it.category_id)) : null;
     const area = cat?.storage_area_id ? areaMap.get(String(cat.storage_area_id)) : null;
     const loc = area?.location_id ? locationMap.get(String(area.location_id)) : null;
@@ -114,20 +121,41 @@ export default async function Page() {
       name: it.name,
       quantity: it.quantity ?? 0,
       expiration_date: it.expiration_date ?? null,
+      barcode: it.barcode ?? null,
+      image_path: it.image_path ?? null,
+      imageUrl: await getInventoryImageUrl(it.image_path),
 
       // used for move/edit
       category_id: it.category_id ?? null,
 
       // breadcrumb display
       category: cat ? { id: cat.id, name: cat.name } : null,
-      area: area ? { id: area.id, name: area.name } : null,
-      location: loc ? { id: loc.id, name: loc.name } : null,
+      area: area
+        ? {
+            id: area.id,
+            name: area.name,
+            image_path: area.image_path ?? null,
+            imageUrl: await getInventoryImageUrl(area.image_path),
+          }
+        : null,
+      location: loc
+        ? {
+            id: loc.id,
+            name: loc.name,
+            image_path: loc.image_path ?? null,
+            imageUrl: await getInventoryImageUrl(loc.image_path),
+          }
+        : null,
     };
-  });
+  }));
 
   return (
-    <main className="page-enter max-w-[1300px] mx-auto p-6 pt-8 min-h-[100vh]">
-      <ItemsPageClient initialItems={items} moveLocations={moveLocations} />
+    <main className="page-enter max-w-[1500px] mx-auto p-6 pt-8 min-h-[100vh]">
+      <ItemsPageClient
+        initialItems={items}
+        moveLocations={moveLocations}
+        canEditInventory={canEditInventory}
+      />
     </main>
   );
 }

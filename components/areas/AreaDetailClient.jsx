@@ -36,6 +36,7 @@ import {
 } from "@/components/modals/modalTheme";
 import { containsQuery } from "@/utils/pantry/search";
 import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
+import { emitInventoryChange } from "@/utils/clientEvents";
 
 function StatPill({ label, value }) {
   return (
@@ -59,7 +60,11 @@ const pageItemVariants = {
   },
 };
 
-export default function AreaDetailClient({ area, initialCategories }) {
+export default function AreaDetailClient({
+  area,
+  initialCategories,
+  canEditInventory = true,
+}) {
   const [categories, setCategories] = useState(initialCategories ?? []);
   const [search, setSearch] = useState("");
   const [newCategory, setNewCategory] = useState("");
@@ -136,6 +141,7 @@ export default function AreaDetailClient({ area, initialCategories }) {
   // ---------------- Actions ----------------
 
   const handleAddCategory = async () => {
+    if (!canEditInventory) return;
     const name = newCategory.trim();
     if (!name) return;
 
@@ -169,6 +175,11 @@ export default function AreaDetailClient({ area, initialCategories }) {
           )
           .sort((a, b) => a.name.localeCompare(b.name))
       );
+      emitInventoryChange({
+        entity: "category",
+        action: "added",
+        id: created.id,
+      });
     } catch (e) {
       console.error("addCategory failed:", e);
 
@@ -182,6 +193,7 @@ export default function AreaDetailClient({ area, initialCategories }) {
   };
 
   const handleRename = async () => {
+    if (!canEditInventory) return;
     const name = renameModal.name.trim();
     if (!name || !renameModal.id) return;
 
@@ -202,6 +214,11 @@ export default function AreaDetailClient({ area, initialCategories }) {
       if (result?.error) throw result.error;
 
       setRenameModal({ open: false, id: null, name: "" });
+      emitInventoryChange({
+        entity: "category",
+        action: "updated",
+        id,
+      });
     } catch (e) {
       console.error("updateCategoryName failed:", e);
 
@@ -219,6 +236,7 @@ export default function AreaDetailClient({ area, initialCategories }) {
   };
 
   const handleDelete = async () => {
+    if (!canEditInventory) return;
     if (!deleteModal.id) return;
 
     const id = deleteModal.id;
@@ -234,6 +252,11 @@ export default function AreaDetailClient({ area, initialCategories }) {
       if (result?.error) throw result.error;
 
       setDeleteModal({ open: false, id: null, name: "", busy: false });
+      emitInventoryChange({
+        entity: "category",
+        action: "deleted",
+        id,
+      });
     } catch (e) {
       console.error("deleteCategory failed:", e);
 
@@ -264,11 +287,23 @@ export default function AreaDetailClient({ area, initialCategories }) {
 
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div>
-            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-stocksense-teal">
-              {area?.name}
-            </h1>
+            <div className="flex items-center gap-3">
+              {area?.imageUrl && (
+                <div className="h-14 w-14 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
+                  <img
+                    src={area.imageUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              )}
+              <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-stocksense-teal">
+                {area?.name}
+              </h1>
+            </div>
             <p className="text-sm text-gray-500">
-              Manage categories for <span className="font-medium">{area?.location?.name}</span>.
+              {canEditInventory ? "Manage" : "View"} categories for{" "}
+              <span className="font-medium">{area?.location?.name}</span>.
               Click a category to view items.
             </p>
 
@@ -295,6 +330,7 @@ export default function AreaDetailClient({ area, initialCategories }) {
               variant="bordered"
             />
             <OpenGlobalAddItemButton
+              canEditInventory={canEditInventory}
               context={{
                 locationId: area?.location?.id,
                 storageAreaId: area?.id,
@@ -305,7 +341,7 @@ export default function AreaDetailClient({ area, initialCategories }) {
       </motion.div>
 
       {/* Add Category */}
-      <motion.div variants={pageItemVariants}>
+      {canEditInventory && <motion.div variants={pageItemVariants}>
         <Card className="border border-stocksense-gray shadow-sm">
         <CardBody className="p-4">
           <div className="flex flex-col md:flex-row gap-2 md:items-center">
@@ -338,10 +374,10 @@ export default function AreaDetailClient({ area, initialCategories }) {
           )}
         </CardBody>
         </Card>
-      </motion.div>
+      </motion.div>}
 
       {/* Categories Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         <AnimatePresence>
           {filtered.map((cat, idx) => (
             <motion.div
@@ -351,8 +387,9 @@ export default function AreaDetailClient({ area, initialCategories }) {
               exit={{ opacity: 0, y: 10 }}
               transition={{ duration: 0.2, delay: idx * 0.02 }}
             >
-              <Card className="group border border-stocksense-gray shadow-sm hover:shadow-md transition">
-                <CardBody className="p-4">
+              <Card className="group relative overflow-hidden border border-stocksense-gray shadow-sm transition hover:bg-gray-50 hover:shadow-md">
+                <div className="absolute inset-x-0 top-0 h-1 bg-[var(--entity-category-accent)]" />
+                <CardBody className="p-3.5 pt-4 sm:p-4">
                   <div className="flex items-start justify-between gap-2">
                     <Link href={`/categories/${cat.id}`} className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
@@ -360,7 +397,7 @@ export default function AreaDetailClient({ area, initialCategories }) {
                           <FaTag />
                         </div>
                         <div className="min-w-0">
-                          <h3 className="font-semibold text-stocksense-teal truncate group-hover:underline">
+                          <h3 className="truncate text-[15px] font-semibold leading-5 text-stocksense-teal group-hover:underline sm:text-base">
                             {cat.name}
                           </h3>
                           <p className="text-xs text-gray-500">
@@ -370,39 +407,41 @@ export default function AreaDetailClient({ area, initialCategories }) {
                       </div>
                     </Link>
 
-                    <Dropdown placement="bottom-end">
-                      <DropdownTrigger>
-                        <Button isIconOnly variant="light" radius="lg" isDisabled={isSaving}>
-                          <FaEllipsisV className="text-gray-500" />
-                        </Button>
-                      </DropdownTrigger>
-                      <DropdownMenu aria-label="Category actions">
-                        <DropdownItem
-                          key="rename"
-                          onPress={() =>
-                            setRenameModal({ open: true, id: cat.id, name: cat.name })
-                          }
-                        >
-                          Rename
-                        </DropdownItem>
-                        <DropdownItem
-                          key="delete"
-                          className="text-danger"
-                          color="danger"
-                          onPress={() =>
-                            setDeleteModal({ open: true, id: cat.id, name: cat.name, busy: false })
-                          }
-                        >
-                          Delete
-                        </DropdownItem>
-                      </DropdownMenu>
-                    </Dropdown>
+                    {canEditInventory && (
+                      <Dropdown placement="bottom-end">
+                        <DropdownTrigger>
+                          <Button isIconOnly variant="light" radius="lg" isDisabled={isSaving}>
+                            <FaEllipsisV className="text-gray-500" />
+                          </Button>
+                        </DropdownTrigger>
+                        <DropdownMenu aria-label="Category actions">
+                          <DropdownItem
+                            key="rename"
+                            onPress={() =>
+                              setRenameModal({ open: true, id: cat.id, name: cat.name })
+                            }
+                          >
+                            Rename
+                          </DropdownItem>
+                          <DropdownItem
+                            key="delete"
+                            className="text-danger"
+                            color="danger"
+                            onPress={() =>
+                              setDeleteModal({ open: true, id: cat.id, name: cat.name, busy: false })
+                            }
+                          >
+                            Delete
+                          </DropdownItem>
+                        </DropdownMenu>
+                      </Dropdown>
+                    )}
                   </div>
 
-                  <div className="mt-4">
+                  <div className="mt-3">
                     <Link
                       href={`/categories/${cat.id}`}
-                      className="inline-flex items-center gap-2 text-sm text-[var(--stocksense-brand)] hover:underline"
+                      className="inline-flex h-9 items-center gap-2 rounded-xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] px-2.5 text-xs text-[var(--entity-category-accent)] hover:brightness-95"
                     >
                       View items →
                     </Link>
@@ -418,10 +457,13 @@ export default function AreaDetailClient({ area, initialCategories }) {
             <CardBody className="p-8 text-center">
               <p className="text-sm text-gray-600 font-medium">No categories found</p>
               <p className="text-xs text-gray-500 mt-1">
-                Try a different search, or add a new category above.
+                {canEditInventory
+                  ? "Try a different search, or add a new category above."
+                  : "Try a different search."}
               </p>
               <div className="mt-4 flex justify-center">
                 <OpenGlobalAddItemButton
+                  canEditInventory={canEditInventory}
                   context={{
                     locationId: area?.location?.id,
                     storageAreaId: area?.id,
@@ -434,7 +476,7 @@ export default function AreaDetailClient({ area, initialCategories }) {
       </div>
 
       {/* Rename Modal */}
-      <Modal
+      {canEditInventory && <Modal
         isOpen={renameModal.open}
         onOpenChange={(open) => setRenameModal((p) => ({ ...p, open }))}
         placement="center"
@@ -469,10 +511,10 @@ export default function AreaDetailClient({ area, initialCategories }) {
             </>
           )}
         </ModalContent>
-      </Modal>
+      </Modal>}
 
       {/* Delete Modal */}
-      <Modal
+      {canEditInventory && <Modal
         isOpen={deleteModal.open}
         onOpenChange={(open) => setDeleteModal((p) => ({ ...p, open }))}
         placement="center"
@@ -506,7 +548,7 @@ export default function AreaDetailClient({ area, initialCategories }) {
             </>
           )}
         </ModalContent>
-      </Modal>
+      </Modal>}
     </motion.div>
   );
 }

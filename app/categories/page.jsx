@@ -1,15 +1,21 @@
 import CategoriesPageClient from "@/components/categories/CategoriesPageClient";
 import { createClient } from "@/utils/supabase/server";
-import { createPageMetadata } from "@/utils/metadata";
+import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
+import { getCanEditInventoryForUser } from "@/utils/households";
 
 export const metadata = createPageMetadata({
     title: "Categories",
     description: "Organize inventory categories across every location and storage area.",
     path: "/categories",
+    robots: NO_INDEX_ROBOTS,
 });
 
 export default async function Page() {
     const supabase = await createClient();
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+    const canEditInventory = await getCanEditInventoryForUser(user);
 
     const { data, error } = await supabase
         .from("storage_categories")
@@ -57,8 +63,11 @@ export default async function Page() {
     }));
 
   return (
-    <main className="page-enter max-w-[1300px] mx-auto p-6 pt-8 min-h-[100vh]">
-      <CategoriesPageClient initialCategories={categories} />
+    <main className="page-enter max-w-[1500px] mx-auto p-6 pt-8 min-h-[100vh]">
+      <CategoriesPageClient
+        initialCategories={categories}
+        canEditInventory={canEditInventory}
+      />
     </main>
   );
 }

@@ -1,17 +1,20 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Select, SelectItem } from '@heroui/react';
 import {
   FaBolt,
   FaBoxOpen,
   FaMapMarkedAlt,
+  FaShoppingBasket,
   FaTags,
   FaUserCircle,
   FaWarehouse,
 } from 'react-icons/fa';
 import { getRecentActivityAction } from '@/app/actions/activity';
+import { themedSelectClassNames } from '@/components/modals/modalTheme';
+import { INVENTORY_CHANGE_EVENT } from '@/utils/clientEvents';
 
 const PAGE_SIZE = 12;
 const ALL_FILTER = 'all';
@@ -102,6 +105,14 @@ function entityName(row) {
       'changes.old.name',
       'changes.snapshot.name',
     ],
+    shopping_list_item: [
+      'item_name',
+      'name_at_event',
+      'changes.name.from',
+      'changes.name.to',
+      'changes.snapshot.name',
+      'changes.from_deleted_item.name',
+    ],
   };
 
   return (
@@ -124,6 +135,8 @@ function pathValue(row, key) {
       'changes.snapshot.location',
       'changes.from.location',
       'changes.from.Location',
+      'changes.source.location',
+      'changes.source.Location',
     ],
     area: [
       'storage_area_name',
@@ -138,6 +151,8 @@ function pathValue(row, key) {
       'changes.snapshot.area',
       'changes.from.area',
       'changes.from.Area',
+      'changes.source.area',
+      'changes.source.Area',
     ],
     category: [
       'category_name',
@@ -149,6 +164,8 @@ function pathValue(row, key) {
       'changes.snapshot.category',
       'changes.from.category',
       'changes.from.Category',
+      'changes.source.category',
+      'changes.source.Category',
     ],
   };
 
@@ -210,6 +227,17 @@ function formatChanges(changes) {
   return parts.length ? parts.join(' | ') : 'Updated';
 }
 
+function shoppingListUpdateText(changes) {
+  const statusTo = changes?.status?.to;
+  const statusFrom = changes?.status?.from;
+
+  if (statusTo === 'purchased') return 'Purchased';
+  if (statusTo === 'needed' && statusFrom) return 'Marked needed';
+  if (statusTo === 'dismissed') return 'Dismissed';
+
+  return formatChanges(changes);
+}
+
 function ActionBadge({ action }) {
   const normalized = (action || '').toLowerCase();
   const map = {
@@ -247,21 +275,25 @@ function entityIcon(entity) {
       return <FaWarehouse className="h-4 w-4 text-white" />;
     case 'category':
       return <FaTags className="h-4 w-4 text-white" />;
+    case 'shopping_list_item':
+      return <FaShoppingBasket className="h-4 w-4 text-white" />;
     default:
       return <FaBoxOpen className="h-4 w-4 text-white" />;
   }
 }
 
-function iconClass(entity) {
+function iconAccent(entity) {
   switch (entity) {
     case 'location':
-      return 'from-indigo-500 to-violet-500';
+      return 'var(--entity-location-accent)';
     case 'storage_area':
-      return 'from-sky-500 to-cyan-500';
+      return 'var(--entity-area-accent)';
     case 'category':
-      return 'from-emerald-500 to-lime-500';
+      return 'var(--entity-category-accent)';
+    case 'shopping_list_item':
+      return 'var(--entity-shopping-accent)';
     default:
-      return 'from-rose-500 to-orange-500';
+      return 'var(--entity-item-accent)';
   }
 }
 
@@ -269,6 +301,41 @@ function detailLine(row) {
   const action = (row.action || '').toLowerCase();
   const entity = (row.entity_type || '').toLowerCase();
   const itemPath = formatPath(buildPath(row, ['category', 'area', 'location']));
+
+  if (entity === 'shopping_list_item') {
+    const sourceParts = buildPath(row, ['category', 'area', 'location']);
+    const sourcePath = formatPath(sourceParts);
+    const fromDeletedItem = row.changes?.from_deleted_item;
+    const quantity = fromDeletedItem?.quantity ?? row.quantity ?? 0;
+
+    if (action === 'added') {
+      return fromDeletedItem
+        ? `Moved from inventory to shopping list | Qty ${quantity} | From: ${sourcePath}`
+        : `Added to shopping list | Qty ${quantity}${
+            sourceParts.length ? ` | From: ${sourcePath}` : ''
+          }`;
+    }
+
+    if (action === 'deleted') {
+      const movedToInventory = row.changes?.moved_to_inventory;
+      if (movedToInventory) {
+        const destinationPath = formatPath([
+          movedToInventory.category,
+          movedToInventory.area,
+          movedToInventory.location,
+        ]);
+        return `Moved to inventory | Qty ${quantity} | To: ${destinationPath}`;
+      }
+
+      return `Removed from shopping list | Qty ${quantity}`;
+    }
+
+    if (action === 'updated') {
+      return shoppingListUpdateText(row.changes);
+    }
+
+    return `Shopping list activity | ${formatChanges(row.changes)}`;
+  }
 
   if (action === 'deleted') {
     if (entity === 'location') return 'Removed location and everything inside it.';
@@ -362,6 +429,7 @@ function selectedKey(keys) {
 export default function RecentActivity({
   items = [],
   members = [],
+  effectivePlanId = 'free',
   initialCursor = null,
   initialHasMore = false,
   initialError = null,
@@ -383,8 +451,19 @@ export default function RecentActivity({
       })),
     [members]
   );
+  const showUserFilter =
+    effectivePlanId === 'family' || memberOptions.length > 1;
 
-  async function loadActivity({
+  useEffect(() => {
+    if (actorUserId !== ALL_FILTER || action !== ALL_FILTER) return;
+
+    setActivityItems(items);
+    setCursor(initialCursor);
+    setHasMore(initialHasMore);
+    setError(initialError);
+  }, [action, actorUserId, initialCursor, initialError, initialHasMore, items]);
+
+  const loadActivity = useCallback(async function loadActivity({
     nextActorUserId = actorUserId,
     nextAction = action,
     mode = 'replace',
@@ -422,7 +501,7 @@ export default function RecentActivity({
       setIsRefreshing(false);
       setIsLoadingMore(false);
     }
-  }
+  }, [action, actorUserId, cursor]);
 
   function handleActorChange(keys) {
     const nextActorUserId = String(selectedKey(keys) || ALL_FILTER);
@@ -435,6 +514,17 @@ export default function RecentActivity({
     setAction(nextAction);
     void loadActivity({ nextAction, mode: 'replace' });
   }
+
+  useEffect(() => {
+    const refreshActivity = () => {
+      void loadActivity({ mode: 'replace' });
+    };
+
+    window.addEventListener(INVENTORY_CHANGE_EVENT, refreshActivity);
+    return () => {
+      window.removeEventListener(INVENTORY_CHANGE_EVENT, refreshActivity);
+    };
+  }, [loadActivity]);
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -449,32 +539,35 @@ export default function RecentActivity({
           </span>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Select
-            aria-label="Filter recent activity by user"
-            label={
-              <span className="inline-flex items-center gap-1.5">
-                <FaUserCircle className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
-                User
-              </span>
-            }
-            selectedKeys={new Set([actorUserId])}
-            onSelectionChange={handleActorChange}
-            isDisabled={isRefreshing}
-            variant="bordered"
-            radius="lg"
-            classNames={{
-              trigger: "border-gray-200 bg-white",
-              value: "text-gray-700",
-            }}
-          >
-            <SelectItem key={ALL_FILTER}>All users</SelectItem>
-            {memberOptions.map((member) => (
-              <SelectItem key={member.value} textValue={member.label}>
-                {member.label}
-              </SelectItem>
-            ))}
-          </Select>
+        <div
+          className={`mt-4 grid gap-3 ${
+            showUserFilter ? 'sm:grid-cols-2' : 'sm:grid-cols-1'
+          }`}
+        >
+          {showUserFilter ? (
+            <Select
+              aria-label="Filter recent activity by user"
+              label={
+                <span className="inline-flex items-center gap-1.5">
+                  <FaUserCircle className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+                  User
+                </span>
+              }
+              selectedKeys={new Set([actorUserId])}
+              onSelectionChange={handleActorChange}
+              isDisabled={isRefreshing}
+              variant="bordered"
+              radius="lg"
+              classNames={themedSelectClassNames}
+            >
+              <SelectItem key={ALL_FILTER}>All users</SelectItem>
+              {memberOptions.map((member) => (
+                <SelectItem key={member.value} textValue={member.label}>
+                  {member.label}
+                </SelectItem>
+              ))}
+            </Select>
+          ) : null}
 
           <Select
             aria-label="Filter recent activity by action"
@@ -489,10 +582,7 @@ export default function RecentActivity({
             isDisabled={isRefreshing}
             variant="bordered"
             radius="lg"
-            classNames={{
-              trigger: "border-gray-200 bg-white",
-              value: "text-gray-700",
-            }}
+            classNames={themedSelectClassNames}
           >
             {ACTION_OPTIONS.map((option) => (
               <SelectItem key={option.value} textValue={option.label}>
@@ -529,7 +619,8 @@ export default function RecentActivity({
               >
                 <div className="flex min-w-0 items-start gap-3">
                   <div
-                    className={`shrink-0 rounded-xl bg-gradient-to-br p-2 ${iconClass(entity)}`}
+                    className="shrink-0 rounded-xl p-2"
+                    style={{ background: iconAccent(entity) }}
                   >
                     {entityIcon(entity)}
                   </div>

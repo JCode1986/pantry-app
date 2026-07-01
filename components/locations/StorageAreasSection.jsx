@@ -37,6 +37,8 @@ import {
 import ConfirmDeleteModal from '@/components/modals/ConfirmDeleteModal';
 import MoveItemsModal from '@/components/items/MoveItemsModal';
 import OpenGlobalAddItemButton from '@/components/ui/OpenGlobalAddItemButton';
+import { emitInventoryChange, emitItemAdded } from '@/utils/clientEvents';
+import EntityImageManager from '@/components/inventory/EntityImageManager';
 import {
   daysUntil,
   isExpiringSoon,
@@ -94,6 +96,7 @@ export default function StorageAreasSection({
   locationName,
   // optional: pass all locations if you want true cross-location moves
   allLocations,
+  canEditInventory = true,
 }) {
   const [storageAreas, setStorageAreas] = useState(initialStorageAreas ?? []);
   const [areaModal, setAreaModal] = useState({
@@ -101,6 +104,8 @@ export default function StorageAreasSection({
     mode: 'create',
     areaId: null,
     name: '',
+    imageUrl: null,
+    image_path: null,
     locationName: '',
   });
   const [categoryModal, setCategoryModal] = useState({
@@ -121,6 +126,8 @@ export default function StorageAreasSection({
     name: '',
     quantity: '',
     expirationDate: '',
+    imageUrl: null,
+    image_path: null,
   });
   const [limitNotice, setLimitNotice] = useState(null);
 
@@ -248,6 +255,7 @@ export default function StorageAreasSection({
   }, [locationId]);
 
   const openDeleteDialog = (entityType, payload) => {
+    if (!canEditInventory) return;
     setDeleteDialog({
       open: true,
       entityType,
@@ -355,6 +363,8 @@ export default function StorageAreasSection({
       mode: 'create',
       areaId: null,
       name: '',
+      imageUrl: null,
+      image_path: null,
       locationName: '',
     });
 
@@ -379,28 +389,57 @@ export default function StorageAreasSection({
       name: '',
       quantity: '',
       expirationDate: '',
+      imageUrl: null,
+      image_path: null,
     });
 
   // ---------- Storage Area CRUD ----------
   const openCreateAreaModal = () =>
+    canEditInventory &&
     setAreaModal({
       open: true,
       mode: 'create',
       areaId: null,
       name: '',
+      imageUrl: null,
+      image_path: null,
       locationName,
     });
 
   const openEditAreaModal = (area) =>
+    canEditInventory &&
     setAreaModal({
       open: true,
       mode: 'edit',
       areaId: area.id,
       name: area.name,
+      imageUrl: area.imageUrl ?? null,
+      image_path: area.image_path ?? null,
       locationName,
     });
 
+  const handleAreaImageChange = ({ imagePath, imageUrl }) => {
+    setAreaModal((prev) => ({
+      ...prev,
+      image_path: imagePath ?? null,
+      imageUrl: imageUrl ?? null,
+    }));
+    setStorageAreas((prev) =>
+      prev.map((area) =>
+        area.id === areaModal.areaId
+          ? { ...area, image_path: imagePath ?? null, imageUrl: imageUrl ?? null }
+          : area
+      )
+    );
+    emitInventoryChange({
+      entity: 'storage_area',
+      action: imagePath ? 'image_updated' : 'image_removed',
+      id: areaModal.areaId,
+    });
+  };
+
   const submitAreaModal = async () => {
+    if (!canEditInventory) return;
     const name = areaModal.name.trim();
     if (!name) return;
 
@@ -410,6 +449,11 @@ export default function StorageAreasSection({
         setStorageAreas((prev) =>
           prev.map((a) => (a.id === areaModal.areaId ? { ...a, name } : a))
         );
+        emitInventoryChange({
+          entity: 'storage_area',
+          action: 'updated',
+          id: areaModal.areaId,
+        });
         closeAreaModal();
       }
       return;
@@ -418,14 +462,25 @@ export default function StorageAreasSection({
     const result = await addStorageArea(locationId, name);
     if (result?.data) {
       setStorageAreas((prev) => [...prev, { ...result.data, categories: [] }]);
+      emitInventoryChange({
+        entity: 'storage_area',
+        action: 'added',
+        id: result.data.id,
+      });
       closeAreaModal();
     }
   };
 
   const performDeleteStorageArea = async (id) => {
+    if (!canEditInventory) return;
     const result = await deleteStorageArea(id);
     if (!result?.error) {
       setStorageAreas((prev) => prev.filter((a) => a.id !== id));
+      emitInventoryChange({
+        entity: 'storage_area',
+        action: 'deleted',
+        id,
+      });
     } else {
       console.error('deleteStorageArea error:', result.error);
     }
@@ -433,6 +488,7 @@ export default function StorageAreasSection({
 
   // ---------- Category CRUD ----------
   const openCreateCategoryModal = (area) =>
+    canEditInventory &&
     setCategoryModal({
       open: true,
       mode: 'create',
@@ -443,6 +499,7 @@ export default function StorageAreasSection({
     });
 
   const openEditCategoryModal = (area, category) =>
+    canEditInventory &&
     setCategoryModal({
       open: true,
       mode: 'edit',
@@ -453,6 +510,7 @@ export default function StorageAreasSection({
     });
 
   const submitCategoryModal = async () => {
+    if (!canEditInventory) return;
     const name = categoryModal.name.trim();
     if (!name) return;
 
@@ -471,6 +529,11 @@ export default function StorageAreasSection({
               : a
           )
         );
+        emitInventoryChange({
+          entity: 'category',
+          action: 'updated',
+          id: categoryModal.categoryId,
+        });
         closeCategoryModal();
       }
       return;
@@ -493,10 +556,16 @@ export default function StorageAreasSection({
       );
       closeCategoryModal();
       setExpandedCategories((prev) => ({ ...prev, [result.data.id]: true }));
+      emitInventoryChange({
+        entity: 'category',
+        action: 'added',
+        id: result.data.id,
+      });
     }
   };
 
   const performDeleteCategory = async (categoryId, storageAreaId) => {
+    if (!canEditInventory) return;
     const result = await deleteCategory(categoryId);
     if (!result?.error) {
       setStorageAreas((prev) =>
@@ -509,6 +578,11 @@ export default function StorageAreasSection({
             : a
         )
       );
+      emitInventoryChange({
+        entity: 'category',
+        action: 'deleted',
+        id: categoryId,
+      });
     } else {
       console.error('deleteCategory error:', result.error);
     }
@@ -516,6 +590,7 @@ export default function StorageAreasSection({
 
   // ---------- Item CRUD ----------
   const openCreateItemModal = (area, category) =>
+    canEditInventory &&
     setItemModal({
       open: true,
       mode: 'create',
@@ -526,9 +601,12 @@ export default function StorageAreasSection({
       name: '',
       quantity: '',
       expirationDate: '',
+      imageUrl: null,
+      image_path: null,
     });
 
   const openEditItemModal = (area, category, item) =>
+    canEditInventory &&
     setItemModal({
       open: true,
       mode: 'edit',
@@ -539,9 +617,50 @@ export default function StorageAreasSection({
       name: item.name,
       quantity: String(item.quantity ?? 0),
       expirationDate: item.expiration_date || '',
+      imageUrl: item.imageUrl ?? null,
+      image_path: item.image_path ?? null,
     });
 
+  const handleItemImageChange = ({ imagePath, imageUrl }) => {
+    setItemModal((prev) => ({
+      ...prev,
+      image_path: imagePath ?? null,
+      imageUrl: imageUrl ?? null,
+    }));
+    setStorageAreas((prev) =>
+      prev.map((area) =>
+        area.id === itemModal.areaId
+          ? {
+              ...area,
+              categories: area.categories.map((cat) =>
+                cat.id === itemModal.categoryId
+                  ? {
+                      ...cat,
+                      items: cat.items.map((item) =>
+                        item.id === itemModal.itemId
+                          ? {
+                              ...item,
+                              image_path: imagePath ?? null,
+                              imageUrl: imageUrl ?? null,
+                            }
+                          : item
+                      ),
+                    }
+                  : cat
+              ),
+            }
+          : area
+      )
+    );
+    emitInventoryChange({
+      entity: 'item',
+      action: imagePath ? 'image_updated' : 'image_removed',
+      id: itemModal.itemId,
+    });
+  };
+
   const submitItemModal = async () => {
+    if (!canEditInventory) return;
     if (!itemModal.name.trim()) return;
     setLimitNotice(null);
 
@@ -568,7 +687,13 @@ export default function StorageAreasSection({
                     ? {
                         ...cat,
                         items: cat.items.map((it) =>
-                          it.id === itemModal.itemId ? data : it
+                          it.id === itemModal.itemId
+                            ? {
+                                ...it,
+                                ...data,
+                                imageUrl: it.imageUrl,
+                              }
+                            : it
                         ),
                       }
                     : cat
@@ -577,6 +702,11 @@ export default function StorageAreasSection({
             : area
         )
       );
+      emitInventoryChange({
+        entity: 'item',
+        action: 'updated',
+        id: itemModal.itemId,
+      });
       closeItemModal();
       return;
     }
@@ -607,10 +737,22 @@ export default function StorageAreasSection({
       }))
     );
 
+    emitItemAdded({
+      ...created,
+      locationId,
+      locationName,
+      storageAreaId: itemModal.areaId,
+      storageAreaName:
+        storageAreas.find((area) => String(area.id) === String(itemModal.areaId))
+          ?.name ?? null,
+      categoryId: itemModal.categoryId,
+      categoryName: itemModal.categoryName,
+    });
     closeItemModal();
   };
 
   const performDeleteItem = async (itemId, categoryId, storageAreaId) => {
+    if (!canEditInventory) return;
     const result = await deleteItem(itemId);
     if (!result?.error) {
       setStorageAreas((prev) =>
@@ -630,12 +772,18 @@ export default function StorageAreasSection({
             : area
         )
       );
+      emitInventoryChange({
+        entity: 'item',
+        action: 'deleted',
+        id: itemId,
+      });
     } else {
       console.error('deleteItem error:', result.error);
     }
   };
 
   const performBulkDeleteItems = async (itemIds, categoryId, storageAreaId) => {
+    if (!canEditInventory) return;
     for (const id of itemIds) {
       await deleteItem(id);
     }
@@ -659,9 +807,15 @@ export default function StorageAreasSection({
     );
 
     setSelectedByCategory((prev) => ({ ...prev, [categoryId]: {} }));
+    emitInventoryChange({
+      entity: 'item',
+      action: 'deleted',
+      ids: itemIds,
+    });
   };
 
   const handleConfirmDelete = async () => {
+    if (!canEditInventory) return;
     const { entityType, payload } = deleteDialog;
     if (!entityType || !payload) return;
 
@@ -735,6 +889,7 @@ export default function StorageAreasSection({
 
 
   const toggleSelectItem = (categoryId, itemId) => {
+    if (!canEditInventory) return;
     setSelectedByCategory((prev) => ({
       ...prev,
       [categoryId]: {
@@ -745,17 +900,20 @@ export default function StorageAreasSection({
   };
 
   const selectAllInCategory = (category) => {
+    if (!canEditInventory) return;
     const all = Object.fromEntries((category.items || []).map((i) => [i.id, true]));
     setSelectedByCategory((prev) => ({ ...prev, [category.id]: all }));
   };
 
   const clearSelectInCategory = (categoryId) => {
+    if (!canEditInventory) return;
     setSelectedByCategory((prev) => ({ ...prev, [categoryId]: {} }));
   };
 
   // ---------- Move items logic ----------
 
   const openMoveModal = (areaId, categoryId, singleItemId = null) => {
+    if (!canEditInventory) return;
     const selectedMap = selectedByCategory[categoryId] || {};
     let itemIds = Object.keys(selectedMap).filter((k) => selectedMap[k]);
 
@@ -782,6 +940,7 @@ export default function StorageAreasSection({
   };
 
   const handleConfirmMove = async () => {
+    if (!canEditInventory) return;
     const {
       sourceAreaId,
       sourceCategoryId,
@@ -896,6 +1055,11 @@ export default function StorageAreasSection({
       targetAreaId: null,
       targetCategoryId: null,
       itemIds: [],
+    });
+    emitInventoryChange({
+      entity: 'item',
+      action: 'moved',
+      ids: itemIds,
     });
   };
 
@@ -1024,19 +1188,22 @@ export default function StorageAreasSection({
         </div>
 
         <div className="mt-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-wrap gap-2">
-            <OpenGlobalAddItemButton
-              context={{
-                locationId,
-              }}
-            />
-            <button
-              onClick={openCreateAreaModal}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 py-2 text-sm font-medium text-[var(--stocksense-brand)] hover:brightness-95"
-            >
-              <FaPlus /> New storage area
-            </button>
-          </div>
+          {canEditInventory && (
+            <div className="flex flex-wrap gap-2">
+              <OpenGlobalAddItemButton
+                canEditInventory={canEditInventory}
+                context={{
+                  locationId,
+                }}
+              />
+              <button
+                onClick={openCreateAreaModal}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 py-2 text-sm font-medium text-[var(--stocksense-brand)] hover:brightness-95"
+              >
+                <FaPlus /> New storage area
+              </button>
+            </div>
+          )}
 
           <button
             onClick={allAreasExpanded ? collapseAllAreas : expandAllAreas}
@@ -1063,12 +1230,14 @@ export default function StorageAreasSection({
             <h2 className="text-lg font-semibold text-stocksense-teal">
               No storage areas yet
             </h2>
-            <button
-              onClick={openCreateAreaModal}
-              className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--stocksense-brand)] px-4 py-2 text-sm font-medium text-white hover:brightness-95"
-            >
-              <FaPlus /> New storage area
-            </button>
+            {canEditInventory && (
+              <button
+                onClick={openCreateAreaModal}
+                className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--stocksense-brand)] px-4 py-2 text-sm font-medium text-white hover:brightness-95"
+              >
+                <FaPlus /> New storage area
+              </button>
+            )}
           </motion.div>
         )}
         {storageAreas.map((area, aIdx) => (
@@ -1096,6 +1265,16 @@ export default function StorageAreasSection({
                   </button>
                 ) : null}
 
+                {area.imageUrl && (
+                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
+                    <img
+                      src={area.imageUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                )}
+
                 <div className="min-w-0">
                   <h2 className="text-lg font-semibold text-stocksense-teal truncate">
                     {area.name}{' '}
@@ -1108,33 +1287,35 @@ export default function StorageAreasSection({
                 </div>
               </div>
 
-              <div className="flex flex-wrap justify-end gap-2 shrink-0">
-                <button
-                  onClick={() => openCreateCategoryModal(area)}
-                  className="inline-flex items-center gap-2 rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-2 text-sm font-medium text-[var(--stocksense-brand)] hover:brightness-95"
-                >
-                  <FaLayerGroup /> New category
-                </button>
-                <button
-                  onClick={() => openEditAreaModal(area)}
-                  className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
-                  title="Edit storage area"
-                >
-                  <FaEdit />
-                </button>
-                <button
-                  onClick={() =>
-                    openDeleteDialog('area', {
-                      areaId: area.id,
-                      name: area.name,
-                    })
-                  }
-                  className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
-                  title="Delete storage area"
-                >
-                  <FaTrash />
-                </button>
-              </div>
+              {canEditInventory && (
+                <div className="flex flex-wrap justify-end gap-2 shrink-0">
+                  <button
+                    onClick={() => openCreateCategoryModal(area)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-2 text-sm font-medium text-[var(--stocksense-brand)] hover:brightness-95"
+                  >
+                    <FaLayerGroup /> New category
+                  </button>
+                  <button
+                    onClick={() => openEditAreaModal(area)}
+                    className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
+                    title="Edit storage area"
+                  >
+                    <FaEdit />
+                  </button>
+                  <button
+                    onClick={() =>
+                      openDeleteDialog('area', {
+                        areaId: area.id,
+                        name: area.name,
+                      })
+                    }
+                    className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
+                    title="Delete storage area"
+                  >
+                    <FaTrash />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Categories list */}
@@ -1212,35 +1393,37 @@ export default function StorageAreasSection({
                                 </div>
                               </div>
 
-                              <div className="flex flex-wrap justify-end gap-2 shrink-0">
-                                <button
-                                  onClick={() => openCreateItemModal(area, category)}
-                                  className="inline-flex items-center gap-2 rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-2 text-sm font-medium text-[var(--stocksense-brand)] hover:brightness-95"
-                                >
-                                  <FaBoxOpen /> Add item
-                                </button>
-                                <button
-                                  onClick={() => openEditCategoryModal(area, category)}
-                                  className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
-                                  title="Edit category"
-                                >
-                                  <FaEdit />
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    openDeleteDialog('category', {
-                                      categoryId: category.id,
-                                      storageAreaId: area.id,
-                                      name: category.name,
-                                      areaName: area.name,
-                                    })
-                                  }
-                                  className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
-                                  title="Delete category"
-                                >
-                                  <FaTrash />
-                                </button>
-                              </div>
+                              {canEditInventory && (
+                                <div className="flex flex-wrap justify-end gap-2 shrink-0">
+                                  <button
+                                    onClick={() => openCreateItemModal(area, category)}
+                                    className="inline-flex items-center gap-2 rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-2 text-sm font-medium text-[var(--stocksense-brand)] hover:brightness-95"
+                                  >
+                                    <FaBoxOpen /> Add item
+                                  </button>
+                                  <button
+                                    onClick={() => openEditCategoryModal(area, category)}
+                                    className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
+                                    title="Edit category"
+                                  >
+                                    <FaEdit />
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      openDeleteDialog('category', {
+                                        categoryId: category.id,
+                                        storageAreaId: area.id,
+                                        name: category.name,
+                                        areaName: area.name,
+                                      })
+                                    }
+                                    className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
+                                    title="Delete category"
+                                  >
+                                    <FaTrash />
+                                  </button>
+                                </div>
+                              )}
                             </div>
 
                             {/* Items list (collapsible) */}
@@ -1254,7 +1437,7 @@ export default function StorageAreasSection({
                                   exit="collapsed"
                                   className="overflow-hidden sm:pl-8"
                                 >
-                                  {items.length > 0 && (
+                                  {canEditInventory && items.length > 0 && (
                                     <div className="px-3 sm:px-4 flex flex-wrap items-center text-sm h-[34px] mb-2 gap-2">
                                       <h3 className='font-medium text-lg text-stocksense-teal truncate'>Items</h3>
                                       <label className="flex items-center gap-2 cursor-pointer">
@@ -1338,17 +1521,28 @@ export default function StorageAreasSection({
                                         >
                                           <>
                                             <div className="flex items-start gap-3 min-w-0">
-                                              <input
-                                                type="checkbox"
-                                                checked={selected}
-                                                onChange={() =>
-                                                  toggleSelectItem(
-                                                    category.id,
-                                                    item.id
-                                                  )
-                                                }
-                                                className="mt-1"
-                                              />
+                                              {canEditInventory && (
+                                                <input
+                                                  type="checkbox"
+                                                  checked={selected}
+                                                  onChange={() =>
+                                                    toggleSelectItem(
+                                                      category.id,
+                                                      item.id
+                                                    )
+                                                  }
+                                                  className="mt-1"
+                                                />
+                                              )}
+                                              {item.imageUrl && (
+                                                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
+                                                  <img
+                                                    src={item.imageUrl}
+                                                    alt=""
+                                                    className="h-full w-full object-cover"
+                                                  />
+                                                </div>
+                                              )}
                                               <div className="min-w-0">
                                                 <p className="font-medium text-stocksense-teal truncate">
                                                   {item.name}
@@ -1366,47 +1560,49 @@ export default function StorageAreasSection({
                                                 </p>
                                               </div>
                                             </div>
-                                            <div className="flex items-center gap-2 self-end shrink-0 sm:self-auto">
-                                              <button
-                                                onClick={() =>
-                                                  openMoveModal(
-                                                    area.id,
-                                                    category.id,
-                                                    item.id
-                                                  )
-                                                }
-                                                className="text-[var(--stocksense-brand)] cursor-pointer rounded-lg p-2 hover:bg-[var(--stocksense-brand-soft)]"
-                                                title="Move item to another category"
-                                              >
-                                                <FaArrowsAlt />
-                                              </button>
+                                            {canEditInventory && (
+                                              <div className="flex items-center gap-2 self-end shrink-0 sm:self-auto">
+                                                <button
+                                                  onClick={() =>
+                                                    openMoveModal(
+                                                      area.id,
+                                                      category.id,
+                                                      item.id
+                                                    )
+                                                  }
+                                                  className="text-[var(--stocksense-brand)] cursor-pointer rounded-lg p-2 hover:bg-[var(--stocksense-brand-soft)]"
+                                                  title="Move item to another category"
+                                                >
+                                                  <FaArrowsAlt />
+                                                </button>
 
-                                              <button
-                                                onClick={() =>
-                                                  openEditItemModal(area, category, item)
-                                                }
-                                                className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
-                                                title="Edit item"
-                                              >
-                                                <FaEdit />
-                                              </button>
-                                              <button
-                                                onClick={() =>
-                                                  openDeleteDialog('item', {
-                                                    itemId: item.id,
-                                                    itemName: item.name,
-                                                    categoryId: category.id,
-                                                    storageAreaId: area.id,
-                                                    categoryName: category.name,
-                                                    areaName: area.name,
-                                                  })
-                                                }
-                                                className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
-                                                title="Delete item"
-                                              >
-                                                <FaTrash />
-                                              </button>
-                                            </div>
+                                                <button
+                                                  onClick={() =>
+                                                    openEditItemModal(area, category, item)
+                                                  }
+                                                  className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
+                                                  title="Edit item"
+                                                >
+                                                  <FaEdit />
+                                                </button>
+                                                <button
+                                                  onClick={() =>
+                                                    openDeleteDialog('item', {
+                                                      itemId: item.id,
+                                                      itemName: item.name,
+                                                      categoryId: category.id,
+                                                      storageAreaId: area.id,
+                                                      categoryName: category.name,
+                                                      areaName: area.name,
+                                                    })
+                                                  }
+                                                  className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
+                                                  title="Delete item"
+                                                >
+                                                  <FaTrash />
+                                                </button>
+                                              </div>
+                                            )}
                                           </>
                                         </motion.div>
                                       );
@@ -1426,7 +1622,7 @@ export default function StorageAreasSection({
         ))}
       </motion.div>
 
-      <Modal
+      {canEditInventory && <Modal
         isOpen={areaModal.open}
         onOpenChange={(open) => !open && closeAreaModal()}
         placement="center"
@@ -1448,6 +1644,15 @@ export default function StorageAreasSection({
               classNames={modalInputClassNames}
               autoFocus
             />
+            {areaModal.mode === 'edit' && (
+              <EntityImageManager
+                entityType="storage_area"
+                entityId={areaModal.areaId}
+                imageUrl={areaModal.imageUrl}
+                label="Storage area photo"
+                onChange={handleAreaImageChange}
+              />
+            )}
           </ModalBody>
           <ModalFooter className={modalFooterClass}>
             <Button variant="light" radius="lg" onPress={closeAreaModal}>
@@ -1464,9 +1669,9 @@ export default function StorageAreasSection({
             </Button>
           </ModalFooter>
         </ModalContent>
-      </Modal>
+      </Modal>}
 
-      <Modal
+      {canEditInventory && <Modal
         isOpen={categoryModal.open}
         onOpenChange={(open) => !open && closeCategoryModal()}
         placement="center"
@@ -1506,9 +1711,9 @@ export default function StorageAreasSection({
             </Button>
           </ModalFooter>
         </ModalContent>
-      </Modal>
+      </Modal>}
 
-      <Modal
+      {canEditInventory && <Modal
         isOpen={itemModal.open}
         onOpenChange={(open) => !open && closeItemModal()}
         placement="center"
@@ -1555,6 +1760,15 @@ export default function StorageAreasSection({
                 classNames={modalInputClassNames}
               />
             </div>
+            {itemModal.mode === 'edit' && (
+              <EntityImageManager
+                entityType="item"
+                entityId={itemModal.itemId}
+                imageUrl={itemModal.imageUrl}
+                label="Item photo"
+                onChange={handleItemImageChange}
+              />
+            )}
           </ModalBody>
           <ModalFooter className={modalFooterClass}>
             <Button variant="light" radius="lg" onPress={closeItemModal}>
@@ -1571,26 +1785,26 @@ export default function StorageAreasSection({
             </Button>
           </ModalFooter>
         </ModalContent>
-      </Modal>
+      </Modal>}
 
-      <MoveItemsModal
+      {canEditInventory && <MoveItemsModal
         moveModal={moveModal}
         setMoveModal={setMoveModal}
         locationsForMove={locationsForMove}
         storageAreas={storageAreas}
         currentLocationId={locationId}
         onConfirm={handleConfirmMove}
-      />
+      />}
 
       {/* Reusable delete confirmation modal */}
-      <ConfirmDeleteModal
+      {canEditInventory && <ConfirmDeleteModal
         isOpen={deleteDialog.open}
         isDeleting={deleteDialog.isDeleting}
         onCancel={closeDeleteDialog}
         onConfirm={handleConfirmDelete}
         title={deleteTitle}
         description={deleteDescription}
-      />
+      />}
 
     </motion.div>
   );

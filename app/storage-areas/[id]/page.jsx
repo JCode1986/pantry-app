@@ -2,7 +2,7 @@ import { createClient } from '@/utils/supabase/server';
 import Link from 'next/link';
 import CategoriesGrid from '@/components/categories/CategoriesGrid';
 import { notFound } from 'next/navigation';
-import { createPageMetadata } from '@/utils/metadata';
+import { createPageMetadata, NO_INDEX_ROBOTS } from '@/utils/metadata';
 
 export async function generateMetadata({ params }) {
   const supabase = await createClient();
@@ -19,6 +19,7 @@ export async function generateMetadata({ params }) {
     title: `${name} Categories`,
     description: `View categories inside ${name}.`,
     path: `/storage-areas/${id}`,
+    robots: NO_INDEX_ROBOTS,
   });
 }
 
@@ -46,7 +47,7 @@ export default async function StorageAreaCategoriesPage({ params }) {
     .order('created_at', { ascending: true });
 
   return (
-    <main className="page-enter mx-auto max-w-6xl px-5 py-8 space-y-6">
+    <main className="page-enter mx-auto max-w-[1500px] px-5 py-8 space-y-6">
       <nav className="content-enter text-sm text-gray-500">
         <Link href={`/locations/${area?.location_id}`} className="hover:underline">
           {area.locations?.name ?? 'Unknown location'}

@@ -3,7 +3,10 @@
 import { createClient } from "@/utils/supabase/server";
 import { getSession } from "@/lib/sessionOptions";
 import { createAdminClient } from "@/utils/supabase/admin";
-import { getHouseholdForUser } from "@/utils/households";
+import {
+  getHouseholdBilling,
+  getHouseholdForUser,
+} from "@/utils/households";
 
 const DEFAULT_LIMIT = 12;
 const MAX_LIMIT = 50;
@@ -331,7 +334,9 @@ async function getAuthedUser() {
 
 export async function getActivityFilterOptionsAction() {
   const { user, error } = await getAuthedUser();
-  if (error) return { data: { members: [] }, error };
+  if (error) {
+    return { data: { members: [], effectivePlanId: "free" }, error };
+  }
 
   try {
     const { household } = await getHouseholdForUser({
@@ -341,15 +346,21 @@ export async function getActivityFilterOptionsAction() {
     });
 
     if (!household?.id) {
-      return { data: { members: [] }, error: null };
+      return { data: { members: [], effectivePlanId: "free" }, error: null };
     }
 
     const admin = createAdminClient();
-    const { data, error: membersError } = await admin
-      .from("household_members")
-      .select("user_id, email, role")
-      .eq("household_id", household.id)
-      .order("joined_at", { ascending: true });
+    const [
+      { data, error: membersError },
+      { effectivePlanId },
+    ] = await Promise.all([
+      admin
+        .from("household_members")
+        .select("user_id, email, role")
+        .eq("household_id", household.id)
+        .order("joined_at", { ascending: true }),
+      getHouseholdBilling(household),
+    ]);
 
     if (membersError) throw membersError;
 
@@ -360,12 +371,13 @@ export async function getActivityFilterOptionsAction() {
           email: member.email || "Unknown email",
           role: member.role,
         })),
+        effectivePlanId,
       },
       error: null,
     };
   } catch (err) {
     return {
-      data: { members: [] },
+      data: { members: [], effectivePlanId: "free" },
       error: err?.message || "Could not load activity filters.",
     };
   }

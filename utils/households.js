@@ -6,6 +6,45 @@ import {
 } from "@/utils/billingPlans";
 
 const INVITE_DAYS = 7;
+export const HOUSEHOLD_ROLES = {
+  OWNER: "owner",
+  EDITOR: "editor",
+  VIEWER: "viewer",
+};
+
+const VALID_HOUSEHOLD_ROLES = new Set(Object.values(HOUSEHOLD_ROLES));
+
+export function normalizeHouseholdRole(value, fallback = HOUSEHOLD_ROLES.EDITOR) {
+  const role = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (role === "member") return HOUSEHOLD_ROLES.EDITOR;
+  return VALID_HOUSEHOLD_ROLES.has(role) ? role : fallback;
+}
+
+export function canEditHouseholdInventory(member) {
+  const role = normalizeHouseholdRole(member?.role, HOUSEHOLD_ROLES.VIEWER);
+  return role === HOUSEHOLD_ROLES.OWNER || role === HOUSEHOLD_ROLES.EDITOR;
+}
+
+export async function getCanEditInventoryForUser(user) {
+  if (!user?.id) return false;
+
+  const { member } = await getHouseholdForUser({
+    userId: user.id,
+    email: user.email,
+    createIfMissing: true,
+  });
+
+  return canEditHouseholdInventory(member);
+}
+
+export function canManageHousehold(member, household, userId) {
+  return (
+    normalizeHouseholdRole(member?.role, HOUSEHOLD_ROLES.VIEWER) ===
+      HOUSEHOLD_ROLES.OWNER &&
+    Boolean(household?.owner_id) &&
+    household.owner_id === userId
+  );
+}
 
 export function normalizeInviteEmail(value) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
@@ -45,18 +84,27 @@ export async function getHouseholdForUser({
 
   if (member?.household_id) {
     const normalizedEmail = normalizeInviteEmail(email);
-    let resolvedMember = member;
+    let resolvedMember = {
+      ...member,
+      role: normalizeHouseholdRole(member.role),
+    };
 
-    if (!member.email && normalizedEmail) {
+    if ((!member.email && normalizedEmail) || member.role === "member") {
       const { data: updatedMember, error: updateMemberError } = await admin
         .from("household_members")
-        .update({ email: normalizedEmail })
+        .update({
+          email: member.email || normalizedEmail || null,
+          role: normalizeHouseholdRole(member.role),
+        })
         .eq("user_id", userId)
         .select("household_id, user_id, email, role, joined_at")
         .single();
 
       if (updateMemberError) throw updateMemberError;
-      resolvedMember = updatedMember;
+      resolvedMember = {
+        ...updatedMember,
+        role: normalizeHouseholdRole(updatedMember.role),
+      };
     }
 
     const { data: household, error: householdError } = await admin

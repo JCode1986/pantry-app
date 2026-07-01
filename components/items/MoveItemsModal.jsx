@@ -3,7 +3,10 @@
 import { useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Select, SelectItem } from "@heroui/react";
-import { modalContentStyle } from "@/components/modals/modalTheme";
+import {
+  modalContentStyle,
+  themedSelectClassNames,
+} from "@/components/modals/modalTheme";
 
 function createClosedMoveModal(currentLocationId) {
   return {
@@ -134,9 +137,7 @@ export default function MoveItemsModal({
                 onSelectionChange={(keys) => handleLocationChange(getSelectedValue(keys))}
                 variant="bordered"
                 radius="lg"
-                classNames={{
-                  trigger: "border-[var(--stocksense-brand-border)] bg-white shadow-none",
-                }}
+                classNames={themedSelectClassNames}
               >
                 {safeLocations.map((location) => (
                   <SelectItem key={String(location.id)}>
@@ -158,9 +159,7 @@ export default function MoveItemsModal({
                 onSelectionChange={(keys) => handleAreaChange(getSelectedValue(keys))}
                 variant="bordered"
                 radius="lg"
-                classNames={{
-                  trigger: "border-[var(--stocksense-brand-border)] bg-white shadow-none",
-                }}
+                classNames={themedSelectClassNames}
               >
                 {areasForSelectedLocation.map((area) => (
                   <SelectItem key={String(area.id)}>{area.name}</SelectItem>
@@ -186,9 +185,7 @@ export default function MoveItemsModal({
                 isDisabled={!moveModal.targetAreaId}
                 variant="bordered"
                 radius="lg"
-                classNames={{
-                  trigger: "border-[var(--stocksense-brand-border)] bg-white shadow-none",
-                }}
+                classNames={themedSelectClassNames}
               >
                 {selectedArea?.categories?.map((category) => (
                   <SelectItem key={String(category.id)}>

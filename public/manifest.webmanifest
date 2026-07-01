@@ -2,11 +2,20 @@
   "name": "WhereKeep",
   "short_name": "WhereKeep",
   "description": "Know what you have, where it is, and what needs attention.",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0E7488",
+  "categories": ["productivity", "lifestyle", "utilities"],
   "icons": [
+    {
+      "src": "/wherekeep-app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
     {
       "src": "/wherekeep-app-icon.png",
       "sizes": "512x512",

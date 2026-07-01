@@ -11,7 +11,7 @@ import {
   ModalBody,
   ModalFooter,
 } from "@heroui/react";
-import { FaSearch, FaWarehouse } from "react-icons/fa";
+import { FaSearch, FaTrash, FaWarehouse } from "react-icons/fa";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import {
   modalBodyClass,
@@ -24,6 +24,8 @@ import {
 import { updateStorageArea, deleteStorageArea } from "@/app/actions/server";
 import { containsQuery } from "@/utils/pantry/search";
 import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
+import { emitInventoryChange } from "@/utils/clientEvents";
+import EntityImageManager from "@/components/inventory/EntityImageManager";
 
 const pageSectionVariants = {
   hidden: { opacity: 0 },
@@ -39,7 +41,7 @@ const pageItemVariants = {
   },
 };
 
-export default function AreasPageClient({ initialAreas }) {
+export default function AreasPageClient({ initialAreas, canEditInventory = true }) {
   const [areas, setAreas] = useState(initialAreas ?? []);
   const [search, setSearch] = useState("");
 
@@ -52,7 +54,9 @@ export default function AreasPageClient({ initialAreas }) {
     open: false,
     payload: null,
     isDeleting: false,
+    mode: "single",
   });
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   const activeArea = useMemo(
     () => areas.find((a) => String(a.id) === String(activeAreaId)) || null,
@@ -149,6 +153,37 @@ export default function AreasPageClient({ initialAreas }) {
     });
   }, [areas, search]);
 
+  const selectedCount = selectedIds.size;
+  const allVisibleSelected =
+    filtered.length > 0 &&
+    filtered.every((area) => selectedIds.has(String(area.id)));
+
+  const toggleSelect = (id) => {
+    if (!canEditInventory) return;
+    const key = String(id);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const toggleSelectAllVisible = () => {
+    if (!canEditInventory) return;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        filtered.forEach((area) => next.delete(String(area.id)));
+      } else {
+        filtered.forEach((area) => next.add(String(area.id)));
+      }
+      return next;
+    });
+  };
+
   const openDrawer = (area) => {
     setActiveAreaId(area.id);
     setRenameValue(area.name);
@@ -162,6 +197,7 @@ export default function AreasPageClient({ initialAreas }) {
   };
 
   const handleRename = async () => {
+    if (!canEditInventory) return;
     if (!activeArea) return;
     const name = renameValue.trim();
     if (!name) return;
@@ -173,14 +209,37 @@ export default function AreasPageClient({ initialAreas }) {
     }
 
     setAreas((prev) => prev.map((a) => (a.id === activeArea.id ? { ...a, name } : a)));
+    emitInventoryChange({
+      entity: "storage_area",
+      action: "updated",
+      id: activeArea.id,
+    });
+  };
+
+  const handleAreaImageChange = ({ imagePath, imageUrl }) => {
+    if (!activeArea?.id) return;
+    setAreas((prev) =>
+      prev.map((area) =>
+        area.id === activeArea.id
+          ? { ...area, image_path: imagePath ?? null, imageUrl: imageUrl ?? null }
+          : area
+      )
+    );
+    emitInventoryChange({
+      entity: "storage_area",
+      action: imagePath ? "image_updated" : "image_removed",
+      id: activeArea.id,
+    });
   };
 
   const openDelete = () => {
+    if (!canEditInventory) return;
     if (!activeArea) return;
 
     setDeleteDialog({
       open: true,
       isDeleting: false,
+      mode: "single",
       payload: {
         areaId: activeArea.id,
         name: activeArea.name,
@@ -191,16 +250,55 @@ export default function AreasPageClient({ initialAreas }) {
     });
   };
 
+  const openBulkDelete = () => {
+    if (!canEditInventory) return;
+    if (selectedIds.size === 0) return;
+
+    setDeleteDialog({
+      open: true,
+      isDeleting: false,
+      mode: "bulk",
+      payload: {
+        areaIds: Array.from(selectedIds),
+        count: selectedIds.size,
+      },
+    });
+  };
+
   const closeDelete = () => {
-    setDeleteDialog({ open: false, payload: null, isDeleting: false });
+    setDeleteDialog({ open: false, payload: null, isDeleting: false, mode: "single" });
   };
 
   const confirmDelete = async () => {
+    if (!canEditInventory) return;
     if (!deleteDialog.payload) return;
 
     setDeleteDialog((p) => ({ ...p, isDeleting: true }));
-    const { areaId } = deleteDialog.payload;
 
+    if (deleteDialog.mode === "bulk") {
+      const ids = deleteDialog.payload.areaIds ?? [];
+      const results = await Promise.all(ids.map((id) => deleteStorageArea(id)));
+      const hasError = results.some((result) => result?.error);
+      if (hasError) {
+        console.error("bulk deleteStorageArea error:", results);
+        closeDelete();
+        return;
+      }
+
+      const deleted = new Set(ids.map(String));
+      setAreas((prev) => prev.filter((area) => !deleted.has(String(area.id))));
+      clearSelection();
+      if (activeAreaId && deleted.has(String(activeAreaId))) closeDrawer();
+      emitInventoryChange({
+        entity: "storage_area",
+        action: "deleted",
+        ids,
+      });
+      closeDelete();
+      return;
+    }
+
+    const { areaId } = deleteDialog.payload;
     const result = await deleteStorageArea(areaId);
     if (result?.error) {
       console.error("deleteStorageArea error:", result.error);
@@ -208,7 +306,17 @@ export default function AreasPageClient({ initialAreas }) {
       return;
     }
 
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(String(areaId));
+      return next;
+    });
     setAreas((prev) => prev.filter((a) => a.id !== areaId));
+    emitInventoryChange({
+      entity: "storage_area",
+      action: "deleted",
+      id: areaId,
+    });
     closeDelete();
     closeDrawer();
   };
@@ -227,7 +335,7 @@ export default function AreasPageClient({ initialAreas }) {
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl p-3 text-white bg-gradient-to-br from-sky-500 to-cyan-500 shadow-sm border border-gray-300">
+            <div className="rounded-xl border border-[var(--entity-area-border)] bg-[var(--entity-area-accent)] p-3 text-white shadow-sm">
               <FaWarehouse className="h-5 w-5" />
             </div>
             <div>
@@ -252,16 +360,72 @@ export default function AreasPageClient({ initialAreas }) {
             />
           </div>
         </div>
+
+        {canEditInventory && (
+          <div className="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={allVisibleSelected}
+                onChange={toggleSelectAllVisible}
+                disabled={filtered.length === 0 || deleteDialog.isDeleting}
+                className="h-5 w-5 cursor-pointer rounded border border-stocksense-gray"
+              />
+              Select all visible
+            </label>
+
+            <Button
+              size="sm"
+              variant="flat"
+              className="w-fit rounded-xl"
+              isDisabled={selectedCount === 0 || deleteDialog.isDeleting}
+              onPress={clearSelection}
+            >
+              Clear selection
+            </Button>
+          </div>
+        )}
+
+        {canEditInventory && <AnimatePresence initial={false}>
+          {selectedCount > 0 ? (
+            <motion.div
+              layout
+              initial={{ opacity: 0, height: 0, y: -6 }}
+              animate={{ opacity: 1, height: "auto", y: 0 }}
+              exit={{ opacity: 0, height: 0, y: -6 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="mt-4 overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3"
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-[var(--stocksense-brand)]">
+                  Bulk actions for <span className="font-semibold">{selectedCount}</span>{" "}
+                  storage area{selectedCount === 1 ? "" : "s"}
+                </p>
+                <Button
+                  size="sm"
+                  color="danger"
+                  variant="flat"
+                  className="w-fit rounded-xl"
+                  isDisabled={deleteDialog.isDeleting}
+                  onPress={openBulkDelete}
+                  startContent={<FaTrash />}
+                >
+                  Delete selected
+                </Button>
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>}
       </motion.div>
 
       {/* List */}
       <motion.div
         variants={pageSectionVariants}
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
       >
         <AnimatePresence initial={false}>
           {filtered.map((a) => (
-          <motion.button
+          <motion.article
             key={a.id}
             layout
             variants={pageItemVariants}
@@ -269,26 +433,58 @@ export default function AreasPageClient({ initialAreas }) {
             animate="show"
             exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
             onClick={() => openDrawer(a)}
-            className="flex flex-col justify-between rounded-2xl border border-stocksense-gray bg-white p-4 text-left shadow-sm transition hover:bg-gray-50 cursor-pointer"
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") openDrawer(a);
+            }}
+            role="button"
+            tabIndex={0}
+            className="relative flex flex-col justify-between overflow-hidden rounded-2xl border border-stocksense-gray bg-white p-3.5 pt-4 text-left shadow-sm transition hover:bg-gray-50 cursor-pointer sm:p-4"
             whileHover={{ y: -1 }}
             whileTap={{ scale: 0.99 }}
           >
-            <div className="flex h-full flex-col justify-between gap-4">
-              <div className="min-w-0">
-                <div className="font-semibold text-stocksense-teal truncate">{a.name}</div>
-                <div className="text-sm text-gray-500 truncate">{a.location?.name}</div>
+            <div className="absolute inset-x-0 top-0 h-1 bg-[var(--entity-area-accent)]" />
+            <div className="flex h-full flex-col justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-2.5">
+                {canEditInventory && (
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(String(a.id))}
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                    onChange={() => toggleSelect(a.id)}
+                    aria-label={`Select ${a.name}`}
+                    className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border border-stocksense-gray"
+                  />
+                )}
+                {a.imageUrl ? (
+                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
+                    <img
+                      src={a.imageUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]">
+                    <FaWarehouse className="h-4 w-4" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <div className="truncate text-[15px] font-semibold leading-5 text-stocksense-teal sm:text-base">{a.name}</div>
+                  <div className="mt-1 text-sm text-gray-500 truncate">{a.location?.name}</div>
+                </div>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
+              <div className="grid grid-cols-2 gap-1.5">
+                <span className="rounded-xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] px-2.5 py-1 text-center text-xs text-[var(--entity-area-accent)]">
                   {a.categoriesCount} {a.categoriesCount === 1 ? "category" : "categories"}
                 </span>
-                <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
+                <span className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-2.5 py-1 text-center text-xs text-[var(--stocksense-brand)]">
                   {a.itemsCount} {a.itemsCount === 1 ? "item" : "items"}
                 </span>
               </div>
             </div>
-          </motion.button>
+          </motion.article>
           ))}
 
           {filtered.length === 0 && (
@@ -298,11 +494,12 @@ export default function AreasPageClient({ initialAreas }) {
             initial="hidden"
             animate="show"
             exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
-            className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center sm:col-span-2 lg:col-span-3"
+            className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center sm:col-span-2 lg:col-span-3 xl:col-span-4"
           >
             <p className="text-gray-500">No storage areas match your search.</p>
             <div className="mt-4 flex justify-center">
               <OpenGlobalAddItemButton
+                canEditInventory={canEditInventory}
                 context={
                   activeArea
                     ? {
@@ -340,24 +537,35 @@ export default function AreasPageClient({ initialAreas }) {
               </ModalHeader>
 
               <ModalBody className={`space-y-5 ${modalBodyClass}`}>
-                {/* Rename */}
-                <div className="space-y-2">
-                  <div className="text-xs font-medium text-gray-600">Area name</div>
-                  <Input
-                    value={renameValue}
-                    onValueChange={setRenameValue}
-                    variant="bordered"
-                    radius="lg"
-                    classNames={modalInputClassNames}
+                {canEditInventory && (
+                  <div className="space-y-2">
+                    <div className="text-xs font-medium text-gray-600">Area name</div>
+                    <Input
+                      value={renameValue}
+                      onValueChange={setRenameValue}
+                      variant="bordered"
+                      radius="lg"
+                      classNames={modalInputClassNames}
+                    />
+                    <Button
+                      onClick={handleRename}
+                      isDisabled={!renameValue.trim()}
+                      className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
+                    >
+                      Save name
+                    </Button>
+                  </div>
+                )}
+
+                {canEditInventory && activeArea?.id && (
+                  <EntityImageManager
+                    entityType="storage_area"
+                    entityId={activeArea.id}
+                    imageUrl={activeArea.imageUrl}
+                    label="Storage area photo"
+                    onChange={handleAreaImageChange}
                   />
-                  <Button
-                    onClick={handleRename}
-                    isDisabled={!renameValue.trim()}
-                    className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
-                  >
-                    Save name
-                  </Button>
-                </div>
+                )}
 
                 {/* Stats */}
                 <div className="flex gap-2 flex-wrap">
@@ -409,9 +617,11 @@ export default function AreasPageClient({ initialAreas }) {
                 <Button variant="light" className="rounded-xl" onClick={closeDrawer}>
                   Close
                 </Button>
-                <Button className="rounded-xl bg-rose-600 text-white" onClick={openDelete}>
-                  Delete area
-                </Button>
+                {canEditInventory && (
+                  <Button className="rounded-xl bg-rose-600 text-white" onClick={openDelete}>
+                    Delete area
+                  </Button>
+                )}
               </ModalFooter>
             </>
           )}
@@ -419,18 +629,24 @@ export default function AreasPageClient({ initialAreas }) {
       </Modal>
 
       {/* Delete confirmation */}
-      <ConfirmDeleteModal
+      {canEditInventory && <ConfirmDeleteModal
         isOpen={deleteDialog.open}
         isDeleting={deleteDialog.isDeleting}
         onCancel={closeDelete}
         onConfirm={confirmDelete}
         title={
-          deleteDialog.payload
+          deleteDialog.mode === "bulk"
+            ? `Delete ${deleteDialog.payload?.count ?? 0} storage area${
+                deleteDialog.payload?.count === 1 ? "" : "s"
+              }?`
+            : deleteDialog.payload
             ? `Delete storage area "${deleteDialog.payload.name}"?`
             : "Delete storage area?"
         }
         description={
-          deleteDialog.payload
+          deleteDialog.mode === "bulk"
+            ? "This will remove the selected storage areas, including categories and items inside them. This action cannot be undone."
+            : deleteDialog.payload
             ? `This will remove "${deleteDialog.payload.name}" in ${deleteDialog.payload.locationName}, including ${deleteDialog.payload.categoriesCount} categor${
                 deleteDialog.payload.categoriesCount === 1 ? "y" : "ies"
               } and ${deleteDialog.payload.itemsCount} item${
@@ -438,7 +654,7 @@ export default function AreasPageClient({ initialAreas }) {
               }. This action cannot be undone.`
             : ""
         }
-      />
+      />}
     </motion.div>
   );
 }

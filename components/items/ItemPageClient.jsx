@@ -14,13 +14,17 @@ import {
   SelectItem,
 } from "@heroui/react";
 import {
+  FaBarcode,
   FaBoxOpen,
+  FaChevronDown,
   FaChevronLeft,
   FaChevronRight,
-  FaEdit,
+  FaFilter,
   FaSearch,
+  FaTimes,
 } from "react-icons/fa";
 import { updateItem, deleteItem, updateItemLocation } from "@/app/actions/server";
+import { deleteItemAndAddToShoppingListAction } from "@/app/actions/shoppingList";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import {
   modalBodyClass,
@@ -29,8 +33,11 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  themedSelectClassNames,
 } from "@/components/modals/modalTheme";
 import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
+import { emitInventoryChange } from "@/utils/clientEvents";
+import EntityImageManager from "@/components/inventory/EntityImageManager";
 import {
   daysUntil,
   isExpiringSoon,
@@ -54,6 +61,27 @@ const pageItemVariants = {
 };
 
 const ITEMS_PER_PAGE = 25;
+const ALL_FILTER_KEY = "all";
+const EXPIRATION_FILTERS = {
+  ALL: "all",
+  EXPIRED: "expired",
+  SOON: "soon",
+  NONE: "none",
+};
+const EXPIRATION_FILTER_LABELS = {
+  [EXPIRATION_FILTERS.EXPIRED]: "Expired",
+  [EXPIRATION_FILTERS.SOON]: "Expiring soon",
+  [EXPIRATION_FILTERS.NONE]: "No expiration",
+};
+const STOCK_FILTERS = {
+  ALL: "all",
+  IN_STOCK: "in_stock",
+  LOW_OR_EMPTY: "low_or_empty",
+};
+const STOCK_FILTER_LABELS = {
+  [STOCK_FILTERS.IN_STOCK]: "In stock",
+  [STOCK_FILTERS.LOW_OR_EMPTY]: "Low or empty",
+};
 
 function PaginationControls({
   currentPage,
@@ -105,13 +133,22 @@ function PaginationControls({
   );
 }
 
-export default function ItemsPageClient({ initialItems, moveLocations }) {
+export default function ItemsPageClient({
+  initialItems,
+  moveLocations,
+  canEditInventory = true,
+}) {
   const [items, setItems] = useState(initialItems ?? []);
 
   // filters
   const [search, setSearch] = useState("");
-  const [expSoonEnabled, setExpSoonEnabled] = useState(false);
+  const [locationFilter, setLocationFilter] = useState(ALL_FILTER_KEY);
+  const [areaFilter, setAreaFilter] = useState(ALL_FILTER_KEY);
+  const [categoryFilter, setCategoryFilter] = useState(ALL_FILTER_KEY);
+  const [expirationFilter, setExpirationFilter] = useState(EXPIRATION_FILTERS.ALL);
+  const [stockFilter, setStockFilter] = useState(STOCK_FILTERS.ALL);
   const [expDays, setExpDays] = useState(7);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   // drawer state
@@ -122,6 +159,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
   const [editName, setEditName] = useState("");
   const [editQty, setEditQty] = useState("");
   const [editExp, setEditExp] = useState("");
+  const [editBarcode, setEditBarcode] = useState("");
 
   // bulk selection (Set of item IDs)
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -138,6 +176,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
     isDeleting: false,
+    isAddingToShoppingList: false,
     mode: null, // "single" | "bulk"
     payload: null,
   });
@@ -155,13 +194,15 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
 
     const quantity = toNonNegativeInteger(editQty, 0);
     const expirationDate = editExp ? editExp : null;
+    const barcode = editBarcode.trim();
 
     return (
       name !== (activeItem.name || "") ||
       quantity !== (activeItem.quantity ?? 0) ||
-      expirationDate !== (activeItem.expiration_date ?? null)
+      expirationDate !== (activeItem.expiration_date ?? null) ||
+      (barcode || null) !== (activeItem.barcode ?? null)
     );
-  }, [activeItem, editExp, editName, editQty]);
+  }, [activeItem, editBarcode, editExp, editName, editQty]);
 
   useEffect(() => {
     const handleItemAdded = (event) => {
@@ -185,10 +226,31 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
         name: item.name,
         quantity: item.quantity ?? 0,
         expiration_date: item.expiration_date ?? null,
+        barcode: item.barcode ?? null,
         category_id: item.category_id ?? item.categoryId ?? null,
-        location: loc ? { id: loc.id, name: loc.name } : null,
-        area: area ? { id: area.id, name: area.name } : null,
-        category: cat ? { id: cat.id, name: cat.name } : null,
+        image_path: item.image_path ?? null,
+        imageUrl: item.imageUrl ?? null,
+        location:
+          loc || item.locationId || item.locationName
+            ? {
+                id: loc?.id ?? item.locationId ?? null,
+                name: loc?.name ?? item.locationName ?? "Unknown location",
+              }
+            : null,
+        area:
+          area || item.storageAreaId || item.storageAreaName
+            ? {
+                id: area?.id ?? item.storageAreaId ?? null,
+                name: area?.name ?? item.storageAreaName ?? "Unknown area",
+              }
+            : null,
+        category:
+          cat || item.categoryId || item.categoryName
+            ? {
+                id: cat?.id ?? item.categoryId ?? null,
+                name: cat?.name ?? item.categoryName ?? "Unknown category",
+              }
+            : null,
       };
 
       setItems((prev) => {
@@ -211,18 +273,204 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
 
   const normalizedSearch = search.trim().toLowerCase();
 
+  const locationOptions = useMemo(() => moveLocations || [], [moveLocations]);
+
+  const areaOptions = useMemo(() => {
+    const locations =
+      locationFilter === ALL_FILTER_KEY
+        ? locationOptions
+        : locationOptions.filter((location) => String(location.id) === locationFilter);
+
+    return locations.flatMap((location) =>
+      (location.storage_areas || []).map((area) => ({
+        ...area,
+        locationId: location.id,
+        locationName: location.name,
+      }))
+    );
+  }, [locationFilter, locationOptions]);
+
+  const categoryOptions = useMemo(() => {
+    const areas =
+      areaFilter === ALL_FILTER_KEY
+        ? areaOptions
+        : areaOptions.filter((area) => String(area.id) === areaFilter);
+
+    return areas.flatMap((area) =>
+      (area.categories || []).map((category) => ({
+        ...category,
+        areaId: area.id,
+        areaName: area.name,
+        locationId: area.locationId,
+        locationName: area.locationName,
+      }))
+    );
+  }, [areaFilter, areaOptions]);
+
+  const selectedLocation = useMemo(
+    () =>
+      locationOptions.find((location) => String(location.id) === locationFilter) ||
+      null,
+    [locationFilter, locationOptions]
+  );
+
+  const selectedArea = useMemo(
+    () => areaOptions.find((area) => String(area.id) === areaFilter) || null,
+    [areaFilter, areaOptions]
+  );
+
+  const selectedCategory = useMemo(
+    () =>
+      categoryOptions.find((category) => String(category.id) === categoryFilter) ||
+      null,
+    [categoryFilter, categoryOptions]
+  );
+
+  const activeFilterCount = useMemo(() => {
+    return [
+      normalizedSearch,
+      locationFilter !== ALL_FILTER_KEY,
+      areaFilter !== ALL_FILTER_KEY,
+      categoryFilter !== ALL_FILTER_KEY,
+      expirationFilter !== EXPIRATION_FILTERS.ALL,
+      stockFilter !== STOCK_FILTERS.ALL,
+    ].filter(Boolean).length;
+  }, [
+    areaFilter,
+    categoryFilter,
+    expirationFilter,
+    locationFilter,
+    normalizedSearch,
+    stockFilter,
+  ]);
+
+  const filtersAreActive = activeFilterCount > 0;
+  const advancedFiltersAreActive =
+    areaFilter !== ALL_FILTER_KEY ||
+    categoryFilter !== ALL_FILTER_KEY ||
+    expirationFilter !== EXPIRATION_FILTERS.ALL ||
+    stockFilter !== STOCK_FILTERS.ALL;
+  const advancedFilterCount =
+    activeFilterCount -
+    Number(Boolean(normalizedSearch)) -
+    Number(locationFilter !== ALL_FILTER_KEY);
+
+  const activeFilterChips = useMemo(() => {
+    const chips = [];
+    const searchLabel = search.trim();
+
+    if (searchLabel) {
+      chips.push({ id: "search", label: `Search: ${searchLabel}` });
+    }
+
+    if (locationFilter !== ALL_FILTER_KEY) {
+      chips.push({
+        id: "location",
+        label: `Location: ${selectedLocation?.name || "Selected"}`,
+      });
+    }
+
+    if (areaFilter !== ALL_FILTER_KEY) {
+      chips.push({
+        id: "area",
+        label: `Area: ${selectedArea?.name || "Selected"}`,
+      });
+    }
+
+    if (categoryFilter !== ALL_FILTER_KEY) {
+      chips.push({
+        id: "category",
+        label: `Category: ${selectedCategory?.name || "Selected"}`,
+      });
+    }
+
+    if (expirationFilter !== EXPIRATION_FILTERS.ALL) {
+      chips.push({
+        id: "expiration",
+        label:
+          expirationFilter === EXPIRATION_FILTERS.SOON
+            ? `Expiring in ${expDays} day${expDays === 1 ? "" : "s"}`
+            : EXPIRATION_FILTER_LABELS[expirationFilter],
+      });
+    }
+
+    if (stockFilter !== STOCK_FILTERS.ALL) {
+      chips.push({
+        id: "stock",
+        label: STOCK_FILTER_LABELS[stockFilter],
+      });
+    }
+
+    return chips;
+  }, [
+    areaFilter,
+    categoryFilter,
+    expDays,
+    expirationFilter,
+    locationFilter,
+    search,
+    selectedArea,
+    selectedCategory,
+    selectedLocation,
+    stockFilter,
+  ]);
+
   const filteredItems = useMemo(() => {
     return (items || []).filter((it) => {
       const nameOk = !normalizedSearch || containsQuery(it.name, normalizedSearch);
+      const barcodeOk = !normalizedSearch || containsQuery(it.barcode, normalizedSearch);
 
       const path = `${it.location?.name || ""} ${it.area?.name || ""} ${it.category?.name || ""}`;
       const pathOk = !normalizedSearch || containsQuery(path, normalizedSearch);
 
-      const expOk = !expSoonEnabled || isExpiringSoon(it.expiration_date, expDays);
+      const itemLocationId = it.location?.id ? String(it.location.id) : "";
+      const itemAreaId = it.area?.id ? String(it.area.id) : "";
+      const itemCategoryId = it.category?.id ?? it.category_id;
+      const itemCategoryKey = itemCategoryId ? String(itemCategoryId) : "";
 
-      return (nameOk || pathOk) && expOk;
+      const locationOk =
+        locationFilter === ALL_FILTER_KEY || itemLocationId === locationFilter;
+      const areaOk = areaFilter === ALL_FILTER_KEY || itemAreaId === areaFilter;
+      const categoryOk =
+        categoryFilter === ALL_FILTER_KEY || itemCategoryKey === categoryFilter;
+
+      const expirationDays = daysUntil(it.expiration_date);
+      let expirationOk = true;
+      if (expirationFilter === EXPIRATION_FILTERS.EXPIRED) {
+        expirationOk = expirationDays < 0;
+      } else if (expirationFilter === EXPIRATION_FILTERS.SOON) {
+        expirationOk = expirationDays >= 0 && expirationDays <= expDays;
+      } else if (expirationFilter === EXPIRATION_FILTERS.NONE) {
+        expirationOk = !it.expiration_date;
+      }
+
+      const quantity = toNonNegativeInteger(it.quantity, 0);
+      let stockOk = true;
+      if (stockFilter === STOCK_FILTERS.IN_STOCK) {
+        stockOk = quantity > 0;
+      } else if (stockFilter === STOCK_FILTERS.LOW_OR_EMPTY) {
+        stockOk = quantity <= 1;
+      }
+
+      return (
+        (nameOk || barcodeOk || pathOk) &&
+        locationOk &&
+        areaOk &&
+        categoryOk &&
+        expirationOk &&
+        stockOk
+      );
     });
-  }, [items, normalizedSearch, expSoonEnabled, expDays]);
+  }, [
+    areaFilter,
+    categoryFilter,
+    expDays,
+    expirationFilter,
+    items,
+    locationFilter,
+    normalizedSearch,
+    stockFilter,
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -236,7 +484,15 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [normalizedSearch, expSoonEnabled, expDays]);
+  }, [
+    areaFilter,
+    categoryFilter,
+    expDays,
+    expirationFilter,
+    locationFilter,
+    normalizedSearch,
+    stockFilter,
+  ]);
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, totalPages));
@@ -260,6 +516,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
 
   // ---- selection helpers ----
   const toggleSelect = (id) => {
+    if (!canEditInventory) return;
     const key = String(id);
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -272,6 +529,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
   const clearSelection = () => setSelectedIds(new Set());
 
   const selectAllFiltered = () => {
+    if (!canEditInventory) return;
     setSelectedIds((prev) => {
       const next = new Set(prev);
       for (const it of filteredItems) next.add(String(it.id));
@@ -280,6 +538,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
   };
 
   const toggleSelectAllFiltered = () => {
+    if (!canEditInventory) return;
     if (allFilteredSelected) {
       // Unselect only the currently filtered items
       setSelectedIds((prev) => {
@@ -297,12 +556,69 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
     return value ? String(value) : "";
   };
 
+  const handleLocationFilterChange = (value) => {
+    setLocationFilter(value || ALL_FILTER_KEY);
+    setAreaFilter(ALL_FILTER_KEY);
+    setCategoryFilter(ALL_FILTER_KEY);
+  };
+
+  const handleAreaFilterChange = (value) => {
+    setAreaFilter(value || ALL_FILTER_KEY);
+    setCategoryFilter(ALL_FILTER_KEY);
+  };
+
+  const resetFilters = () => {
+    setSearch("");
+    setLocationFilter(ALL_FILTER_KEY);
+    setAreaFilter(ALL_FILTER_KEY);
+    setCategoryFilter(ALL_FILTER_KEY);
+    setExpirationFilter(EXPIRATION_FILTERS.ALL);
+    setStockFilter(STOCK_FILTERS.ALL);
+    setExpDays(7);
+    clearSelection();
+  };
+
+  const clearFilter = (filterId) => {
+    if (filterId === "search") {
+      setSearch("");
+      return;
+    }
+
+    if (filterId === "location") {
+      setLocationFilter(ALL_FILTER_KEY);
+      setAreaFilter(ALL_FILTER_KEY);
+      setCategoryFilter(ALL_FILTER_KEY);
+      return;
+    }
+
+    if (filterId === "area") {
+      setAreaFilter(ALL_FILTER_KEY);
+      setCategoryFilter(ALL_FILTER_KEY);
+      return;
+    }
+
+    if (filterId === "category") {
+      setCategoryFilter(ALL_FILTER_KEY);
+      return;
+    }
+
+    if (filterId === "expiration") {
+      setExpirationFilter(EXPIRATION_FILTERS.ALL);
+      return;
+    }
+
+    if (filterId === "stock") {
+      setStockFilter(STOCK_FILTERS.ALL);
+    }
+  };
+
   // ---- drawer helpers ----
   const openDrawer = (it) => {
     setActiveItemId(it.id);
     setEditName(it.name || "");
     setEditQty(String(it.quantity ?? 0));
     setEditExp(it.expiration_date || "");
+    setEditBarcode(it.barcode || "");
     setDrawerOpen(true);
   };
 
@@ -312,10 +628,12 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
     setEditName("");
     setEditQty("");
     setEditExp("");
+    setEditBarcode("");
     setMoveModalOpen(false);
   };
 
   const saveEdits = async () => {
+    if (!canEditInventory) return;
     if (!activeItem) return;
 
     const name = editName.trim();
@@ -327,6 +645,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
       name,
       quantity: qty,
       expiration_date: editExp ? editExp : null,
+      barcode: editBarcode,
     };
 
     const { data, error } = await updateItem(activeItem.id, updated);
@@ -343,15 +662,38 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
               name: data?.name ?? name,
               quantity: data?.quantity ?? qty,
               expiration_date: data?.expiration_date ?? updated.expiration_date,
+              barcode: (data?.barcode ?? updated.barcode.trim()) || null,
             }
           : x
       )
     );
+    emitInventoryChange({
+      entity: "item",
+      action: "updated",
+      id: activeItem.id,
+    });
     closeDrawer();
+  };
+
+  const handleActiveItemImageChange = ({ imagePath, imageUrl }) => {
+    if (!activeItem?.id) return;
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === activeItem.id
+          ? { ...item, image_path: imagePath ?? null, imageUrl: imageUrl ?? null }
+          : item
+      )
+    );
+    emitInventoryChange({
+      entity: "item",
+      action: imagePath ? "image_updated" : "image_removed",
+      id: activeItem.id,
+    });
   };
 
   // ---- move helpers (single + bulk) ----
   const openMove = (mode) => {
+    if (!canEditInventory) return;
     // mode: "single" or "bulk"
     if (mode === "single" && !activeItem) return;
     if (mode === "bulk" && selectedIds.size === 0) return;
@@ -396,6 +738,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
   const currentCategories = currentArea?.categories || [];
 
   const canConfirmMove = useMemo(() => {
+    if (!canEditInventory) return false;
     if (!moveTarget.categoryId) return false;
 
     const targetCategoryId = String(moveTarget.categoryId);
@@ -412,9 +755,10 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
       const currentCategoryId = item.category?.id ?? item.category_id;
       return String(currentCategoryId) !== targetCategoryId;
     });
-  }, [activeItem, drawerOpen, items, moveTarget.categoryId, selectedIds]);
+  }, [activeItem, canEditInventory, drawerOpen, items, moveTarget.categoryId, selectedIds]);
 
   const confirmMoveSingle = async () => {
+    if (!canEditInventory) return;
     if (!activeItem) return;
     if (!moveTarget.categoryId) return;
     if (!canConfirmMove) return;
@@ -450,10 +794,16 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
       )
     );
 
+    emitInventoryChange({
+      entity: "item",
+      action: "moved",
+      id: activeItem.id,
+    });
     closeDrawer();
   };
 
   const confirmMoveBulk = async () => {
+    if (!canEditInventory) return;
     if (!moveTarget.categoryId) return;
     if (selectedIds.size === 0) return;
     if (!canConfirmMove) return;
@@ -496,15 +846,22 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
 
     setMoveModalOpen(false);
     clearSelection();
+    emitInventoryChange({
+      entity: "item",
+      action: "moved",
+      ids,
+    });
   };
 
   // ---- delete helpers (single + bulk) ----
   const openDeleteSingle = () => {
+    if (!canEditInventory) return;
     if (!activeItem) return;
 
     setDeleteDialog({
       open: true,
       isDeleting: false,
+      isAddingToShoppingList: false,
       mode: "single",
       payload: {
         itemId: activeItem.id,
@@ -517,11 +874,13 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
   };
 
   const openDeleteBulk = () => {
+    if (!canEditInventory) return;
     if (selectedIds.size === 0) return;
 
     setDeleteDialog({
       open: true,
       isDeleting: false,
+      isAddingToShoppingList: false,
       mode: "bulk",
       payload: {
         itemIds: Array.from(selectedIds),
@@ -531,10 +890,17 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
   };
 
   const closeDelete = () => {
-    setDeleteDialog({ open: false, isDeleting: false, mode: null, payload: null });
+    setDeleteDialog({
+      open: false,
+      isDeleting: false,
+      isAddingToShoppingList: false,
+      mode: null,
+      payload: null,
+    });
   };
 
   const confirmDelete = async () => {
+    if (!canEditInventory) return;
     if (!deleteDialog.payload) return;
 
     setDeleteDialog((p) => ({ ...p, isDeleting: true }));
@@ -549,6 +915,11 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
         }
 
         setItems((prev) => prev.filter((x) => x.id !== deleteDialog.payload.itemId));
+        emitInventoryChange({
+          entity: "item",
+          action: "deleted",
+          id: deleteDialog.payload.itemId,
+        });
         closeDelete();
         closeDrawer();
         setSelectedIds((prev) => {
@@ -571,6 +942,11 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
 
         const deletedSet = new Set(ids.map(String));
         setItems((prev) => prev.filter((x) => !deletedSet.has(String(x.id))));
+        emitInventoryChange({
+          entity: "item",
+          action: "deleted",
+          ids,
+        });
         closeDelete();
         clearSelection();
 
@@ -581,6 +957,45 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
       }
     } catch (e) {
       console.error("Delete error:", e);
+      closeDelete();
+    }
+  };
+
+  const confirmDeleteAndAddToShoppingList = async () => {
+    if (!canEditInventory) return;
+    if (!deleteDialog.payload || deleteDialog.mode !== "single") return;
+
+    setDeleteDialog((p) => ({ ...p, isAddingToShoppingList: true }));
+
+    try {
+      const result = await deleteItemAndAddToShoppingListAction(
+        deleteDialog.payload.itemId
+      );
+
+      if (result?.error) {
+        console.error("deleteItemAndAddToShoppingListAction error:", result.error);
+        closeDelete();
+        return;
+      }
+
+      setItems((prev) => prev.filter((x) => x.id !== deleteDialog.payload.itemId));
+      emitInventoryChange({
+        entity: "shopping_list_item",
+        action: "added",
+        sourceEntity: "item",
+        sourceAction: "deleted",
+        id: result.data?.shoppingListItem?.id,
+        deletedItemId: deleteDialog.payload.itemId,
+      });
+      closeDelete();
+      closeDrawer();
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(String(deleteDialog.payload.itemId));
+        return next;
+      });
+    } catch (e) {
+      console.error("Delete and add to shopping list error:", e);
       closeDelete();
     }
   };
@@ -600,7 +1015,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl p-3 text-white bg-gradient-to-br from-rose-500 to-orange-500 shadow-sm border border-gray-300">
+            <div className="rounded-xl border border-[var(--entity-item-border)] bg-[var(--entity-item-accent)] p-3 text-white shadow-sm">
               <FaBoxOpen className="h-5 w-5" />
             </div>
             <div>
@@ -608,47 +1023,217 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                 Items
               </h1>
               <p className="text-sm text-gray-500">
-                Search and manage items across all locations.
+                {canEditInventory
+                  ? "Search and manage items across all locations."
+                  : "Search items across all locations."}
               </p>
             </div>
           </div>
-
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-            <Input
-              value={search}
-              onValueChange={setSearch}
-              placeholder="Search items or location/area/category…"
-              startContent={<FaSearch className="text-gray-400" />}
-              classNames={{
-                inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
-              }}
-            />
-
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-2 text-sm w-max">
-                <input
-                  type="checkbox"
-                  checked={expSoonEnabled}
-                  onChange={() => setExpSoonEnabled((v) => !v)}
-                  className="w-5 h-5 border border-stocksense-gray rounded cursor-pointer"
-                />
-                Expiring in
-              </label>
-
-              <input
-                type="number"
-                min={1}
-                value={expDays}
-                onChange={(e) => setExpDays(toPositiveInteger(e.target.value, 7))}
-                className={`border border-stocksense-gray rounded px-2 py-1 w-16 ${
-                  !expSoonEnabled && "bg-gray-100 text-gray-400"
-                }`}
-                disabled={!expSoonEnabled}
-              />
-              <span className="text-sm">days</span>
-            </div>
-          </div>
         </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(220px,280px)_auto] md:items-start">
+          <Input
+            value={search}
+            onValueChange={setSearch}
+            placeholder="Search items, locations, areas, categories..."
+            startContent={<FaSearch className="text-gray-400" />}
+            classNames={{
+              inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
+            }}
+          />
+
+          <Select
+            aria-label="Filter by location"
+            label="Location"
+            selectedKeys={new Set([locationFilter])}
+            onSelectionChange={(keys) =>
+              handleLocationFilterChange(getSelectedValue(keys) || ALL_FILTER_KEY)
+            }
+            variant="bordered"
+            radius="lg"
+            classNames={themedSelectClassNames}
+          >
+            <SelectItem key={ALL_FILTER_KEY}>All locations</SelectItem>
+            {locationOptions.map((location) => (
+              <SelectItem key={String(location.id)}>{location.name}</SelectItem>
+            ))}
+          </Select>
+
+          <button
+            type="button"
+            onClick={() => setShowAdvancedFilters((value) => !value)}
+            className={`flex h-14 items-center justify-between gap-2 rounded-xl border px-4 text-sm font-medium transition md:justify-center ${
+              advancedFiltersAreActive
+                ? "border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
+                : "border-stocksense-gray bg-white text-gray-700 hover:bg-gray-50"
+            }`}
+            aria-expanded={showAdvancedFilters}
+          >
+            <span className="flex items-center gap-2">
+              <FaFilter className="h-3.5 w-3.5" />
+              More filters
+              {advancedFiltersAreActive && (
+                <span className="rounded-full bg-[var(--stocksense-brand)] px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                  {advancedFilterCount}
+                </span>
+              )}
+            </span>
+            <FaChevronDown
+              className={`h-3 w-3 transition-transform ${
+                showAdvancedFilters ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+        </div>
+
+        <AnimatePresence initial={false}>
+          {showAdvancedFilters && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, y: -6 }}
+              animate={{ opacity: 1, height: "auto", y: 0 }}
+              exit={{ opacity: 0, height: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="overflow-hidden"
+            >
+              <div className="mt-3 rounded-2xl border border-stocksense-gray bg-gray-50 p-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <Select
+                    aria-label="Filter by storage area"
+                    label="Storage area"
+                    selectedKeys={new Set([areaFilter])}
+                    onSelectionChange={(keys) =>
+                      handleAreaFilterChange(getSelectedValue(keys) || ALL_FILTER_KEY)
+                    }
+                    isDisabled={areaOptions.length === 0}
+                    variant="bordered"
+                    radius="lg"
+                    classNames={themedSelectClassNames}
+                  >
+                    <SelectItem key={ALL_FILTER_KEY}>All areas</SelectItem>
+                    {areaOptions.map((area) => (
+                      <SelectItem key={String(area.id)}>
+                        {locationFilter === ALL_FILTER_KEY
+                          ? `${area.name} - ${area.locationName}`
+                          : area.name}
+                      </SelectItem>
+                    ))}
+                  </Select>
+
+                  <Select
+                    aria-label="Filter by category"
+                    label="Category"
+                    selectedKeys={new Set([categoryFilter])}
+                    onSelectionChange={(keys) =>
+                      setCategoryFilter(getSelectedValue(keys) || ALL_FILTER_KEY)
+                    }
+                    isDisabled={categoryOptions.length === 0}
+                    variant="bordered"
+                    radius="lg"
+                    classNames={themedSelectClassNames}
+                  >
+                    <SelectItem key={ALL_FILTER_KEY}>All categories</SelectItem>
+                    {categoryOptions.map((category) => (
+                      <SelectItem key={String(category.id)}>
+                        {locationFilter === ALL_FILTER_KEY
+                          ? `${category.name} - ${category.areaName} - ${category.locationName}`
+                          : areaFilter === ALL_FILTER_KEY
+                          ? `${category.name} - ${category.areaName}`
+                          : category.name}
+                      </SelectItem>
+                    ))}
+                  </Select>
+
+                  <div className="flex gap-2 sm:col-span-2 lg:col-span-1">
+                    <Select
+                      aria-label="Filter by expiration"
+                      label="Expiration"
+                      selectedKeys={new Set([expirationFilter])}
+                      onSelectionChange={(keys) =>
+                        setExpirationFilter(
+                          getSelectedValue(keys) || EXPIRATION_FILTERS.ALL
+                        )
+                      }
+                      variant="bordered"
+                      radius="lg"
+                      className="min-w-0 flex-1"
+                      classNames={themedSelectClassNames}
+                    >
+                      <SelectItem key={EXPIRATION_FILTERS.ALL}>
+                        Any expiration
+                      </SelectItem>
+                      <SelectItem key={EXPIRATION_FILTERS.EXPIRED}>
+                        Expired
+                      </SelectItem>
+                      <SelectItem key={EXPIRATION_FILTERS.SOON}>
+                        Expiring soon
+                      </SelectItem>
+                      <SelectItem key={EXPIRATION_FILTERS.NONE}>
+                        No expiration
+                      </SelectItem>
+                    </Select>
+
+                    <input
+                      aria-label="Expiring soon day window"
+                      type="number"
+                      min={1}
+                      value={expDays}
+                      onChange={(e) => setExpDays(toPositiveInteger(e.target.value, 7))}
+                      className={`w-20 rounded-xl border border-stocksense-gray px-3 text-sm ${
+                        expirationFilter !== EXPIRATION_FILTERS.SOON
+                          ? "bg-gray-100 text-gray-400"
+                          : "bg-white text-gray-800"
+                      }`}
+                      disabled={expirationFilter !== EXPIRATION_FILTERS.SOON}
+                    />
+                  </div>
+
+                  <Select
+                    aria-label="Filter by stock"
+                    label="Stock"
+                    selectedKeys={new Set([stockFilter])}
+                    onSelectionChange={(keys) =>
+                      setStockFilter(getSelectedValue(keys) || STOCK_FILTERS.ALL)
+                    }
+                    variant="bordered"
+                    radius="lg"
+                    classNames={themedSelectClassNames}
+                  >
+                    <SelectItem key={STOCK_FILTERS.ALL}>Any stock</SelectItem>
+                    <SelectItem key={STOCK_FILTERS.IN_STOCK}>In stock</SelectItem>
+                    <SelectItem key={STOCK_FILTERS.LOW_OR_EMPTY}>
+                      Low or empty
+                    </SelectItem>
+                  </Select>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {filtersAreActive && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {activeFilterChips.map((chip) => (
+              <button
+                key={chip.id}
+                type="button"
+                onClick={() => clearFilter(chip.id)}
+                className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-1.5 text-xs font-medium text-[var(--stocksense-brand)] hover:brightness-95"
+                title={`Clear ${chip.label}`}
+              >
+                <span className="truncate">{chip.label}</span>
+                <FaTimes className="h-2.5 w-2.5 shrink-0" />
+              </button>
+            ))}
+
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="rounded-full border border-stocksense-gray bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Reset all
+            </button>
+          </div>
+        )}
 
         {/* Stats + select controls */}
         <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -661,36 +1246,44 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
               expiring soon
             </span>
 
-            {selectedCount > 0 && (
+            {canEditInventory && selectedCount > 0 && (
               <span className="px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-700 border border-gray-200">
                 <strong>{selectedCount}</strong> selected
               </span>
             )}
+
+            {filtersAreActive && (
+              <span className="px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-700 border border-gray-200">
+                <strong>{filteredItems.length}</strong> matching
+              </span>
+            )}
           </div>
 
-          <div className="flex flex-wrap gap-2 items-center">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={allFilteredSelected}
-                onChange={toggleSelectAllFiltered}
-                className="w-5 h-5 border border-stocksense-gray rounded cursor-pointer"
-              />
-              Select all (filtered)
-            </label>
+          {canEditInventory && (
+            <div className="flex flex-wrap gap-2 items-center">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={allFilteredSelected}
+                  onChange={toggleSelectAllFiltered}
+                  className="w-5 h-5 border border-stocksense-gray rounded cursor-pointer"
+                />
+                Select all visible
+              </label>
 
-            <button
-              onClick={clearSelection}
-              className="rounded-xl border border-stocksense-gray px-3 py-1.5 text-xs hover:bg-gray-50 cursor-pointer"
-              disabled={selectedCount === 0}
-            >
-              Clear selection
-            </button>
-          </div>
+              <button
+                onClick={clearSelection}
+                className="rounded-xl border border-stocksense-gray px-3 py-1.5 text-xs hover:bg-gray-50 cursor-pointer"
+                disabled={selectedCount === 0}
+              >
+                Clear selection
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Bulk actions bar */}
-        <AnimatePresence initial={false}>
+        {canEditInventory && <AnimatePresence initial={false}>
           {selectedCount > 0 && (
           <motion.div
             layout
@@ -728,7 +1321,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
             </div>
           </motion.div>
           )}
-        </AnimatePresence>
+        </AnimatePresence>}
       </motion.div>
 
       {/* List */}
@@ -743,7 +1336,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
           onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
         />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <AnimatePresence initial={false}>
         {paginatedItems.map((it) => {
           const soon = isExpiringSoon(it.expiration_date, expDays);
@@ -758,52 +1351,74 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
               initial="hidden"
               animate="show"
               exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
-              className={`rounded-2xl border border-stocksense-gray bg-white p-4 shadow-sm transition ${
-                selected ? "ring-2 ring-rose-200" : "hover:bg-gray-50"
-              }`}
+              role="button"
+              tabIndex={0}
+              onClick={() => openDrawer(it)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  openDrawer(it);
+                }
+              }}
+              className={`relative h-full overflow-hidden rounded-2xl border bg-white p-3.5 pt-4 shadow-sm transition sm:p-4 ${
+                selected
+                  ? "border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]"
+                  : "border-stocksense-gray hover:bg-gray-50"
+              } cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]`}
               whileHover={{ y: -1 }}
             >
-              <div className="flex h-full items-start justify-between gap-3">
+              <div className={`absolute inset-x-0 top-0 h-1 ${soon ? "bg-[var(--entity-warning-accent)]" : "bg-[var(--entity-item-accent)]"}`} />
+              <div className="flex h-full items-start gap-2.5">
                 {/* Left: checkbox + info */}
-                <div className="flex items-start gap-3 min-w-0">
-                  <input
-                    type="checkbox"
-                    checked={selected}
-                    onChange={() => toggleSelect(it.id)}
-                    className="mt-1 w-5 h-5 cursor-pointer"
-                  />
+                <div className="flex items-start gap-2.5 min-w-0">
+                  {canEditInventory && (
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                      onChange={() => toggleSelect(it.id)}
+                      className="mt-0.5 w-5 h-5 cursor-pointer"
+                    />
+                  )}
 
-                  <button onClick={() => openDrawer(it)} className="min-w-0 text-left">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="font-semibold text-stocksense-teal truncate">{it.name}</div>
+                  {it.imageUrl && (
+                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
+                      <img
+                        src={it.imageUrl}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  )}
+
+                  <div className="min-w-0 text-left">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="truncate text-[15px] font-semibold leading-5 text-stocksense-teal sm:text-base">{it.name}</div>
 
                       {soon && (
-                        <span className="text-[10px] uppercase tracking-wide bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
+                        <span className="rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-orange-700">
                           {du < 0 ? "Expired" : "Soon"}
                         </span>
                       )}
                     </div>
 
-                    <div className="text-sm text-gray-500 truncate mt-1">
+                    <div className="mt-1 text-sm text-gray-500 truncate">
                       {it.location?.name || "Unknown location"} • {it.area?.name || "—"} •{" "}
                       {it.category?.name || "—"}
                     </div>
 
-                    <div className="text-sm text-gray-500 truncate mt-1">
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-xs text-gray-600">
                       Qty: {it.quantity ?? 0} • Exp: {it.expiration_date || "—"}
                     </div>
-                  </button>
+                    {it.barcode && (
+                      <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                        <FaBarcode className="h-3 w-3" />
+                        <span className="truncate">{it.barcode}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-
-                {/* Right: edit item */}
-                <button
-                  onClick={() => openDrawer(it)}
-                  className="flex shrink-0 items-center gap-1 rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-2.5 py-1 text-xs font-medium text-[var(--stocksense-brand)] hover:brightness-95 cursor-pointer"
-                  title="Edit item"
-                >
-                  <FaEdit className="h-3 w-3" />
-                  Edit
-                </button>
               </div>
             </motion.div>
           );
@@ -816,11 +1431,11 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
             initial="hidden"
             animate="show"
             exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
-            className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center sm:col-span-2 lg:col-span-3"
+            className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center sm:col-span-2 lg:col-span-3 xl:col-span-4"
           >
             <p className="text-gray-500">No items match your search.</p>
             <div className="mt-4 flex justify-center">
-              <OpenGlobalAddItemButton />
+              <OpenGlobalAddItemButton canEditInventory={canEditInventory} />
             </div>
           </motion.div>
         )}
@@ -865,66 +1480,116 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
               </ModalHeader>
 
               <ModalBody className={`space-y-5 ${modalBodyClass}`}>
-                <div className="space-y-2">
-                  <div className="text-xs font-medium text-gray-600">Item name</div>
-                  <Input
-                    value={editName}
-                    onValueChange={setEditName}
-                    variant="bordered"
-                    radius="lg"
-                    classNames={modalInputClassNames}
-                  />
-                </div>
+                {canEditInventory ? (
+                  <>
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-gray-600">Item name</div>
+                      <Input
+                        value={editName}
+                        onValueChange={setEditName}
+                        variant="bordered"
+                        radius="lg"
+                        classNames={modalInputClassNames}
+                      />
+                    </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-gray-600">Quantity</div>
-                    <Input
-                      value={editQty}
-                      onValueChange={setEditQty}
-                      type="number"
-                      min={0}
-                      variant="bordered"
-                      radius="lg"
-                      classNames={modalInputClassNames}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <div className="text-xs font-medium text-gray-600">Quantity</div>
+                        <Input
+                          value={editQty}
+                          onValueChange={setEditQty}
+                          type="number"
+                          min={0}
+                          variant="bordered"
+                          radius="lg"
+                          classNames={modalInputClassNames}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="text-xs font-medium text-gray-600">Expiration date</div>
+                        <input
+                          type="date"
+                          value={editExp || ""}
+                          onChange={(e) => setEditExp(e.target.value)}
+                          className="w-full rounded-xl border border-[var(--stocksense-brand-border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-gray-600">Barcode</div>
+                      <Input
+                        value={editBarcode}
+                        onValueChange={setEditBarcode}
+                        placeholder="UPC / EAN"
+                        variant="bordered"
+                        radius="lg"
+                        classNames={modalInputClassNames}
+                        startContent={<FaBarcode className="text-gray-400" />}
+                      />
+                    </div>
+
+                    <EntityImageManager
+                      entityType="item"
+                      entityId={activeItem?.id}
+                      imageUrl={activeItem?.imageUrl}
+                      label="Item photo"
+                      onChange={handleActiveItemImageChange}
                     />
-                  </div>
 
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-gray-600">Expiration date</div>
-                    <input
-                      type="date"
-                      value={editExp || ""}
-                      onChange={(e) => setEditExp(e.target.value)}
-                      className="w-full rounded-xl border border-[var(--stocksense-brand-border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
-                    />
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={saveEdits}
+                        isDisabled={!hasItemEditChanges}
+                        className="rounded-xl bg-[var(--stocksense-brand)] text-white w-full"
+                      >
+                        Save changes
+                      </Button>
+                      <Button
+                        onClick={() => openMove("single")}
+                        className="w-full rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
+                      >
+                        Move
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-stocksense-gray bg-white p-3">
+                      <div className="text-xs font-medium text-gray-500">Quantity</div>
+                      <div className="mt-1 text-sm font-semibold text-gray-800">
+                        {activeItem?.quantity ?? 0}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-stocksense-gray bg-white p-3">
+                      <div className="text-xs font-medium text-gray-500">Expiration</div>
+                      <div className="mt-1 text-sm font-semibold text-gray-800">
+                        {activeItem?.expiration_date || "None"}
+                      </div>
+                    </div>
+                    {activeItem?.barcode && (
+                      <div className="rounded-xl border border-stocksense-gray bg-white p-3 sm:col-span-2">
+                        <div className="text-xs font-medium text-gray-500">Barcode</div>
+                        <div className="mt-1 text-sm font-semibold text-gray-800">
+                          {activeItem.barcode}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    onClick={saveEdits}
-                    isDisabled={!hasItemEditChanges}
-                    className="rounded-xl bg-[var(--stocksense-brand)] text-white w-full"
-                  >
-                    Save changes
-                  </Button>
-                  <Button
-                    onClick={() => openMove("single")}
-                    className="w-full rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
-                  >
-                    Move
-                  </Button>
-                </div>
+                )}
               </ModalBody>
 
               <ModalFooter className={modalFooterClass}>
                 <Button variant="light" className="rounded-xl" onClick={closeDrawer}>
                   Close
                 </Button>
-                <Button className="rounded-xl bg-rose-600 text-white" onClick={openDeleteSingle}>
-                  Delete
-                </Button>
+                {canEditInventory && (
+                  <Button className="rounded-xl bg-rose-600 text-white" onClick={openDeleteSingle}>
+                    Delete
+                  </Button>
+                )}
               </ModalFooter>
             </>
           )}
@@ -932,7 +1597,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
       </Modal>
 
       {/* Move Modal (single + bulk) */}
-      <Modal isOpen={moveModalOpen} onOpenChange={setMoveModalOpen} size="md">
+      {canEditInventory && <Modal isOpen={moveModalOpen} onOpenChange={setMoveModalOpen} size="md">
         <ModalContent className={modalContentClass} style={modalContentStyle}>
           {() => (
             <>
@@ -969,9 +1634,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                   }}
                   variant="bordered"
                   radius="lg"
-                  classNames={{
-                    trigger: "border-[var(--stocksense-brand-border)] bg-white shadow-none",
-                  }}
+                  classNames={themedSelectClassNames}
                 >
                   {moveLocations.map((location) => (
                     <SelectItem key={String(location.id)}>
@@ -1004,9 +1667,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                   isDisabled={!moveTarget.locationId}
                   variant="bordered"
                   radius="lg"
-                  classNames={{
-                    trigger: "border-[var(--stocksense-brand-border)] bg-white shadow-none",
-                  }}
+                  classNames={themedSelectClassNames}
                 >
                   {currentAreas.map((area) => (
                     <SelectItem key={String(area.id)}>{area.name}</SelectItem>
@@ -1030,9 +1691,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
                   isDisabled={!moveTarget.areaId}
                   variant="bordered"
                   radius="lg"
-                  classNames={{
-                    trigger: "border-[var(--stocksense-brand-border)] bg-white shadow-none",
-                  }}
+                  classNames={themedSelectClassNames}
                 >
                   {currentCategories.map((category) => (
                     <SelectItem key={String(category.id)}>
@@ -1061,14 +1720,22 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
             </>
           )}
         </ModalContent>
-      </Modal>
+      </Modal>}
 
       {/* Delete confirmation (single + bulk) */}
-      <ConfirmDeleteModal
+      {canEditInventory && <ConfirmDeleteModal
         isOpen={deleteDialog.open}
         isDeleting={deleteDialog.isDeleting}
+        isSecondaryConfirming={deleteDialog.isAddingToShoppingList}
         onCancel={closeDelete}
         onConfirm={confirmDelete}
+        onSecondaryConfirm={
+          deleteDialog.mode === "single" ? confirmDeleteAndAddToShoppingList : null
+        }
+        secondaryConfirmLabel={
+          deleteDialog.mode === "single" ? "Delete and add to shopping list" : null
+        }
+        secondaryConfirmClassName="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700"
         title={
           deleteDialog.mode === "bulk"
             ? `Delete ${deleteDialog.payload?.count ?? 0} items?`
@@ -1083,7 +1750,7 @@ export default function ItemsPageClient({ initialItems, moveLocations }) {
               ? `This will permanently delete "${deleteDialog.payload.name}" from ${deleteDialog.payload.categoryName || "its category"} in ${deleteDialog.payload.areaName || "its area"} (${deleteDialog.payload.locationName || "unknown location"}). This action cannot be undone.`
               : ""
         }
-      />
+      />}
     </motion.div>
   );
 }

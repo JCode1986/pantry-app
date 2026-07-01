@@ -11,6 +11,24 @@
   --stocksense-brand-dark: #0A5664;
   --stocksense-brand-soft: #E6FAF6;
   --stocksense-brand-border: #9FE7D7;
+  --entity-location-accent: color-mix(in oklab, var(--stocksense-brand) 62%, #3b82f6);
+  --entity-location-soft: color-mix(in oklab, var(--entity-location-accent) 12%, white);
+  --entity-location-border: color-mix(in oklab, var(--entity-location-accent) 28%, white);
+  --entity-area-accent: color-mix(in oklab, var(--stocksense-brand) 58%, #06b6d4);
+  --entity-area-soft: color-mix(in oklab, var(--entity-area-accent) 12%, white);
+  --entity-area-border: color-mix(in oklab, var(--entity-area-accent) 28%, white);
+  --entity-category-accent: color-mix(in oklab, var(--stocksense-brand) 54%, #22c55e);
+  --entity-category-soft: color-mix(in oklab, var(--entity-category-accent) 12%, white);
+  --entity-category-border: color-mix(in oklab, var(--entity-category-accent) 28%, white);
+  --entity-item-accent: color-mix(in oklab, var(--stocksense-brand) 46%, #f97316);
+  --entity-item-soft: color-mix(in oklab, var(--entity-item-accent) 12%, white);
+  --entity-item-border: color-mix(in oklab, var(--entity-item-accent) 28%, white);
+  --entity-shopping-accent: color-mix(in oklab, var(--stocksense-brand) 58%, #8b5cf6);
+  --entity-shopping-soft: color-mix(in oklab, var(--entity-shopping-accent) 12%, white);
+  --entity-shopping-border: color-mix(in oklab, var(--entity-shopping-accent) 28%, white);
+  --entity-warning-accent: color-mix(in oklab, var(--stocksense-brand) 28%, #f59e0b);
+  --entity-warning-soft: color-mix(in oklab, var(--entity-warning-accent) 12%, white);
+  --entity-warning-border: color-mix(in oklab, var(--entity-warning-accent) 32%, white);
 }
 
 @theme {
@@ -64,6 +82,19 @@ body {
 input[type="checkbox"],
 input[type="radio"] {
   accent-color: var(--stocksense-brand);
+}
+
+[data-slot="listbox"] [data-selected="true"] {
+  background: var(--stocksense-brand-soft);
+  color: var(--stocksense-brand);
+}
+
+[data-slot="listbox"] [data-hover="true"] {
+  background: var(--stocksense-brand-soft);
+}
+
+[data-slot="listbox"] [data-focus="true"] {
+  outline-color: var(--stocksense-brand-border);
 }
 
 .page-enter {

@@ -7,6 +7,10 @@ import { motion } from "framer-motion";
 import { FaCheckCircle, FaEnvelopeOpenText, FaSignInAlt, FaUserFriends } from "react-icons/fa";
 import { acceptHouseholdInviteAction } from "@/app/actions/household";
 
+function formatInviteRole(role) {
+  return role === "viewer" ? "Viewer" : "Editor";
+}
+
 export default function AcceptInviteClient({
   token,
   preview,
@@ -95,6 +99,9 @@ export default function AcceptInviteClient({
                     </div>
                     <div className="mt-1 break-words text-sm text-gray-500">
                       Invited email: {preview?.email ?? "Unknown"}
+                    </div>
+                    <div className="mt-1 text-sm text-gray-500">
+                      Access role: {formatInviteRole(preview?.role)}
                     </div>
                     {userEmail && (
                       <div className="mt-1 break-words text-xs text-gray-400">

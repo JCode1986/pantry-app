@@ -168,6 +168,8 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
                   {results.map((item) => {
                     const duplicateCount =
                       itemNameCounts.get(item.name?.trim().toLowerCase()) ?? 0;
+                    const imageUrl =
+                      item.imageUrl || item.storageArea?.imageUrl || item.location?.imageUrl;
 
                     return (
                       <motion.button
@@ -181,7 +183,21 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
                         className="w-full rounded-xl border border-stocksense-gray bg-white p-4 text-left shadow-sm transition hover:-translate-y-[1px] hover:bg-gray-50 hover:shadow-md"
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
+                          <div className="flex min-w-0 gap-3">
+                            {imageUrl ? (
+                              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
+                                <img
+                                  src={imageUrl}
+                                  alt=""
+                                  className="h-full w-full object-cover"
+                                />
+                              </div>
+                            ) : (
+                              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+                                <FaBoxOpen className="h-5 w-5" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="font-semibold text-[var(--stocksense-brand)]">
                                 {item.name}
@@ -217,6 +233,7 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
                                   {item.category?.name || "Unknown category"}
                                 </span>
                               </span>
+                            </div>
                             </div>
                           </div>
 

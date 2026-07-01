@@ -26,18 +26,24 @@ export default function ConfirmDeleteModal({
   description,
   confirmLabel = 'Delete',
   cancelLabel = 'Cancel',
+  secondaryConfirmLabel = null,
+  secondaryConfirmClassName = '',
+  isSecondaryConfirming = false,
   isDeleting = false,
   onConfirm,
+  onSecondaryConfirm,
   onCancel,
 }) {
+  const isBusy = isDeleting || isSecondaryConfirming;
+
   return (
     <Modal
       isOpen={isOpen}
       onOpenChange={(open) => {
-        if (!open && !isDeleting) onCancel?.();
+        if (!open && !isBusy) onCancel?.();
       }}
-      hideCloseButton={isDeleting}
-      isDismissable={!isDeleting}
+      hideCloseButton={isBusy}
+      isDismissable={!isBusy}
       backdrop="blur"
       placement="center"
       className="max-w-md"
@@ -51,24 +57,37 @@ export default function ConfirmDeleteModal({
             <ModalBody className={modalBodyClass}>
               <p className="text-sm text-gray-600">{description}</p>
             </ModalBody>
-            <ModalFooter className={modalFooterClass}>
+            <ModalFooter
+              className={`${modalFooterClass} flex flex-col-reverse gap-2 sm:flex-row sm:justify-end`}
+            >
               <Button
                 variant="flat"
                 color="default"
                 onPress={() => {
-                  if (!isDeleting) {
+                  if (!isBusy) {
                     onCancel?.();
                     close();
                   }
                 }}
-                isDisabled={isDeleting}
+                isDisabled={isBusy}
               >
                 {cancelLabel}
               </Button>
+              {secondaryConfirmLabel && onSecondaryConfirm ? (
+                <Button
+                  className={secondaryConfirmClassName}
+                  onPress={onSecondaryConfirm}
+                  isLoading={isSecondaryConfirming}
+                  isDisabled={isDeleting}
+                >
+                  {secondaryConfirmLabel}
+                </Button>
+              ) : null}
               <Button
                 color="danger"
                 onPress={onConfirm}
                 isLoading={isDeleting}
+                isDisabled={isSecondaryConfirming}
               >
                 {confirmLabel}
               </Button>

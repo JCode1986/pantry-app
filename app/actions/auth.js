@@ -2,7 +2,6 @@
 
 import { getSession } from "@/lib/sessionOptions";
 import { supabase } from "@/lib/supabaseClient";
-import { redirect } from "next/navigation";
 
 /** LOGIN – server action */
 export async function login({ email, password, redirectTo = "/" }) {
@@ -32,7 +31,11 @@ export async function login({ email, password, redirectTo = "/" }) {
       ? redirectTo
       : "/";
 
-  redirect(safeRedirect);
+  return {
+    success: true,
+    error: null,
+    redirectTo: safeRedirect,
+  };
 }
 
 export async function logoutAction() {
@@ -47,7 +50,11 @@ export async function logoutAction() {
     console.error("Error signing out Supabase:", error);
   }
 
-  redirect('/login');
+  return {
+    success: true,
+    error: null,
+    redirectTo: "/login",
+  };
 }
 
 export async function updatePasswordAction({ password }) {

@@ -1,7 +1,7 @@
 import AcceptInviteClient from "@/components/auth/AcceptInviteClient";
 import { getSessionForLayout } from "@/app/actions/auth";
 import { getHouseholdInvitePreviewAction } from "@/app/actions/household";
-import { createPageMetadata } from "@/utils/metadata";
+import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
 
 export async function generateMetadata({ params }) {
   const { token } = await params;
@@ -12,10 +12,7 @@ export async function generateMetadata({ params }) {
     title: "Household Invite",
     description: `Accept your invitation to join ${householdName} on WhereKeep.`,
     path: `/invite/${token}`,
-    robots: {
-      index: false,
-      follow: false,
-    },
+    robots: NO_INDEX_ROBOTS,
   });
 }
 
