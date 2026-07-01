@@ -32,7 +32,14 @@ import {
 } from "@/app/actions/server";
 import { toNonNegativeInteger } from "@/utils/pantry/date";
 import { emitItemAdded } from "@/utils/clientEvents";
-import { themedSelectClassNames } from "@/components/modals/modalTheme";
+import {
+  modalBodyClass,
+  modalContentClass,
+  modalContentStyle,
+  modalFooterClass,
+  modalHeaderClass,
+  themedSelectClassNames,
+} from "@/components/modals/modalTheme";
 import BarcodeScannerModal from "@/components/items/BarcodeScannerModal";
 
 const NEW_VALUE = "__new__";
@@ -493,17 +500,17 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
         size="3xl"
         scrollBehavior="inside"
       >
-        <ModalContent>
+        <ModalContent className={modalContentClass} style={modalContentStyle}>
           {() => (
             <>
-            <ModalHeader className="flex flex-col gap-1">
+            <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
               <span className="text-[var(--stocksense-brand)]">Add item</span>
               <span className="text-sm font-normal text-gray-500">
                 Choose where it belongs, or create the missing location, area, or category.
               </span>
             </ModalHeader>
 
-            <ModalBody className="min-h-[150px] space-y-4">
+            <ModalBody className={`min-h-[150px] space-y-4 ${modalBodyClass}`}>
               <AnimatePresence initial={false}>
                 {message && (
                   <motion.div
@@ -655,7 +662,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                       </motion.div>
                     </motion.div>
 
-                    <div className="rounded-2xl border border-stocksense-gray bg-white p-3 shadow-sm">
+                    <div className="overflow-hidden rounded-2xl border border-stocksense-gray bg-white p-3 shadow-sm">
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_190px]">
                         <Input
                           label="Barcode"
@@ -765,7 +772,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
               </AnimatePresence>
             </ModalBody>
 
-            <ModalFooter>
+            <ModalFooter className={modalFooterClass}>
               <Button variant="light" className="rounded-xl" onPress={handleClose} isDisabled={isSaving}>
                 Cancel
               </Button>

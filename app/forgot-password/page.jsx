@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
+import SiteFooter from '@/components/app-shell/SiteFooter';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -43,6 +44,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
+    <>
     <main className="page-enter min-h-[100vh] flex items-center justify-center px-4 py-10 bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
@@ -139,5 +141,7 @@ export default function ForgotPasswordPage() {
         </div>
       </motion.div>
     </main>
+    <SiteFooter compact />
+    </>
   );
 }

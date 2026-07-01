@@ -32,6 +32,20 @@ function mapBreakdown(rows, counts) {
   }));
 }
 
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function toDateString(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function LandingStructuredData() {
   const jsonLd = {
     "@context": "https://schema.org",
@@ -111,6 +125,119 @@ async function getItemBreakdowns(supabase) {
   };
 }
 
+async function getExpirationNotifications(supabase, withinDays = 3) {
+  const cutoff = toDateString(addDays(new Date(), withinDays));
+  const today = toDateString(new Date());
+
+  const [
+    { data: itemsRaw = [], error: itemsError },
+    { count: expiredCount = 0, error: expiredCountError },
+    { count: expiringSoonCount = 0, error: expiringSoonCountError },
+  ] = await Promise.all([
+    supabase
+      .from('items')
+      .select('id, name, quantity, expiration_date, category_id')
+      .not('expiration_date', 'is', null)
+      .lte('expiration_date', cutoff)
+      .order('expiration_date', { ascending: true })
+      .limit(50),
+    supabase
+      .from('items')
+      .select('*', { count: 'exact', head: true })
+      .not('expiration_date', 'is', null)
+      .lt('expiration_date', today),
+    supabase
+      .from('items')
+      .select('*', { count: 'exact', head: true })
+      .gte('expiration_date', today)
+      .lte('expiration_date', cutoff),
+  ]);
+
+  if (itemsError || expiredCountError || expiringSoonCountError) {
+    console.error('expiration notifications error:', {
+      itemsError,
+      expiredCountError,
+      expiringSoonCountError,
+    });
+    return {
+      items: [],
+      expiredCount: 0,
+      expiringSoonCount: 0,
+      withinDays,
+    };
+  }
+
+  if (itemsRaw.length === 0) {
+    return {
+      items: [],
+      expiredCount: 0,
+      expiringSoonCount: 0,
+      withinDays,
+    };
+  }
+
+  const categoryIds = [
+    ...new Set(itemsRaw.map((item) => item.category_id).filter(Boolean)),
+  ];
+
+  const { data: categoriesRaw = [] } = categoryIds.length
+    ? await supabase
+        .from('storage_categories')
+        .select('id, name, storage_area_id')
+        .in('id', categoryIds)
+    : { data: [] };
+
+  const areaIds = [
+    ...new Set((categoriesRaw ?? []).map((category) => category.storage_area_id).filter(Boolean)),
+  ];
+
+  const { data: areasRaw = [] } = areaIds.length
+    ? await supabase
+        .from('storage_areas')
+        .select('id, name, location_id')
+        .in('id', areaIds)
+    : { data: [] };
+
+  const locationIds = [
+    ...new Set((areasRaw ?? []).map((area) => area.location_id).filter(Boolean)),
+  ];
+
+  const { data: locationsRaw = [] } = locationIds.length
+    ? await supabase.from('locations').select('id, name').in('id', locationIds)
+    : { data: [] };
+
+  const categoryMap = new Map((categoriesRaw ?? []).map((category) => [String(category.id), category]));
+  const areaMap = new Map((areasRaw ?? []).map((area) => [String(area.id), area]));
+  const locationMap = new Map((locationsRaw ?? []).map((location) => [String(location.id), location]));
+
+  return {
+    items: itemsRaw.map((item) => {
+      const category = item.category_id
+        ? categoryMap.get(String(item.category_id))
+        : null;
+      const area = category?.storage_area_id
+        ? areaMap.get(String(category.storage_area_id))
+        : null;
+      const location = area?.location_id
+        ? locationMap.get(String(area.location_id))
+        : null;
+
+      return {
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity ?? 0,
+        expirationDate: item.expiration_date,
+        categoryName: category?.name ?? null,
+        areaName: area?.name ?? null,
+        locationName: location?.name ?? null,
+      };
+    }),
+    expiredCount: expiredCount ?? 0,
+    expiringSoonCount: expiringSoonCount ?? 0,
+    withinDays,
+  };
+}
+
 export default async function HomePage() {
   const session = await getSessionForLayout();
   const token = session?.user?.access_token;
@@ -132,11 +259,13 @@ export default async function HomePage() {
     { default: StatsCards },
     { default: RecentActivity },
     { default: ItemsDonut },
+    { default: ExpirationNotifications },
     { getActivityFilterOptionsAction, getRecentActivityAction },
   ] = await Promise.all([
     import('@/components/dashboard/StatsCards'),
     import('@/components/dashboard/RecentActivity'),
     import('@/components/dashboard/ItemsDonut'),
+    import('@/components/dashboard/ExpirationNotifications'),
     import('@/app/actions/activity'),
   ]);
 
@@ -160,7 +289,10 @@ export default async function HomePage() {
     getActivityFilterOptionsAction(),
   ]);
 
-  const itemBreakdowns = await getItemBreakdowns(supabase);
+  const [itemBreakdowns, expirationNotifications] = await Promise.all([
+    getItemBreakdowns(supabase),
+    getExpirationNotifications(supabase, 3),
+  ]);
 
   return (
     <main className="page-enter mx-auto max-w-[1500px] px-5 py-8 space-y-10 pt-8 min-h-[100vh]">
@@ -172,6 +304,8 @@ export default async function HomePage() {
       <StatsCards
         totals={{ locations, areas, categories, items, shoppingListItems }}
       />
+
+      <ExpirationNotifications {...expirationNotifications} />
 
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">

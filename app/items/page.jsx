@@ -11,7 +11,8 @@ export const metadata = createPageMetadata({
   robots: NO_INDEX_ROBOTS,
 });
 
-export default async function Page() {
+export default async function Page({ searchParams }) {
+  const params = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -155,6 +156,8 @@ export default async function Page() {
         initialItems={items}
         moveLocations={moveLocations}
         canEditInventory={canEditInventory}
+        initialExpirationFilter={params?.expiration}
+        initialExpirationDays={params?.days}
       />
     </main>
   );
