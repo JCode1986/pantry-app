@@ -137,7 +137,17 @@ export default function ItemsPageClient({
   initialItems,
   moveLocations,
   canEditInventory = true,
+  initialExpirationFilter,
+  initialExpirationDays,
 }) {
+  const hasInitialExpirationFilter =
+    initialExpirationFilter === EXPIRATION_FILTERS.EXPIRED ||
+    initialExpirationFilter === EXPIRATION_FILTERS.SOON ||
+    initialExpirationFilter === EXPIRATION_FILTERS.NONE;
+  const normalizedInitialExpirationDays = toPositiveInteger(
+    initialExpirationDays,
+    7
+  );
   const [items, setItems] = useState(initialItems ?? []);
 
   // filters
@@ -145,10 +155,14 @@ export default function ItemsPageClient({
   const [locationFilter, setLocationFilter] = useState(ALL_FILTER_KEY);
   const [areaFilter, setAreaFilter] = useState(ALL_FILTER_KEY);
   const [categoryFilter, setCategoryFilter] = useState(ALL_FILTER_KEY);
-  const [expirationFilter, setExpirationFilter] = useState(EXPIRATION_FILTERS.ALL);
+  const [expirationFilter, setExpirationFilter] = useState(
+    hasInitialExpirationFilter ? initialExpirationFilter : EXPIRATION_FILTERS.ALL
+  );
   const [stockFilter, setStockFilter] = useState(STOCK_FILTERS.ALL);
-  const [expDays, setExpDays] = useState(7);
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [expDays, setExpDays] = useState(normalizedInitialExpirationDays);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(
+    hasInitialExpirationFilter
+  );
   const [currentPage, setCurrentPage] = useState(1);
 
   // drawer state

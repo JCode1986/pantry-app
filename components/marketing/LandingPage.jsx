@@ -23,6 +23,7 @@ import {
   FaUserCheck,
 } from 'react-icons/fa';
 import PricingSection from '@/components/marketing/PricingSection';
+import SiteFooter from '@/components/app-shell/SiteFooter';
 import WhereKeepLogo from '@/components/ui/WhereKeepLogo';
 
 const heroProofPoints = [
@@ -49,6 +50,12 @@ const features = [
     title: 'Search and filter deeply',
     description:
       'Narrow inventory by text, location, area, category, expiration, and stock status.',
+  },
+  {
+    icon: FaBell,
+    title: 'Catch food before it expires',
+    description:
+      'Expiration alerts help you use leftovers, restaurant takeout, pantry food, and freezer items before they go to waste.',
   },
   {
     icon: FaShoppingBasket,
@@ -100,6 +107,11 @@ const outcomes = [
       'Keep locations, storage areas, categories, quantities, and expiration dates connected.',
   },
   {
+    title: 'Use leftovers before they become waste',
+    description:
+      'Track restaurant leftovers, fast-food extras, freezer meals, and pantry items with expiration reminders on the dashboard.',
+  },
+  {
     title: 'Turn low stock into action',
     description:
       'Move deleted, empty, or needed items into a shopping list and track what gets purchased.',
@@ -126,7 +138,7 @@ const audiences = [
     icon: FaHome,
     title: 'Busy homes',
     description:
-      'Pantry, garage, freezer, bathroom, cleaning, storage bins, and everything people forget they already bought.',
+      'Pantry, fridge leftovers, freezer meals, garage, bathroom, cleaning, storage bins, and everything people forget they already bought.',
     accent: 'var(--entity-location-accent)',
     soft: 'var(--entity-location-soft)',
     border: 'var(--entity-location-border)',
@@ -158,7 +170,7 @@ const workflow = [
   },
   {
     title: 'Track items',
-    description: 'Add quantities and expiration dates, then filter across the whole inventory when it grows.',
+    description: 'Add quantities and expiration dates, then get dashboard reminders for what is expired or expiring soon.',
   },
   {
     title: 'Restock confidently',
@@ -251,6 +263,10 @@ const spreadsheetComparison = [
     newWay: 'Roles decide who can edit, and recent activity shows what changed.',
   },
   {
+    oldWay: 'Leftovers disappear in the fridge until they are wasted.',
+    newWay: 'Expiration reminders surface takeout, restaurant leftovers, and pantry food before they are forgotten.',
+  },
+  {
     oldWay: 'A spreadsheet says "garage" but not which bin or shelf.',
     newWay: 'Locations, storage areas, categories, photos, and item details stay connected.',
   },
@@ -294,6 +310,11 @@ const faqs = [
     answer:
       'Yes. Family roles support view-only access for people who should see the data but not edit it.',
   },
+  {
+    question: 'Can it help reduce food waste?',
+    answer:
+      'Yes. Add expiration dates for leftovers, takeout, freezer meals, and pantry food so WhereKeep can surface what needs attention before it is forgotten.',
+  },
 ];
 
 function getPreviewToneClass(tone = 'brand') {
@@ -315,7 +336,7 @@ function getPreviewToneClass(tone = 'brand') {
 function PrimaryCta({ className = '' }) {
   return (
     <Link
-      href="/login?mode=create"
+      href="/signup"
       className={`inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--stocksense-brand)] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-95 ${className}`}
     >
       Start free <FaArrowRight className="h-3.5 w-3.5" />
@@ -951,6 +972,8 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      <SiteFooter />
     </main>
   );
 }

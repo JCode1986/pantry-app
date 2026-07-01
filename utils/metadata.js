@@ -16,11 +16,23 @@ export const NO_INDEX_ROBOTS = {
   },
 };
 
+export const INDEX_ROBOTS = {
+  index: true,
+  follow: true,
+  googleBot: {
+    index: true,
+    follow: true,
+    maxVideoPreview: -1,
+    maxImagePreview: "large",
+    maxSnippet: -1,
+  },
+};
+
 export function createPageMetadata({
   title,
   description = siteConfig.description,
   path = "/",
-  robots,
+  robots = INDEX_ROBOTS,
 } = {}) {
   const pageTitle = title || siteConfig.name;
   const socialTitle = title ? `${title} | ${siteConfig.name}` : siteConfig.name;

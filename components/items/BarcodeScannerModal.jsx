@@ -11,6 +11,14 @@ import {
   ModalHeader,
 } from "@heroui/react";
 import { FaBarcode, FaCamera, FaImage, FaSpinner, FaStop } from "react-icons/fa";
+import {
+  modalBodyClass,
+  modalContentClass,
+  modalContentStyle,
+  modalFooterClass,
+  modalHeaderClass,
+  modalInputClassNames,
+} from "@/components/modals/modalTheme";
 
 const BARCODE_FORMATS = [
   "ean_13",
@@ -208,17 +216,17 @@ export default function BarcodeScannerModal({ isOpen, onOpenChange, onScan }) {
       size="lg"
       scrollBehavior="inside"
     >
-      <ModalContent>
+      <ModalContent className={modalContentClass} style={modalContentStyle}>
         {() => (
           <>
-            <ModalHeader className="flex flex-col gap-1">
+            <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
               <span className="text-[var(--stocksense-brand)]">Scan barcode</span>
               <span className="text-sm font-normal text-gray-500">
                 Use the camera, choose a barcode photo, or enter the number.
               </span>
             </ModalHeader>
 
-            <ModalBody className="space-y-4">
+            <ModalBody className={`space-y-4 ${modalBodyClass}`}>
               {message && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                   {message}
@@ -277,6 +285,7 @@ export default function BarcodeScannerModal({ isOpen, onOpenChange, onScan }) {
                   placeholder="012345678905"
                   variant="bordered"
                   radius="lg"
+                  classNames={modalInputClassNames}
                 />
                 <Button
                   className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] sm:self-end"
@@ -288,7 +297,7 @@ export default function BarcodeScannerModal({ isOpen, onOpenChange, onScan }) {
               </div>
             </ModalBody>
 
-            <ModalFooter>
+            <ModalFooter className={modalFooterClass}>
               <Button variant="light" className="rounded-xl" onPress={() => onOpenChange?.(false)}>
                 Close
               </Button>

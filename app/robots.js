@@ -11,15 +11,22 @@ const privatePaths = [
   "/magic-link-sync",
   "/profile",
   "/reset-password",
+  "/signup",
   "/shopping-list",
   "/storage-areas",
+];
+
+const publicPaths = [
+  "/",
+  "/privacy",
+  "/terms",
 ];
 
 export default function robots() {
   return {
     rules: {
       userAgent: "*",
-      allow: "/",
+      allow: publicPaths,
       disallow: privatePaths,
     },
     sitemap: new URL("/sitemap.xml", siteConfig.url).toString(),

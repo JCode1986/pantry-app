@@ -306,6 +306,25 @@ export default function Navigation({ canEditInventory = true }) {
           })}
 
           <div className="mt-3 border-t border-gray-200 pt-3">
+            <div className="px-2 pb-2 text-xs font-medium text-gray-400">
+              Legal
+            </div>
+            <div className="grid gap-1 pb-3">
+              <Link
+                href="/terms"
+                onClick={() => setIsMenuOpen(false)}
+                className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+              >
+                Terms
+              </Link>
+              <Link
+                href="/privacy"
+                onClick={() => setIsMenuOpen(false)}
+                className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+              >
+                Privacy
+              </Link>
+            </div>
             <Button
               variant="flat"
               className={cx(

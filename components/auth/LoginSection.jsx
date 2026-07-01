@@ -2,23 +2,47 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
 import { login } from '@/app/actions/auth';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import Image from 'next/image';
+import SiteFooter from '@/components/app-shell/SiteFooter';
 
 const CREDENTIAL_VALIDATION_ERROR =
   'Enter a valid email and a password with at least 6 characters.';
+const PASSWORD_MATCH_ERROR = 'Passwords do not match.';
 
-export default function LoginPage() {
+function authErrorMessage(message, mode) {
+  const normalized = String(message || '').toLowerCase();
+
+  if (normalized.includes('invalid login credentials')) {
+    return 'We could not log you in with that email and password. Check your password, or create an account if you are new.';
+  }
+
+  if (normalized.includes('email not confirmed')) {
+    return 'That email still needs to be confirmed. Check your inbox, then log in again.';
+  }
+
+  if (normalized.includes('already') || normalized.includes('registered')) {
+    return 'An account may already exist for that email. Log in instead, or reset your password.';
+  }
+
+  return message || (mode === 'signup' ? 'Unable to create account.' : 'Unable to sign in.');
+}
+
+export default function LoginPage({ mode = 'login' }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/';
   const confirmed = searchParams.get('confirmed') === '1';
+  const urlError = searchParams.get('error');
+  const isSignupMode = mode === 'signup';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const [showPw, setShowPw] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
@@ -36,12 +60,19 @@ export default function LoginPage() {
   );
   const showEmailValidation = validationSubmitted && !emailValid;
   const showPasswordValidation = validationSubmitted && password.length < 6;
+  const showConfirmValidation =
+    isSignupMode && validationSubmitted && confirmPassword !== password;
 
   const validateCredentials = () => {
     setValidationSubmitted(true);
 
     if (!emailValid || password.length < 6) {
       setError(CREDENTIAL_VALIDATION_ERROR);
+      return false;
+    }
+
+    if (isSignupMode && password !== confirmPassword) {
+      setError(PASSWORD_MATCH_ERROR);
       return false;
     }
 
@@ -57,13 +88,33 @@ export default function LoginPage() {
     ) {
       setError(null);
     }
-  }, [emailValid, error, password.length, validationSubmitted]);
+    if (
+      validationSubmitted &&
+      isSignupMode &&
+      password === confirmPassword &&
+      error === PASSWORD_MATCH_ERROR
+    ) {
+      setError(null);
+    }
+  }, [confirmPassword, emailValid, error, isSignupMode, password, validationSubmitted]);
 
   useEffect(() => {
     if (confirmed) {
       setSuccessMessage('Email confirmed. Log in to continue.');
     }
   }, [confirmed]);
+
+  useEffect(() => {
+    if (!urlError) return;
+
+    const messages = {
+      'invalid-session': 'Your sign-in link expired or could not be verified. Try logging in again.',
+      'sync-failed': 'We could not finish signing you in. Try logging in again.',
+      'sync-exception': 'Something went wrong while signing you in. Try logging in again.',
+    };
+
+    setError(messages[urlError] || 'Something went wrong. Try again.');
+  }, [urlError]);
 
   const handleSignIn = async (e) => {
     e.preventDefault();
@@ -76,7 +127,7 @@ export default function LoginPage() {
     try {
       const result = await login({ email, password, redirectTo });
       if (result?.error) {
-        setError(result.error);
+        setError(authErrorMessage(result.error, 'login'));
         return;
       }
 
@@ -85,7 +136,7 @@ export default function LoginPage() {
         router.refresh();
       }
     } catch (err) {
-      setError(err?.message || 'Unable to sign in.');
+      setError(authErrorMessage(err?.message, 'login'));
     } finally {
       setLoginLoading(false);
     }
@@ -101,21 +152,31 @@ export default function LoginPage() {
     setError(null);
     setSuccessMessage(null);
 
-    const { error: signErr } = await supabase.auth.signUp({
+    const loginRedirect =
+      redirectTo && redirectTo !== '/'
+        ? `/login?confirmed=1&redirectTo=${encodeURIComponent(redirectTo)}`
+        : '/login?confirmed=1';
+
+    const { data, error: signErr } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo:
           typeof window !== 'undefined'
-            ? `${window.location.origin}/magic-link-sync?redirectTo=${encodeURIComponent('/login?confirmed=1')}`
-            : 'http://localhost:3000/magic-link-sync?redirectTo=%2Flogin%3Fconfirmed%3D1',
+            ? `${window.location.origin}/magic-link-sync?redirectTo=${encodeURIComponent(loginRedirect)}`
+            : `http://localhost:3000/magic-link-sync?redirectTo=${encodeURIComponent(loginRedirect)}`,
       },
     });
 
     if (signErr) {
-      setError(signErr.message);
+      setError(authErrorMessage(signErr.message, 'signup'));
     } else {
-      setSuccessMessage('Success! Check your email to confirm your account.');
+      const hasIdentity = Boolean(data?.user?.identities?.length);
+      setSuccessMessage(
+        hasIdentity
+          ? 'Success! Check your email to confirm your account.'
+          : 'An account already exists for this email. Log in instead, or reset your password if you cannot get in.'
+      );
     }
     setSignupLoading(false);
   };
@@ -132,14 +193,37 @@ export default function LoginPage() {
     hidden: { opacity: 0, y: 8 },
     show: { opacity: 1, y: 0, transition: { duration: 0.25 } },
   };
+  const pageCopy = isSignupMode
+    ? {
+        title: 'Create your WhereKeep account',
+        subtitle: 'Start free. Upgrade later when you need unlimited inventory or shared access.',
+        submit: 'Create account',
+        loading: 'Creating account...',
+        alternateLabel: 'Already have an account?',
+        alternateHref: `/login${redirectTo && redirectTo !== '/' ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`,
+        alternateText: 'Log in',
+        passwordAutoComplete: 'new-password',
+      }
+    : {
+        title: 'Log in to WhereKeep',
+        subtitle: 'Welcome back. Continue managing your inventory.',
+        submit: 'Log in',
+        loading: 'Logging in...',
+        alternateLabel: 'New to WhereKeep?',
+        alternateHref: `/signup${redirectTo && redirectTo !== '/' ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`,
+        alternateText: 'Create an account',
+        passwordAutoComplete: 'current-password',
+      };
+  const formSubmit = isSignupMode ? handleSignUp : handleSignIn;
 
   return (
+    <>
     <main className="page-enter min-h-[100vh] flex items-center justify-center px-4">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
-        className="w-full max-w-md"
+        className="w-full max-w-[540px]"
       >
         {/* Card */}
         <div className="rounded-2xl border border-stocksense-gray bg-white shadow-lg overflow-hidden">
@@ -158,9 +242,9 @@ export default function LoginPage() {
               </div>
               <div>
                 <h1 className="text-white text-xl sm:text-2xl font-semibold leading-tight">
-                  Welcome to WhereKeep
+                  {pageCopy.title}
                 </h1>
-                <p className="text-white/80 text-xs sm:text-sm">Sign in to manage your items.</p>
+                <p className="text-white/80 text-xs sm:text-sm">{pageCopy.subtitle}</p>
               </div>
             </div>
           </div>
@@ -202,7 +286,7 @@ export default function LoginPage() {
               )}
             </AnimatePresence>
 
-            <form onSubmit={handleSignIn} className="space-y-4" noValidate>
+            <form onSubmit={formSubmit} className="space-y-4" noValidate>
               {/* Email */}
               <motion.div variants={item} className="space-y-1">
                 <label htmlFor="email" className="text-sm font-medium text-stocksense-dark-gray">
@@ -252,8 +336,8 @@ export default function LoginPage() {
                   <input
                     id="password"
                     type={showPw ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    placeholder="••••••••"
+                    autoComplete={pageCopy.passwordAutoComplete}
+                    placeholder="Password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -265,6 +349,27 @@ export default function LoginPage() {
                 )}
               </motion.div>
 
+              {isSignupMode && (
+                <motion.div variants={item} className="space-y-1">
+                  <label htmlFor="confirm-password" className="text-sm font-medium text-stocksense-dark-gray">
+                    Confirm password
+                  </label>
+                  <input
+                    id="confirm-password"
+                    type={showPw ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    placeholder="Confirm password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    className="w-full rounded-lg border border-stocksense-gray px-3 py-2 outline-none focus:ring-2 focus:ring-stocksense-sky/60 focus:border-stocksense-sky bg-white"
+                  />
+                  {showConfirmValidation && (
+                    <p className="text-xs text-amber-700">Passwords must match.</p>
+                  )}
+                </motion.div>
+              )}
+
               {/* Submit */}
               <motion.div variants={item} className="space-y-3 pt-2">
                 <button
@@ -274,45 +379,45 @@ export default function LoginPage() {
                     ${!isBusy ? 'bg-stocksense-teal hover:bg-stocksense-tealDark' : 'bg-stocksense-teal/50 cursor-not-allowed'}
                   `}
                 >
-                  {loginLoading ? (
+                  {isBusy ? (
                     <span className="inline-flex items-center gap-2">
                       <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4A4 4 0 008 12H4z" />
                       </svg>
-                      Logging in…
+                      <span>{pageCopy.loading}</span>
                     </span>
                   ) : (
-                    'Log in'
+                    pageCopy.submit
                   )}
                 </button>
 
-                <div className="flex items-center gap-3">
-                  <span className="h-px w-full bg-stocksense-gray" />
-                  <span className="text-[11px] uppercase tracking-wide text-stocksense-dark-gray/70">
-                    or
-                  </span>
-                  <span className="h-px w-full bg-stocksense-gray" />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleSignUp}
-                  disabled={isBusy}
-                  className="w-full cursor-pointer inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-white font-medium transition bg-stocksense-sky hover:bg-stocksense-teal disabled:opacity-60"
-                >
-                  {signupLoading ? 'Signing up…' : 'Create account'}
-                </button>
+                <p className="text-center text-sm text-stocksense-dark-gray/75">
+                  {pageCopy.alternateLabel}{' '}
+                  <Link
+                    href={pageCopy.alternateHref}
+                    className="font-semibold text-stocksense-teal hover:text-stocksense-tealDark"
+                  >
+                    {pageCopy.alternateText}
+                  </Link>
+                </p>
               </motion.div>
 
               {/* Helper links */}
-              <motion.div variants={item} className="flex items-center justify-between pt-1">
-                <a href="/forgot-password" className="text-sm text-stocksense-teal hover:text-stocksense-tealDark">
-                  Forgot password?
-                </a>
-                <span className="text-[11px] text-stocksense-dark-gray/70">
-                  Email will redirect to confirmation.
-                </span>
+              <motion.div variants={item} className="flex flex-col gap-1 pt-1 text-xs text-stocksense-dark-gray/70 sm:flex-row sm:items-center sm:justify-between">
+                {isSignupMode ? (
+                  <>
+                    <span>Use an email you can access for confirmation.</span>
+                    <span>Invited? Sign up with that email.</span>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/forgot-password" className="text-sm text-stocksense-teal hover:text-stocksense-tealDark">
+                      Forgot password?
+                    </Link>
+                    <span>Use the email tied to your household.</span>
+                  </>
+                )}
               </motion.div>
             </form>
           </motion.div>
@@ -325,9 +430,19 @@ export default function LoginPage() {
           transition={{ delay: 0.15 }}
           className="text-center text-xs text-stocksense-dark-gray/70 mt-4"
         >
-          By continuing you agree to the Terms & Privacy Policy.
+          By continuing you agree to the{' '}
+          <Link href="/terms" className="font-semibold text-stocksense-teal hover:text-stocksense-tealDark">
+            Terms
+          </Link>{' '}
+          and{' '}
+          <Link href="/privacy" className="font-semibold text-stocksense-teal hover:text-stocksense-tealDark">
+            Privacy Policy
+          </Link>
+          .
         </motion.p>
       </motion.div>
     </main>
+    <SiteFooter compact />
+    </>
   );
 }

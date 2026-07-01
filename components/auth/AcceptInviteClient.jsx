@@ -6,6 +6,7 @@ import { Button } from "@heroui/react";
 import { motion } from "framer-motion";
 import { FaCheckCircle, FaEnvelopeOpenText, FaSignInAlt, FaUserFriends } from "react-icons/fa";
 import { acceptHouseholdInviteAction } from "@/app/actions/household";
+import SiteFooter from "@/components/app-shell/SiteFooter";
 
 function formatInviteRole(role) {
   return role === "viewer" ? "Viewer" : "Editor";
@@ -38,6 +39,7 @@ export default function AcceptInviteClient({
   };
 
   return (
+    <>
     <main className="page-enter flex min-h-[100vh] items-center justify-center px-4 py-10">
       <motion.section
         initial={{ opacity: 0, y: 12 }}
@@ -123,19 +125,31 @@ export default function AcceptInviteClient({
                   Accept invite
                 </Button>
               ) : (
-                <Button
-                  as={Link}
-                  href={`/login?redirectTo=/invite/${token}`}
-                  className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
-                  startContent={<FaSignInAlt className="h-4 w-4" />}
-                >
-                  Log in to accept
-                </Button>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button
+                    as={Link}
+                    href={`/signup?redirectTo=/invite/${token}`}
+                    className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
+                    startContent={<FaUserFriends className="h-4 w-4" />}
+                  >
+                    Create account
+                  </Button>
+                  <Button
+                    as={Link}
+                    href={`/login?redirectTo=/invite/${token}`}
+                    className="w-full rounded-xl border border-gray-200 bg-white text-gray-700"
+                    startContent={<FaSignInAlt className="h-4 w-4" />}
+                  >
+                    Log in
+                  </Button>
+                </div>
               )}
             </>
           )}
         </div>
       </motion.section>
     </main>
+    <SiteFooter compact />
+    </>
   );
 }

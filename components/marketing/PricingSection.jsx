@@ -91,7 +91,7 @@ export default function PricingSection({ showHeading = true }) {
               </ul>
 
               <Link
-                href={plan.id === "free" ? "/login?mode=create" : "/login?mode=create"}
+                href="/signup"
                 className={`mt-6 inline-flex w-full items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
                   plan.featured
                     ? "bg-[var(--stocksense-brand)] text-white hover:brightness-95"

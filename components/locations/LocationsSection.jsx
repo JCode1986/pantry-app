@@ -35,19 +35,19 @@ const modalContentStyle = {
 };
 
 const modalContentClass =
-  'border border-[var(--stocksense-brand-border)] bg-white text-gray-700';
+  'flex w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white text-gray-700 sm:w-full';
 
 const modalHeaderClass =
-  'border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-base font-semibold text-[var(--stocksense-brand)]';
+  'shrink-0 border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-base font-semibold text-[var(--stocksense-brand)]';
 
 const modalFooterClass =
-  'border-t border-[var(--stocksense-brand-border)] bg-white';
+  'flex shrink-0 flex-col-reverse gap-2 border-t border-[var(--stocksense-brand-border)] bg-white sm:flex-row sm:justify-end';
 
 const modalInputClassNames = {
   inputWrapper:
     'border-[var(--stocksense-brand-border)] bg-white focus-within:border-[var(--stocksense-brand)]',
-  label: 'text-gray-600',
-  input: 'text-gray-800',
+  label: 'text-gray-700',
+  input: 'text-gray-900 placeholder:text-gray-500',
 };
 
 export default function LocationsSection({ locations, canEditInventory = true }) {

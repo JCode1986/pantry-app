@@ -172,6 +172,23 @@ function ShortcutButton({ href, icon: Icon, label, description }) {
   );
 }
 
+function LegalResourceButton({ href, label, description }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-start justify-between gap-3 rounded-xl border border-stocksense-gray bg-gray-50/60 px-3 py-3 transition hover:border-[var(--stocksense-brand-border)] hover:bg-[var(--stocksense-brand-soft)]"
+    >
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-gray-800">{label}</span>
+        <span className="mt-0.5 block text-xs leading-5 text-gray-500">
+          {description}
+        </span>
+      </span>
+      <FaExternalLinkAlt className="mt-1 h-3.5 w-3.5 shrink-0 text-[var(--stocksense-brand)]" />
+    </Link>
+  );
+}
+
 function AppearancePreview({ theme, font }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1258,6 +1275,39 @@ export default function ProfileClient({
                 label="Categories"
                 description="Organize item groups"
               />
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+                <FaShieldAlt className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Legal and support</h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Review account terms, privacy details, and billing access.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3">
+              <LegalResourceButton
+                href="/terms"
+                label="Terms of Service"
+                description="Rules for accounts, household access, subscriptions, and acceptable use."
+              />
+              <LegalResourceButton
+                href="/privacy"
+                label="Privacy Policy"
+                description="How account, inventory, photo, barcode, and billing data are handled."
+              />
+              <Link
+                href="#billing"
+                className="inline-flex items-center justify-center rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 py-2.5 text-sm font-semibold text-[var(--stocksense-brand)] transition hover:brightness-95"
+              >
+                Billing and plan settings
+              </Link>
             </div>
           </section>
         </motion.aside>
