@@ -33,6 +33,9 @@ import {
   FaArrowsAlt,
   FaBoxOpen,
   FaLayerGroup,
+  FaWarehouse,
+  FaTags,
+  FaBarcode,
 } from 'react-icons/fa';
 import ConfirmDeleteModal from '@/components/modals/ConfirmDeleteModal';
 import MoveItemsModal from '@/components/items/MoveItemsModal';
@@ -85,7 +88,7 @@ const modalInputClassNames = {
   inputWrapper:
     'border-[var(--stocksense-brand-border)] bg-white focus-within:border-[var(--stocksense-brand)]',
   label: 'text-gray-700',
-  input: 'text-gray-900 placeholder:text-gray-500',
+  input: 'text-gray-900 placeholder:text-gray-400',
 };
 
 const modalPrimaryButtonClass =
@@ -134,6 +137,7 @@ export default function StorageAreasSection({
 
   const [expandedAreas, setExpandedAreas] = useState({});
   const [expandedCategories, setExpandedCategories] = useState({});
+  const [mobileCategorySheet, setMobileCategorySheet] = useState(null);
 
   // bulk-select state: { [categoryId]: { [itemId]: true } }
   const [selectedByCategory, setSelectedByCategory] = useState({});
@@ -1083,6 +1087,25 @@ export default function StorageAreasSection({
     return (category.items || []).some(filterItem);
   };
 
+  const activeMobileCategory = useMemo(() => {
+    if (!mobileCategorySheet) return null;
+
+    const area = (storageAreas ?? []).find(
+      (item) => String(item.id) === String(mobileCategorySheet.areaId)
+    );
+    const category = area?.categories?.find(
+      (item) => String(item.id) === String(mobileCategorySheet.categoryId)
+    );
+
+    if (!area || !category) return null;
+
+    return {
+      area,
+      category,
+      items: (category.items ?? []).filter(filterItem),
+    };
+  }, [mobileCategorySheet, storageAreas, normalizedSearch, expSoonEnabled, expDays]);
+
   // ---------- UI ----------
   return (
     <motion.div
@@ -1221,8 +1244,210 @@ export default function StorageAreasSection({
 
       </motion.div>
 
-      {/* Areas */}
-      <motion.div variants={pageVariants} className="grid grid-cols-1 gap-4">
+      {/* Mobile hierarchy */}
+      <motion.div variants={pageVariants} className="grid grid-cols-1 gap-3 md:hidden">
+        {storageAreas.length === 0 && (
+          <motion.div
+            variants={pageItemVariants}
+            className="rounded-2xl border border-dashed border-stocksense-gray bg-white p-6 text-center shadow-sm"
+          >
+            <h2 className="text-lg font-semibold text-stocksense-teal">
+              No storage areas yet
+            </h2>
+            <p className="mt-2 text-sm text-gray-500">
+              Add an item or create the first storage area for this location.
+            </p>
+            {canEditInventory && (
+              <div className="mt-4 grid gap-2">
+                <OpenGlobalAddItemButton
+                  canEditInventory={canEditInventory}
+                  context={{ locationId }}
+                  className="rounded-xl bg-[var(--stocksense-brand)] text-white"
+                >
+                  Add item here
+                </OpenGlobalAddItemButton>
+                <button
+                  onClick={openCreateAreaModal}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 py-2 text-sm font-medium text-[var(--stocksense-brand)]"
+                >
+                  <FaPlus /> New storage area
+                </button>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {storageAreas.map((area, aIdx) => {
+          const areaNameMatches =
+            normalizedSearch && containsQuery(area.name, normalizedSearch);
+          const visibleCategories = areaNameMatches
+            ? area.categories || []
+            : (area.categories || []).filter((category) =>
+                filterCategoryVisible(category)
+              );
+          const areaItemCount = (area.categories || []).reduce(
+            (sum, category) => sum + (category.items?.length || 0),
+            0
+          );
+
+          if (
+            (normalizedSearch || expSoonEnabled) &&
+            !areaNameMatches &&
+            visibleCategories.length === 0
+          ) {
+            return null;
+          }
+
+          return (
+            <motion.article
+              key={area.id}
+              variants={pageItemVariants}
+              className="overflow-hidden rounded-2xl border border-stocksense-gray bg-white shadow-sm"
+            >
+              <div className="border-t-4 border-[var(--entity-area-accent)] p-4">
+                <div className="flex items-start gap-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleArea(area.id)}
+                    className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                    aria-expanded={Boolean(expandedAreas[area.id])}
+                    aria-label={`${expandedAreas[area.id] ? 'Collapse' : 'Expand'} ${area.name}`}
+                  >
+                    {area.imageUrl ? (
+                      <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-[var(--entity-area-border)] bg-white">
+                        <img
+                          src={area.imageUrl}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]">
+                        <FaWarehouse className="h-5 w-5" />
+                      </div>
+                    )}
+
+                    <div className="min-w-0 flex-1">
+                      <h2 className="truncate text-lg font-semibold text-gray-900">
+                        {area.name}
+                      </h2>
+                      <p className="mt-1 text-sm text-gray-500">
+                        {(area.categories || []).length}{' '}
+                        {(area.categories || []).length === 1 ? 'category' : 'categories'} |{' '}
+                        {areaItemCount} {areaItemCount === 1 ? 'item' : 'items'}
+                      </p>
+                    </div>
+
+                    <FaChevronUp
+                      className={`mt-1 h-4 w-4 shrink-0 text-gray-400 transition-transform ${
+                        expandedAreas[area.id] ? '' : 'rotate-180'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {canEditInventory && (
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    <OpenGlobalAddItemButton
+                      canEditInventory={canEditInventory}
+                      context={{ locationId, storageAreaId: area.id }}
+                      variant="flat"
+                      className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-2 text-xs text-[var(--stocksense-brand)]"
+                    >
+                      Add
+                    </OpenGlobalAddItemButton>
+                    <button
+                      onClick={() => openEditAreaModal(area)}
+                      className="inline-flex h-9 items-center justify-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700"
+                    >
+                      <FaEdit /> Edit
+                    </button>
+                    <button
+                      onClick={() =>
+                        openDeleteDialog('area', {
+                          areaId: area.id,
+                          name: area.name,
+                        })
+                      }
+                      className="inline-flex h-9 items-center justify-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-2 text-xs font-medium text-rose-700"
+                    >
+                      <FaTrash /> Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <AnimatePresence initial={false}>
+                {expandedAreas[area.id] && (
+                  <motion.div
+                    key={`${area.id}-mobile-content`}
+                    variants={collapseVariants}
+                    initial="collapsed"
+                    animate="open"
+                    exit="collapsed"
+                    className="overflow-hidden"
+                  >
+                    <div className="space-y-2 border-t border-gray-100 bg-gray-50/70 p-3">
+                      {visibleCategories.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-gray-200 bg-white px-3 py-4 text-center text-sm text-gray-500">
+                          {search || expSoonEnabled
+                            ? 'No matching categories or items.'
+                            : 'No categories yet.'}
+                        </div>
+                      ) : (
+                        visibleCategories.map((category) => {
+                          const items = (category.items || []).filter(filterItem);
+
+                          return (
+                            <button
+                              key={category.id}
+                              type="button"
+                              onClick={() =>
+                                setMobileCategorySheet({
+                                  areaId: area.id,
+                                  categoryId: category.id,
+                                })
+                              }
+                              className="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white p-3 text-left shadow-sm"
+                            >
+                              <div className="flex min-w-0 items-center gap-3">
+                                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
+                                  <FaTags className="h-4 w-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold text-gray-900">
+                                    {category.name}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {items.length} {items.length === 1 ? 'item' : 'items'}
+                                  </p>
+                                </div>
+                              </div>
+                              <FaChevronUp className="h-3.5 w-3.5 rotate-90 text-gray-400" />
+                            </button>
+                          );
+                        })
+                      )}
+
+                      {canEditInventory && (
+                        <button
+                          onClick={() => openCreateCategoryModal(area)}
+                          className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--stocksense-brand-border)] bg-white text-sm font-medium text-[var(--stocksense-brand)]"
+                        >
+                          <FaLayerGroup /> New category
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.article>
+          );
+        })}
+      </motion.div>
+
+      {/* Desktop hierarchy */}
+      <motion.div variants={pageVariants} className="hidden grid-cols-1 gap-4 md:grid">
         {storageAreas.length === 0 && (
           <motion.div
             variants={pageItemVariants}
@@ -1247,10 +1472,10 @@ export default function StorageAreasSection({
             initial={{ opacity: 0, y: 10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ type: 'spring', stiffness: 220, damping: 20, delay: aIdx * 0.02 }}
-            className="rounded-2xl border border-stocksense-gray bg-white shadow-sm"
+            className="overflow-hidden rounded-2xl border border-stocksense-gray bg-white shadow-sm"
           >
             {/* Area header */}
-            <div className="p-4 md:p-5 flex items-start justify-between gap-3">
+            <div className="border-t-4 border-[var(--entity-area-accent)] p-4 md:p-5 flex items-start justify-between gap-3">
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 {area.categories?.length ? (
                   <button
@@ -1266,7 +1491,7 @@ export default function StorageAreasSection({
                   </button>
                 ) : null}
 
-                {area.imageUrl && (
+                {area.imageUrl ? (
                   <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
                     <img
                       src={area.imageUrl}
@@ -1274,16 +1499,19 @@ export default function StorageAreasSection({
                       className="h-full w-full object-cover"
                     />
                   </div>
+                ) : (
+                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]">
+                    <FaWarehouse className="h-5 w-5" />
+                  </div>
                 )}
 
                 <div className="min-w-0">
-                  <h2 className="text-lg font-semibold text-stocksense-teal truncate">
-                    {area.name}{' '}
-                    <span className="text-sm text-gray-400 font-medium">(Area)</span>
+                  <h2 className="text-lg font-semibold text-gray-900 truncate">
+                    {area.name}
                   </h2>
                   <p className="text-xs text-gray-500">
                     {area.categories?.length || 0}{' '}
-                    {area.categories?.length === 1 ? 'category' : 'categories'}
+                    {area.categories?.length === 1 ? 'category' : 'categories'} in this storage area
                   </p>
                 </div>
               </div>
@@ -1330,7 +1558,7 @@ export default function StorageAreasSection({
                   exit="collapsed"
                   className="overflow-hidden"
                 >
-                  <div className="px-4 md:px-5 pb-5 space-y-3">
+                  <div className="border-t border-gray-100 bg-gray-50/70 px-3 py-4 md:px-5 space-y-3">
                     {(area.categories || []).filter((c) =>
                       filterCategoryVisible(c)
                     ).length === 0 && (
@@ -1355,7 +1583,7 @@ export default function StorageAreasSection({
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.22, delay: cIdx * 0.02 }}
-                            className="rounded-xl border border-stocksense-gray bg-white shadow-sm"
+                            className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
                           >
                             {/* Category header */}
                             <div className="p-3 sm:p-4 flex items-start justify-between gap-3">
@@ -1380,16 +1608,17 @@ export default function StorageAreasSection({
                                   </button>
                                 ) : null}
 
+                                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
+                                  <FaTags className="h-4 w-4" />
+                                </div>
+
                                 <div className="min-w-0">
-                                  <h3 className="font-medium text-stocksense-teal truncate">
-                                    {category.name}{' '}
-                                    <span className="text-gray-400 text-sm">
-                                      (Category)
-                                    </span>
+                                  <h3 className="font-semibold text-gray-900 truncate">
+                                    {category.name}
                                   </h3>
                                   <p className="text-xs text-gray-500">
                                     {items.length}{' '}
-                                    {items.length === 1 ? 'item' : 'items'}
+                                    {items.length === 1 ? 'item' : 'items'} in this category
                                   </p>
                                 </div>
                               </div>
@@ -1439,8 +1668,10 @@ export default function StorageAreasSection({
                                   className="overflow-hidden sm:pl-8"
                                 >
                                   {canEditInventory && items.length > 0 && (
-                                    <div className="px-3 sm:px-4 flex flex-wrap items-center text-sm h-[34px] mb-2 gap-2">
-                                      <h3 className='font-medium text-lg text-stocksense-teal truncate'>Items</h3>
+                                    <div className="px-3 sm:px-4 flex flex-wrap items-center text-sm mb-2 gap-2">
+                                      <h3 className="font-semibold text-sm uppercase tracking-wide text-gray-500 truncate">
+                                        Items
+                                      </h3>
                                       <label className="flex items-center gap-2 cursor-pointer">
                                         <input
                                           type="checkbox"
@@ -1516,7 +1747,7 @@ export default function StorageAreasSection({
                                             duration: 0.18,
                                             delay: iIdx * 0.015,
                                           }}
-                                          className={`flex flex-col gap-3 border border-stocksense-gray rounded-xl px-3 py-2 bg-white sm:flex-row sm:items-center sm:justify-between ${
+                                          className={`flex flex-col gap-3 rounded-xl border border-gray-100 bg-gray-50/70 px-3 py-2.5 transition hover:border-[var(--stocksense-brand-border)] hover:bg-white sm:flex-row sm:items-center sm:justify-between ${
                                             selected ? 'ring-2 ring-rose-200' : ''
                                           }`}
                                         >
@@ -1535,7 +1766,7 @@ export default function StorageAreasSection({
                                                   className="mt-1"
                                                 />
                                               )}
-                                              {item.imageUrl && (
+                                              {item.imageUrl ? (
                                                 <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
                                                   <img
                                                     src={item.imageUrl}
@@ -1543,9 +1774,13 @@ export default function StorageAreasSection({
                                                     className="h-full w-full object-cover"
                                                   />
                                                 </div>
+                                              ) : (
+                                                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] text-[var(--entity-item-accent)]">
+                                                  <FaBoxOpen className="h-4 w-4" />
+                                                </div>
                                               )}
                                               <div className="min-w-0">
-                                                <p className="font-medium text-stocksense-teal truncate">
+                                                <p className="font-semibold text-gray-900 truncate">
                                                   {item.name}
                                                   {soon && (
                                                     <span className="ml-2 text-[10px] uppercase tracking-wide bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
@@ -1555,10 +1790,16 @@ export default function StorageAreasSection({
                                                     </span>
                                                   )}
                                                 </p>
-                                                <p className="text-sm text-gray-500 truncate">
-                                                  Qty: {item.quantity} | Exp:{' '}
-                                                  {item.expiration_date || '-'}
-                                                </p>
+                                                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-gray-500">
+                                                  <span>Qty: {item.quantity}</span>
+                                                  <span>Exp: {item.expiration_date || '-'}</span>
+                                                  {item.barcode && (
+                                                    <span className="inline-flex min-w-0 items-center gap-1 text-xs">
+                                                      <FaBarcode className="h-3 w-3" />
+                                                      <span className="truncate">{item.barcode}</span>
+                                                    </span>
+                                                  )}
+                                                </div>
                                               </div>
                                             </div>
                                             {canEditInventory && (
@@ -1622,6 +1863,198 @@ export default function StorageAreasSection({
           </motion.div>
         ))}
       </motion.div>
+
+      <Modal
+        isOpen={Boolean(activeMobileCategory)}
+        onOpenChange={(open) => {
+          if (!open) setMobileCategorySheet(null);
+        }}
+        placement="bottom"
+        scrollBehavior="inside"
+        size="full"
+        classNames={{
+          wrapper: "items-end",
+        }}
+      >
+        <ModalContent
+          className={`${modalContentClass} max-h-[88dvh] rounded-b-none sm:rounded-2xl`}
+          style={modalContentStyle}
+        >
+          {() => (
+            <>
+              <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
+                <span className="text-[var(--stocksense-brand)]">
+                  {activeMobileCategory?.category?.name || 'Category'}
+                </span>
+                <span className="text-sm font-normal text-gray-500">
+                  {activeMobileCategory?.area?.name} | {locationName}
+                </span>
+              </ModalHeader>
+
+              <ModalBody className={`space-y-3 ${modalBodyClass}`}>
+                {canEditInventory && activeMobileCategory && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => {
+                        openCreateItemModal(
+                          activeMobileCategory.area,
+                          activeMobileCategory.category
+                        );
+                      }}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--stocksense-brand)] px-3 text-sm font-medium text-white"
+                    >
+                      <FaBoxOpen /> Add item
+                    </button>
+                    <button
+                      onClick={() =>
+                        openEditCategoryModal(
+                          activeMobileCategory.area,
+                          activeMobileCategory.category
+                        )
+                      }
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-medium text-amber-700"
+                    >
+                      <FaEdit /> Edit category
+                    </button>
+                  </div>
+                )}
+
+                {activeMobileCategory?.items?.length ? (
+                  activeMobileCategory.items.map((item) => {
+                    const soon = isExpiringSoon(item.expiration_date, expDays);
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm"
+                      >
+                        <div className="flex min-w-0 gap-3">
+                          {item.imageUrl ? (
+                            <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
+                              <img
+                                src={item.imageUrl}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] text-[var(--entity-item-accent)]">
+                              <FaBoxOpen className="h-4 w-4" />
+                            </div>
+                          )}
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <p className="truncate text-sm font-semibold text-gray-900">
+                                {item.name}
+                              </p>
+                              {soon && (
+                                <span className="shrink-0 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-orange-700">
+                                  {daysUntil(item.expiration_date) < 0
+                                    ? 'Expired'
+                                    : 'Soon'}
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-gray-500">
+                              <span>Qty: {item.quantity}</span>
+                              <span>Exp: {item.expiration_date || '-'}</span>
+                              {item.barcode && (
+                                <span className="inline-flex min-w-0 items-center gap-1 text-xs">
+                                  <FaBarcode className="h-3 w-3" />
+                                  <span className="truncate">{item.barcode}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {canEditInventory && activeMobileCategory && (
+                          <div className="mt-3 grid grid-cols-3 gap-2">
+                            <button
+                              onClick={() =>
+                                openMoveModal(
+                                  activeMobileCategory.area.id,
+                                  activeMobileCategory.category.id,
+                                  item.id
+                                )
+                              }
+                              className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
+                              title="Move item"
+                            >
+                              <FaArrowsAlt />
+                            </button>
+                            <button
+                              onClick={() =>
+                                openEditItemModal(
+                                  activeMobileCategory.area,
+                                  activeMobileCategory.category,
+                                  item
+                                )
+                              }
+                              className="inline-flex h-9 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700"
+                              title="Edit item"
+                            >
+                              <FaEdit />
+                            </button>
+                            <button
+                              onClick={() =>
+                                openDeleteDialog('item', {
+                                  itemId: item.id,
+                                  itemName: item.name,
+                                  categoryId: activeMobileCategory.category.id,
+                                  storageAreaId: activeMobileCategory.area.id,
+                                  categoryName: activeMobileCategory.category.name,
+                                  areaName: activeMobileCategory.area.name,
+                                })
+                              }
+                              className="inline-flex h-9 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
+                              title="Delete item"
+                            >
+                              <FaTrash />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+                    No items in this category yet.
+                  </div>
+                )}
+
+                {canEditInventory && activeMobileCategory && (
+                  <button
+                    onClick={() => {
+                      setMobileCategorySheet(null);
+                      openDeleteDialog('category', {
+                        categoryId: activeMobileCategory.category.id,
+                        storageAreaId: activeMobileCategory.area.id,
+                        name: activeMobileCategory.category.name,
+                        areaName: activeMobileCategory.area.name,
+                      });
+                    }}
+                    className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 text-sm font-medium text-rose-700"
+                  >
+                    <FaTrash /> Delete category
+                  </button>
+                )}
+              </ModalBody>
+
+              <ModalFooter className={modalFooterClass}>
+                <Button
+                  variant="light"
+                  radius="lg"
+                  onPress={() => setMobileCategorySheet(null)}
+                >
+                  Close
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
 
       {canEditInventory && <Modal
         isOpen={areaModal.open}

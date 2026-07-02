@@ -1537,7 +1537,7 @@ export default function ItemsPageClient({
                       <Input
                         value={editBarcode}
                         onValueChange={setEditBarcode}
-                        placeholder="UPC / EAN"
+                        placeholder="e.g., 012345678905"
                         variant="bordered"
                         radius="lg"
                         classNames={modalInputClassNames}

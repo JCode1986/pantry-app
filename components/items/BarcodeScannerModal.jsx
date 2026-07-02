@@ -15,7 +15,6 @@ import {
   modalBodyClass,
   modalContentClass,
   modalContentStyle,
-  modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
 } from "@/components/modals/modalTheme";
@@ -34,6 +33,20 @@ function cleanBarcode(value) {
   return typeof value === "string"
     ? value.trim().replace(/[^0-9A-Za-z._-]/g, "").slice(0, 80)
     : "";
+}
+
+function ScannerMessage({ message, className = "" }) {
+  if (!message) return null;
+
+  return (
+    <div
+      role="alert"
+      aria-live="polite"
+      className={`rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 ${className}`}
+    >
+      {message}
+    </div>
+  );
 }
 
 export default function BarcodeScannerModal({ isOpen, onOpenChange, onScan }) {
@@ -227,11 +240,7 @@ export default function BarcodeScannerModal({ isOpen, onOpenChange, onScan }) {
             </ModalHeader>
 
             <ModalBody className={`space-y-4 ${modalBodyClass}`}>
-              {message && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                  {message}
-                </div>
-              )}
+              <ScannerMessage message={message} className="hidden sm:block" />
 
               <div className="overflow-hidden rounded-2xl border border-stocksense-gray bg-gray-950">
                 <video
@@ -282,7 +291,7 @@ export default function BarcodeScannerModal({ isOpen, onOpenChange, onScan }) {
                   label="Barcode"
                   value={manualBarcode}
                   onValueChange={setManualBarcode}
-                  placeholder="012345678905"
+                  placeholder="e.g., 012345678905"
                   variant="bordered"
                   radius="lg"
                   classNames={modalInputClassNames}
@@ -297,10 +306,13 @@ export default function BarcodeScannerModal({ isOpen, onOpenChange, onScan }) {
               </div>
             </ModalBody>
 
-            <ModalFooter className={modalFooterClass}>
-              <Button variant="light" className="rounded-xl" onPress={() => onOpenChange?.(false)}>
-                Close
-              </Button>
+            <ModalFooter className="flex shrink-0 flex-col gap-2 border-t border-[var(--stocksense-brand-border)] bg-white sm:flex-row sm:justify-end">
+              <ScannerMessage message={message} className="w-full sm:hidden" />
+              <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:justify-end">
+                <Button variant="light" className="rounded-xl" onPress={() => onOpenChange?.(false)}>
+                  Close
+                </Button>
+              </div>
             </ModalFooter>
           </>
         )}

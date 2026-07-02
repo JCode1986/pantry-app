@@ -63,6 +63,7 @@ export default async function Page({ params }) {
           quantity,
           expiration_date,
           category_id,
+          barcode,
           image_path
         )
       )
@@ -132,21 +133,18 @@ export default async function Page({ params }) {
 
   return (
     <main className="page-enter max-w-[1500px] mx-auto px-5 py-8 min-h-[100vh]">
-      <header className="mb-6 rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm">
-        <Link
-          href="/locations"
-          className="inline-flex items-center text-sm font-medium text-[var(--stocksense-brand)] hover:underline"
-        >
-          Back to locations
-        </Link>
-        <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Location
-            </p>
-            <div className="mt-2 flex items-center gap-3">
+      <header className="mb-6 overflow-hidden rounded-2xl border border-stocksense-gray bg-white shadow-sm">
+        <div className="border-t-4 border-[var(--entity-location-accent)] p-5">
+          <Link
+            href="/locations"
+            className="inline-flex items-center text-sm font-medium text-[var(--stocksense-brand)] hover:underline"
+          >
+            Back to locations
+          </Link>
+          <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div className="flex min-w-0 gap-4">
               {locationImageUrl && (
-                <div className="h-14 w-14 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
+                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-location-border)] bg-white">
                   <img
                     src={locationImageUrl}
                     alt=""
@@ -154,14 +152,20 @@ export default async function Page({ params }) {
                   />
                 </div>
               )}
-              <h1 className="text-3xl font-semibold tracking-tight text-stocksense-teal">
-                {location.name}
-              </h1>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Location
+                </p>
+                <h1 className="mt-1 truncate text-3xl font-semibold tracking-tight text-stocksense-teal">
+                  {location.name}
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm text-gray-500">
+                  Manage this location while seeing the hierarchy clearly: storage
+                  areas contain categories, and categories contain items.
+                </p>
+              </div>
             </div>
           </div>
-          <p className="max-w-xl text-sm text-gray-500">
-            Organize this location by storage area, category, and item.
-          </p>
         </div>
       </header>
       <StorageAreasSection
