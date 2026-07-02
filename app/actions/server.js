@@ -423,6 +423,93 @@ async function getImageEntityRecord(admin, entityType, entityId) {
   return { data: null, error: new Error('Unsupported image entity type') };
 }
 
+async function getLocationForHousehold(admin, locationId, householdId) {
+  if (!locationId || !householdId) {
+    return { data: null, error: 'Location is required.' };
+  }
+
+  const { data, error } = await admin
+    .from('locations')
+    .select('id, name, household_id, image_path')
+    .eq('id', locationId)
+    .maybeSingle();
+
+  if (error) return { data: null, error: error.message };
+  if (!data || String(data.household_id) !== String(householdId)) {
+    return { data: null, error: 'Location not found for this household.' };
+  }
+
+  return { data, error: null };
+}
+
+async function getStorageAreaForHousehold(admin, storageAreaId, householdId) {
+  if (!storageAreaId || !householdId) {
+    return { data: null, error: 'Storage area is required.' };
+  }
+
+  const { data: area, error } = await admin
+    .from('storage_areas')
+    .select('id, name, location_id, image_path')
+    .eq('id', storageAreaId)
+    .maybeSingle();
+
+  if (error) return { data: null, error: error.message };
+  if (!area?.location_id) {
+    return { data: null, error: 'Storage area not found for this household.' };
+  }
+
+  const locationResult = await getLocationForHousehold(
+    admin,
+    area.location_id,
+    householdId
+  );
+  if (locationResult.error) {
+    return { data: null, error: 'Storage area not found for this household.' };
+  }
+
+  return {
+    data: {
+      ...area,
+      location: locationResult.data,
+    },
+    error: null,
+  };
+}
+
+async function getCategoryForHousehold(admin, categoryId, householdId) {
+  if (!categoryId || !householdId) {
+    return { data: null, error: 'Category is required.' };
+  }
+
+  const { data: category, error } = await admin
+    .from('storage_categories')
+    .select('id, name, storage_area_id')
+    .eq('id', categoryId)
+    .maybeSingle();
+
+  if (error) return { data: null, error: error.message };
+  if (!category?.storage_area_id) {
+    return { data: null, error: 'Category not found for this household.' };
+  }
+
+  const areaResult = await getStorageAreaForHousehold(
+    admin,
+    category.storage_area_id,
+    householdId
+  );
+  if (areaResult.error) {
+    return { data: null, error: 'Category not found for this household.' };
+  }
+
+  return {
+    data: {
+      ...category,
+      storageArea: areaResult.data,
+    },
+    error: null,
+  };
+}
+
 function imageEntityTable(entityType) {
   if (entityType === INVENTORY_IMAGE_ENTITY.LOCATION) return 'locations';
   if (entityType === INVENTORY_IMAGE_ENTITY.STORAGE_AREA) return 'storage_areas';
@@ -562,13 +649,16 @@ export async function addLocation(name) {
   const limitError = await enforceLocationLimit(supabase);
   if (limitError) return upgradeLimitError(limitError);
 
-  const { data, error } = await supabase
+  const admin = createAdminClient();
+  const { data, error } = await admin
     .from('locations')
     .insert([{ name: normalizedName, household_id: household?.id }])
-    .select('*');
+    .select('id, name, household_id, image_path, created_at')
+    .single();
+
   if (error) throw error;
   revalidateInventoryPaths();
-  return { data: data[0], error: null };
+  return { data, error: null };
 }
 
 export async function updateLocationName(id, newName) {
@@ -619,15 +709,22 @@ export async function addStorageArea(locationId, name) {
     return validationError('Location and storage area name are required');
   }
 
-  const { error: permissionError } = await requireInventoryEditor();
+  const { household, error: permissionError } = await requireInventoryEditor();
   if (permissionError) return validationError(permissionError);
 
-  const supabase = await createClient();
+  const admin = createAdminClient();
+  const locationResult = await getLocationForHousehold(
+    admin,
+    locationId,
+    household?.id
+  );
+  if (locationResult.error) return validationError(locationResult.error);
 
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from('storage_areas')
     .insert([{ location_id: locationId, name: normalizedName }])
-    .select();
+    .select('id, name, location_id, image_path, created_at')
+    .single();
 
   if (error) {
     console.error('Error adding storage area:', error);
@@ -635,7 +732,7 @@ export async function addStorageArea(locationId, name) {
   }
 
   revalidateInventoryPaths([`/locations/${locationId}`]);
-  return { data: data[0] };
+  return { data };
 }
 
 // updateStorageArea
@@ -761,7 +858,15 @@ export async function addItem(
   const limitError = await enforceItemLimit(supabase);
   if (limitError) return upgradeLimitError(limitError);
 
-  const { data, error } = await supabase
+  const admin = createAdminClient();
+  const categoryResult = await getCategoryForHousehold(
+    admin,
+    categoryId,
+    household?.id
+  );
+  if (categoryResult.error) return validationError(categoryResult.error);
+
+  const { data, error } = await admin
     .from('items')
     .insert([
       {
@@ -981,6 +1086,7 @@ export async function addItemWithPath({
   if (permissionError) return validationError(permissionError);
   const itemLimitError = await enforceItemLimit(supabase);
   if (itemLimitError) return upgradeLimitError(itemLimitError);
+  const admin = createAdminClient();
 
   let finalLocationId = locationId || null;
   let finalLocationName = null;
@@ -992,7 +1098,7 @@ export async function addItemWithPath({
     const locationLimitError = await enforceLocationLimit(supabase);
     if (locationLimitError) return upgradeLimitError(locationLimitError);
 
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from('locations')
       .insert([{ name: normalizedLocationName, household_id: household?.id }])
       .select('id, name, image_path')
@@ -1007,12 +1113,13 @@ export async function addItemWithPath({
     finalLocationName = data.name;
     createdLocation = true;
   } else {
-    const { data } = await supabase
-      .from('locations')
-      .select('name')
-      .eq('id', finalLocationId)
-      .single();
-    finalLocationName = data?.name ?? null;
+    const locationResult = await getLocationForHousehold(
+      admin,
+      finalLocationId,
+      household?.id
+    );
+    if (locationResult.error) return validationError(locationResult.error);
+    finalLocationName = locationResult.data?.name ?? null;
   }
 
   let finalStorageAreaId = storageAreaId || null;
@@ -1022,7 +1129,7 @@ export async function addItemWithPath({
     const normalizedStorageAreaName = normalizeName(storageAreaName);
     if (!normalizedStorageAreaName) return validationError('Storage area is required');
 
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from('storage_areas')
       .insert([{ location_id: finalLocationId, name: normalizedStorageAreaName }])
       .select('id, name')
@@ -1037,12 +1144,16 @@ export async function addItemWithPath({
     finalStorageAreaName = data.name;
     createdStorageArea = true;
   } else {
-    const { data } = await supabase
-      .from('storage_areas')
-      .select('name')
-      .eq('id', finalStorageAreaId)
-      .single();
-    finalStorageAreaName = data?.name ?? null;
+    const areaResult = await getStorageAreaForHousehold(
+      admin,
+      finalStorageAreaId,
+      household?.id
+    );
+    if (areaResult.error) return validationError(areaResult.error);
+    if (String(areaResult.data?.location_id) !== String(finalLocationId)) {
+      return validationError('Storage area does not belong to selected location.');
+    }
+    finalStorageAreaName = areaResult.data?.name ?? null;
   }
 
   let finalCategoryId = categoryId || null;
@@ -1052,7 +1163,7 @@ export async function addItemWithPath({
     const normalizedCategoryName = normalizeName(categoryName);
     if (!normalizedCategoryName) return validationError('Category is required');
 
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from('storage_categories')
       .insert({ storage_area_id: finalStorageAreaId, name: normalizedCategoryName })
       .select('id, name')
@@ -1067,15 +1178,19 @@ export async function addItemWithPath({
     finalCategoryName = data.name;
     createdCategory = true;
   } else {
-    const { data } = await supabase
-      .from('storage_categories')
-      .select('name')
-      .eq('id', finalCategoryId)
-      .single();
-    finalCategoryName = data?.name ?? null;
+    const categoryResult = await getCategoryForHousehold(
+      admin,
+      finalCategoryId,
+      household?.id
+    );
+    if (categoryResult.error) return validationError(categoryResult.error);
+    if (String(categoryResult.data?.storage_area_id) !== String(finalStorageAreaId)) {
+      return validationError('Category does not belong to selected storage area.');
+    }
+    finalCategoryName = categoryResult.data?.name ?? null;
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from('items')
     .insert([
       {
@@ -1185,11 +1300,18 @@ export async function addCategory(storageAreaId, name) {
     return validationError('Storage area and category name are required');
   }
 
-  const { error: permissionError } = await requireInventoryEditor();
+  const { household, error: permissionError } = await requireInventoryEditor();
   if (permissionError) return validationError(permissionError);
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  const admin = createAdminClient();
+  const areaResult = await getStorageAreaForHousehold(
+    admin,
+    storageAreaId,
+    household?.id
+  );
+  if (areaResult.error) return validationError(areaResult.error);
+
+  const { data, error } = await admin
     .from('storage_categories')
     .insert({ storage_area_id: storageAreaId, name: normalizedName })
     .select('id, name, storage_area_id, created_at')
