@@ -46,11 +46,32 @@ async function getAuthedBillingContext() {
 
 async function getAppUrl() {
   const headersList = await headers();
-  return (
-    process.env.NEXT_PUBLIC_APP_URL ||
-    headersList.get("origin") ||
-    "http://localhost:3000"
-  );
+  const origin = headersList.get("origin");
+  const forwardedHost = headersList.get("x-forwarded-host");
+  const host = forwardedHost || headersList.get("host");
+  const forwardedProto = headersList.get("x-forwarded-proto") || "https";
+  const requestUrl = host ? `${forwardedProto}://${host}` : null;
+  const candidates = [
+    origin,
+    requestUrl,
+    process.env.NEXT_PUBLIC_APP_URL,
+    "http://localhost:3000",
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+
+    try {
+      const url = new URL(candidate);
+      if (url.protocol === "http:" || url.protocol === "https:") {
+        return url.origin;
+      }
+    } catch {
+      // Ignore malformed deployment env/header values and keep falling back.
+    }
+  }
+
+  return "http://localhost:3000";
 }
 
 export async function getUserBillingAction() {

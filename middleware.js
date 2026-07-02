@@ -33,7 +33,10 @@ export async function middleware(req) {
   // If no token and protected route, redirect to login.
   if (!token && isProtected && !isAuthPage) {
     const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("redirectTo", pathname);
+    loginUrl.searchParams.set(
+      "redirectTo",
+      `${pathname}${req.nextUrl.search}`
+    );
     return NextResponse.redirect(loginUrl);
   }
 

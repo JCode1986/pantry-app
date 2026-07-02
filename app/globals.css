@@ -69,9 +69,9 @@ body {
 }
 
 :where(input, textarea)::placeholder {
-  color: #6b7280;
+  color: #9ca3af;
   opacity: 1;
-  -webkit-text-fill-color: #6b7280;
+  -webkit-text-fill-color: #9ca3af;
 }
 
 :where(input, textarea, select):disabled {

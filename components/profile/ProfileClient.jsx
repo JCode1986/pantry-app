@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button, Input, Select, SelectItem } from "@heroui/react";
 import {
@@ -371,6 +372,36 @@ function BillingSection({ billing, billingError, billingLoading, onCheckout, onP
       </div>
     </motion.section>
   );
+}
+
+function BillingReturnNotice() {
+  const searchParams = useSearchParams();
+  const billingStatus = searchParams.get("billing");
+
+  if (billingStatus === "success") {
+    return (
+      <motion.div
+        variants={itemVariants}
+        className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm"
+      >
+        Checkout complete. Your subscription is being activated; if the plan still
+        looks unchanged, refresh in a moment after Stripe finishes syncing.
+      </motion.div>
+    );
+  }
+
+  if (billingStatus === "cancelled") {
+    return (
+      <motion.div
+        variants={itemVariants}
+        className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm"
+      >
+        Checkout was cancelled. Your current plan was not changed.
+      </motion.div>
+    );
+  }
+
+  return null;
 }
 
 function SharingSection({
@@ -993,6 +1024,8 @@ export default function ProfileClient({
       </motion.header>
 
       {requiresPasswordSetup && <PasswordSetupNotice />}
+
+      <BillingReturnNotice />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
         <div className="space-y-6">

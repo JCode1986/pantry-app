@@ -47,7 +47,7 @@ const modalInputClassNames = {
   inputWrapper:
     'border-[var(--stocksense-brand-border)] bg-white focus-within:border-[var(--stocksense-brand)]',
   label: 'text-gray-700',
-  input: 'text-gray-900 placeholder:text-gray-500',
+  input: 'text-gray-900 placeholder:text-gray-400',
 };
 
 export default function LocationsSection({ locations, canEditInventory = true }) {
@@ -517,15 +517,7 @@ export default function LocationsSection({ locations, canEditInventory = true })
                   <motion.li
                     key={loc.id}
                     variants={itemVariants}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => router.push(`/locations/${loc.id}`)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        router.push(`/locations/${loc.id}`);
-                      }
-                    }}
-                    className="relative flex flex-col justify-between gap-3 overflow-hidden rounded-2xl border border-stocksense-gray bg-white p-3.5 pt-4 text-gray-700 shadow-sm transition hover:bg-gray-50 dark:text-gray-300 sm:p-4 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]"
+                    className="relative flex flex-col justify-between gap-3 overflow-hidden rounded-2xl border border-stocksense-gray bg-white p-3.5 pt-4 text-gray-700 shadow-sm transition hover:bg-gray-50 dark:text-gray-300 sm:p-4"
                   >
                     <div className="absolute inset-x-0 top-0 h-1 bg-[var(--entity-location-accent)]" />
                     {/* Left: icon + content */}
@@ -534,8 +526,6 @@ export default function LocationsSection({ locations, canEditInventory = true })
                         <input
                           type="checkbox"
                           checked={selectedIds.has(String(loc.id))}
-                          onClick={(event) => event.stopPropagation()}
-                          onKeyDown={(event) => event.stopPropagation()}
                           onChange={() => toggleSelect(loc.id)}
                           className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border border-stocksense-gray"
                           aria-label={`Select ${loc.name}`}
@@ -578,10 +568,7 @@ export default function LocationsSection({ locations, canEditInventory = true })
                         <motion.button
                           whileHover={{ y: -1 }}
                           whileTap={{ scale: 0.98 }}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            router.push(`/locations/${loc.id}`);
-                          }}
+                          onClick={() => router.push(`/locations/${loc.id}`)}
                           className="inline-flex h-9 min-w-0 items-center justify-center gap-1 rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-2 text-xs text-[var(--stocksense-brand)] hover:bg-[var(--stocksense-brand-soft)] cursor-pointer"
                         >
                           <FaEye /> View
@@ -591,10 +578,7 @@ export default function LocationsSection({ locations, canEditInventory = true })
                             <motion.button
                               whileHover={{ y: -1 }}
                               whileTap={{ scale: 0.98 }}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openEditLocationModal(loc);
-                              }}
+                              onClick={() => openEditLocationModal(loc)}
                               className="inline-flex h-9 min-w-0 items-center justify-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-2 text-xs text-amber-700 hover:bg-amber-100 cursor-pointer"
                             >
                               <FaEdit /> Edit
@@ -602,10 +586,7 @@ export default function LocationsSection({ locations, canEditInventory = true })
                             <motion.button
                               whileHover={{ y: -1 }}
                               whileTap={{ scale: 0.98 }}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openDeleteDialog(loc);
-                              }}
+                              onClick={() => openDeleteDialog(loc)}
                               className="inline-flex h-9 min-w-0 items-center justify-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-2 text-xs text-rose-700 hover:bg-rose-100 cursor-pointer"
                             >
                               <FaTrash /> Delete

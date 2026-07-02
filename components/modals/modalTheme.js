@@ -18,7 +18,7 @@ export const modalInputClassNames = {
   inputWrapper:
     "border-[var(--stocksense-brand-border)] bg-white shadow-none focus-within:border-[var(--stocksense-brand)]",
   label: "text-gray-700",
-  input: "text-gray-900 placeholder:text-gray-500",
+  input: "text-gray-900 placeholder:text-gray-400",
 };
 
 export const themedSelectClassNames = {

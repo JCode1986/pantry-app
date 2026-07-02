@@ -121,7 +121,7 @@ export default function AddShoppingListItemModal({
                 label="Item"
                 value={form.name}
                 onValueChange={(value) => updateForm("name", value)}
-                placeholder="Milk, paper towels, coffee..."
+                placeholder="e.g., Milk, paper towels, coffee"
                 variant="bordered"
                 radius="lg"
                 isDisabled={isSaving}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -17,18 +17,23 @@ import {
 } from "@heroui/react";
 import {
   FaBarcode,
+  FaCamera,
   FaCheckCircle,
+  FaImage,
   FaMapMarkerAlt,
   FaPlus,
   FaSearch,
   FaSpinner,
   FaTags,
+  FaTrash,
+  FaUpload,
   FaWarehouse,
 } from "react-icons/fa";
 import {
   addItemWithPath,
   getInventoryHierarchy,
   lookupProductByBarcode,
+  uploadInventoryImage,
 } from "@/app/actions/server";
 import { toNonNegativeInteger } from "@/utils/pantry/date";
 import { emitItemAdded } from "@/utils/clientEvents";
@@ -36,14 +41,15 @@ import {
   modalBodyClass,
   modalContentClass,
   modalContentStyle,
-  modalFooterClass,
   modalHeaderClass,
+  modalInputClassNames,
   themedSelectClassNames,
 } from "@/components/modals/modalTheme";
 import BarcodeScannerModal from "@/components/items/BarcodeScannerModal";
 
 const NEW_VALUE = "__new__";
 const EMPTY_LIST = [];
+const ITEM_IMAGE_ENTITY = "item";
 const revealTransition = { duration: 0.2, ease: "easeOut" };
 const revealMotion = {
   initial: { opacity: 0, height: 0, y: -6 },
@@ -69,14 +75,58 @@ const emptyItemFields = {
   expirationDate: "",
 };
 
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
+
 function cleanBarcode(value) {
   return typeof value === "string"
     ? value.trim().replace(/[^0-9A-Za-z._-]/g, "").slice(0, 80)
     : "";
 }
 
+function validateImageFile(file) {
+  if (!file) return "";
+  if (!IMAGE_TYPES.has(file.type)) {
+    return "Choose a JPG, PNG, WebP, or GIF image.";
+  }
+  if (file.size > MAX_IMAGE_SIZE) {
+    return "Images must be 5 MB or smaller.";
+  }
+  return "";
+}
+
 function byId(items, id) {
   return (items ?? []).find((item) => String(item.id) === String(id)) ?? null;
+}
+
+function AddItemMessage({ message, upgradeHref, onLinkClick, className = "" }) {
+  if (!message) return null;
+
+  return (
+    <motion.div
+      layout
+      {...revealMotion}
+      role="alert"
+      aria-live="polite"
+      className={`overflow-hidden rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 ${className}`}
+    >
+      {message}
+      {upgradeHref && (
+        <Link
+          href={upgradeHref}
+          onClick={onLinkClick}
+          className="ml-2 font-semibold underline underline-offset-2"
+        >
+          View plans
+        </Link>
+      )}
+    </motion.div>
+  );
 }
 
 function NewPathField({
@@ -109,7 +159,9 @@ function NewPathField({
         variant="bordered"
         radius="lg"
         classNames={{
-          inputWrapper: "border-[var(--stocksense-brand-border)] bg-white",
+          ...modalInputClassNames,
+          inputWrapper:
+            "border-[var(--stocksense-brand-border)] bg-white shadow-none focus-within:border-[var(--stocksense-brand)]",
         }}
       />
     </motion.div>
@@ -158,6 +210,8 @@ function getDefaultSelection(locations, context) {
 
 export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialContext }) {
   const router = useRouter();
+  const imageInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const [locations, setLocations] = useState([]);
   const [locationId, setLocationId] = useState(NEW_VALUE);
   const [storageAreaId, setStorageAreaId] = useState(NEW_VALUE);
@@ -171,6 +225,9 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   const [isLookingUpBarcode, setIsLookingUpBarcode] = useState(false);
   const [barcodeMessage, setBarcodeMessage] = useState("");
   const [productPreview, setProductPreview] = useState(null);
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
+  const [selectedImagePreview, setSelectedImagePreview] = useState("");
+  const [imageMessage, setImageMessage] = useState("");
 
   const selectedLocation = useMemo(
     () => byId(locations, locationId),
@@ -224,6 +281,40 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
       cancelled = true;
     };
   }, [initialContext, isOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (selectedImagePreview?.startsWith("blob:")) {
+        URL.revokeObjectURL(selectedImagePreview);
+      }
+    };
+  }, [selectedImagePreview]);
+
+  const clearSelectedImage = () => {
+    setSelectedImageFile(null);
+    setSelectedImagePreview((current) => {
+      if (current?.startsWith("blob:")) URL.revokeObjectURL(current);
+      return "";
+    });
+    setImageMessage("");
+  };
+
+  const selectImageFile = (file) => {
+    if (!file) return;
+
+    const validationMessage = validateImageFile(file);
+    if (validationMessage) {
+      setImageMessage(validationMessage);
+      return;
+    }
+
+    setSelectedImageFile(file);
+    setImageMessage("");
+    setSelectedImagePreview((current) => {
+      if (current?.startsWith("blob:")) URL.revokeObjectURL(current);
+      return URL.createObjectURL(file);
+    });
+  };
 
   const updateForm = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -315,6 +406,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
     setUpgradeHref("");
     setBarcodeMessage("");
     setProductPreview(null);
+    clearSelectedImage();
     setIsScannerOpen(false);
     setIsLoading(true);
     onClose?.();
@@ -356,16 +448,15 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
         categoryName: form.categoryName,
         itemName: form.itemName,
         barcode: form.barcode,
-        productImageUrl: productPreview?.imageUrl ?? null,
+        productImageUrl: selectedImageFile ? null : productPreview?.imageUrl ?? null,
         quantity: toNonNegativeInteger(form.quantity, 0),
         expirationDate: form.expirationDate || null,
       });
     } catch (error) {
       console.error("addItemWithPath error:", error);
       setMessage("Could not add item.");
-      return;
-    } finally {
       setIsSaving(false);
+      return;
     }
 
     if (result?.error) {
@@ -375,10 +466,44 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
           : result.error?.message ?? "Could not add item."
       );
       setUpgradeHref(result.upgradeHref || "");
+      setIsSaving(false);
       return;
     }
 
-    const added = result.data;
+    let added = result.data;
+    let imageUploadWarning = "";
+
+    if (selectedImageFile && added?.id) {
+      const formData = new FormData();
+      formData.append("image", selectedImageFile);
+
+      try {
+        const imageResult = await uploadInventoryImage(
+          ITEM_IMAGE_ENTITY,
+          added.id,
+          formData
+        );
+
+        if (imageResult?.error) {
+          imageUploadWarning =
+            typeof imageResult.error === "string"
+              ? imageResult.error
+              : "Item was added, but the photo could not be uploaded.";
+        } else if (imageResult?.data) {
+          added = {
+            ...added,
+            image_path: imageResult.data.imagePath ?? added.image_path,
+            imageUrl: imageResult.data.imageUrl ?? added.imageUrl,
+          };
+        }
+      } catch (error) {
+        console.error("uploadInventoryImage after add error:", error);
+        imageUploadWarning = "Item was added, but the photo could not be uploaded.";
+      }
+    }
+
+    setIsSaving(false);
+
     setLocations((prev) => {
       const locationExists = prev.some(
         (location) => String(location.id) === String(added.locationId)
@@ -477,12 +602,13 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
     }));
     setProductPreview(null);
     setBarcodeMessage("");
-    setMessage("");
+    clearSelectedImage();
+    setMessage(imageUploadWarning);
     onAdded?.({
       itemName: addedName,
       destinationName: destination || "inventory",
     });
-    if (closeAfterAdd) {
+    if (closeAfterAdd && !imageUploadWarning) {
       setIsLoading(true);
       onClose?.();
     }
@@ -510,26 +636,14 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
               </span>
             </ModalHeader>
 
-            <ModalBody className={`min-h-[150px] space-y-4 ${modalBodyClass}`}>
+            <ModalBody className={`min-h-[150px] space-y-4 pb-3 ${modalBodyClass}`}>
               <AnimatePresence initial={false}>
-                {message && (
-                  <motion.div
-                    layout
-                    {...revealMotion}
-                    className="overflow-hidden rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
-                  >
-                      {message}
-                      {upgradeHref && (
-                        <Link
-                          href={upgradeHref}
-                          onClick={handleClose}
-                          className="ml-2 font-semibold underline underline-offset-2"
-                        >
-                          View plans
-                        </Link>
-                      )}
-                    </motion.div>
-                )}
+                <AddItemMessage
+                  message={message}
+                  upgradeHref={upgradeHref}
+                  onLinkClick={handleClose}
+                  className="hidden sm:block"
+                />
               </AnimatePresence>
 
               <AnimatePresence mode="wait" initial={false}>
@@ -553,9 +667,19 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -6 }}
                     transition={revealTransition}
-                    className="space-y-4"
+                    className="space-y-3 sm:space-y-4"
                   >
-                    <motion.div layout className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <div className="rounded-2xl border border-stocksense-gray bg-gray-50/70 p-3 sm:bg-white">
+                      <div className="mb-3">
+                        <div className="text-sm font-semibold text-gray-900">
+                          Where it goes
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Choose existing places or create the missing ones.
+                        </div>
+                      </div>
+
+                      <motion.div layout className="grid grid-cols-1 gap-3 md:grid-cols-3">
                       <motion.div layout className="space-y-2">
                         <Select
                           label="Location"
@@ -584,7 +708,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                               label="Location name"
                               value={form.locationName}
                               onValueChange={(value) => updateForm("locationName", value)}
-                              placeholder="Home"
+                              placeholder="e.g., Home"
                               isDisabled={isSaving}
                             />
                           )}
@@ -619,7 +743,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                               label="Storage area name"
                               value={form.storageAreaName}
                               onValueChange={(value) => updateForm("storageAreaName", value)}
-                              placeholder="Pantry"
+                              placeholder="e.g., Kitchen pantry"
                               isDisabled={isSaving}
                             />
                           )}
@@ -654,25 +778,36 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                               label="Category name"
                               value={form.categoryName}
                               onValueChange={(value) => updateForm("categoryName", value)}
-                              placeholder="Snacks"
+                              placeholder="e.g., Snacks or Shelf 1"
                               isDisabled={isSaving}
                             />
                           )}
                         </AnimatePresence>
                       </motion.div>
-                    </motion.div>
+                      </motion.div>
+                    </div>
 
                     <div className="overflow-hidden rounded-2xl border border-stocksense-gray bg-white p-3 shadow-sm">
+                      <div className="mb-3">
+                        <div className="text-sm font-semibold text-gray-900">
+                          Barcode
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Scan with the camera, choose a photo, or enter a code.
+                        </div>
+                      </div>
+
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_190px]">
                         <Input
                           label="Barcode"
                           value={form.barcode}
                           onValueChange={updateBarcode}
-                          placeholder="Scan or enter UPC / EAN"
+                          placeholder="e.g., 012345678905"
                           isDisabled={isSaving || isLookingUpBarcode}
                           variant="bordered"
                           radius="lg"
                           startContent={<FaBarcode className="text-gray-400" />}
+                          classNames={modalInputClassNames}
                         />
                         <div className="grid grid-cols-2 gap-2 md:grid-cols-1">
                           <Button
@@ -737,61 +872,189 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_140px_180px]">
-                      <Input
-                        label="Item name"
-                        value={form.itemName}
-                        onValueChange={(value) => updateForm("itemName", value)}
-                        placeholder="Rice"
-                        isDisabled={isSaving}
-                        variant="bordered"
-                        radius="lg"
-                      />
-                      <Input
-                        label="Quantity"
-                        type="number"
-                        min={0}
-                        value={form.quantity}
-                        onValueChange={(value) => updateForm("quantity", value)}
-                        isDisabled={isSaving}
-                        variant="bordered"
-                        radius="lg"
-                      />
-                      <Input
-                        label="Expiration"
-                        type="date"
-                        value={form.expirationDate}
-                        onValueChange={(value) => updateForm("expirationDate", value)}
-                        isDisabled={isSaving}
-                        variant="bordered"
-                        radius="lg"
-                      />
+                    <div className="rounded-2xl border border-stocksense-gray bg-white p-3 shadow-sm">
+                      <div className="mb-3">
+                        <div className="text-sm font-semibold text-gray-900">
+                          Item details
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Add the name now. Quantity and expiration can be updated later.
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_140px_180px]">
+                        <Input
+                          label="Item name"
+                          value={form.itemName}
+                          onValueChange={(value) => updateForm("itemName", value)}
+                          placeholder="e.g., Rice"
+                          isDisabled={isSaving}
+                          variant="bordered"
+                          radius="lg"
+                          classNames={modalInputClassNames}
+                        />
+                        <Input
+                          label="Quantity"
+                          type="number"
+                          min={0}
+                          value={form.quantity}
+                          onValueChange={(value) => updateForm("quantity", value)}
+                          isDisabled={isSaving}
+                          variant="bordered"
+                          radius="lg"
+                          classNames={modalInputClassNames}
+                        />
+                        <Input
+                          label="Expiration"
+                          type="date"
+                          value={form.expirationDate}
+                          onValueChange={(value) => updateForm("expirationDate", value)}
+                          isDisabled={isSaving}
+                          variant="bordered"
+                          radius="lg"
+                          classNames={modalInputClassNames}
+                        />
+                      </div>
+
+                      <div className="mt-3 rounded-xl border border-stocksense-gray bg-gray-50/70 p-3">
+                        <input
+                          ref={imageInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            event.target.value = "";
+                            selectImageFile(file);
+                          }}
+                        />
+                        <input
+                          ref={cameraInputRef}
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            event.target.value = "";
+                            selectImageFile(file);
+                          }}
+                        />
+
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                            <FaImage className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+                            Item photo
+                          </div>
+                          {selectedImageFile && (
+                            <span className="rounded-full bg-[var(--stocksense-brand-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--stocksense-brand)]">
+                              Ready to upload
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                          <div className="h-28 w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:w-36">
+                            {selectedImagePreview || productPreview?.imageUrl ? (
+                              <img
+                                src={selectedImagePreview || productPreview.imageUrl}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="grid h-full w-full place-items-center text-xs text-gray-400">
+                                Optional photo
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex flex-1 flex-col gap-2">
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                size="sm"
+                                variant="flat"
+                                className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] sm:hidden"
+                                isDisabled={isSaving}
+                                onPress={() => cameraInputRef.current?.click()}
+                                startContent={<FaCamera className="h-3.5 w-3.5" />}
+                              >
+                                Take photo
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="flat"
+                                className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
+                                isDisabled={isSaving}
+                                onPress={() => imageInputRef.current?.click()}
+                                startContent={<FaUpload className="h-3.5 w-3.5" />}
+                              >
+                                {selectedImageFile ? "Choose different" : "Choose image"}
+                              </Button>
+                              {selectedImageFile && (
+                                <Button
+                                  size="sm"
+                                  variant="flat"
+                                  className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
+                                  isDisabled={isSaving}
+                                  onPress={clearSelectedImage}
+                                  startContent={<FaTrash className="h-3.5 w-3.5" />}
+                                >
+                                  Remove
+                                </Button>
+                              )}
+                            </div>
+                            <p className="text-xs leading-5 text-gray-500">
+                              {selectedImageFile
+                                ? selectedImageFile.name
+                                : productPreview?.imageUrl
+                                ? "Barcode lookup image will be used unless you choose your own."
+                                : "Take a photo or choose one from your camera roll. Max 5 MB."}
+                            </p>
+                            {imageMessage && (
+                              <p className="text-xs text-rose-700">{imageMessage}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </ModalBody>
 
-            <ModalFooter className={modalFooterClass}>
-              <Button variant="light" className="rounded-xl" onPress={handleClose} isDisabled={isSaving}>
-                Cancel
-              </Button>
-              <Button
-                variant="flat"
-                className="rounded-xl"
-                onPress={() => handleSubmit({ closeAfterAdd: true })}
-                isDisabled={isSaving || isLoading}
-              >
-                Add & close
-              </Button>
-              <Button
-                className="rounded-xl bg-[var(--stocksense-brand)] text-white"
-                onPress={() => handleSubmit()}
-                isDisabled={isSaving || isLoading}
-                startContent={isSaving ? <FaSpinner className="animate-spin" /> : <FaPlus />}
-              >
-                {isSaving ? "Adding..." : "Add another"}
-              </Button>
+            <ModalFooter
+              className="flex shrink-0 flex-col gap-2 border-t border-[var(--stocksense-brand-border)] bg-white sm:flex-row sm:items-center sm:justify-end"
+            >
+              <AnimatePresence initial={false}>
+                <AddItemMessage
+                  message={message}
+                  upgradeHref={upgradeHref}
+                  onLinkClick={handleClose}
+                  className="w-full sm:hidden"
+                />
+              </AnimatePresence>
+
+              <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:justify-end">
+                <Button variant="light" className="rounded-xl" onPress={handleClose} isDisabled={isSaving}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="flat"
+                  className="rounded-xl"
+                  onPress={() => handleSubmit({ closeAfterAdd: true })}
+                  isDisabled={isSaving || isLoading}
+                >
+                  Add & close
+                </Button>
+                <Button
+                  className="rounded-xl bg-[var(--stocksense-brand)] text-white"
+                  onPress={() => handleSubmit()}
+                  isDisabled={isSaving || isLoading}
+                  startContent={isSaving ? <FaSpinner className="animate-spin" /> : <FaPlus />}
+                >
+                  {isSaving ? "Adding..." : "Add another"}
+                </Button>
+              </div>
             </ModalFooter>
             </>
           )}
