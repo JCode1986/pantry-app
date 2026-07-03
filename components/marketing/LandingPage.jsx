@@ -441,28 +441,28 @@ function InventoryPreview() {
 
       <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_1.2fr]">
         <div className="space-y-2">
-          <div className="text-xs font-semibold uppercase text-gray-400">Locations</div>
+          <div className="text-xs font-semibold uppercase text-gray-600">Locations</div>
           <PreviewRow label="Home" value="104" />
           <PreviewRow label="Work" value="22" />
           <PreviewRow label="School" value="12" tone="muted" />
         </div>
 
         <div className="space-y-2">
-          <div className="text-xs font-semibold uppercase text-gray-400">Storage areas</div>
+          <div className="text-xs font-semibold uppercase text-gray-600">Storage areas</div>
           <PreviewRow label="Kitchen pantry" value="58" />
           <PreviewRow label="Garage shelf" value="34" />
           <PreviewRow label="Classroom cabinet" value="12" tone="muted" />
         </div>
 
         <div className="space-y-2">
-          <div className="text-xs font-semibold uppercase text-gray-400">Shopping list</div>
+          <div className="text-xs font-semibold uppercase text-gray-600">Shopping list</div>
           <PreviewRow label="Paper towels" value="Needed" />
           <PreviewRow label="Pasta sauce" value="Purchased" tone="success" />
           <PreviewRow label="Coffee filters" value="Qty 1" tone="warning" />
         </div>
 
         <div className="space-y-2">
-          <div className="text-xs font-semibold uppercase text-gray-400">Recent activity</div>
+          <div className="text-xs font-semibold uppercase text-gray-600">Recent activity</div>
           <ActivityLine action="Scanned" name="Olive oil" detail="Barcode match added to pantry" />
           <ActivityLine action="Moved" name="Rice" detail="Pantry to Bulk storage" />
           <ActivityLine action="Purchased" name="Paper towels" detail="Shopping list" />
@@ -575,7 +575,7 @@ function HierarchySection() {
         </div>
 
         <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+          <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-gray-600">
             Example paths
           </div>
           <div className="grid gap-2 lg:grid-cols-4">
@@ -622,7 +622,7 @@ export default function LandingPage() {
           alt=""
           fill
           priority
-          quality={82}
+          quality={60}
           sizes="100vw"
           className="object-cover object-center"
           aria-hidden="true"
