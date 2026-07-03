@@ -1,6 +1,6 @@
 "use server";
 
-import { getSession } from "@/lib/sessionOptions";
+import { getVerifiedSession } from "@/lib/verifiedSession";
 import { createClient } from "@/utils/supabase/server";
 import {
   BILLING_INTERVALS,
@@ -15,14 +15,13 @@ function billingError(message) {
 }
 
 async function getAuthedBillingContext() {
-  const session = await getSession();
-  const user = session?.user?.user;
+  const { user, error: sessionError } = await getVerifiedSession();
 
-  if (!session?.user?.access_token || !user?.id) {
+  if (sessionError || !user?.id) {
     return {
       user: null,
       billing: null,
-      error: "Your session has expired. Please log in again.",
+      error: sessionError || "Your session has expired. Please log in again.",
     };
   }
 

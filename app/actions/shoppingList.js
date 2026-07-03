@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSession } from "@/lib/sessionOptions";
+import { getVerifiedSession } from "@/lib/verifiedSession";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 import { toNonNegativeInteger } from "@/utils/pantry/date";
@@ -52,15 +52,14 @@ function serializeShoppingListItem(row) {
 }
 
 async function getAuthedHousehold() {
-  const session = await getSession();
-  const user = session?.user?.user;
+  const { user, error: sessionError } = await getVerifiedSession();
 
-  if (!session?.user?.access_token || !user?.id) {
+  if (sessionError || !user?.id) {
     return {
       user: null,
       household: null,
       member: null,
-      error: "Your session has expired. Please log in again.",
+      error: sessionError || "Your session has expired. Please log in again.",
     };
   }
 

@@ -1,6 +1,6 @@
 "use server";
 
-import { getSession } from "@/lib/sessionOptions";
+import { getVerifiedSession } from "@/lib/verifiedSession";
 import { createClient } from "@/utils/supabase/server";
 import {
   DEFAULT_PREFERENCES,
@@ -15,18 +15,20 @@ const APPEARANCE_UPGRADE_MESSAGE =
   "Appearance customization requires a Plus or Family plan.";
 
 async function createAuthedClient() {
-  const session = await getSession();
-  const accessToken = session?.user?.access_token;
-  const refreshToken = session?.user?.refresh_token;
-  const user = session?.user?.user;
+  const {
+    user,
+    accessToken,
+    refreshToken,
+    error: sessionError,
+  } = await getVerifiedSession();
   const userId = user?.id;
 
-  if (!accessToken || !refreshToken || !userId) {
+  if (sessionError || !accessToken || !refreshToken || !userId) {
     return {
       supabase: null,
       user: null,
       userId: null,
-      error: "Your session has expired. Please log in again.",
+      error: sessionError || "Your session has expired. Please log in again.",
     };
   }
 

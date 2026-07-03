@@ -2,7 +2,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { toNonNegativeInteger } from '@/utils/pantry/date';
-import { getSession } from '@/lib/sessionOptions';
+import { getVerifiedSession } from '@/lib/verifiedSession';
 import { createAdminClient } from '@/utils/supabase/admin';
 import {
   canEditHouseholdInventory,
@@ -255,8 +255,8 @@ async function recordItemMoveActivity({
 }
 
 async function getCurrentUser() {
-  const session = await getSession();
-  return session?.user?.user ?? null;
+  const { user } = await getVerifiedSession();
+  return user ?? null;
 }
 
 async function getCurrentHouseholdContext() {
