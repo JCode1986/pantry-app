@@ -78,7 +78,7 @@ export default function PricingSection({ showHeading = true }) {
                 )}
               </div>
 
-              <div className="mt-5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              <div className="mt-5 text-xs font-semibold uppercase tracking-wide text-gray-600">
                 Includes
               </div>
               <ul className="mt-2 space-y-2">

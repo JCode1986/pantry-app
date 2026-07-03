@@ -111,18 +111,26 @@ export default async function RootLayout({ children }) {
     }
   }
 
+  const pageContent = (
+    <>
+      {currentUser?.id && <Navigation canEditInventory={canEditInventory} />}
+      <div className="bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10">
+        {children}
+      </div>
+    </>
+  );
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: getPreferenceBootScript() }} />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Providers isAuthenticated={Boolean(currentUser?.id)}>
-          {currentUser?.id && <Navigation canEditInventory={canEditInventory} />}
-          <div className="bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10">
-            {children}
-          </div>
-        </Providers>
+        {currentUser?.id ? (
+          <Providers isAuthenticated>{pageContent}</Providers>
+        ) : (
+          pageContent
+        )}
       </body>
     </html>
   );
