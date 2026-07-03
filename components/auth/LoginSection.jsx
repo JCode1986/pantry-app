@@ -218,15 +218,28 @@ export default function LoginPage({ mode = 'login' }) {
 
   return (
     <>
-    <main className="page-enter min-h-[100vh] flex items-center justify-center px-4">
+    <main className="page-enter relative flex min-h-[100vh] items-center justify-center overflow-hidden px-4 py-10">
+      <Image
+        src="/wherekeep-hero.jpg"
+        alt=""
+        fill
+        priority
+        quality={78}
+        sizes="100vw"
+        className="object-cover object-center"
+        aria-hidden="true"
+      />
+      <div className="absolute inset-0 bg-white/78" />
+      <div className="absolute inset-0 bg-gradient-to-br from-white via-[var(--stocksense-brand-soft)]/80 to-white/55" />
+      <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-white/30" />
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
-        className="w-full max-w-[540px]"
+        className="relative z-10 w-full max-w-[540px]"
       >
         {/* Card */}
-        <div className="rounded-2xl border border-stocksense-gray bg-white shadow-lg overflow-hidden">
+        <div className="overflow-hidden rounded-2xl border border-white/80 bg-white shadow-2xl shadow-slate-900/10">
           {/* Header */}
           <div className="px-6 sm:px-8 pt-6 pb-4 bg-gradient-to-r from-stocksense-teal to-stocksense-sky">
             <div className="flex items-center gap-3">

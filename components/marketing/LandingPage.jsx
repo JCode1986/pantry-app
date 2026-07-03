@@ -23,6 +23,7 @@ import {
   FaUserCheck,
 } from 'react-icons/fa';
 import PricingSection from '@/components/marketing/PricingSection';
+import ComparePlansButton from '@/components/marketing/ComparePlansButton';
 import SiteFooter from '@/components/app-shell/SiteFooter';
 import WhereKeepLogo from '@/components/ui/WhereKeepLogo';
 
@@ -346,12 +347,11 @@ function PrimaryCta({ className = '' }) {
 
 function SecondaryCta({ className = '' }) {
   return (
-    <Link
-      href="#pricing"
+    <ComparePlansButton
       className={`inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 ${className}`}
     >
       Compare plans
-    </Link>
+    </ComparePlansButton>
   );
 }
 
@@ -636,7 +636,7 @@ export default function LandingPage() {
               <WhereKeepLogo className="drop-shadow-sm" markClassName="h-14 max-w-[245px]" />
             </Link>
 
-            <div className="flex items-center gap-2">
+            <div className="hidden items-center gap-2 sm:flex">
               <Link
                 href="/login"
                 className="rounded-xl px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"

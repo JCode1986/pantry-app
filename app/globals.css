@@ -55,6 +55,10 @@ body {
   color-scheme: light;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 :where(
   input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
   textarea,
@@ -369,6 +373,10 @@ input[type="radio"] {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   .page-enter,
   .content-enter,
   .content-stagger > *,

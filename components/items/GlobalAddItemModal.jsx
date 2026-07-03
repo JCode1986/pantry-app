@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -75,6 +75,37 @@ const emptyItemFields = {
   expirationDate: "",
 };
 
+const emptyValidationErrors = {
+  locationName: "",
+  storageAreaName: "",
+  categoryName: "",
+  itemName: "",
+};
+
+const invalidInputWrapperClass =
+  "data-[invalid=true]:border-rose-500 data-[invalid=true]:bg-rose-50/40 focus-within:data-[invalid=true]:border-rose-500";
+
+const invalidSelectTriggerClass =
+  "data-[invalid=true]:border-rose-500 data-[invalid=true]:bg-rose-50/40 data-[invalid=true]:text-rose-700";
+
+function getModalInputClassNames(isInvalid = false) {
+  return {
+    ...modalInputClassNames,
+    inputWrapper: `${modalInputClassNames.inputWrapper} ${
+      isInvalid ? invalidInputWrapperClass : ""
+    }`,
+  };
+}
+
+function getThemedSelectClassNames(isInvalid = false) {
+  return {
+    ...themedSelectClassNames,
+    trigger: `${themedSelectClassNames.trigger} ${
+      isInvalid ? invalidSelectTriggerClass : ""
+    }`,
+  };
+}
+
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const IMAGE_TYPES = new Set([
   "image/jpeg",
@@ -137,12 +168,18 @@ function NewPathField({
   onValueChange,
   placeholder,
   isDisabled,
+  isInvalid = false,
+  errorMessage = "",
 }) {
   return (
     <motion.div
       layout
       {...revealMotion}
-      className="overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3 shadow-sm"
+      className={`overflow-hidden rounded-xl border p-3 shadow-sm ${
+        isInvalid
+          ? "border-rose-200 bg-rose-50/60"
+          : "border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]"
+      }`}
     >
       <div className="mb-2 flex items-center gap-2">
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--stocksense-brand)] text-white">
@@ -156,12 +193,16 @@ function NewPathField({
         onValueChange={onValueChange}
         placeholder={placeholder}
         isDisabled={isDisabled}
+        isInvalid={isInvalid}
+        errorMessage={errorMessage}
         variant="bordered"
         radius="lg"
         classNames={{
-          ...modalInputClassNames,
+          ...getModalInputClassNames(isInvalid),
           inputWrapper:
-            "border-[var(--stocksense-brand-border)] bg-white shadow-none focus-within:border-[var(--stocksense-brand)]",
+            `border-[var(--stocksense-brand-border)] bg-white shadow-none focus-within:border-[var(--stocksense-brand)] ${
+              isInvalid ? invalidInputWrapperClass : ""
+            }`,
         }}
       />
     </motion.div>
@@ -217,6 +258,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   const [storageAreaId, setStorageAreaId] = useState(NEW_VALUE);
   const [categoryId, setCategoryId] = useState(NEW_VALUE);
   const [form, setForm] = useState(emptyForm);
+  const [validationErrors, setValidationErrors] = useState(emptyValidationErrors);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -242,6 +284,36 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   );
 
   const categories = selectedStorageArea?.categories ?? EMPTY_LIST;
+  const hasExistingLocations = locations.length > 0;
+  const hasExistingStorageAreas = storageAreas.length > 0;
+  const hasExistingCategories = categories.length > 0;
+  const validationMessage =
+    "Choose or create a location, storage area, and category before adding the item.";
+
+  const getValidationErrors = useCallback(
+    ({
+      nextLocationId = locationId,
+      nextStorageAreaId = storageAreaId,
+      nextCategoryId = categoryId,
+      nextForm = form,
+    } = {}) => ({
+      ...emptyValidationErrors,
+      locationName:
+        nextLocationId === NEW_VALUE && !nextForm.locationName.trim()
+          ? "Location is required."
+          : "",
+      storageAreaName:
+        nextStorageAreaId === NEW_VALUE && !nextForm.storageAreaName.trim()
+          ? "Storage area is required."
+          : "",
+      categoryName:
+        nextCategoryId === NEW_VALUE && !nextForm.categoryName.trim()
+          ? "Category is required."
+          : "",
+      itemName: !nextForm.itemName.trim() ? "Item name is required." : "",
+    }),
+    [categoryId, form, locationId, storageAreaId]
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -252,6 +324,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
       setIsLoading(true);
       setMessage("");
       setUpgradeHref("");
+      setValidationErrors(emptyValidationErrors);
 
       const result = await getInventoryHierarchy();
       if (cancelled) return;
@@ -290,6 +363,28 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
     };
   }, [selectedImagePreview]);
 
+  useEffect(() => {
+    const hasVisibleValidationErrors = Object.values(validationErrors).some(Boolean);
+    const nextValidationErrors = getValidationErrors();
+    const hasCurrentValidationErrors = Object.values(nextValidationErrors).some(Boolean);
+    const hasCurrentDestinationErrors = Boolean(
+      nextValidationErrors.locationName ||
+        nextValidationErrors.storageAreaName ||
+        nextValidationErrors.categoryName
+    );
+
+    if (hasVisibleValidationErrors && !hasCurrentValidationErrors) {
+      setValidationErrors(emptyValidationErrors);
+    }
+
+    if (
+      (message === validationMessage && !hasCurrentDestinationErrors) ||
+      (message === "Complete the highlighted required fields." && !hasCurrentValidationErrors)
+    ) {
+      setMessage("");
+    }
+  }, [getValidationErrors, message, validationErrors, validationMessage]);
+
   const clearSelectedImage = () => {
     setSelectedImageFile(null);
     setSelectedImagePreview((current) => {
@@ -318,6 +413,9 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
 
   const updateForm = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+    if (validationErrors[key] && String(value).trim()) {
+      setValidationErrors((prev) => ({ ...prev, [key]: "" }));
+    }
   };
 
   const updateBarcode = (value) => {
@@ -388,6 +486,12 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
     setLocationId(nextLocationId);
     setStorageAreaId(nextStorageArea?.id ?? NEW_VALUE);
     setCategoryId(nextCategory?.id ?? NEW_VALUE);
+    setValidationErrors((prev) => ({
+      ...prev,
+      locationName: "",
+      storageAreaName: "",
+      categoryName: "",
+    }));
   };
 
   const selectStorageArea = (value) => {
@@ -397,12 +501,18 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
 
     setStorageAreaId(nextStorageAreaId);
     setCategoryId(nextCategory?.id ?? NEW_VALUE);
+    setValidationErrors((prev) => ({
+      ...prev,
+      storageAreaName: "",
+      categoryName: "",
+    }));
   };
 
   const handleClose = () => {
     if (isSaving) return;
     setForm(emptyForm);
     setMessage("");
+    setValidationErrors(emptyValidationErrors);
     setUpgradeHref("");
     setBarcodeMessage("");
     setProductPreview(null);
@@ -415,23 +525,22 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   const handleSubmit = async ({ closeAfterAdd = false } = {}) => {
     setMessage("");
 
-    if (!form.itemName.trim()) {
-      setMessage("Item name is required.");
-      return;
-    }
+    const nextValidationErrors = getValidationErrors();
 
-    if (locationId === NEW_VALUE && !form.locationName.trim()) {
-      setMessage("Location is required.");
-      return;
-    }
+    const missingDestination =
+      nextValidationErrors.locationName ||
+      nextValidationErrors.storageAreaName ||
+      nextValidationErrors.categoryName;
+    const hasValidationErrors = Object.values(nextValidationErrors).some(Boolean);
 
-    if (storageAreaId === NEW_VALUE && !form.storageAreaName.trim()) {
-      setMessage("Storage area is required.");
-      return;
-    }
+    setValidationErrors(nextValidationErrors);
 
-    if (categoryId === NEW_VALUE && !form.categoryName.trim()) {
-      setMessage("Category is required.");
+    if (hasValidationErrors) {
+      setMessage(
+        missingDestination
+          ? validationMessage
+          : "Complete the highlighted required fields."
+      );
       return;
     }
 
@@ -681,25 +790,30 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
 
                       <motion.div layout className="grid grid-cols-1 gap-3 md:grid-cols-3">
                       <motion.div layout className="space-y-2">
-                        <Select
-                          label="Location"
-                          selectedKeys={new Set([String(locationId)])}
-                          onSelectionChange={(keys) => {
-                            const value = Array.from(keys)[0];
-                            if (value) selectLocation(value);
-                          }}
-                          isDisabled={isSaving}
-                          variant="bordered"
-                          radius="lg"
-                          classNames={themedSelectClassNames}
-                        >
-                          {locations.map((location) => (
-                            <SelectItem key={String(location.id)}>
-                              {location.name}
-                            </SelectItem>
-                          ))}
-                          <SelectItem key={NEW_VALUE}>+ New location</SelectItem>
-                        </Select>
+                        {hasExistingLocations && (
+                          <Select
+                            label="Location"
+                            selectedKeys={new Set([String(locationId)])}
+                            onSelectionChange={(keys) => {
+                              const value = Array.from(keys)[0];
+                              if (value) selectLocation(value);
+                            }}
+                            isDisabled={isSaving}
+                            isInvalid={Boolean(validationErrors.locationName)}
+                            variant="bordered"
+                            radius="lg"
+                            classNames={getThemedSelectClassNames(
+                              Boolean(validationErrors.locationName)
+                            )}
+                          >
+                            {locations.map((location) => (
+                              <SelectItem key={String(location.id)}>
+                                {location.name}
+                              </SelectItem>
+                            ))}
+                            <SelectItem key={NEW_VALUE}>+ New location</SelectItem>
+                          </Select>
+                        )}
                         <AnimatePresence initial={false}>
                           {locationId === NEW_VALUE && (
                             <NewPathField
@@ -710,31 +824,38 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                               onValueChange={(value) => updateForm("locationName", value)}
                               placeholder="e.g., Home"
                               isDisabled={isSaving}
+                              isInvalid={Boolean(validationErrors.locationName)}
+                              errorMessage={validationErrors.locationName}
                             />
                           )}
                         </AnimatePresence>
                       </motion.div>
 
                       <motion.div layout className="space-y-2">
-                        <Select
-                          label="Storage area"
-                          selectedKeys={new Set([String(storageAreaId)])}
-                          onSelectionChange={(keys) => {
-                            const value = Array.from(keys)[0];
-                            if (value) selectStorageArea(value);
-                          }}
-                          isDisabled={isSaving || locationId === NEW_VALUE}
-                          variant="bordered"
-                          radius="lg"
-                          classNames={themedSelectClassNames}
-                        >
-                          {storageAreas.map((area) => (
-                            <SelectItem key={String(area.id)}>
-                              {area.name}
-                            </SelectItem>
-                          ))}
-                          <SelectItem key={NEW_VALUE}>+ New storage area</SelectItem>
-                        </Select>
+                        {hasExistingStorageAreas && (
+                          <Select
+                            label="Storage area"
+                            selectedKeys={new Set([String(storageAreaId)])}
+                            onSelectionChange={(keys) => {
+                              const value = Array.from(keys)[0];
+                              if (value) selectStorageArea(value);
+                            }}
+                            isDisabled={isSaving || locationId === NEW_VALUE}
+                            isInvalid={Boolean(validationErrors.storageAreaName)}
+                            variant="bordered"
+                            radius="lg"
+                            classNames={getThemedSelectClassNames(
+                              Boolean(validationErrors.storageAreaName)
+                            )}
+                          >
+                            {storageAreas.map((area) => (
+                              <SelectItem key={String(area.id)}>
+                                {area.name}
+                              </SelectItem>
+                            ))}
+                            <SelectItem key={NEW_VALUE}>+ New storage area</SelectItem>
+                          </Select>
+                        )}
                         <AnimatePresence initial={false}>
                           {storageAreaId === NEW_VALUE && (
                             <NewPathField
@@ -745,31 +866,44 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                               onValueChange={(value) => updateForm("storageAreaName", value)}
                               placeholder="e.g., Kitchen pantry"
                               isDisabled={isSaving}
+                              isInvalid={Boolean(validationErrors.storageAreaName)}
+                              errorMessage={validationErrors.storageAreaName}
                             />
                           )}
                         </AnimatePresence>
                       </motion.div>
 
                       <motion.div layout className="space-y-2">
-                        <Select
-                          label="Category"
-                          selectedKeys={new Set([String(categoryId)])}
-                          onSelectionChange={(keys) => {
-                            const value = Array.from(keys)[0];
-                            if (value) setCategoryId(String(value));
-                          }}
-                          isDisabled={isSaving || storageAreaId === NEW_VALUE}
-                          variant="bordered"
-                          radius="lg"
-                          classNames={themedSelectClassNames}
-                        >
-                          {categories.map((category) => (
-                            <SelectItem key={String(category.id)}>
-                              {category.name}
-                            </SelectItem>
-                          ))}
-                          <SelectItem key={NEW_VALUE}>+ New category</SelectItem>
-                        </Select>
+                        {hasExistingCategories && (
+                          <Select
+                            label="Category"
+                            selectedKeys={new Set([String(categoryId)])}
+                            onSelectionChange={(keys) => {
+                              const value = Array.from(keys)[0];
+                              if (value) {
+                                setCategoryId(String(value));
+                                setValidationErrors((prev) => ({
+                                  ...prev,
+                                  categoryName: "",
+                                }));
+                              }
+                            }}
+                            isDisabled={isSaving || storageAreaId === NEW_VALUE}
+                            isInvalid={Boolean(validationErrors.categoryName)}
+                            variant="bordered"
+                            radius="lg"
+                            classNames={getThemedSelectClassNames(
+                              Boolean(validationErrors.categoryName)
+                            )}
+                          >
+                            {categories.map((category) => (
+                              <SelectItem key={String(category.id)}>
+                                {category.name}
+                              </SelectItem>
+                            ))}
+                            <SelectItem key={NEW_VALUE}>+ New category</SelectItem>
+                          </Select>
+                        )}
                         <AnimatePresence initial={false}>
                           {categoryId === NEW_VALUE && (
                             <NewPathField
@@ -780,6 +914,8 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                               onValueChange={(value) => updateForm("categoryName", value)}
                               placeholder="e.g., Snacks or Shelf 1"
                               isDisabled={isSaving}
+                              isInvalid={Boolean(validationErrors.categoryName)}
+                              errorMessage={validationErrors.categoryName}
                             />
                           )}
                         </AnimatePresence>
@@ -790,16 +926,16 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                     <div className="overflow-hidden rounded-2xl border border-stocksense-gray bg-white p-3 shadow-sm">
                       <div className="mb-3">
                         <div className="text-sm font-semibold text-gray-900">
-                          Barcode
+                          Barcode (optional)
                         </div>
                         <div className="text-xs text-gray-500">
-                          Scan with the camera, choose a photo, or enter a code.
+                          Skip this, or scan/enter a code to fill product details faster.
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_190px]">
                         <Input
-                          label="Barcode"
+                          label="Barcode (optional)"
                           value={form.barcode}
                           onValueChange={updateBarcode}
                           placeholder="e.g., 012345678905"
@@ -889,9 +1025,13 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                           onValueChange={(value) => updateForm("itemName", value)}
                           placeholder="e.g., Rice"
                           isDisabled={isSaving}
+                          isInvalid={Boolean(validationErrors.itemName)}
+                          errorMessage={validationErrors.itemName}
                           variant="bordered"
                           radius="lg"
-                          classNames={modalInputClassNames}
+                          classNames={getModalInputClassNames(
+                            Boolean(validationErrors.itemName)
+                          )}
                         />
                         <Input
                           label="Quantity"
