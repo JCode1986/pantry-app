@@ -117,7 +117,7 @@ export default async function RootLayout({ children }) {
         <script dangerouslySetInnerHTML={{ __html: getPreferenceBootScript() }} />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Providers>
+        <Providers isAuthenticated={Boolean(currentUser?.id)}>
           {currentUser?.id && <Navigation canEditInventory={canEditInventory} />}
           <div className="bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10">
             {children}
