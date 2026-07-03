@@ -1,11 +1,25 @@
 import { NextResponse } from "next/server";
 import { getSession } from "./lib/sessionOptions";
+import { updateSession } from "./utils/supabase/middleware";
+
+function copyCookies(source, target) {
+  source.cookies.getAll().forEach((cookie) => {
+    const { name, value, ...options } = cookie;
+    target.cookies.set(name, value, options);
+  });
+  return target;
+}
+
+function redirectWithCookies(url, sourceResponse) {
+  return copyCookies(sourceResponse, NextResponse.redirect(url));
+}
 
 export async function middleware(req) {
+  const { response: supabaseResponse, user } = await updateSession(req);
   const session = await getSession();
-  const token = session?.user?.access_token;
   const requiresPasswordSetup = Boolean(
-    session?.user?.user?.user_metadata?.requires_password_setup
+    user?.user_metadata?.requires_password_setup ||
+      session?.user?.user?.user_metadata?.requires_password_setup
   );
 
   const { pathname } = req.nextUrl;
@@ -30,30 +44,38 @@ export async function middleware(req) {
     (root) => pathname === root || pathname.startsWith(root + "/")
   );
 
-  // If no token and protected route, redirect to login.
-  if (!token && isProtected && !isAuthPage) {
+  // If Supabase has no active user for a protected route, send them through login.
+  if (!user && isProtected && !isAuthPage) {
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set(
       "redirectTo",
       `${pathname}${req.nextUrl.search}`
     );
-    return NextResponse.redirect(loginUrl);
+    const redirect = redirectWithCookies(loginUrl, supabaseResponse);
+    redirect.cookies.delete("pantry_session");
+    return redirect;
   }
 
   if (
-    token &&
+    user &&
     requiresPasswordSetup &&
     !isProfilePage &&
     !isInvitePage &&
     !isMagicLinkSyncPage
   ) {
-    return NextResponse.redirect(new URL("/profile?setup=password", req.url));
+    return redirectWithCookies(
+      new URL("/profile?setup=password", req.url),
+      supabaseResponse
+    );
   }
 
-  // Optional: if token exists and user hits an auth page, send them home
-  if (isAuthPage && token) {
+  // If an active Supabase user hits an auth page, send them home.
+  if (isAuthPage && user) {
     if (requiresPasswordSetup) {
-      return NextResponse.redirect(new URL("/profile?setup=password", req.url));
+      return redirectWithCookies(
+        new URL("/profile?setup=password", req.url),
+        supabaseResponse
+      );
     }
 
     const redirectTo = req.nextUrl.searchParams.get("redirectTo");
@@ -62,10 +84,10 @@ export async function middleware(req) {
         ? redirectTo
         : "/";
 
-    return NextResponse.redirect(new URL(safeRedirect, req.url));
+    return redirectWithCookies(new URL(safeRedirect, req.url), supabaseResponse);
   }
 
-  return NextResponse.next();
+  return supabaseResponse;
 }
 
 export const config = {
