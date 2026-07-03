@@ -617,16 +617,15 @@ export default function LandingPage() {
   return (
     <main className="min-h-[100vh] bg-white text-gray-900">
       <section className="relative overflow-hidden bg-gradient-to-br from-white via-emerald-50 to-sky-50">
-        <Image
-          src="/wherekeep-hero.jpg"
-          alt=""
-          fill
-          priority
-          quality={60}
-          sizes="100vw"
-          className="object-cover object-center"
-          aria-hidden="true"
-        />
+        <picture aria-hidden="true">
+          <source media="(max-width: 767px)" srcSet="/wherekeep-hero-mobile.jpg" />
+          <img
+            src="/wherekeep-hero.jpg"
+            alt=""
+            fetchPriority="high"
+            className="absolute inset-0 h-full w-full object-cover object-center"
+          />
+        </picture>
         <div className="absolute inset-0 bg-gradient-to-r from-white via-white/88 to-white/20" />
         <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-white/45" />
 
