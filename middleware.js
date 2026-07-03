@@ -17,6 +17,7 @@ function redirectWithCookies(url, sourceResponse) {
 export async function middleware(req) {
   const { response: supabaseResponse, user } = await updateSession(req);
   const session = await getSession();
+  const hasAppSession = Boolean(session?.user?.access_token);
   const requiresPasswordSetup = Boolean(
     user?.user_metadata?.requires_password_setup ||
       session?.user?.user?.user_metadata?.requires_password_setup
@@ -69,8 +70,9 @@ export async function middleware(req) {
     );
   }
 
-  // If an active Supabase user hits an auth page, send them home.
-  if (isAuthPage && user) {
+  // If both auth layers agree the user is signed in, keep auth pages out of the way.
+  // If Iron Session is missing, allow /login so the app session can be repaired.
+  if (isAuthPage && user && hasAppSession) {
     if (requiresPasswordSetup) {
       return redirectWithCookies(
         new URL("/profile?setup=password", req.url),

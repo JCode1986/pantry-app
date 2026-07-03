@@ -636,14 +636,14 @@ export default function LandingPage() {
               <WhereKeepLogo className="drop-shadow-sm" markClassName="h-14 max-w-[245px]" />
             </Link>
 
-            <div className="hidden items-center gap-2 sm:flex">
+            <div className="flex items-center gap-2">
               <Link
                 href="/login"
                 className="rounded-xl px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
               >
                 Log in
               </Link>
-              <PrimaryCta className="px-4 py-2" />
+              <PrimaryCta className="hidden px-4 py-2 sm:inline-flex" />
             </div>
           </nav>
 
