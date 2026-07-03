@@ -39,13 +39,15 @@ export async function login({ email, password, redirectTo = "/" }) {
 }
 
 export async function logoutAction() {
+  const { createClient } = await import('@/utils/supabase/server');
+  const supa = await createClient();
   const session = await getSession();
 
   // Destroy Iron Session
   session.destroy();
 
   // Log out Supabase cookie session
-  const { error } = await supabase.auth.signOut();
+  const { error } = await supa.auth.signOut();
   if (error) {
     console.error("Error signing out Supabase:", error);
   }
@@ -181,7 +183,9 @@ export async function refreshTokenIfNeeded() {
     // Best effort: clear Iron Session + Supabase
     session.destroy();
     try {
-      await supabase.auth.signOut();
+      const { createClient } = await import('@/utils/supabase/server');
+      const supa = await createClient();
+      await supa.auth.signOut();
     } catch (e) {
       console.warn("Error on supabase.signOut after refresh fail", e);
     }

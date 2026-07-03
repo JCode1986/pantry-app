@@ -240,9 +240,17 @@ async function getExpirationNotifications(supabase, withinDays = 3) {
 
 export default async function HomePage() {
   const session = await getSessionForLayout();
-  const token = session?.user?.access_token;
+  const supabase = await createClient();
+  let currentUser = session?.user?.user ?? null;
 
-  if (!token) {
+  if (!currentUser?.id) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    currentUser = user ?? null;
+  }
+
+  if (!currentUser?.id) {
     return (
       <>
         <LandingStructuredData />
@@ -251,7 +259,7 @@ export default async function HomePage() {
     );
   }
 
-  if (session?.user?.user?.user_metadata?.requires_password_setup) {
+  if (currentUser?.user_metadata?.requires_password_setup) {
     redirect('/profile?setup=password');
   }
 
@@ -268,8 +276,6 @@ export default async function HomePage() {
     import('@/components/dashboard/ExpirationNotifications'),
     import('@/app/actions/activity'),
   ]);
-
-  const supabase = await createClient();
 
   const getCount = async (table) => {
     const { count } = await supabase.from(table).select('*', { count: 'exact', head: true });

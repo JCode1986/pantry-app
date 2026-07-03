@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
-import { getSession } from "@/lib/sessionOptions";
+import { getVerifiedSession } from "@/lib/verifiedSession";
 import { createAdminClient } from "@/utils/supabase/admin";
 import {
   getHouseholdBilling,
@@ -322,11 +322,10 @@ async function enrichMovedActivityItems(supabase, items) {
 }
 
 async function getAuthedUser() {
-  const session = await getSession();
-  const user = session?.user?.user;
+  const { user, error } = await getVerifiedSession();
 
-  if (!session?.user?.access_token || !user?.id) {
-    return { user: null, error: "Your session has expired. Please log in again." };
+  if (error || !user?.id) {
+    return { user: null, error: error || "Your session has expired. Please log in again." };
   }
 
   return { user, error: null };

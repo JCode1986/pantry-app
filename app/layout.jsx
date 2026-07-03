@@ -9,6 +9,7 @@ import {
   canEditHouseholdInventory,
   getHouseholdForUser,
 } from "@/utils/households";
+import { createClient } from "@/utils/supabase/server";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -82,14 +83,26 @@ export const viewport = {
 
 export default async function RootLayout({ children }) {
   const session = await getSessionForLayout(); // ✅ read-only
-  const token = session?.user?.access_token;
+  let currentUser = session?.user?.user ?? null;
   let canEditInventory = true;
 
-  if (token && session?.user?.user?.id) {
+  if (!currentUser?.id) {
+    try {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      currentUser = user ?? null;
+    } catch (err) {
+      console.error("Navigation Supabase user error:", err);
+    }
+  }
+
+  if (currentUser?.id) {
     try {
       const { member } = await getHouseholdForUser({
-        userId: session.user.user.id,
-        email: session.user.user.email,
+        userId: currentUser.id,
+        email: currentUser.email,
         createIfMissing: true,
       });
       canEditInventory = canEditHouseholdInventory(member);
@@ -104,8 +117,8 @@ export default async function RootLayout({ children }) {
         <script dangerouslySetInnerHTML={{ __html: getPreferenceBootScript() }} />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Providers>
-          {token && <Navigation canEditInventory={canEditInventory} />}
+        <Providers isAuthenticated={Boolean(currentUser?.id)}>
+          {currentUser?.id && <Navigation canEditInventory={canEditInventory} />}
           <div className="bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10">
             {children}
           </div>
