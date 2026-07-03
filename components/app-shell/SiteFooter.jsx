@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import WhereKeepLogo from "@/components/ui/WhereKeepLogo";
+import { scrollToPricingSection } from "@/components/marketing/ComparePlansButton";
 
 const primaryLinks = [
   { href: "/", label: "Product" },
@@ -16,6 +18,8 @@ const legalLinks = [
 ];
 
 export default function SiteFooter({ compact = false, className = "" }) {
+  const pathname = usePathname();
+
   return (
     <footer
       className={`border-t border-[var(--stocksense-brand-border)] bg-white ${className}`}
@@ -43,15 +47,30 @@ export default function SiteFooter({ compact = false, className = "" }) {
                 WhereKeep
               </div>
               <div className="mt-3 grid gap-2">
-                {primaryLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="text-gray-600 transition hover:text-[var(--stocksense-brand)]"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
+                {primaryLinks.map((link) => {
+                  if (link.href === "/#pricing" && pathname === "/") {
+                    return (
+                      <button
+                        key={link.href}
+                        type="button"
+                        onClick={scrollToPricingSection}
+                        className="text-left text-gray-600 transition hover:text-[var(--stocksense-brand)]"
+                      >
+                        {link.label}
+                      </button>
+                    );
+                  }
+
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className="text-gray-600 transition hover:text-[var(--stocksense-brand)]"
+                    >
+                      {link.label}
+                    </Link>
+                  );
+                })}
               </div>
             </div>
 
