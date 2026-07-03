@@ -1,6 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { getSession } from "@/lib/sessionOptions";
@@ -17,18 +16,10 @@ import {
   normalizeHouseholdRole,
   normalizeInviteEmail,
 } from "@/utils/households";
+import { getCanonicalAppUrl } from "@/utils/urlSecurity";
 
 function actionError(message) {
   return { data: null, error: message };
-}
-
-async function getAppUrl() {
-  const headersList = await headers();
-  return (
-    process.env.NEXT_PUBLIC_APP_URL ||
-    headersList.get("origin") ||
-    "http://localhost:3000"
-  );
 }
 
 async function getAuthedUser() {
@@ -168,7 +159,7 @@ export async function getHouseholdSharingAction() {
 
   try {
     const admin = createAdminClient();
-    const appUrl = await getAppUrl();
+    const appUrl = getCanonicalAppUrl();
     const { household, member } = context;
     const [{ data: members, error: membersError }, { data: invites, error: invitesError }] =
       await Promise.all([
@@ -286,7 +277,7 @@ export async function createHouseholdInviteAction(email, role = HOUSEHOLD_ROLES.
     if (inviteError) throw inviteError;
 
     revalidatePath("/profile");
-    const appUrl = await getAppUrl();
+    const appUrl = getCanonicalAppUrl();
     const emailResult = await sendInviteEmail({
       admin,
       email: normalizedEmail,

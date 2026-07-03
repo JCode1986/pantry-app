@@ -615,13 +615,14 @@ function ComparisonRow({ row }) {
 
 export default function LandingPage() {
   return (
-    <main className="page-enter min-h-[100vh] bg-white text-gray-900">
-      <section className="relative overflow-hidden">
+    <main className="min-h-[100vh] bg-white text-gray-900">
+      <section className="relative overflow-hidden bg-gradient-to-br from-white via-emerald-50 to-sky-50">
         <Image
           src="/wherekeep-hero.jpg"
           alt=""
           fill
           priority
+          quality={82}
           sizes="100vw"
           className="object-cover object-center"
           aria-hidden="true"

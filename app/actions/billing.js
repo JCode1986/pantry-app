@@ -1,6 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
 import { getSession } from "@/lib/sessionOptions";
 import { createClient } from "@/utils/supabase/server";
 import {
@@ -9,6 +8,7 @@ import {
   getStripePriceId,
 } from "@/utils/billingPlans";
 import { getStripe } from "@/utils/stripe";
+import { getCanonicalAppUrl } from "@/utils/urlSecurity";
 
 function billingError(message) {
   return { url: null, error: message };
@@ -42,36 +42,6 @@ async function getAuthedBillingContext() {
   }
 
   return { user, billing, error: null };
-}
-
-async function getAppUrl() {
-  const headersList = await headers();
-  const origin = headersList.get("origin");
-  const forwardedHost = headersList.get("x-forwarded-host");
-  const host = forwardedHost || headersList.get("host");
-  const forwardedProto = headersList.get("x-forwarded-proto") || "https";
-  const requestUrl = host ? `${forwardedProto}://${host}` : null;
-  const candidates = [
-    origin,
-    requestUrl,
-    process.env.NEXT_PUBLIC_APP_URL,
-    "http://localhost:3000",
-  ];
-
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-
-    try {
-      const url = new URL(candidate);
-      if (url.protocol === "http:" || url.protocol === "https:") {
-        return url.origin;
-      }
-    } catch {
-      // Ignore malformed deployment env/header values and keep falling back.
-    }
-  }
-
-  return "http://localhost:3000";
 }
 
 export async function getUserBillingAction() {
@@ -130,7 +100,7 @@ export async function createCheckoutSessionAction({
 
   try {
     const stripe = getStripe();
-    const appUrl = await getAppUrl();
+    const appUrl = getCanonicalAppUrl();
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: billing?.stripe_customer_id || undefined,
@@ -168,7 +138,7 @@ export async function createBillingPortalSessionAction() {
 
   try {
     const stripe = getStripe();
-    const appUrl = await getAppUrl();
+    const appUrl = getCanonicalAppUrl();
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: billing.stripe_customer_id,
       return_url: `${appUrl}/profile`,
