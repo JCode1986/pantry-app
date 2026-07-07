@@ -15,6 +15,7 @@ import {
 import { FaEdit } from "react-icons/fa";
 import { updateShoppingListItemAction } from "@/app/actions/shoppingList";
 import { toNonNegativeInteger } from "@/utils/pantry/date";
+import EntityImageManager from "@/components/inventory/EntityImageManager";
 import {
   modalBodyClass,
   modalContentClass,
@@ -117,6 +118,16 @@ export default function EditShoppingListItemModal({
     onClose?.();
   };
 
+  const handleImageChange = ({ imagePath, imageUrl }) => {
+    if (!item) return;
+    onUpdated?.({
+      ...item,
+      image_path: imagePath ?? null,
+      imagePath: imagePath ?? null,
+      imageUrl: imageUrl ?? null,
+    });
+  };
+
   return (
     <Modal
       isOpen={isOpen}
@@ -185,6 +196,15 @@ export default function EditShoppingListItemModal({
                   ))}
                 </Select>
               </div>
+
+              <EntityImageManager
+                entityType="shopping_list_item"
+                entityId={item?.id}
+                imageUrl={item?.imageUrl}
+                label="Shopping list photo"
+                onChange={handleImageChange}
+              />
+
               {onDelete && item ? (
                 <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
                   <p className="text-sm font-semibold text-gray-950">Danger zone</p>

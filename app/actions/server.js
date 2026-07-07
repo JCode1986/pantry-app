@@ -726,6 +726,16 @@ async function getImageEntityRecord(admin, entityType, entityId) {
     return { data, error };
   }
 
+  if (entityType === INVENTORY_IMAGE_ENTITY.SHOPPING_LIST_ITEM) {
+    const { data, error } = await admin
+      .from('shopping_list_items')
+      .select('id, household_id, image_path')
+      .eq('id', entityId)
+      .maybeSingle();
+
+    return { data, error };
+  }
+
   return { data: null, error: new Error('Unsupported image entity type') };
 }
 
@@ -821,6 +831,7 @@ function imageEntityTable(entityType) {
   if (entityType === INVENTORY_IMAGE_ENTITY.STORAGE_AREA) return 'storage_areas';
   if (entityType === INVENTORY_IMAGE_ENTITY.CATEGORY) return 'storage_categories';
   if (entityType === INVENTORY_IMAGE_ENTITY.ITEM) return 'items';
+  if (entityType === INVENTORY_IMAGE_ENTITY.SHOPPING_LIST_ITEM) return 'shopping_list_items';
   return null;
 }
 

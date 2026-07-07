@@ -7,6 +7,7 @@ export const INVENTORY_IMAGE_ENTITY = {
   STORAGE_AREA: "storage_area",
   CATEGORY: "category",
   ITEM: "item",
+  SHOPPING_LIST_ITEM: "shopping_list_item",
 };
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;

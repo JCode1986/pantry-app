@@ -210,19 +210,19 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
       size="2xl"
       scrollBehavior="inside"
       classNames={{
-        wrapper: "max-md:items-stretch max-md:justify-stretch max-md:p-0",
-        base: "max-md:m-0 max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:w-screen max-md:max-w-none max-md:rounded-none",
+        wrapper: "max-md:items-stretch max-md:justify-stretch max-md:overflow-hidden max-md:p-0",
+        base: "max-md:m-0 max-md:h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:max-h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:w-screen max-md:max-w-none max-md:rounded-none",
       }}
     >
       <ModalContent
-        className={`${modalContentClass} overflow-hidden max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:w-screen max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:bg-gray-50 max-md:shadow-none`}
+        className={`${modalContentClass} overflow-hidden max-md:h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:max-h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:w-screen max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:bg-gray-50 max-md:shadow-none`}
         style={modalContentStyle}
       >
         {() => (
           <>
-            <ModalHeader className={`flex flex-col gap-1 max-md:sticky max-md:top-0 max-md:z-20 max-md:border-b max-md:border-gray-200 max-md:bg-white max-md:px-4 max-md:py-3 ${modalHeaderClass}`}>
+            <ModalHeader className={`flex flex-col gap-1 max-md:sticky max-md:top-0 max-md:z-20 max-md:border-b max-md:border-[var(--stocksense-brand-border)] max-md:bg-[var(--stocksense-brand-soft)] max-md:px-4 max-md:py-3 ${modalHeaderClass}`}>
               <div className="flex items-center justify-between gap-3">
-                <span className="text-gray-950">
+                <span className="text-[var(--stocksense-brand)]">
                   Search
                 </span>
                 <button

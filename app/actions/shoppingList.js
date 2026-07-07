@@ -10,8 +10,11 @@ import {
   getHouseholdBilling,
   getHouseholdForUser,
 } from "@/utils/households";
+import { getInventoryImageUrl } from "@/utils/inventoryImages";
 
 const SHOPPING_LIST_STATUSES = new Set(["needed", "purchased", "dismissed"]);
+const SHOPPING_LIST_ITEM_SELECT =
+  "id, household_id, name, quantity, status, source_item_id, source_category_id, added_by, image_path, created_at, updated_at";
 
 function actionError(message) {
   return { data: null, error: message };
@@ -46,9 +49,24 @@ function serializeShoppingListItem(row) {
     sourceItemId: row.source_item_id,
     sourceCategoryId: row.source_category_id,
     addedBy: row.added_by,
+    image_path: row.image_path ?? null,
+    imagePath: row.image_path ?? null,
+    imageUrl: row.imageUrl ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+async function serializeShoppingListItemWithImage(row) {
+  if (!row) return null;
+  return serializeShoppingListItem({
+    ...row,
+    imageUrl: await getInventoryImageUrl(row.image_path),
+  });
+}
+
+async function serializeShoppingListItemsWithImages(rows) {
+  return Promise.all((rows ?? []).map(serializeShoppingListItemWithImage));
 }
 
 async function getAuthedHousehold() {
@@ -167,7 +185,7 @@ async function getItemSnapshot(admin, itemId) {
 
   const { data: item, error } = await admin
     .from("items")
-    .select("id, name, quantity, expiration_date, category_id")
+    .select("id, name, quantity, expiration_date, category_id, image_path")
     .eq("id", itemId)
     .maybeSingle();
 
@@ -219,9 +237,7 @@ export async function getShoppingListAction(filters = {}) {
     const admin = createAdminClient();
     let query = admin
       .from("shopping_list_items")
-      .select(
-        "id, household_id, name, quantity, status, source_item_id, source_category_id, added_by, created_at, updated_at"
-      )
+      .select(SHOPPING_LIST_ITEM_SELECT)
       .eq("household_id", context.household.id)
       .order("created_at", { ascending: false });
 
@@ -233,7 +249,7 @@ export async function getShoppingListAction(filters = {}) {
     if (error) throw error;
 
     return {
-      data: { items: (data ?? []).map(serializeShoppingListItem) },
+      data: { items: await serializeShoppingListItemsWithImages(data) },
       error: null,
     };
   } catch (err) {
@@ -291,9 +307,7 @@ export async function addShoppingListItemAction(input = {}) {
         source_category_id: sourceCategoryId,
         added_by: context.user.id,
       })
-      .select(
-        "id, household_id, name, quantity, status, source_item_id, source_category_id, added_by, created_at, updated_at"
-      )
+      .select(SHOPPING_LIST_ITEM_SELECT)
       .single();
 
     if (error) throw error;
@@ -318,7 +332,7 @@ export async function addShoppingListItemAction(input = {}) {
     });
 
     revalidateShoppingListPaths();
-    return { data: serializeShoppingListItem(data), error: null };
+    return { data: await serializeShoppingListItemWithImage(data), error: null };
   } catch (err) {
     return actionError(err?.message || "Could not add shopping list item.");
   }
@@ -360,7 +374,7 @@ export async function updateShoppingListItemAction(itemId, updates = {}) {
     const admin = createAdminClient();
     const { data: existing, error: existingError } = await admin
       .from("shopping_list_items")
-      .select("id, name, quantity, status")
+      .select("id, name, quantity, status, image_path")
       .eq("id", itemId)
       .eq("household_id", context.household.id)
       .maybeSingle();
@@ -377,9 +391,7 @@ export async function updateShoppingListItemAction(itemId, updates = {}) {
       .update(payload)
       .eq("id", itemId)
       .eq("household_id", context.household.id)
-      .select(
-        "id, household_id, name, quantity, status, source_item_id, source_category_id, added_by, created_at, updated_at"
-      )
+      .select(SHOPPING_LIST_ITEM_SELECT)
       .single();
 
     if (error) throw error;
@@ -394,7 +406,7 @@ export async function updateShoppingListItemAction(itemId, updates = {}) {
     });
 
     revalidateShoppingListPaths();
-    return { data: serializeShoppingListItem(data), error: null };
+    return { data: await serializeShoppingListItemWithImage(data), error: null };
   } catch (err) {
     return actionError(err?.message || "Could not update shopping list item.");
   }
@@ -425,7 +437,7 @@ export async function bulkUpdateShoppingListItemsAction(itemIds = [], updates = 
     const admin = createAdminClient();
     const { data: existing = [], error: existingError } = await admin
       .from("shopping_list_items")
-      .select("id, name, quantity, status")
+      .select("id, name, quantity, status, image_path")
       .eq("household_id", context.household.id)
       .in("id", ids);
 
@@ -442,9 +454,7 @@ export async function bulkUpdateShoppingListItemsAction(itemIds = [], updates = 
       .update(payload)
       .eq("household_id", context.household.id)
       .in("id", matchedIds)
-      .select(
-        "id, household_id, name, quantity, status, source_item_id, source_category_id, added_by, created_at, updated_at"
-      );
+      .select(SHOPPING_LIST_ITEM_SELECT);
 
     if (error) throw error;
 
@@ -472,7 +482,7 @@ export async function bulkUpdateShoppingListItemsAction(itemIds = [], updates = 
     );
 
     revalidateShoppingListPaths();
-    return { data: { items: data.map(serializeShoppingListItem) }, error: null };
+    return { data: { items: await serializeShoppingListItemsWithImages(data) }, error: null };
   } catch (err) {
     return actionError(err?.message || "Could not update selected shopping list items.");
   }
@@ -490,9 +500,7 @@ export async function deleteShoppingListItemAction(itemId) {
     const admin = createAdminClient();
     const { data: existing, error: lookupError } = await admin
       .from("shopping_list_items")
-      .select(
-        "id, household_id, name, quantity, status, source_item_id, source_category_id, added_by, created_at, updated_at"
-      )
+      .select(SHOPPING_LIST_ITEM_SELECT)
       .eq("id", itemId)
       .eq("household_id", context.household.id)
       .maybeSingle();
@@ -524,7 +532,7 @@ export async function deleteShoppingListItemAction(itemId) {
     });
 
     revalidateShoppingListPaths();
-    return { data: serializeShoppingListItem(existing), error: null };
+    return { data: await serializeShoppingListItemWithImage(existing), error: null };
   } catch (err) {
     return actionError(err?.message || "Could not delete shopping list item.");
   }
@@ -543,9 +551,7 @@ export async function bulkDeleteShoppingListItemsAction(itemIds = []) {
     const admin = createAdminClient();
     const { data: existing = [], error: lookupError } = await admin
       .from("shopping_list_items")
-      .select(
-        "id, household_id, name, quantity, status, source_item_id, source_category_id, added_by, created_at, updated_at"
-      )
+      .select(SHOPPING_LIST_ITEM_SELECT)
       .eq("household_id", context.household.id)
       .in("id", ids);
 
@@ -583,7 +589,7 @@ export async function bulkDeleteShoppingListItemsAction(itemIds = []) {
     );
 
     revalidateShoppingListPaths();
-    return { data: { items: existing.map(serializeShoppingListItem) }, error: null };
+    return { data: { items: await serializeShoppingListItemsWithImages(existing) }, error: null };
   } catch (err) {
     return actionError(err?.message || "Could not delete selected shopping list items.");
   }
@@ -612,9 +618,7 @@ export async function moveShoppingListItemToInventoryAction(itemId, input = {}) 
 
     const { data: shoppingListItem, error: lookupError } = await admin
       .from("shopping_list_items")
-      .select(
-        "id, household_id, name, quantity, status, source_item_id, source_category_id, added_by, created_at, updated_at"
-      )
+      .select(SHOPPING_LIST_ITEM_SELECT)
       .eq("id", itemId)
       .eq("household_id", context.household.id)
       .maybeSingle();
@@ -629,8 +633,9 @@ export async function moveShoppingListItemToInventoryAction(itemId, input = {}) 
         name: shoppingListItem.name,
         quantity: toNonNegativeInteger(shoppingListItem.quantity, 0),
         expiration_date: null,
+        image_path: shoppingListItem.image_path ?? null,
       })
-      .select("id, name, quantity, expiration_date, category_id")
+      .select("id, name, quantity, expiration_date, category_id, image_path")
       .single();
 
     if (insertError) throw insertError;
@@ -671,12 +676,14 @@ export async function moveShoppingListItemToInventoryAction(itemId, input = {}) 
     revalidateShoppingListPaths();
     return {
       data: {
-        shoppingListItem: serializeShoppingListItem(shoppingListItem),
+        shoppingListItem: await serializeShoppingListItemWithImage(shoppingListItem),
         inventoryItem: {
           id: inventoryItem.id,
           name: inventoryItem.name,
           quantity: inventoryItem.quantity ?? 0,
           expirationDate: inventoryItem.expiration_date ?? null,
+          image_path: inventoryItem.image_path ?? null,
+          imageUrl: await getInventoryImageUrl(inventoryItem.image_path),
           categoryId: inventoryItem.category_id,
           locationId: destinationPath.locationId,
           locationName: destinationPath.location,
@@ -718,11 +725,10 @@ export async function deleteItemAndAddToShoppingListAction(itemId) {
         status: "needed",
         source_item_id: item.id,
         source_category_id: item.category_id,
+        image_path: item.image_path ?? null,
         added_by: context.user.id,
       })
-      .select(
-        "id, household_id, name, quantity, status, source_item_id, source_category_id, added_by, created_at, updated_at"
-      )
+      .select(SHOPPING_LIST_ITEM_SELECT)
       .single();
 
     if (insertError) throw insertError;
@@ -767,7 +773,7 @@ export async function deleteItemAndAddToShoppingListAction(itemId) {
     return {
       data: {
         deletedItemId: item.id,
-        shoppingListItem: serializeShoppingListItem(shoppingListItem),
+        shoppingListItem: await serializeShoppingListItemWithImage(shoppingListItem),
       },
       error: null,
     };

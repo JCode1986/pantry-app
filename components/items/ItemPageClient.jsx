@@ -61,6 +61,23 @@ const pageItemVariants = {
   },
 };
 
+const mobileSelectionTransition = {
+  duration: 0.18,
+  ease: [0.22, 1, 0.36, 1],
+};
+
+const mobileSelectionPanelMotion = {
+  initial: { opacity: 0, y: -6, scale: 0.985 },
+  animate: { opacity: 1, y: 0, scale: 1 },
+  transition: mobileSelectionTransition,
+};
+
+const mobileDefaultPanelMotion = {
+  initial: { opacity: 0, y: 6, scale: 0.995 },
+  animate: { opacity: 1, y: 0, scale: 1 },
+  transition: mobileSelectionTransition,
+};
+
 const ITEMS_PER_PAGE = 25;
 const ALL_FILTER_KEY = "all";
 const EXPIRATION_FILTERS = {
@@ -1161,7 +1178,11 @@ export default function ItemsPageClient({
         }
       >
         {mobileSelectionMode ? (
-          <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-lg">
+          <motion.div
+            key="items-mobile-selection"
+            {...mobileSelectionPanelMotion}
+            className="transform-gpu rounded-2xl border border-gray-200 bg-white p-3 shadow-lg"
+          >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <h1 className="text-xl font-semibold tracking-tight text-gray-950">
@@ -1210,9 +1231,13 @@ export default function ItemsPageClient({
                 Delete
               </Button>
             </div>
-          </div>
+          </motion.div>
         ) : (
-          <div className="space-y-3">
+          <motion.div
+            key="items-mobile-default"
+            {...mobileDefaultPanelMotion}
+            className="space-y-3 transform-gpu"
+          >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h1 className="text-2xl font-semibold tracking-tight text-gray-950">
@@ -1306,7 +1331,7 @@ export default function ItemsPageClient({
                   ))}
                 </div>
               )}
-          </div>
+          </motion.div>
         )}
       </motion.section>
 
@@ -1684,7 +1709,12 @@ export default function ItemsPageClient({
                   }`}
                 >
                   {mobileSelectionMode && (
-                    <div className="mt-7 shrink-0">
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.85 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={mobileSelectionTransition}
+                      className="mt-7 shrink-0 transform-gpu"
+                    >
                       <input
                         type="checkbox"
                         checked={selected}
@@ -1695,7 +1725,7 @@ export default function ItemsPageClient({
                         className="h-5 w-5 cursor-pointer rounded border-gray-300 text-[var(--stocksense-brand)]"
                         aria-label={`Select ${it.name}`}
                       />
-                    </div>
+                    </motion.div>
                   )}
 
                   <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 text-[var(--stocksense-brand)]">
@@ -1918,19 +1948,19 @@ export default function ItemsPageClient({
         }}
       >
         <ModalContent
-          className="max-h-[88dvh] w-full overflow-hidden rounded-t-3xl bg-white text-gray-700 md:hidden"
+          className="max-h-[88svh] w-full overflow-hidden rounded-t-3xl bg-white text-gray-700 md:hidden"
           style={modalContentStyle}
         >
           {() => (
             <>
-              <ModalHeader className="sticky top-0 z-20 flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
+              <ModalHeader className="sticky top-0 z-20 flex items-center gap-3 border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 py-3 text-[var(--stocksense-brand)]">
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-lg font-semibold text-gray-950">Filters</h2>
+                  <h2 className="text-lg font-semibold text-[var(--stocksense-brand)]">Filters</h2>
                 </div>
                 <MobileSheetCloseButton onPress={() => setFilterSheetOpen(false)} />
               </ModalHeader>
 
-              <ModalBody className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 pb-6">
+              <ModalBody className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 pb-[calc(1.5rem+var(--wherekeep-keyboard-inset,0px))]">
                 <Select
                   aria-label="Filter by location"
                   label="Location"
@@ -2076,7 +2106,7 @@ export default function ItemsPageClient({
                 </Select>
               </ModalBody>
 
-              <ModalFooter className="sticky bottom-0 z-20 border-t border-gray-200 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+              <ModalFooter className="sticky bottom-[var(--wherekeep-keyboard-inset,0px)] z-20 border-t border-gray-200 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)]">
                 <Button
                   className="min-h-12 w-full rounded-xl bg-[var(--stocksense-brand)] text-base font-semibold text-white"
                   onClick={() => setFilterSheetOpen(false)}
@@ -2105,7 +2135,7 @@ export default function ItemsPageClient({
             <>
               <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-lg font-semibold text-gray-950">
+                  <div className="truncate text-lg font-semibold text-[var(--stocksense-brand)]">
                     {activeItem?.name || "Item"}
                   </div>
                   <div className="truncate text-sm text-gray-500">
@@ -2155,7 +2185,7 @@ export default function ItemsPageClient({
                       </div>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-md:hidden">
                       <div className="text-xs font-medium text-gray-600">Barcode</div>
                       <Input
                         value={editBarcode}
@@ -2175,6 +2205,18 @@ export default function ItemsPageClient({
                       label="Item photo"
                       onChange={handleActiveItemImageChange}
                     />
+
+                    {activeItem?.barcode && (
+                      <div className="rounded-xl border border-gray-200 bg-white p-3 md:hidden">
+                        <div className="flex items-center gap-2 text-xs font-medium text-gray-500">
+                          <FaBarcode className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+                          <span>Barcode</span>
+                        </div>
+                        <div className="mt-1 truncate text-sm font-semibold text-gray-800">
+                          {activeItem.barcode}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="flex gap-2 max-md:flex-col">
                       <Button
@@ -2261,7 +2303,7 @@ export default function ItemsPageClient({
             <>
               <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-lg font-semibold text-gray-950">
+                  <div className="truncate text-lg font-semibold text-[var(--stocksense-brand)]">
                     Move {selectedCount > 0 && !drawerOpen ? `${selectedCount} items` : "item"}
                   </div>
                   <div className="truncate text-sm text-gray-500">

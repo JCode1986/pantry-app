@@ -10,7 +10,7 @@ import { getCanEditInventoryForUser } from '@/utils/households';
 export const metadata = createPageMetadata({
   title: 'Household Inventory Tracker',
   description:
-    'WhereKeep helps households track inventory with barcode-assisted entry, photos, shopping lists, recent activity, and shared access roles.',
+    'WhereKeep helps households find what they already own, remember where it lives, use items before they expire, and restock from the same shared system.',
   path: '/',
 });
 

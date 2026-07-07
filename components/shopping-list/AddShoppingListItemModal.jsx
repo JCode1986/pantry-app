@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Button,
   Input,
@@ -10,7 +10,8 @@ import {
   ModalFooter,
   ModalHeader,
 } from "@heroui/react";
-import { FaPlus, FaShoppingBasket } from "react-icons/fa";
+import { FaCamera, FaImage, FaPlus, FaShoppingBasket, FaTrash, FaUpload } from "react-icons/fa";
+import { uploadInventoryImage } from "@/app/actions/server";
 import { addShoppingListItemAction } from "@/app/actions/shoppingList";
 import { toNonNegativeInteger } from "@/utils/pantry/date";
 import {
@@ -30,21 +31,44 @@ const EMPTY_FORM = {
 };
 
 const SHOPPING_SUGGESTIONS = ["Milk", "Bread", "Eggs", "Rice", "Dog food"];
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
+function validateImageFile(file) {
+  if (!file) return "";
+  if (!IMAGE_TYPES.has(file.type)) return "Choose a JPG, PNG, WebP, or GIF image.";
+  if (file.size > MAX_IMAGE_SIZE) return "Images must be 5 MB or smaller.";
+  return "";
+}
 
 export default function AddShoppingListItemModal({
   isOpen,
   onClose,
   onAdded,
 }) {
+  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [message, setMessage] = useState("");
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const [imageMessage, setImageMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
     setForm(EMPTY_FORM);
     setMessage("");
+    setImageFile(null);
+    setImagePreview("");
+    setImageMessage("");
   }, [isOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+    };
+  }, [imagePreview]);
 
   const updateForm = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -53,7 +77,30 @@ export default function AddShoppingListItemModal({
   const handleClose = () => {
     if (isSaving) return;
     setMessage("");
+    setImageMessage("");
     onClose?.();
+  };
+
+  const chooseImage = (file) => {
+    if (!file) return;
+
+    const error = validateImageFile(file);
+    if (error) {
+      setImageMessage(error);
+      return;
+    }
+
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImageFile(file);
+    setImagePreview(file ? URL.createObjectURL(file) : "");
+    setImageMessage("");
+  };
+
+  const removeImage = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setImagePreview("");
+    setImageMessage("");
   };
 
   const handleSubmit = async ({ closeAfterAdd = true } = {}) => {
@@ -79,18 +126,52 @@ export default function AddShoppingListItemModal({
       return;
     }
 
-    setIsSaving(false);
-
     if (result?.error) {
+      setIsSaving(false);
       setMessage(result.error);
       return;
     }
 
-    onAdded?.(result.data);
-    setForm(EMPTY_FORM);
-    setMessage("");
+    let nextItem = result.data;
+    let imageUploadWarning = "";
 
-    if (closeAfterAdd) {
+    if (imageFile && nextItem?.id) {
+      const formData = new FormData();
+      formData.append("image", imageFile);
+
+      try {
+        const imageResult = await uploadInventoryImage(
+          "shopping_list_item",
+          nextItem.id,
+          formData
+        );
+
+        if (imageResult?.error) {
+          imageUploadWarning =
+            typeof imageResult.error === "string"
+              ? imageResult.error
+              : "Shopping list item was added, but the photo could not be uploaded.";
+        } else if (imageResult?.data) {
+          nextItem = {
+            ...nextItem,
+            image_path: imageResult.data.imagePath ?? nextItem.image_path ?? null,
+            imagePath: imageResult.data.imagePath ?? nextItem.imagePath ?? null,
+            imageUrl: imageResult.data.imageUrl ?? nextItem.imageUrl ?? null,
+          };
+        }
+      } catch (error) {
+        console.error("shopping list image upload error:", error);
+        imageUploadWarning = "Shopping list item was added, but the photo could not be uploaded.";
+      }
+    }
+
+    onAdded?.(nextItem);
+    setForm(EMPTY_FORM);
+    removeImage();
+    setMessage(imageUploadWarning);
+    setIsSaving(false);
+
+    if (closeAfterAdd && !imageUploadWarning) {
       onClose?.();
     }
   };
@@ -149,6 +230,87 @@ export default function AddShoppingListItemModal({
                 isDisabled={isSaving}
                 classNames={modalInputClassNames}
               />
+
+              <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-3 max-md:bg-white">
+                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-900">
+                  <FaImage className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+                  Photo optional
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:h-28 sm:w-40">
+                    {imagePreview ? (
+                      <img src={imagePreview} alt="" className="h-full w-full object-contain" />
+                    ) : (
+                      <div className="grid h-full w-full place-items-center text-xs text-gray-400">
+                        Optional photo
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-1 flex-col gap-2">
+                    <input
+                      ref={cameraInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        event.target.value = "";
+                        chooseImage(file);
+                      }}
+                    />
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        event.target.value = "";
+                        chooseImage(file);
+                      }}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        className="min-h-10 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] sm:hidden"
+                        isDisabled={isSaving}
+                        onPress={() => cameraInputRef.current?.click()}
+                        startContent={<FaCamera className="h-3.5 w-3.5" />}
+                      >
+                        Take photo
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        className="min-h-10 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
+                        isDisabled={isSaving}
+                        onPress={() => fileInputRef.current?.click()}
+                        startContent={<FaUpload className="h-3.5 w-3.5" />}
+                      >
+                        {imageFile ? "Change photo" : "Add photo"}
+                      </Button>
+                      {imageFile ? (
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          className="min-h-10 rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
+                          isDisabled={isSaving}
+                          onPress={removeImage}
+                          startContent={<FaTrash className="h-3.5 w-3.5" />}
+                        >
+                          Remove
+                        </Button>
+                      ) : null}
+                    </div>
+                    <p className="text-xs leading-5 text-gray-500 max-md:hidden">
+                      Take a photo or choose one from your camera roll. Max 5 MB.
+                    </p>
+                    {imageMessage ? <p className="text-xs text-rose-700">{imageMessage}</p> : null}
+                  </div>
+                </div>
+              </div>
             </ModalBody>
 
             <ModalFooter className={modalFooterClass}>

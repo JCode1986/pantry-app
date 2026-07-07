@@ -1,18 +1,14 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import {
   FaArrowRight,
-  FaBarcode,
   FaBell,
   FaBoxOpen,
   FaCamera,
   FaChartLine,
   FaCheck,
   FaClipboardList,
-  FaClock,
   FaDollarSign,
   FaHome,
-  FaImage,
   FaLayerGroup,
   FaMapMarkedAlt,
   FaShoppingBasket,
@@ -28,109 +24,85 @@ import SiteFooter from '@/components/app-shell/SiteFooter';
 import WhereKeepLogo from '@/components/ui/WhereKeepLogo';
 
 const heroProofPoints = [
-  'Start free in minutes',
-  'Home > room > bin > item',
-  'Add photos, barcodes, and notes',
+  'Stop rebuying what you already own',
+  'Search the exact shelf, bin, or category',
+  'Restock from the same household list',
 ];
 
-const features = [
+const problemSolutions = [
   {
     icon: FaMapMarkedAlt,
-    title: 'Remember the real-world spot',
-    description:
-      'Organize by the way people actually remember things: place, room, shelf, bin, basket, and item.',
-  },
-  {
-    icon: FaBarcode,
-    title: 'Add items faster',
-    description:
-      'Scan a barcode, pull product details when available, attach photos, and still edit the final item before saving.',
-  },
-  {
-    icon: FaSearch,
-    title: 'Ask where things are',
-    description:
-      'Search by item name, barcode, location, room, container, stock level, or expiration window.',
-  },
-  {
-    icon: FaBell,
-    title: 'Catch food before it expires',
-    description:
-      'Expiration alerts help you use leftovers, restaurant takeout, pantry food, and freezer items before they go to waste.',
-  },
-  {
-    icon: FaShoppingBasket,
-    title: 'Restock from the same system',
-    description:
-      'Move deleted or low-stock items into a shopping list, then move purchases back into inventory.',
-  },
-  {
-    icon: FaImage,
-    title: 'Make storage visual',
-    description:
-      'Add photos for locations, storage areas, containers, and items so everyone can recognize the right spot faster.',
+    problem: 'Someone says, "I know we have it somewhere."',
+    solution:
+      'WhereKeep turns "somewhere" into Home > Garage shelf > Tool bin > Power drill.',
   },
   {
     icon: FaCamera,
-    title: 'Works with mobile habits',
-    description:
-      'Use a phone camera or camera roll for images, then finish the item details without leaving the add flow.',
+    problem: 'The label, box, or shelf matters more than a perfect database row.',
+    solution:
+      'Add a photo, scan a barcode, or speak the item in quickly, then keep moving.',
   },
   {
-    icon: FaClock,
-    title: 'See what changed',
-    description:
-      'Recent activity keeps a timeline of inventory, shopping list, move, update, and delete events.',
+    icon: FaSearch,
+    problem: 'Search needs to answer where, not just whether it exists.',
+    solution:
+      'Find by item name, barcode, location, storage area, category, stock, or expiration.',
+  },
+  {
+    icon: FaBell,
+    problem: 'Leftovers and pantry food disappear until they are expired.',
+    solution:
+      'Expiration and expired-item alerts surface what needs attention before it becomes waste.',
+  },
+  {
+    icon: FaShoppingBasket,
+    problem: 'The shopping list lives in a separate notes app.',
+    solution:
+      'Move needed items to the shopping list, buy them, then move them back into inventory.',
   },
   {
     icon: FaShieldAlt,
-    title: 'Role-based access',
-    description:
-      'Owners manage the household, editors can create, update, and delete inventory, and viewers can browse without changing data.',
-  },
-  {
-    icon: FaChartLine,
-    title: 'Grows past the free plan',
-    description:
-      'Start with a small inventory, then upgrade when unlimited locations, unlimited items, and shared access matter.',
+    problem: 'A shared list gets messy when everyone can change everything.',
+    solution:
+      'Owners, editors, and viewers keep the household useful without giving up control.',
   },
 ];
 
 const outcomes = [
   {
-    title: 'Know where the thing lives',
+    title: 'Before: the house gets searched twice',
     description:
-      'Turn "I know I own it" into a specific place, shelf, bin, or basket instead of another long search.',
+      'A missing charger, tool, document, or pantry item turns into opened drawers, duplicate purchases, and messages asking who saw it last.',
   },
   {
-    title: 'Make "where is it?" searchable',
+    title: 'During: the item gets a real home',
     description:
-      'Keep locations, storage areas, containers, quantities, and expiration dates connected.',
+      'WhereKeep stores the practical answer: location, storage area, category, item, quantity, photo, barcode, and expiration when it matters.',
   },
   {
-    title: 'Use leftovers before they become waste',
+    title: 'After: search becomes the household habit',
     description:
-      'Track restaurant leftovers, fast-food extras, freezer meals, and pantry items with expiration reminders on the dashboard.',
+      'Instead of asking around or rebuying it, someone searches, sees the path, and knows whether it needs to be used, moved, or restocked.',
   },
   {
-    title: 'Turn low stock into action',
+    title: 'When it runs out: restock stays connected',
     description:
-      'Move deleted, empty, or needed items into a shopping list and track what gets purchased.',
+      'Items can move into the shopping list with their photo, then return to inventory after purchase so the loop stays clean.',
   },
 ];
 
 const conversionStats = [
   {
-    value: '50',
-    label: 'free items to map the first spaces',
+    value: 'Find',
+    label: 'the exact place before buying again',
   },
   {
-    value: 'Room',
-    label: 'to shelf and bin paths',
+    value: 'Use',
+    label: 'food before it expires',
   },
   {
-    value: '5',
-    label: 'household members on Family',
+    value: 'Restock',
+    label: 'from the same inventory loop',
   },
 ];
 
@@ -166,16 +138,16 @@ const audiences = [
 
 const workflow = [
   {
-    title: 'Create your home',
-    description: 'Start with the real places people use: kitchen, garage, pantry, closet, office, or storage room.',
+    title: 'Map the messy spot',
+    description: 'Start with the real place people already use: pantry, garage, closet, freezer, office, or storage room.',
   },
   {
-    title: 'Add where it lives',
-    description: 'Attach the item to the shelf, bin, basket, or area where someone would actually look for it.',
+    title: 'Give each item context',
+    description: 'Attach the item to the shelf, bin, basket, area, photo, quantity, and status that will matter later.',
   },
   {
     title: 'Search before you rebuy',
-    description: 'Use search, photos, shopping list, and recent activity to keep the household aligned.',
+    description: 'Use search, photos, shopping list status, and recent activity before adding another duplicate to the house.',
   },
 ];
 
@@ -200,23 +172,23 @@ const upgradeReasons = [
 const inventoryLoop = [
   {
     icon: FaCamera,
-    title: 'Capture',
-    description: 'Scan a barcode or add a photo so the item is easy to identify later.',
+    title: 'Capture the thing',
+    description: 'Add it by barcode, voice, manual entry, or photo without turning it into a long chore.',
   },
   {
     icon: FaMapMarkedAlt,
-    title: 'Confirm location',
-    description: 'Choose the room, storage area, shelf, bin, or grouping that matches the real setup.',
+    title: 'Put it somewhere real',
+    description: 'Choose the location, storage area, shelf, bin, or category someone would actually check.',
   },
   {
     icon: FaSearch,
-    title: 'Find',
-    description: 'Search by name, barcode, location, stock level, or expiration window.',
+    title: 'Find it later',
+    description: 'Search by name, barcode, path, stock level, expiration window, or shopping state.',
   },
   {
     icon: FaClipboardList,
-    title: 'Restock',
-    description: 'Move needed items into the shopping list and track what gets purchased.',
+    title: 'Restock without losing context',
+    description: 'Move items into the shopping list and back to inventory with photos and quantity intact.',
   },
 ];
 
@@ -666,19 +638,19 @@ export default function LandingPage() {
           <div className="grid flex-1 content-center gap-10 py-12">
             <div className="max-w-3xl">
               <div className="mb-4 inline-flex rounded-full border border-[var(--stocksense-brand-border)] bg-white/85 px-3 py-1 text-xs font-semibold text-[var(--stocksense-brand)] shadow-sm backdrop-blur">
-                Your home's memory for everything you store
+                For the "where did we put it?" problem
               </div>
               <h1 className="text-5xl font-semibold tracking-tight text-[var(--stocksense-brand)] sm:text-6xl md:text-7xl">
                 WhereKeep
               </h1>
               <p className="mt-5 max-w-2xl text-2xl font-semibold leading-tight text-gray-900 sm:text-3xl">
-                Find everything you own, right where you left it.
+                Stop searching the house for things you already own.
               </p>
               <p className="mt-4 max-w-2xl text-base leading-7 text-gray-700">
-                WhereKeep helps your household remember the real spot for each
-                item: pantry basket, closet box, garage shelf, freezer drawer,
-                or storage bin. Add photos and barcodes when they help, then
-                search before you buy a duplicate or tear apart the house.
+                WhereKeep gives each item a real home: pantry basket, closet
+                box, garage shelf, freezer drawer, or storage bin. Add it fast,
+                search the exact path later, and turn what ran out into a
+                shopping list without losing the context.
               </p>
 
               <div className="mt-7 flex flex-col gap-3 sm:flex-row">
@@ -715,8 +687,8 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-5 py-14">
           <SectionHeader
             eyebrow="Fast capture"
-            title="The add flow is built for real life, not perfect data entry."
-            description="Start with the minimum that helps later: what it is, where it lives, and a photo or barcode when useful. Extra details stay optional until they matter."
+            title="The app starts where the problem starts: putting something away."
+            description="You should not need a perfect cataloging session. Capture the item quickly, give it a real location, and add the details that make it findable later."
           />
 
           <div className="grid gap-4 md:grid-cols-4">
@@ -730,9 +702,9 @@ export default function LandingPage() {
       <section className="border-y border-gray-200 bg-gray-50">
         <div className="mx-auto max-w-6xl px-5 py-14">
           <SectionHeader
-            eyebrow="Why people keep using it"
-            title="It solves the everyday search problem first."
-            description="The product loop is simple: remember what you have, find it fast, restock only what is needed, and keep everyone aligned."
+            eyebrow="The everyday loop"
+            title="The problem is not inventory. The problem is memory."
+            description="WhereKeep is built around the moments that actually happen at home: something goes missing, something expires, something runs out, or someone needs to know what changed."
           />
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -756,15 +728,15 @@ export default function LandingPage() {
         <div className="mx-auto grid max-w-6xl gap-8 px-5 py-14 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
           <div>
             <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--stocksense-brand)]">
-              The subscription case
+              The cost of not knowing
             </div>
             <h2 className="text-2xl font-semibold tracking-tight text-gray-900 sm:text-3xl">
-              A few avoided duplicate purchases can cover the plan.
+              The app earns trust when it prevents the next duplicate purchase.
             </h2>
             <p className="mt-3 text-sm leading-6 text-gray-600 sm:text-base">
-              WhereKeep is easiest to trust when the value is concrete: less
-              time searching, fewer repeated purchases, cleaner restocking, and
-              fewer accidental edits in shared households.
+              The value is concrete: less time searching, fewer repeated
+              purchases, cleaner restocking, fewer expired items, and fewer
+              accidental edits in shared households.
             </p>
             <div className="mt-5 inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
               <FaDollarSign className="h-4 w-4" />
@@ -783,9 +755,9 @@ export default function LandingPage() {
       <section className="bg-white">
         <div className="mx-auto max-w-6xl px-5 py-14">
           <SectionHeader
-            eyebrow="Built for real users"
-            title="One product, different permission levels."
-            description="WhereKeep can fit a home pantry, family storage, or a small shared stockroom without giving everyone edit access."
+            eyebrow="Shared homes need control"
+            title="The solution has to work for everyone in the house."
+            description="WhereKeep can fit a pantry, family storage setup, or small shared stockroom without giving every person full edit access."
           />
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -799,30 +771,32 @@ export default function LandingPage() {
       <section className="border-y border-gray-200 bg-gray-50">
         <div className="mx-auto max-w-6xl px-5 py-14">
           <SectionHeader
-            eyebrow="Features"
-            title="Everything connects from finding to restocking."
-            description="WhereKeep covers the full loop: organize, find, update, delete, move, purchase, and audit changes."
+            eyebrow="Problem solved"
+            title="Each part of WhereKeep answers a moment of household friction."
+            description="The app is not a pile of tools. It is one loop: put it away, find it, use it before it expires, restock it, and keep the household aligned."
           />
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {features.map((feature) => {
-              const Icon = feature.icon;
+            {problemSolutions.map((item) => {
+              const Icon = item.icon;
 
               return (
                 <article
-                  key={feature.title}
+                  key={item.problem}
                   className="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
                 >
                   <div className="absolute inset-x-0 top-0 h-1 bg-[var(--stocksense-brand)]" />
                   <div className="mb-4 grid h-10 w-10 place-items-center rounded-xl bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
                     <Icon />
                   </div>
-                  <h3 className="text-base font-semibold text-gray-900">
-                    {feature.title}
-                  </h3>
-                  <p className="mt-2 text-sm leading-6 text-gray-600">
-                    {feature.description}
-                  </p>
+                  <div className="mb-2 inline-flex rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
+                    Problem
+                  </div>
+                  <h3 className="text-base font-semibold text-gray-900">{item.problem}</h3>
+                  <div className="mt-4 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                    WhereKeep
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-gray-600">{item.solution}</p>
                 </article>
               );
             })}
@@ -833,9 +807,9 @@ export default function LandingPage() {
       <section className="border-y border-gray-200 bg-gray-50">
         <div className="mx-auto max-w-6xl px-5 py-14">
           <SectionHeader
-            eyebrow="Workflow"
-            title="A practical system for remembering where things are."
-            description="Start simple, then let the same data support larger homes, multiple storage places, and shared responsibility."
+            eyebrow="How it starts"
+            title="Start with one messy shelf, then let the system grow naturally."
+            description="The first win should be simple: map a place, add a few things, and search before buying another duplicate."
           />
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -911,7 +885,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-5 py-14">
           <SectionHeader
             eyebrow="Why upgrade"
-            title="Paid plans are for the moment your home memory becomes worth sharing."
+            title="Upgrade when the problem gets bigger than one shelf."
             description="WhereKeep becomes most valuable when there are more items, more places, more people, and more restocking decisions to keep aligned."
           />
 
@@ -946,7 +920,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-5 py-14">
           <SectionHeader
             eyebrow="Questions"
-            title="Designed to feel useful before it asks users to upgrade."
+            title="Designed to solve the first problem before asking users to upgrade."
           />
           <div className="grid gap-4 md:grid-cols-3">
             {faqs.map((faq) => (
