@@ -103,6 +103,10 @@ async function fetchAttentionCounts() {
     { count: expiredCount = 0, error: expiredError },
     { count: expiringSoonCount = 0, error: expiringSoonError },
     { count: shoppingListNeededItems = 0, error: shoppingListError },
+    { count: locationsCount = 0, error: locationsError },
+    { count: storageAreasCount = 0, error: storageAreasError },
+    { count: categoriesCount = 0, error: categoriesError },
+    { count: itemsCount = 0, error: itemsError },
   ] = await Promise.all([
     supabase
       .from("items")
@@ -119,13 +123,29 @@ async function fetchAttentionCounts() {
       .from("shopping_list_items")
       .select("*", { count: "exact", head: true })
       .eq("status", "needed"),
+    supabase.from("locations").select("*", { count: "exact", head: true }),
+    supabase.from("storage_areas").select("*", { count: "exact", head: true }),
+    supabase.from("storage_categories").select("*", { count: "exact", head: true }),
+    supabase.from("items").select("*", { count: "exact", head: true }),
   ]);
 
-  if (expiredError || expiringSoonError || shoppingListError) {
+  if (
+    expiredError ||
+    expiringSoonError ||
+    shoppingListError ||
+    locationsError ||
+    storageAreasError ||
+    categoriesError ||
+    itemsError
+  ) {
     console.error("Navigation attention count error:", {
       expiredError,
       expiringSoonError,
       shoppingListError,
+      locationsError,
+      storageAreasError,
+      categoriesError,
+      itemsError,
     });
     return null;
   }
@@ -134,6 +154,10 @@ async function fetchAttentionCounts() {
     expiredCount: expiredCount ?? 0,
     expiringSoonCount: expiringSoonCount ?? 0,
     shoppingListNeededItems: shoppingListNeededItems ?? 0,
+    locationsCount: locationsCount ?? 0,
+    storageAreasCount: storageAreasCount ?? 0,
+    categoriesCount: categoriesCount ?? 0,
+    itemsCount: itemsCount ?? 0,
   };
 }
 
@@ -255,7 +279,61 @@ function MobileTopBar({ attentionCount, onOpenMenu, onOpenAttention }) {
   );
 }
 
-function MobileMenu({ isOpen, activeHref, loggingOut, onClose, onLogout }) {
+const mobileMenuSections = [
+  {
+    title: "Dashboard",
+    items: [
+      { href: "/", label: "Overview", icon: FaHome },
+      { href: "/activity", label: "Recent Activity", icon: FaBolt },
+    ],
+  },
+  {
+    title: "Inventory",
+    items: [
+      { href: "/locations", label: "Locations", icon: FaMapMarkedAlt, countKey: "locationsCount" },
+      { href: "/areas", label: "Storage Areas", icon: FaWarehouse, countKey: "storageAreasCount" },
+      { href: "/categories", label: "Categories", icon: FaTags, countKey: "categoriesCount" },
+      { href: "/items", label: "Items", icon: FaBoxOpen, countKey: "itemsCount" },
+    ],
+  },
+  {
+    title: "Tools",
+    items: [
+      {
+        href: "/shopping-list",
+        label: "Shopping List",
+        icon: FaShoppingBasket,
+        countKey: "shoppingListNeededItems",
+      },
+    ],
+  },
+  {
+    title: "Account",
+    items: [{ href: "/profile", label: "Profile", icon: FaUserCircle }],
+  },
+];
+
+function CountBadge({ value }) {
+  return (
+    <span className="ml-auto grid min-w-7 place-items-center rounded-full border border-gray-200 bg-white px-2 py-0.5 text-xs font-semibold leading-5 text-gray-500">
+      {value > 99 ? "99+" : value}
+    </span>
+  );
+}
+
+function MobileMenu({
+  isOpen,
+  activeHref,
+  loggingOut,
+  onClose,
+  onLogout,
+  navigationSummary = {},
+  counts = {},
+}) {
+  const householdName = navigationSummary.householdName || "Household inventory";
+  const itemCount = counts.itemsCount ?? 0;
+  const locationCount = counts.locationsCount ?? 0;
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -267,7 +345,7 @@ function MobileMenu({ isOpen, activeHref, loggingOut, onClose, onLogout }) {
           exit="exit"
         >
           <motion.div
-            className="h-full w-full overflow-y-auto bg-gray-50 px-5 pt-5 shadow-2xl"
+            className="flex h-full w-full flex-col overflow-y-auto bg-white px-5 pt-5 shadow-2xl pb-[max(1.25rem,env(safe-area-inset-bottom))]"
             variants={menuPanelVariants}
             initial="hidden"
             animate="show"
@@ -299,55 +377,87 @@ function MobileMenu({ isOpen, activeHref, loggingOut, onClose, onLogout }) {
 
             <motion.div
               variants={menuItemVariants}
-              className="px-2 pb-2 text-xs font-medium text-gray-400"
+              className="mb-5 rounded-2xl border border-gray-200 bg-gray-50 p-4"
             >
-              Navigation
+              <p className="truncate text-base font-semibold text-gray-950">
+                {householdName}
+              </p>
+              <p className="mt-1 text-sm text-gray-600">
+                {itemCount} item{itemCount === 1 ? "" : "s"} organized
+              </p>
+              <p className="mt-2 inline-flex rounded-full border border-[var(--stocksense-brand-border)] bg-white px-2.5 py-1 text-xs font-semibold text-[var(--stocksense-brand)]">
+                {locationCount} location{locationCount === 1 ? "" : "s"}
+              </p>
             </motion.div>
-            <div className="grid gap-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeHref === item.href;
 
-                return (
-                  <motion.div key={item.href} variants={menuItemVariants}>
-                    <Link
-                      href={item.href}
-                      onClick={onClose}
-                      className={cx(
-                        "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition",
-                        isActive
-                          ? "border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
-                          : "text-gray-700 hover:bg-white/70 hover:text-[var(--stocksense-brand)]"
-                      )}
-                      aria-current={isActive ? "page" : undefined}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {item.menuLabel || item.label}
-                    </Link>
-                  </motion.div>
-                );
-              })}
+            <div className="grid flex-1 content-start gap-5">
+              {mobileMenuSections.map((section) => (
+                <motion.section key={section.title} variants={menuItemVariants}>
+                  <h2 className="px-1 pb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">
+                    {section.title}
+                  </h2>
+                  <div className="grid gap-1.5">
+                    {section.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeHref === item.href;
+                      const count =
+                        item.countKey && counts[item.countKey] !== undefined
+                          ? counts[item.countKey]
+                          : null;
+
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={onClose}
+                          className={cx(
+                            "relative flex min-h-12 items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition",
+                            isActive
+                              ? "border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] shadow-sm"
+                              : "border border-transparent text-gray-700 hover:border-gray-200 hover:bg-gray-50 hover:text-[var(--stocksense-brand)]"
+                          )}
+                          aria-current={isActive ? "page" : undefined}
+                        >
+                          {isActive && (
+                            <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-[var(--stocksense-brand)]" />
+                          )}
+                          <span
+                            className={cx(
+                              "grid h-9 w-9 shrink-0 place-items-center rounded-xl border",
+                              isActive
+                                ? "border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
+                                : "border-gray-200 bg-white text-gray-500"
+                            )}
+                          >
+                            <Icon className="h-4 w-4" />
+                          </span>
+                          <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                          {count !== null && <CountBadge value={count} />}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </motion.section>
+              ))}
             </div>
 
             <motion.div
               variants={menuItemVariants}
-              className="mt-3 border-t border-gray-200 pt-3"
+              className="mt-6 border-t border-gray-200 pt-4"
             >
-              <div className="px-2 pb-2 text-xs font-medium text-gray-400">
-                Legal
-              </div>
-              <div className="grid gap-1">
+              <div className="mb-4 flex items-center justify-center gap-2 text-xs font-medium text-gray-400">
                 <Link
                   href="/terms"
                   onClick={onClose}
-                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-white/70 hover:text-[var(--stocksense-brand)]"
+                  className="transition hover:text-[var(--stocksense-brand)]"
                 >
                   Terms
                 </Link>
+                <span>•</span>
                 <Link
                   href="/privacy"
                   onClick={onClose}
-                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-white/70 hover:text-[var(--stocksense-brand)]"
+                  className="transition hover:text-[var(--stocksense-brand)]"
                 >
                   Privacy
                 </Link>
@@ -490,6 +600,7 @@ function AttentionSheet({
 export default function Navigation({
   canEditInventory = true,
   attentionCounts = {},
+  navigationSummary = {},
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -502,6 +613,7 @@ export default function Navigation({
   const [showItemSearchModal, setShowItemSearchModal] = useState(false);
   const [isAttentionOpen, setIsAttentionOpen] = useState(false);
   const [addItemContext, setAddItemContext] = useState(null);
+  const [routeAddItemContext, setRouteAddItemContext] = useState(null);
   const [addItemNotice, setAddItemNotice] = useState(null);
   const [liveAttentionCounts, setLiveAttentionCounts] =
     useState(attentionCounts);
@@ -546,6 +658,10 @@ export default function Navigation({
     attentionCounts.expiredCount,
     attentionCounts.expiringSoonCount,
     attentionCounts.shoppingListNeededItems,
+    attentionCounts.locationsCount,
+    attentionCounts.storageAreasCount,
+    attentionCounts.categoriesCount,
+    attentionCounts.itemsCount,
   ]);
 
   useEffect(() => {
@@ -580,7 +696,15 @@ export default function Navigation({
   useEffect(() => {
     const openAddItem = (event) => {
       if (!canEditInventory) return;
-      setAddItemContext(event.detail ?? null);
+      const explicitContext = event.detail ?? null;
+      const nextContext =
+        routeAddItemContext || explicitContext
+          ? {
+              ...(routeAddItemContext ?? {}),
+              ...(explicitContext ?? {}),
+            }
+          : null;
+      setAddItemContext(nextContext);
       setShowAddItemModal(true);
     };
 
@@ -589,7 +713,25 @@ export default function Navigation({
     return () => {
       window.removeEventListener("stocksense:open-add-item", openAddItem);
     };
-  }, [canEditInventory]);
+  }, [canEditInventory, routeAddItemContext]);
+
+  useEffect(() => {
+    const setDefaultAddItemContext = (event) => {
+      setRouteAddItemContext(event.detail ?? null);
+    };
+
+    window.addEventListener(
+      "stocksense:set-add-item-context",
+      setDefaultAddItemContext
+    );
+
+    return () => {
+      window.removeEventListener(
+        "stocksense:set-add-item-context",
+        setDefaultAddItemContext
+      );
+    };
+  }, []);
 
   useEffect(() => {
     const openItemSearch = () => {
@@ -711,7 +853,7 @@ export default function Navigation({
               <Button
                 className="rounded-xl bg-[var(--stocksense-brand)] text-white"
                 onPress={() => {
-                  setAddItemContext(null);
+                  setAddItemContext(routeAddItemContext);
                   setShowAddItemModal(true);
                 }}
                 startContent={<FaPlus />}
@@ -823,6 +965,8 @@ export default function Navigation({
         isOpen={isMenuOpen}
         activeHref={activeHref}
         loggingOut={loggingOut}
+        navigationSummary={navigationSummary}
+        counts={liveAttentionCounts}
         onClose={() => setIsMenuOpen(false)}
         onLogout={() => {
           setIsMenuOpen(false);
@@ -872,7 +1016,7 @@ export default function Navigation({
             onClick={() => {
               if (!canEditInventory) return;
               setIsMenuOpen(false);
-              setAddItemContext(null);
+              setAddItemContext(routeAddItemContext);
               setShowAddItemModal(true);
             }}
             disabled={!canEditInventory}
@@ -937,7 +1081,7 @@ export default function Navigation({
                   type="button"
                   onClick={() => {
                     onClose();
-                    setAddItemContext(null);
+                    setAddItemContext(routeAddItemContext);
                     setShowAddItemModal(true);
                   }}
                   className="flex min-h-14 items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2 text-left text-gray-700 shadow-sm transition hover:border-[var(--entity-item-border)] hover:bg-gray-50"

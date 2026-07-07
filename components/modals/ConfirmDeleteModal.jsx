@@ -9,6 +9,7 @@ import {
   modalFooterClass,
   modalHeaderClass,
 } from "@/components/modals/modalTheme";
+import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 
 
 // import {
@@ -25,7 +26,7 @@ export default function ConfirmDeleteModal({
   title,
   description,
   confirmLabel = 'Delete',
-  cancelLabel = 'Cancel',
+  cancelLabel = 'Keep',
   secondaryConfirmLabel = null,
   secondaryConfirmClassName = '',
   isSecondaryConfirming = false,
@@ -47,22 +48,37 @@ export default function ConfirmDeleteModal({
       backdrop="blur"
       placement="center"
       className="max-w-md"
+      classNames={{
+        wrapper: "max-md:items-end",
+      }}
     >
-      <ModalContent className={modalContentClass} style={modalContentStyle}>
+      <ModalContent
+        className={`${modalContentClass} max-md:h-auto max-md:max-h-[80dvh] max-md:rounded-b-none max-md:rounded-t-2xl max-md:border max-md:border-gray-200 max-md:bg-white max-md:shadow-2xl`}
+        style={modalContentStyle}
+      >
         {(close) => (
           <>
-            <ModalHeader className={modalHeaderClass}>
-              {title}
+            <ModalHeader className={`${modalHeaderClass} max-md:static max-md:flex max-md:items-center max-md:gap-3`}>
+              <span className="min-w-0 flex-1 truncate">{title}</span>
+              {!isBusy ? (
+                <MobileSheetCloseButton
+                  onPress={() => {
+                    onCancel?.();
+                    close();
+                  }}
+                />
+              ) : null}
             </ModalHeader>
-            <ModalBody className={modalBodyClass}>
+            <ModalBody className={`${modalBodyClass} max-md:pb-4`}>
               <p className="text-sm text-gray-600">{description}</p>
             </ModalBody>
             <ModalFooter
-              className={`${modalFooterClass} flex flex-col-reverse gap-2 sm:flex-row sm:justify-end`}
+              className={`${modalFooterClass} flex flex-col-reverse gap-2 sm:flex-row sm:justify-end max-md:static`}
             >
               <Button
                 variant="flat"
                 color="default"
+                className="min-h-11 rounded-xl"
                 onPress={() => {
                   if (!isBusy) {
                     onCancel?.();
@@ -75,7 +91,7 @@ export default function ConfirmDeleteModal({
               </Button>
               {secondaryConfirmLabel && onSecondaryConfirm ? (
                 <Button
-                  className={secondaryConfirmClassName}
+                  className={`min-h-11 rounded-xl ${secondaryConfirmClassName}`}
                   onPress={onSecondaryConfirm}
                   isLoading={isSecondaryConfirming}
                   isDisabled={isDeleting}
@@ -85,6 +101,7 @@ export default function ConfirmDeleteModal({
               ) : null}
               <Button
                 color="danger"
+                className="min-h-11 rounded-xl"
                 onPress={onConfirm}
                 isLoading={isDeleting}
                 isDisabled={isSecondaryConfirming}

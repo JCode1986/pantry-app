@@ -37,7 +37,7 @@ export default async function ActivityPage() {
   ]);
 
   return (
-    <main className="page-enter mx-auto min-h-[100vh] max-w-[1500px] px-5 py-8">
+    <main className="page-enter mx-auto max-w-[1500px] px-5 py-8 md:min-h-[100vh] max-md:pb-0 max-md:pt-4">
       <div className="mb-5">
         <p className="text-sm font-semibold text-[var(--stocksense-brand)]">
           Household log

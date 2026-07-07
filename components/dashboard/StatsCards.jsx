@@ -155,7 +155,7 @@ export default function StatsCards({ totals, isLoading = false }) {
                       >
                         <Icon className="h-5 w-5" />
                       </div>
-                      <h3 className="text-sm md:text-base font-semibold text-[var(--stocksense-brand)]">
+                      <h3 className="text-sm font-semibold text-gray-950 md:text-base">
                         {c.label}
                       </h3>
                     </div>

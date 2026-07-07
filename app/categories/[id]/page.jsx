@@ -125,6 +125,62 @@ export default async function CategoryDetailPage({ params }) {
   const area = category.storage_area;
   const location = area?.location;
 
+  const [
+    { data: moveCategoriesRaw, error: moveCategoriesError },
+    { data: moveAreasRaw, error: moveAreasError },
+    { data: moveLocationsRaw, error: moveLocationsError },
+  ] = await Promise.all([
+    supabase
+      .from("storage_categories")
+      .select("id, name, storage_area_id")
+      .order("name", { ascending: true }),
+    supabase
+      .from("storage_areas")
+      .select("id, name, location_id")
+      .order("name", { ascending: true }),
+    supabase
+      .from("locations")
+      .select("id, name")
+      .order("name", { ascending: true }),
+  ]);
+
+  if (moveCategoriesError) {
+    console.error("Move categories fetch error:", moveCategoriesError);
+  }
+  if (moveAreasError) {
+    console.error("Move areas fetch error:", moveAreasError);
+  }
+  if (moveLocationsError) {
+    console.error("Move locations fetch error:", moveLocationsError);
+  }
+
+  const categoriesByArea = new Map();
+  for (const moveCategory of moveCategoriesRaw ?? []) {
+    const key = String(moveCategory.storage_area_id);
+    if (!categoriesByArea.has(key)) categoriesByArea.set(key, []);
+    categoriesByArea.get(key).push({
+      id: moveCategory.id,
+      name: moveCategory.name,
+    });
+  }
+
+  const areasByLocation = new Map();
+  for (const moveArea of moveAreasRaw ?? []) {
+    const key = String(moveArea.location_id);
+    if (!areasByLocation.has(key)) areasByLocation.set(key, []);
+    areasByLocation.get(key).push({
+      id: moveArea.id,
+      name: moveArea.name,
+      categories: categoriesByArea.get(String(moveArea.id)) ?? [],
+    });
+  }
+
+  const moveLocations = (moveLocationsRaw ?? []).map((moveLocation) => ({
+    id: moveLocation.id,
+    name: moveLocation.name,
+    storage_areas: areasByLocation.get(String(moveLocation.id)) ?? [],
+  }));
+
   return (
     <CategoryDetailClient
       category={{
@@ -138,6 +194,7 @@ export default async function CategoryDetailPage({ params }) {
       area={area ? { id: area.id, name: area.name } : null}
       location={location ? { id: location.id, name: location.name } : null}
       initialItems={items}
+      moveLocations={moveLocations}
       canEditInventory={canEditInventory}
     />
   );

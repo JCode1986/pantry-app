@@ -76,7 +76,7 @@ export default function EntityImageManager({
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-3">
+    <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-3 max-md:bg-white">
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
           <FaImage className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
@@ -86,12 +86,12 @@ export default function EntityImageManager({
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="h-24 w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:w-32">
+        <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:h-32 sm:w-44">
           {imageUrl ? (
             <img
               src={imageUrl}
               alt=""
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain"
             />
           ) : (
             <div className="grid h-full w-full place-items-center text-xs text-gray-400">
@@ -128,7 +128,7 @@ export default function EntityImageManager({
             <Button
               size="sm"
               variant="flat"
-              className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] sm:hidden"
+              className="min-h-10 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] sm:hidden"
               isDisabled={isWorking || !entityId}
               onPress={() => cameraInputRef.current?.click()}
               startContent={<FaCamera className="h-3.5 w-3.5" />}
@@ -138,27 +138,27 @@ export default function EntityImageManager({
             <Button
               size="sm"
               variant="flat"
-              className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
+              className="min-h-10 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
               isDisabled={isWorking || !entityId}
               onPress={() => fileInputRef.current?.click()}
               startContent={<FaUpload className="h-3.5 w-3.5" />}
             >
-              {imageUrl ? "Choose replacement" : "Choose image"}
+              {imageUrl ? "Change photo" : "Add photo"}
             </Button>
             {imageUrl && (
               <Button
                 size="sm"
                 variant="flat"
-                className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
+                className="min-h-10 rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
                 isDisabled={isWorking}
                 onPress={removeImage}
                 startContent={<FaTrash className="h-3.5 w-3.5" />}
               >
-                Remove
+                Remove photo
               </Button>
             )}
           </div>
-          <p className="text-xs leading-5 text-gray-500">
+          <p className="text-xs leading-5 text-gray-500 max-md:hidden">
             Take a photo or choose one from your camera roll. Max 5 MB.
           </p>
           {error && <p className="text-xs text-rose-700">{error}</p>}

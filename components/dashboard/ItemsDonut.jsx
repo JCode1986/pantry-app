@@ -37,7 +37,7 @@ export default function ItemsDonut({
     <div className="rounded-2xl bg-white shadow-sm border-gray-300 border">
       <div className="p-5 border-b border-gray-300">
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-lg font-semibold text-stocksense-teal">{title}</h2>
+          <h2 className="text-lg font-semibold text-gray-950">{title}</h2>
           {tooltip ? (
             <HeroTooltip
               content={tooltip}

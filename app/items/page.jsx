@@ -151,7 +151,7 @@ export default async function Page({ searchParams }) {
   }));
 
   return (
-    <main className="page-enter max-w-[1500px] mx-auto p-6 pt-8 min-h-[100vh] max-md:px-4 max-md:pb-32 max-md:pt-4">
+    <main className="page-enter max-w-[1500px] mx-auto p-6 pt-8 md:min-h-[100vh] max-md:px-4 max-md:pb-0 max-md:pt-4">
       <ItemsPageClient
         initialItems={items}
         moveLocations={moveLocations}

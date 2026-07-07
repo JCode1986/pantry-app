@@ -3,16 +3,16 @@ export const modalContentStyle = {
 };
 
 export const modalContentClass =
-  "flex w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white text-gray-700 shadow-xl sm:w-full";
+  "flex w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white text-gray-700 shadow-xl sm:w-full max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:w-screen max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:bg-gray-50 max-md:shadow-none";
 
 export const modalHeaderClass =
-  "shrink-0 border-b border-gray-200 bg-white text-base font-semibold text-gray-950";
+  "shrink-0 border-b border-gray-200 bg-white text-base font-semibold text-gray-950 max-md:sticky max-md:top-0 max-md:z-20 max-md:px-4 max-md:py-3";
 
 export const modalBodyClass =
-  "min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pt-5";
+  "min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pt-5 max-md:px-4 max-md:pb-28 max-md:pt-4";
 
 export const modalFooterClass =
-  "flex shrink-0 flex-col-reverse gap-2 border-t border-gray-200 bg-white sm:flex-row sm:justify-end";
+  "flex shrink-0 flex-col-reverse gap-2 border-t border-gray-200 bg-white sm:flex-row sm:justify-end max-md:sticky max-md:bottom-0 max-md:z-20 max-md:px-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] max-md:pt-3";
 
 export const modalInputClassNames = {
   inputWrapper:

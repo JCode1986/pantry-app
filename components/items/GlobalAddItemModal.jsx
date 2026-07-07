@@ -1456,12 +1456,12 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                         </div>
 
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                          <div className="h-28 w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:w-36">
+                          <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:h-32 sm:w-44">
                             {selectedImagePreview || productPreview?.imageUrl ? (
                               <img
                                 src={selectedImagePreview || productPreview.imageUrl}
                                 alt=""
-                                className="h-full w-full object-cover"
+                                className="h-full w-full object-contain"
                               />
                             ) : (
                               <div className="grid h-full w-full place-items-center text-xs text-gray-400">

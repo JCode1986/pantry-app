@@ -522,7 +522,7 @@ export default function MobileDashboardHome({
       (totals.shoppingListItems ?? 0) ===
     0;
   return (
-    <main className="min-h-[calc(100dvh-61px)] overflow-x-hidden px-5 text-gray-700 md:hidden">
+    <main className="overflow-x-hidden px-5 text-gray-700 md:hidden">
       <motion.div
         variants={pageSectionVariants}
         initial="hidden"

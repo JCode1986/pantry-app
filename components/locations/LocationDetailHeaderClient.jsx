@@ -8,6 +8,7 @@ import { FaBoxOpen, FaEdit, FaMapMarkedAlt, FaTags, FaTrash, FaWarehouse } from 
 import { deleteLocation, updateLocationName } from "@/app/actions/server";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import EntityImageManager from "@/components/inventory/EntityImageManager";
+import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import {
   modalBodyClass,
   modalContentClass,
@@ -192,7 +193,7 @@ export default function LocationDetailHeaderClient({
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                   Location
                 </p>
-                <h1 className="mt-1 truncate text-3xl font-semibold tracking-tight text-stocksense-teal">
+                <h1 className="mt-1 truncate text-3xl font-semibold tracking-tight text-gray-950">
                   {name}
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm text-gray-500">
@@ -234,7 +235,10 @@ export default function LocationDetailHeaderClient({
           <ModalContent className={modalContentClass} style={modalContentStyle}>
             {(onClose) => (
               <>
-                <ModalHeader className={modalHeaderClass}>Edit location</ModalHeader>
+                <ModalHeader className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}>
+                  <span className="min-w-0 flex-1 truncate">Edit location</span>
+                  <MobileSheetCloseButton onPress={onClose} />
+                </ModalHeader>
                 <ModalBody className={`space-y-3 ${modalBodyClass}`}>
                   <Input
                     label="Location name"
@@ -254,9 +258,26 @@ export default function LocationDetailHeaderClient({
                       setCurrentImageUrl(nextImageUrl ?? null);
                     }}
                   />
+                  <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
+                    <p className="text-sm font-semibold text-gray-950">Danger zone</p>
+                    <Button
+                      className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
+                      onPress={() => {
+                        onClose();
+                        setDeleteOpen(true);
+                      }}
+                    >
+                      Delete location
+                    </Button>
+                  </div>
                 </ModalBody>
                 <ModalFooter className={modalFooterClass}>
-                  <Button variant="light" onPress={onClose} isDisabled={isSaving}>
+                  <Button
+                    variant="light"
+                    onPress={onClose}
+                    isDisabled={isSaving}
+                    className="max-md:hidden"
+                  >
                     Cancel
                   </Button>
                   <Button

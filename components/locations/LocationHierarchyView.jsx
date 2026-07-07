@@ -335,7 +335,7 @@ export default function LocationHierarchyView({
       variants={pageVariants}
       initial="hidden"
       animate="show"
-      className="page-enter mx-auto min-h-[100vh] max-w-[1500px] px-5 py-8"
+      className="page-enter mx-auto max-w-[1500px] px-5 py-8 md:min-h-[100vh] max-md:pb-0 max-md:pt-4"
     >
       <motion.header
         variants={itemVariants}
@@ -369,7 +369,7 @@ export default function LocationHierarchyView({
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                   Location
                 </p>
-                <h1 className="mt-1 truncate text-3xl font-semibold tracking-tight text-stocksense-teal">
+                <h1 className="mt-1 truncate text-3xl font-semibold tracking-tight text-gray-950">
                   {location.name}
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm text-gray-500">

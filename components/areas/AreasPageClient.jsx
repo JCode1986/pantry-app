@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Input,
@@ -11,8 +12,14 @@ import {
   ModalBody,
   ModalFooter,
 } from "@heroui/react";
-import { FaSearch, FaTrash, FaWarehouse } from "react-icons/fa";
+import {
+  FaChevronRight,
+  FaSearch,
+  FaTrash,
+  FaWarehouse,
+} from "react-icons/fa";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
+import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import {
   modalBodyClass,
   modalContentClass,
@@ -42,6 +49,7 @@ const pageItemVariants = {
 };
 
 export default function AreasPageClient({ initialAreas, canEditInventory = true }) {
+  const router = useRouter();
   const [areas, setAreas] = useState(initialAreas ?? []);
   const [search, setSearch] = useState("");
 
@@ -236,16 +244,22 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
     if (!canEditInventory) return;
     if (!activeArea) return;
 
+    openDeleteForArea(activeArea);
+  };
+
+  const openDeleteForArea = (area) => {
+    if (!canEditInventory || !area) return;
+
     setDeleteDialog({
       open: true,
       isDeleting: false,
       mode: "single",
       payload: {
-        areaId: activeArea.id,
-        name: activeArea.name,
-        locationName: activeArea.location?.name,
-        categoriesCount: activeArea.categoriesCount,
-        itemsCount: activeArea.itemsCount,
+        areaId: area.id,
+        name: area.name,
+        locationName: area.location?.name,
+        categoriesCount: area.categoriesCount,
+        itemsCount: area.itemsCount,
       },
     });
   };
@@ -328,10 +342,123 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
       animate="show"
       className="space-y-6"
     >
+      <motion.section variants={pageItemVariants} className="md:hidden">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-950">
+              Storage Areas
+            </h1>
+            <p className="mt-1 text-sm text-gray-600">
+              Where items sit inside each location
+            </p>
+          </div>
+        </div>
+
+        <div className="relative mt-4">
+          <FaSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search areas..."
+            className="h-11 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-3 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-[var(--stocksense-brand)]"
+          />
+        </div>
+      </motion.section>
+
+      <motion.section variants={pageSectionVariants} className="grid gap-3 md:hidden">
+        {filtered.length === 0 ? (
+          <motion.div
+            key="mobile-empty"
+            variants={pageItemVariants}
+            className="rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-7 text-center shadow-sm"
+          >
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]">
+              <FaWarehouse className="h-6 w-6" />
+            </div>
+            <h2 className="mt-4 text-lg font-semibold text-gray-950">
+              No storage areas found
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Try a different search or add an item to create a storage area.
+            </p>
+            {canEditInventory && (
+              <div className="mt-5 flex justify-center">
+                <OpenGlobalAddItemButton canEditInventory={canEditInventory} />
+              </div>
+            )}
+          </motion.div>
+        ) : (
+          filtered.map((area) => (
+            <motion.article
+              key={area.id}
+              layout
+              variants={pageItemVariants}
+              className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
+            >
+              <button
+                type="button"
+                onClick={() => router.push(`/areas/${area.id}`)}
+                className="flex min-h-[112px] w-full items-center gap-4 p-4 text-left transition active:scale-[0.99]"
+              >
+                {area.imageUrl ? (
+                  <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-area-border)] bg-white">
+                    <img src={area.imageUrl} alt="" className="h-full w-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]">
+                    <FaWarehouse className="h-7 w-7" />
+                  </div>
+                )}
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-lg font-semibold leading-6 text-gray-950">
+                    {area.name}
+                  </p>
+                  <p className="mt-1 truncate text-sm text-gray-500">
+                    {area.location?.name}
+                  </p>
+                  <div className="mt-2 grid gap-0.5 text-sm leading-5 text-gray-500">
+                    <span>
+                      {area.categoriesCount ?? 0}{" "}
+                      {(area.categoriesCount ?? 0) === 1 ? "category" : "categories"}
+                    </span>
+                    <span>
+                      {area.itemsCount ?? 0}{" "}
+                      {(area.itemsCount ?? 0) === 1 ? "item" : "items"}
+                    </span>
+                  </div>
+                </div>
+
+                <FaChevronRight className="h-4 w-4 shrink-0 text-[var(--stocksense-brand)]" />
+              </button>
+
+              {canEditInventory && (
+                <div className="grid grid-cols-2 gap-2 border-t border-gray-200 bg-gray-50 p-3">
+                  <button
+                    type="button"
+                    onClick={() => openDrawer(area)}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 text-sm font-semibold text-amber-700"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openDeleteForArea(area)}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 text-sm font-semibold text-rose-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
+            </motion.article>
+          ))
+        )}
+      </motion.section>
+
       {/* Header */}
       <motion.div
         variants={pageItemVariants}
-        className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm"
+        className="rounded-2xl border border-stocksense-gray bg-white p-4 shadow-sm max-md:hidden md:p-5"
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -339,7 +466,7 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
               <FaWarehouse className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-stocksense-teal">
+              <h1 className="text-xl font-semibold tracking-tight text-gray-950 md:text-2xl">
                 Storage Areas
               </h1>
               <p className="text-sm text-gray-500">
@@ -421,7 +548,7 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
       {/* List */}
       <motion.div
         variants={pageSectionVariants}
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        className="grid grid-cols-1 gap-4 max-md:hidden sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
       >
         <AnimatePresence initial={false}>
           {filtered.map((a) => (
@@ -470,7 +597,7 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
                   </div>
                 )}
                 <div className="min-w-0">
-                  <div className="truncate text-[15px] font-semibold leading-5 text-gray-950 sm:text-base md:text-stocksense-teal">{a.name}</div>
+                  <div className="truncate text-[15px] font-semibold leading-5 text-gray-950 sm:text-base">{a.name}</div>
                   <div className="mt-1 text-sm text-gray-500 truncate">{a.location?.name}</div>
                 </div>
               </div>
@@ -529,11 +656,14 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
         <ModalContent className={modalContentClass} style={modalContentStyle}>
           {() => (
             <>
-              <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
-                <div className="text-lg font-semibold text-gray-950">
-                  {activeArea?.name || "Storage Area"}
+              <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-lg font-semibold text-gray-950">
+                    {activeArea?.name || "Storage Area"}
+                  </div>
+                  <div className="truncate text-sm text-gray-500">{activeArea?.location?.name}</div>
                 </div>
-                <div className="text-sm text-gray-500">{activeArea?.location?.name}</div>
+                <MobileSheetCloseButton onPress={closeDrawer} />
               </ModalHeader>
 
               <ModalBody className={`space-y-5 ${modalBodyClass}`}>
@@ -550,7 +680,7 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
                     <Button
                       onClick={handleRename}
                       isDisabled={!renameValue.trim()}
-                      className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
+                      className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                     >
                       Save name
                     </Button>
@@ -567,6 +697,18 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
                   />
                 )}
 
+                {canEditInventory && activeArea?.id && (
+                  <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
+                    <p className="text-sm font-semibold text-gray-950">Danger zone</p>
+                    <Button
+                      className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
+                      onClick={openDelete}
+                    >
+                      Delete storage area
+                    </Button>
+                  </div>
+                )}
+
                 {/* Stats */}
                 <div className="flex gap-2 flex-wrap">
                   <span className="px-2.5 py-1 rounded-full text-xs bg-gray-50 text-gray-600 border border-gray-200">
@@ -581,7 +723,7 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
 
                 {/* Categories preview */}
                 <div>
-                  <div className="text-sm font-semibold text-stocksense-teal mb-2">
+                  <div className="mb-2 text-sm font-semibold text-gray-950">
                     Categories
                   </div>
 
@@ -592,7 +734,7 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
                         className="rounded-xl border border-stocksense-gray bg-white p-3 flex items-start justify-between gap-3"
                       >
                         <div className="min-w-0">
-                          <div className="font-medium text-stocksense-teal truncate">{c.name}</div>
+                          <div className="truncate font-medium text-gray-950">{c.name}</div>
                           <div className="text-sm text-gray-500 truncate">
                             {c.itemsCount} {c.itemsCount === 1 ? "item" : "items"}
                           </div>
@@ -614,12 +756,24 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
               </ModalBody>
 
               <ModalFooter className={modalFooterClass}>
-                <Button variant="light" className="rounded-xl" onClick={closeDrawer}>
+                <Button variant="light" className="rounded-xl max-md:hidden" onClick={closeDrawer}>
                   Close
                 </Button>
                 {canEditInventory && (
-                  <Button className="rounded-xl bg-rose-600 text-white" onClick={openDelete}>
+                  <Button
+                    className="rounded-xl bg-rose-600 text-white max-md:hidden"
+                    onClick={openDelete}
+                  >
                     Delete area
+                  </Button>
+                )}
+                {canEditInventory && (
+                  <Button
+                    onClick={handleRename}
+                    isDisabled={!renameValue.trim()}
+                    className="rounded-xl bg-[var(--stocksense-brand)] text-white md:hidden"
+                  >
+                    Save changes
                   </Button>
                 )}
               </ModalFooter>

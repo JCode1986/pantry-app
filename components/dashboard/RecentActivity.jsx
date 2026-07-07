@@ -542,7 +542,7 @@ export default function RecentActivity({
     <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
       <div className="border-b border-gray-200 p-5">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-stocksense-teal">
+          <h2 className="text-lg font-semibold text-gray-950">
             Recent activity
           </h2>
           <span className="shrink-0 text-xs text-gray-600">
