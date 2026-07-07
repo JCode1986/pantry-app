@@ -638,7 +638,7 @@ export default function CategoriesPageClient({
           {() => (
             <>
               <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass} max-md:flex-row max-md:gap-3`}>
-                <div className="min-w-0 flex-1 truncate text-lg font-semibold text-gray-950">
+                <div className="min-w-0 flex-1 truncate text-lg font-semibold text-[var(--stocksense-brand)]">
                   {activeCategory?.name || "Category"}
                 </div>
                 <div className="text-sm text-gray-500 max-md:hidden">

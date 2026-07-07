@@ -1,6 +1,6 @@
 # WhereKeep
 
-WhereKeep is a household inventory app for tracking what you have, where it is stored, and what needs attention. The app supports shared households, role-based editing, locations, storage areas, categories, item search, shopping lists, expiration tracking, inventory images, barcode-assisted item entry, billing plans, and session management.
+WhereKeep is a household inventory app for tracking what you have, where it is stored, what needs attention, and what needs to be bought again. The app supports shared households, role-based editing, locations, storage areas, categories, item search, shopping lists, expiration tracking, images, barcode-assisted item entry, voice-assisted quick add, billing plans, mobile-first workflows, and session management.
 
 The project is built with Next.js App Router, Supabase, Iron Session, HeroUI, Tailwind CSS, Stripe, and Framer Motion.
 
@@ -8,14 +8,19 @@ The project is built with Next.js App Router, Supabase, Iron Session, HeroUI, Ta
 
 - Household inventory organized by locations, storage areas, categories, and items.
 - Global item search and item creation from the app shell.
-- Quantity and expiration tracking with dashboard notifications.
-- Shopping list workflow for restocking.
+- Fast add flow with preferred methods for barcode, voice, or manual entry.
+- Barcode scanner support with camera, image upload, manual entry, and product lookup.
+- Quantity, low-stock, expiration, and expired-item tracking with dashboard and mobile notifications.
+- Shopping list workflow for restocking, including item photos.
+- Move items from inventory to the shopping list and back while preserving photos when available.
 - Shared household support with owner, editor, and viewer roles.
 - Role-aware editing so viewers can browse without changing inventory.
 - Household invites and profile management.
 - Recent activity tracking.
-- Barcode-assisted item entry and inventory images.
+- Images for locations, storage areas, categories, inventory items, and shopping list items.
 - Theme and font preferences.
+- Mobile app-style navigation drawer, bottom navigation, action sheets, and bulk selection.
+- Mobile-safe modal sizing that accounts for phone keyboards and safe-area spacing.
 - Stripe-backed Free, Plus, and Family billing plans.
 - Supabase authentication with Iron Session-backed app sessions.
 - Inactivity timeout modal with a countdown before logout.
@@ -56,9 +61,12 @@ STRIPE_PLUS_MONTHLY_PRICE_ID=your_plus_monthly_price_id
 STRIPE_PLUS_YEARLY_PRICE_ID=your_plus_yearly_price_id
 STRIPE_FAMILY_MONTHLY_PRICE_ID=your_family_monthly_price_id
 STRIPE_FAMILY_YEARLY_PRICE_ID=your_family_yearly_price_id
+
+OPENAI_API_KEY=optional_for_ai_voice_quick_add
+OPENAI_QUICK_ADD_MODEL=optional_model_override
 ```
 
-Stripe variables are only required for billing checkout and webhook flows. The Supabase URL, anon key, service role key, and Iron Session secret are required for the authenticated app.
+Stripe variables are only required for billing checkout and webhook flows. OpenAI variables are optional; if no OpenAI key is configured, voice quick add falls back to local parsing where possible. The Supabase URL, anon key, service role key, and Iron Session secret are required for the authenticated app.
 
 Run the development server:
 
@@ -74,6 +82,30 @@ On Windows PowerShell, `npm.ps1` may be blocked by the local execution policy. I
 cmd /c npm run dev
 cmd /c npm run build
 ```
+
+## Supabase Setup
+
+WhereKeep expects the application tables, household role tables, activity tables, billing metadata, and the `inventory-images` storage bucket to exist in Supabase.
+
+Database migrations live in `supabase/migrations/`.
+
+Current local migration:
+
+```text
+supabase/migrations/20260707000000_add_shopping_list_item_images.sql
+```
+
+This migration adds `shopping_list_items.image_path` so shopping list entries can use the same image storage workflow as inventory items.
+
+Image-enabled tables currently include:
+
+- `locations.image_path`
+- `storage_areas.image_path`
+- `storage_categories.image_path`
+- `items.image_path`
+- `shopping_list_items.image_path`
+
+The app stores image paths in the database and serves signed URLs from the shared `inventory-images` Supabase Storage bucket.
 
 ## Available Scripts
 
@@ -112,6 +144,8 @@ WhereKeep uses both Supabase and Iron Session:
 - Logout must clear both layers.
 
 The shared logout action in `app/actions/auth.js` destroys the Iron Session and signs out with the server Supabase client so the Supabase auth cookies are also expired.
+
+`lib/verifiedSession.js` verifies the Iron Session and can fall back to Supabase session data. When it runs in a read-only server component context, it avoids throwing on cookie writes and simply skips saving the refreshed Iron Session.
 
 Protected routes include:
 
@@ -165,6 +199,53 @@ Activity events currently watched:
 
 Once the warning modal is visible, normal page activity does not dismiss it. The user must explicitly choose `Stay signed in` or `Log out`.
 
+## Mobile UX
+
+The authenticated app has a dedicated mobile navigation and sheet experience:
+
+- Mobile top bar with drawer, notifications, and bottom navigation.
+- Drawer sections for Dashboard, Inventory, Tools, and Account.
+- Inventory summary and count badges in the mobile drawer.
+- Active mobile navigation uses the user's theme color as an accent.
+- Terms and Privacy are grouped as a compact legal row.
+- Logout remains destructive and pinned low in the drawer.
+- Mobile modals use full-screen sheets for add/edit forms, compact confirmation sheets for delete, and sticky bottom actions.
+- Sheet height and footer positioning use `MobileViewportInsets` so phone keyboards do not squash content or hide primary actions.
+- Desktop navigation and desktop modal layouts are intentionally separate from mobile behavior.
+
+## Inventory And Shopping Workflows
+
+Items can be added globally from the app shell. The add flow supports barcode, voice, and manual entry, remembers the user's preferred method locally, and supports a keep-adding mode for repeated item entry.
+
+Mobile item and shopping-list pages use native-style cards. Default mode keeps cards clean and tappable; selection mode is opt-in through `Select` or long press. Mobile bulk selection supports Move and Delete without permanently showing checkboxes.
+
+Shopping list items support:
+
+- Needed, purchased, and dismissed states.
+- A mobile filter dropdown for list state.
+- Photos when creating or editing shopping list items.
+- Moving a shopping list item into inventory.
+- Moving an inventory item into the shopping list.
+- Preserving `image_path` when moving between inventory and the shopping list.
+
+## Images
+
+Image upload logic is centralized through:
+
+- `components/inventory/EntityImageManager.jsx`
+- `app/actions/server.js`
+- `utils/inventoryImages.js`
+
+Supported image entity types:
+
+- `location`
+- `storage_area`
+- `category`
+- `item`
+- `shopping_list_item`
+
+Images are limited to JPG, PNG, WebP, or GIF files up to 5 MB. Mobile forms keep photo controls compact with optional camera capture and file picker buttons.
+
 ## Billing Plans
 
 Billing plan definitions live in `utils/billingPlans.js`.
@@ -205,6 +286,9 @@ components/
   shopping-list/        Shopping list modals and client UI
   ui/                   Shared UI components
 
+supabase/
+  migrations/           SQL migrations for Supabase schema changes
+
 lib/
   SessionContext.js     Client Supabase session context and refresh loop
   sessionOptions.js     Iron Session cookie configuration
@@ -216,6 +300,7 @@ utils/
   billingPlans.js       Billing plan metadata and Stripe price env mapping
   appPreferences.js     Theme/font preference helpers
   households.js         Household roles, limits, and membership helpers
+  inventoryImages.js    Image storage entity metadata and signed URL helpers
   metadata.js           App metadata helpers
   stripe.js             Stripe client helper
 ```
@@ -226,6 +311,10 @@ utils/
 - Use the shared `logoutAction()` for any logout flow so both session layers are cleared.
 - Keep role checks on server-side actions; client role gates are only UI affordances.
 - Do not rely on the inactivity countdown as the security boundary. Server session and middleware enforcement remain the source of truth.
+- Keep desktop navigation and desktop modal behavior separate from mobile-only UX changes unless a task explicitly asks for both.
+- Use `modalTheme.js` for shared modal/sheet styling so headers, focus rings, sticky footers, keyboard insets, and theme accents stay consistent.
+- Apply the user's selected color as an accent for controls, active states, icons, and modal headers. Do not recolor all body text.
+- When adding image support for a new entity, update the Supabase schema, `INVENTORY_IMAGE_ENTITY`, `getImageEntityRecord`, and the relevant serializer.
 - If auth behavior looks stale during development, restart the dev server and clear browser cookies for `localhost`.
 
 ## License

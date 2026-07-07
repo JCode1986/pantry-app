@@ -658,7 +658,7 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
             <>
               <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-lg font-semibold text-gray-950">
+                  <div className="truncate text-lg font-semibold text-[var(--stocksense-brand)]">
                     {activeArea?.name || "Storage Area"}
                   </div>
                   <div className="truncate text-sm text-gray-500">{activeArea?.location?.name}</div>

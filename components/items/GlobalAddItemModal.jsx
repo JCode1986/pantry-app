@@ -54,6 +54,13 @@ import BarcodeScannerModal from "@/components/items/BarcodeScannerModal";
 const NEW_VALUE = "__new__";
 const EMPTY_LIST = [];
 const ITEM_IMAGE_ENTITY = "item";
+const ADD_METHOD_STORAGE_KEY = "wherekeep:add-item-method";
+const KEEP_ADDING_STORAGE_KEY = "wherekeep:keep-adding-items";
+const ADD_METHODS = [
+  { id: "barcode", label: "Barcode", icon: FaBarcode },
+  { id: "voice", label: "Voice", icon: FaMicrophone },
+  { id: "manual", label: "Manual", icon: FaPlus },
+];
 const revealTransition = { duration: 0.2, ease: "easeOut" };
 const revealMotion = {
   initial: { opacity: 0, height: 0, y: -6 },
@@ -149,6 +156,19 @@ function byName(items, name) {
   return (
     (items ?? []).find((item) => normalizeMatchName(item?.name) === target) ?? null
   );
+}
+
+function readStoredAddMethod() {
+  if (typeof window === "undefined") return "barcode";
+  const storedMethod = window.localStorage.getItem(ADD_METHOD_STORAGE_KEY);
+  return ADD_METHODS.some((method) => method.id === storedMethod)
+    ? storedMethod
+    : "barcode";
+}
+
+function readStoredKeepAdding() {
+  if (typeof window === "undefined") return true;
+  return window.localStorage.getItem(KEEP_ADDING_STORAGE_KEY) !== "false";
 }
 
 function AddItemMessage({ message, upgradeHref, onLinkClick, className = "" }) {
@@ -287,12 +307,14 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   const [selectedImageFile, setSelectedImageFile] = useState(null);
   const [selectedImagePreview, setSelectedImagePreview] = useState("");
   const [imageMessage, setImageMessage] = useState("");
-  const [isBarcodeExpanded, setIsBarcodeExpanded] = useState(false);
+  const [isBarcodeExpanded, setIsBarcodeExpanded] = useState(true);
   const [quickAddMessage, setQuickAddMessage] = useState("");
   const [quickAddTranscript, setQuickAddTranscript] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isParsingVoice, setIsParsingVoice] = useState(false);
   const [mobileAddedToast, setMobileAddedToast] = useState(null);
+  const [addMethod, setAddMethod] = useState(readStoredAddMethod);
+  const [keepAdding, setKeepAdding] = useState(readStoredKeepAdding);
 
   const selectedLocation = useMemo(
     () => byId(locations, locationId),
@@ -313,6 +335,48 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   const validationMessage =
     "Choose or create a location, storage area, and category before adding the item.";
   const isQuickAdding = isListening || isParsingVoice;
+  const methodOrder = useMemo(() => {
+    if (addMethod === "voice") {
+      return {
+        barcode: "order-20",
+        voice: "order-10",
+        manual: "order-30",
+      };
+    }
+
+    if (addMethod === "manual") {
+      return {
+        barcode: "order-20",
+        voice: "order-30",
+        manual: "order-10",
+      };
+    }
+
+    return {
+      barcode: "order-10",
+      voice: "order-20",
+      manual: "order-30",
+    };
+  }, [addMethod]);
+
+  const savePreferredAddMethod = useCallback((method) => {
+    if (!ADD_METHODS.some((item) => item.id === method)) return;
+    setAddMethod(method);
+    try {
+      window.localStorage.setItem(ADD_METHOD_STORAGE_KEY, method);
+    } catch {
+      // Local storage is only a convenience for the add flow.
+    }
+  }, []);
+
+  const updateKeepAdding = (value) => {
+    setKeepAdding(value);
+    try {
+      window.localStorage.setItem(KEEP_ADDING_STORAGE_KEY, value ? "true" : "false");
+    } catch {
+      // Local storage is only a convenience for the add flow.
+    }
+  };
 
   const getValidationErrors = useCallback(
     ({
@@ -458,6 +522,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   };
 
   const updateBarcode = (value) => {
+    savePreferredAddMethod("barcode");
     const barcode = cleanBarcode(value);
     setForm((prev) => ({ ...prev, barcode }));
     setBarcodeMessage("");
@@ -583,6 +648,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
 
   const handleVoiceQuickAdd = () => {
     if (isParsingVoice) return;
+    savePreferredAddMethod("voice");
 
     if (isListening) {
       speechRecognitionRef.current?.stop?.();
@@ -680,6 +746,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   };
 
   const lookupBarcode = async (barcodeValue) => {
+    savePreferredAddMethod("barcode");
     const barcode = cleanBarcode(barcodeValue ?? form.barcode);
 
     if (!barcode) {
@@ -774,7 +841,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
     setProductPreview(null);
     clearSelectedImage();
     setIsScannerOpen(false);
-    setIsBarcodeExpanded(false);
+    setIsBarcodeExpanded(true);
     setQuickAddMessage("");
     setQuickAddTranscript("");
     setIsListening(false);
@@ -971,22 +1038,28 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
       categoryName: "",
       ...emptyItemFields,
     }));
+    const shouldCloseAfterAdd = (closeAfterAdd || !keepAdding) && !imageUploadWarning;
+
     setProductPreview(null);
     setBarcodeMessage("");
-    setIsBarcodeExpanded(false);
+    setIsBarcodeExpanded(addMethod === "barcode");
     clearSelectedImage();
     setMessage(imageUploadWarning);
-    setMobileAddedToast({
-      itemId: added.id,
-      itemName: addedName,
-      destinationName: destination || "inventory",
-    });
+    setMobileAddedToast(
+      shouldCloseAfterAdd
+        ? null
+        : {
+            itemId: added.id,
+            itemName: addedName,
+            destinationName: destination || "inventory",
+          }
+    );
     onAdded?.({
       itemName: addedName,
       destinationName: destination || "inventory",
       itemId: added.id,
     });
-    if (closeAfterAdd && !imageUploadWarning) {
+    if (shouldCloseAfterAdd) {
       setIsLoading(true);
       onClose?.();
     }
@@ -1004,19 +1077,19 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
         size="3xl"
         scrollBehavior="inside"
         classNames={{
-          wrapper: "max-md:items-stretch max-md:justify-stretch max-md:p-0",
-          base: "max-md:m-0 max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:w-screen max-md:max-w-none max-md:rounded-none",
+          wrapper: "max-md:items-stretch max-md:justify-stretch max-md:overflow-hidden max-md:p-0",
+          base: "max-md:m-0 max-md:h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:max-h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:w-screen max-md:max-w-none max-md:rounded-none",
         }}
       >
         <ModalContent
-          className={`${modalContentClass} max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:w-screen max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:bg-gray-50 max-md:shadow-none`}
+          className={`${modalContentClass} max-md:h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:max-h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:w-screen max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:bg-gray-50 max-md:shadow-none`}
           style={modalContentStyle}
         >
           {() => (
             <>
             <ModalHeader className={`flex flex-col gap-1 max-md:sticky max-md:top-0 max-md:z-20 max-md:px-4 max-md:py-3 ${modalHeaderClass}`}>
               <div className="flex items-center justify-between gap-3">
-                <span className="text-gray-950">Add item</span>
+                <span className="text-[var(--stocksense-brand)]">Add item</span>
                 <button
                   type="button"
                   aria-label="Close add item"
@@ -1065,7 +1138,36 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                     transition={revealTransition}
                     className="flex min-w-0 flex-col gap-3 sm:gap-4"
                   >
-                    <section className="order-10 md:hidden">
+                    <div className="order-0 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm md:hidden">
+                      <div className="grid grid-cols-3 gap-1">
+                        {ADD_METHODS.map((method) => {
+                          const Icon = method.icon;
+                          const isActive = addMethod === method.id;
+
+                          return (
+                            <button
+                              key={method.id}
+                              type="button"
+                              onClick={() => {
+                                savePreferredAddMethod(method.id);
+                                if (method.id === "barcode") setIsBarcodeExpanded(true);
+                              }}
+                              className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 text-sm font-semibold transition ${
+                                isActive
+                                  ? "bg-[var(--stocksense-brand)] text-white shadow-sm"
+                                  : "text-gray-600 hover:bg-gray-50"
+                              }`}
+                              aria-pressed={isActive}
+                            >
+                              <Icon className="h-3.5 w-3.5 shrink-0" />
+                              <span>{method.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <section className={`${methodOrder.voice} md:hidden`}>
                       <h2 className="mb-2 text-base font-semibold text-gray-950">
                         Quick add
                       </h2>
@@ -1114,7 +1216,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                       )}
                     </section>
 
-                    <div className="order-30 rounded-2xl border border-stocksense-gray bg-gray-50/70 p-3 sm:bg-white md:order-10">
+                    <div className="order-40 rounded-2xl border border-stocksense-gray bg-gray-50/70 p-3 sm:bg-white md:order-10">
                       <div className="mb-3">
                         <div className="text-sm font-semibold text-gray-950">
                           <span className="md:hidden">Where is it stored?</span>
@@ -1260,7 +1362,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                       </motion.div>
                     </div>
 
-                    <div className="order-40 overflow-hidden rounded-2xl border border-stocksense-gray bg-white shadow-sm md:order-20 md:p-3">
+                    <div className={`${methodOrder.barcode} overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white shadow-sm md:order-20 md:border-stocksense-gray md:p-3`}>
                       <button
                         type="button"
                         onClick={() => setIsBarcodeExpanded((value) => !value)}
@@ -1270,10 +1372,10 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                           <FaBarcode className="h-4 w-4 shrink-0 text-[var(--stocksense-brand)]" />
                           <span className="min-w-0">
                             <span className="block text-sm font-semibold text-gray-950">
-                              Scan barcode optional
+                              Scan barcode
                             </span>
                             <span className="block truncate text-xs text-gray-500">
-                              Scan or enter a code
+                              Fastest way to fill item details
                             </span>
                           </span>
                         </span>
@@ -1294,6 +1396,17 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                       </div>
 
                       <div className={`${isBarcodeExpanded ? "block" : "hidden"} border-t border-gray-100 p-3 md:block md:border-t-0 md:p-0`}>
+                      <Button
+                        className="mb-3 min-h-12 w-full rounded-2xl bg-[var(--stocksense-brand)] text-base font-semibold text-white md:hidden"
+                        onPress={() => {
+                          savePreferredAddMethod("barcode");
+                          setIsScannerOpen(true);
+                        }}
+                        isDisabled={isSaving || isLookingUpBarcode}
+                        startContent={<FaBarcode />}
+                      >
+                        Scan barcode
+                      </Button>
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_190px]">
                         <Input
                           label="Barcode (optional)"
@@ -1306,10 +1419,13 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                           startContent={<FaBarcode className="text-gray-400" />}
                           classNames={modalInputClassNames}
                         />
-                        <div className="grid grid-cols-2 gap-2 md:grid-cols-1">
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-1">
                           <Button
-                            className="rounded-xl bg-[var(--stocksense-brand)] text-white"
-                            onPress={() => setIsScannerOpen(true)}
+                            className="hidden rounded-xl bg-[var(--stocksense-brand)] text-white md:inline-flex"
+                            onPress={() => {
+                              savePreferredAddMethod("barcode");
+                              setIsScannerOpen(true);
+                            }}
                             isDisabled={isSaving || isLookingUpBarcode}
                             startContent={<FaBarcode />}
                           >
@@ -1317,7 +1433,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                           </Button>
                           <Button
                             variant="flat"
-                            className="rounded-xl"
+                            className="min-h-11 rounded-xl"
                             onPress={() => lookupBarcode()}
                             isDisabled={isSaving || isLookingUpBarcode || !form.barcode}
                             startContent={
@@ -1370,7 +1486,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                       </div>
                     </div>
 
-                    <div className="order-20 rounded-2xl border border-stocksense-gray bg-white p-3 shadow-sm md:order-30">
+                    <div className={`${methodOrder.manual} rounded-2xl border border-stocksense-gray bg-white p-3 shadow-sm md:order-30`}>
                       <div className="mb-3">
                         <div className="text-sm font-semibold text-gray-950">
                           Item details
@@ -1384,7 +1500,10 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                         <Input
                           label="Item name"
                           value={form.itemName}
-                          onValueChange={(value) => updateForm("itemName", value)}
+                          onValueChange={(value) => {
+                            savePreferredAddMethod("manual");
+                            updateForm("itemName", value);
+                          }}
                           placeholder="e.g., Rice"
                           isDisabled={isSaving}
                           isInvalid={Boolean(validationErrors.itemName)}
@@ -1525,7 +1644,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
             </ModalBody>
 
             <ModalFooter
-              className="flex shrink-0 flex-col gap-2 border-t border-gray-200 bg-white max-md:sticky max-md:bottom-0 max-md:z-20 max-md:px-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] max-md:pt-3 sm:flex-row sm:items-center sm:justify-end"
+              className="flex shrink-0 flex-col gap-2 border-t border-gray-200 bg-white max-md:sticky max-md:bottom-[var(--wherekeep-keyboard-inset,0px)] max-md:z-20 max-md:px-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)] sm:flex-row sm:items-center sm:justify-end"
             >
               <AnimatePresence initial={false}>
                 {mobileAddedToast && (
@@ -1548,10 +1667,9 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                         className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
                         onPress={() => {
                           handleClose();
-                          router.push("/items");
                         }}
                       >
-                        View item
+                        Done
                       </Button>
                       <Button
                         size="sm"
@@ -1559,9 +1677,20 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                         onPress={() => {
                           setMobileAddedToast(null);
                           setMessage("");
+                          if (addMethod === "barcode") {
+                            setIsBarcodeExpanded(true);
+                            setIsScannerOpen(true);
+                          }
+                          if (addMethod === "voice") {
+                            handleVoiceQuickAdd();
+                          }
                         }}
                       >
-                        Add another
+                        {addMethod === "barcode"
+                          ? "Scan next"
+                          : addMethod === "voice"
+                          ? "Voice next"
+                          : "Add another"}
                       </Button>
                     </div>
                   </motion.div>
@@ -1576,6 +1705,21 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                   className="w-full md:hidden"
                 />
               </AnimatePresence>
+
+              <label className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-gray-800 md:hidden">
+                <span className="min-w-0">
+                  <span className="block">Keep adding here</span>
+                  <span className="block truncate text-xs font-normal text-gray-500">
+                    Preserve this location and method
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={keepAdding}
+                  onChange={(event) => updateKeepAdding(event.target.checked)}
+                  className="h-5 w-5 shrink-0 rounded border-gray-300"
+                />
+              </label>
 
               <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:justify-end">
                 <Button variant="light" className="hidden rounded-xl md:inline-flex" onPress={handleClose} isDisabled={isSaving}>
@@ -1599,7 +1743,9 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                     "Adding..."
                   ) : (
                     <>
-                      <span className="md:hidden">Add item</span>
+                      <span className="md:hidden">
+                        {keepAdding ? "Add item" : "Add item & done"}
+                      </span>
                       <span className="hidden md:inline">Add another</span>
                     </>
                   )}

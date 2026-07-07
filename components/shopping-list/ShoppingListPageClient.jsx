@@ -16,6 +16,7 @@ import {
   FaCheck,
   FaEdit,
   FaExchangeAlt,
+  FaImage,
   FaPlus,
   FaShoppingBasket,
   FaTrash,
@@ -59,6 +60,23 @@ const itemVariants = {
   hidden: { opacity: 0, y: 12 },
   show: { opacity: 1, y: 0, transition: { duration: 0.25 } },
   exit: { opacity: 0, y: -8, transition: { duration: 0.15 } },
+};
+
+const mobileSelectionTransition = {
+  duration: 0.18,
+  ease: [0.22, 1, 0.36, 1],
+};
+
+const mobileSelectionPanelMotion = {
+  initial: { opacity: 0, y: -6, scale: 0.985 },
+  animate: { opacity: 1, y: 0, scale: 1 },
+  transition: mobileSelectionTransition,
+};
+
+const mobileDefaultPanelMotion = {
+  initial: { opacity: 0, y: 6, scale: 0.995 },
+  animate: { opacity: 1, y: 0, scale: 1 },
+  transition: mobileSelectionTransition,
 };
 
 function sortItems(items) {
@@ -214,6 +232,9 @@ export default function ShoppingListPageClient({
     if (!canEditInventory) return;
     setItems((current) =>
       sortItems(current.map((existing) => (existing.id === item.id ? item : existing)))
+    );
+    setEditingItem((current) =>
+      current && current.id === item.id ? { ...current, ...item } : current
     );
     setMessage({ type: "success", text: "Shopping list item updated." });
     emitInventoryChange({
@@ -554,7 +575,11 @@ export default function ShoppingListPageClient({
         }
       >
         {mobileSelectionMode ? (
-          <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-lg">
+          <motion.div
+            key="shopping-mobile-selection"
+            {...mobileSelectionPanelMotion}
+            className="transform-gpu rounded-2xl border border-gray-200 bg-white p-3 shadow-lg"
+          >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="text-xl font-semibold tracking-tight text-gray-950">
@@ -629,9 +654,13 @@ export default function ShoppingListPageClient({
                 Delete
               </Button>
             </div>
-          </div>
+          </motion.div>
         ) : (
-          <div className="space-y-3">
+          <motion.div
+            key="shopping-mobile-default"
+            {...mobileDefaultPanelMotion}
+            className="space-y-3 transform-gpu"
+          >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h1 className="text-2xl font-semibold tracking-tight text-gray-950">
@@ -667,22 +696,34 @@ export default function ShoppingListPageClient({
                 )}
               </div>
 
-              <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+              <Select
+                aria-label="Shopping list status filter"
+                label="Show"
+                selectedKeys={new Set([filter])}
+                onSelectionChange={(keys) => {
+                  const value = getSelectedValue(keys);
+                  if (value) setFilter(value);
+                }}
+                variant="bordered"
+                radius="lg"
+                disallowEmptySelection
+                className="w-full"
+                classNames={{
+                  ...themedSelectClassNames,
+                  trigger: `${themedSelectClassNames.trigger} min-h-12 rounded-2xl border-gray-200 bg-white shadow-sm`,
+                }}
+              >
                 {FILTERS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setFilter(option.value)}
-                    className={`min-h-10 shrink-0 rounded-full border px-4 text-sm font-semibold transition ${
-                      filter === option.value
-                        ? "border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
-                        : "border-gray-200 bg-white text-gray-700"
-                    }`}
-                  >
-                    {option.label} ({counts[option.value] ?? 0})
-                  </button>
+                  <SelectItem key={option.value} textValue={option.label}>
+                    <span className="flex w-full items-center justify-between gap-3">
+                      <span>{option.label}</span>
+                      <span className="text-xs font-medium text-gray-500">
+                        {counts[option.value] ?? 0}
+                      </span>
+                    </span>
+                  </SelectItem>
                 ))}
-              </div>
+              </Select>
 
               {message ? (
                 <p
@@ -695,7 +736,7 @@ export default function ShoppingListPageClient({
                   {message.text}
                 </p>
               ) : null}
-          </div>
+          </motion.div>
         )}
       </motion.section>
 
@@ -885,7 +926,12 @@ export default function ShoppingListPageClient({
                 <div className="flex h-full flex-col justify-between gap-3 pt-1">
                   <div className="flex items-start gap-2.5">
                     {mobileSelectionMode && (
-                      <div className="mt-0.5 shrink-0 md:hidden">
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.85 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={mobileSelectionTransition}
+                        className="mt-0.5 shrink-0 transform-gpu md:hidden"
+                      >
                         <input
                           type="checkbox"
                           checked={isSelected}
@@ -897,7 +943,7 @@ export default function ShoppingListPageClient({
                           aria-label={`Select ${item.name}`}
                           className="h-5 w-5 cursor-pointer rounded border border-stocksense-gray"
                         />
-                      </div>
+                      </motion.div>
                     )}
 
                     {canEditInventory && (
@@ -910,6 +956,18 @@ export default function ShoppingListPageClient({
                         className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border border-stocksense-gray max-md:hidden"
                       />
                     )}
+
+                    <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 text-[var(--stocksense-brand)]">
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <FaImage className="h-5 w-5" />
+                      )}
+                    </div>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2.5">

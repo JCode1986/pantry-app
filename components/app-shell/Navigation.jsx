@@ -256,7 +256,7 @@ function MobileTopBar({ attentionCount, onOpenMenu, onOpenAttention }) {
 
         <Link href="/" className="flex min-w-0 items-center justify-center gap-2">
           <WhereKeepLogo showWordmark={false} markClassName="h-8" />
-          <span className="truncate text-lg font-bold text-[var(--stocksense-brand)]">
+          <span className="truncate bg-gradient-to-r from-[var(--stocksense-brand-border)] via-[var(--stocksense-brand)] to-[var(--stocksense-brand-dark)] bg-clip-text text-lg font-bold text-transparent">
             WhereKeep
           </span>
         </Link>
@@ -361,7 +361,7 @@ function MobileMenu({
                 className="flex min-w-0 items-center gap-2"
               >
                 <WhereKeepLogo showWordmark={false} markClassName="h-9" />
-                <span className="truncate text-lg font-bold text-[var(--stocksense-brand)]">
+                <span className="truncate bg-gradient-to-r from-[var(--stocksense-brand-border)] via-[var(--stocksense-brand)] to-[var(--stocksense-brand-dark)] bg-clip-text text-lg font-bold text-transparent">
                   WhereKeep
                 </span>
               </Link>
@@ -510,15 +510,15 @@ function AttentionSheet({
           onClick={onClose}
         >
           <motion.div
-            className="absolute left-4 right-4 top-[4.25rem] ml-auto max-h-[calc(100dvh-5.25rem)] max-w-md overflow-visible rounded-2xl border border-gray-200 bg-white p-4 shadow-2xl"
+            className="absolute left-4 right-4 top-[4.25rem] ml-auto max-h-[calc(100svh-5.25rem)] max-w-md overflow-visible rounded-2xl border border-[var(--stocksense-brand-border)] bg-white shadow-2xl"
             variants={sheetPanelVariants}
             initial="hidden"
             animate="show"
             exit="exit"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="absolute -top-2 right-5 h-4 w-4 rotate-45 border-l border-t border-gray-200 bg-white" />
-            <div className="flex items-start justify-between gap-3">
+            <div className="absolute -top-2 right-5 h-4 w-4 rotate-45 border-l border-t border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]" />
+            <div className="flex items-start justify-between gap-3 rounded-t-2xl border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-4">
               <div className="flex items-start gap-3">
                 <IconCircle
                   icon={hasAttention ? FaBell : FaCheckCircle}
@@ -526,7 +526,7 @@ function AttentionSheet({
                   className="h-11 w-11"
                 />
                 <div>
-                  <h2 className="text-base font-semibold text-slate-950">
+                  <h2 className="text-base font-semibold text-[var(--stocksense-brand)]">
                     Notifications
                   </h2>
                   <p className="mt-1 text-sm leading-5 text-slate-500">
@@ -547,7 +547,7 @@ function AttentionSheet({
             </div>
 
             {hasAttention ? (
-              <div className="mt-4 grid gap-2">
+              <div className="grid gap-2 p-4">
                 {expiringSoonCount > 0 && (
                   <Link
                     href="/items?expiration=soon&days=3"
@@ -564,7 +564,7 @@ function AttentionSheet({
                   <Link
                     href="/items?expiration=expired"
                     onClick={onClose}
-                    className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-[var(--entity-warning-border)] bg-[var(--entity-warning-soft)] px-3 py-2 text-sm font-medium text-[var(--entity-warning-accent)]"
+                    className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700"
                   >
                     <span>
                       {expiredCount} expired item{expiredCount === 1 ? "" : "s"}
@@ -586,8 +586,10 @@ function AttentionSheet({
                 )}
               </div>
             ) : (
-              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
-                No expired items, urgent expirations, or needed shopping list items.
+              <div className="p-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
+                  No expired items, urgent expirations, or needed shopping list items.
+                </div>
               </div>
             )}
           </motion.div>

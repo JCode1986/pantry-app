@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button, Input, Select, SelectItem } from "@heroui/react";
@@ -229,8 +229,16 @@ function MobileAccordionCard({
   children,
   defaultOpen = false,
   id,
+  isOpen: controlledOpen,
+  onOpenChange,
 }) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const isOpen = controlledOpen ?? internalOpen;
+  const toggleOpen = () => {
+    const nextOpen = !isOpen;
+    if (onOpenChange) onOpenChange(nextOpen);
+    else setInternalOpen(nextOpen);
+  };
 
   return (
     <section
@@ -240,7 +248,7 @@ function MobileAccordionCard({
       <button
         type="button"
         className="flex min-h-16 w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
-        onClick={() => setIsOpen((value) => !value)}
+        onClick={toggleOpen}
         aria-expanded={isOpen}
       >
         <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
@@ -830,6 +838,8 @@ export default function ProfileClient({
   const [removeMemberCandidate, setRemoveMemberCandidate] = useState(null);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [mobileBillingOpen, setMobileBillingOpen] = useState(false);
+  const mobileBillingScrollTimerRef = useRef(null);
 
   const passwordValid = password.length >= 6;
   const passwordsMatch = password === confirmPassword;
@@ -876,6 +886,54 @@ export default function ProfileClient({
     setSharing(initialSharing);
     setSharingError(initialSharingError);
   }, [initialSharing, initialSharingError]);
+
+  useEffect(() => {
+    return () => {
+      if (mobileBillingScrollTimerRef.current) {
+        window.clearTimeout(mobileBillingScrollTimerRef.current);
+      }
+    };
+  }, []);
+
+  const centerMobileBilling = (delay = 0) => {
+    if (mobileBillingScrollTimerRef.current) {
+      window.clearTimeout(mobileBillingScrollTimerRef.current);
+    }
+
+    mobileBillingScrollTimerRef.current = window.setTimeout(() => {
+      mobileBillingScrollTimerRef.current = null;
+      document.getElementById("mobile-billing")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, delay);
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const openFromHash = () => {
+      if (window.location.hash !== "#mobile-billing") return;
+      setMobileBillingOpen(true);
+      centerMobileBilling(260);
+    };
+
+    openFromHash();
+    window.addEventListener("hashchange", openFromHash);
+
+    return () => window.removeEventListener("hashchange", openFromHash);
+  }, []);
+
+  const handleMobileBillingLink = (event) => {
+    event.preventDefault();
+    setMobileBillingOpen(true);
+
+    if (window.location.hash !== "#mobile-billing") {
+      window.history.pushState(null, "", "#mobile-billing");
+    }
+
+    centerMobileBilling(mobileBillingOpen ? 0 : 260);
+  };
 
   const handlePasswordSubmit = async (event) => {
     event.preventDefault();
@@ -1222,7 +1280,11 @@ export default function ProfileClient({
             {!canCustomizeAppearance && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
                 Theme and font customization is included with Plus and Family.{" "}
-                <Link href="#mobile-billing" className="font-semibold underline">
+                <Link
+                  href="#mobile-billing"
+                  onClick={handleMobileBillingLink}
+                  className="font-semibold underline"
+                >
                   View plans
                 </Link>
               </div>
@@ -1293,6 +1355,8 @@ export default function ProfileClient({
           icon={FaCreditCard}
           title="Billing"
           summary={`${currentPlan.name}${billing.status ? ` - ${billing.status}` : ""}`}
+          isOpen={mobileBillingOpen}
+          onOpenChange={setMobileBillingOpen}
         >
           <div className="space-y-3">
             {renewalDate && (
@@ -1404,7 +1468,11 @@ export default function ProfileClient({
                 {!sharingIsFamily && sharingIsOwner && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
                     Upgrade to Family to invite household members.{" "}
-                    <Link href="#mobile-billing" className="font-semibold underline">
+                    <Link
+                      href="#mobile-billing"
+                      onClick={handleMobileBillingLink}
+                      className="font-semibold underline"
+                    >
                       View Family plan
                     </Link>
                   </div>
@@ -1611,6 +1679,7 @@ export default function ProfileClient({
             </Link>
             <Link
               href="#mobile-billing"
+              onClick={handleMobileBillingLink}
               className="flex min-h-11 items-center justify-between rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 text-sm font-semibold text-[var(--stocksense-brand)]"
             >
               Billing and plan settings

@@ -231,7 +231,7 @@ export default async function RootLayout({ children }) {
           navigationSummary={navigationSummary}
         />
       )}
-      <div className={`bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10 ${currentUser?.id ? "min-h-[100dvh] pb-24 pt-[61px] md:pb-0 md:pt-0" : ""}`}>
+      <div className={`bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10 ${currentUser?.id ? "min-h-[100svh] pb-24 pt-[61px] md:pb-0 md:pt-0" : ""}`}>
         {children}
       </div>
     </>

@@ -53,7 +53,7 @@ export default function ConfirmDeleteModal({
       }}
     >
       <ModalContent
-        className={`${modalContentClass} max-md:h-auto max-md:max-h-[80dvh] max-md:rounded-b-none max-md:rounded-t-2xl max-md:border max-md:border-gray-200 max-md:bg-white max-md:shadow-2xl`}
+        className={`${modalContentClass} max-md:h-auto max-md:max-h-[80svh] max-md:rounded-b-none max-md:rounded-t-2xl max-md:border max-md:border-gray-200 max-md:bg-white max-md:shadow-2xl`}
         style={modalContentStyle}
       >
         {(close) => (
