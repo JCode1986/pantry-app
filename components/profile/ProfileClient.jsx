@@ -298,7 +298,7 @@ function BillingSection({ billing, billingError, billingLoading, onCheckout, onP
           className={`mt-4 rounded-xl border px-3 py-2 text-sm ${
             billing.cancelAtPeriodEnd
               ? "border-amber-200 bg-amber-50 text-amber-800"
-              : "border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
+              : "border-gray-200 bg-gray-50 text-gray-700"
           }`}
         >
           {billing.cancelAtPeriodEnd
@@ -481,7 +481,7 @@ function SharingSection({
           )}
 
           {isFamily && !isOwner && (
-            <div className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-3 text-sm text-[var(--stocksense-brand)]">
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-700">
               {sharing.currentUserRole === "viewer"
                 ? "You have view-only access. You can browse inventory, shopping list, and activity without changing household data."
                 : "You can view and manage this shared inventory. Only the household owner can invite new members."}

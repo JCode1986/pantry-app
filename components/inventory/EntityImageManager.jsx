@@ -8,6 +8,8 @@ import {
   uploadInventoryImage,
 } from "@/app/actions/server";
 
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
 export default function EntityImageManager({
   entityType,
   entityId,
@@ -19,9 +21,15 @@ export default function EntityImageManager({
   const cameraInputRef = useRef(null);
   const [isWorking, setIsWorking] = useState(false);
   const [error, setError] = useState("");
+  const displayLabel = /optional/i.test(label) ? label : `${label} optional`;
 
   const uploadImage = async (file) => {
     if (!file || !entityType || !entityId) return;
+
+    if (file.size > MAX_IMAGE_BYTES) {
+      setError("Images must be 5 MB or smaller.");
+      return;
+    }
 
     setIsWorking(true);
     setError("");
@@ -29,15 +37,25 @@ export default function EntityImageManager({
     const formData = new FormData();
     formData.append("image", file);
 
-    const result = await uploadInventoryImage(entityType, entityId, formData);
-    setIsWorking(false);
+    try {
+      const result = await uploadInventoryImage(entityType, entityId, formData);
 
-    if (result?.error) {
-      setError(typeof result.error === "string" ? result.error : "Could not upload image.");
-      return;
+      if (result?.error) {
+        setError(typeof result.error === "string" ? result.error : "Could not upload image.");
+        return;
+      }
+
+      onChange?.(result.data);
+    } catch (err) {
+      console.error("uploadInventoryImage request error:", err);
+      setError(
+        err?.message === "aborted"
+          ? "The upload was interrupted. Try a smaller image or choose it again."
+          : "Could not upload image."
+      );
+    } finally {
+      setIsWorking(false);
     }
-
-    onChange?.(result.data);
   };
 
   const removeImage = async () => {
@@ -58,11 +76,11 @@ export default function EntityImageManager({
   };
 
   return (
-    <div className="rounded-xl border border-stocksense-gray bg-gray-50/70 p-3">
+    <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-3">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+        <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
           <FaImage className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
-          {label}
+          {displayLabel}
         </div>
         {isWorking && <FaSpinner className="h-3.5 w-3.5 animate-spin text-gray-400" />}
       </div>
@@ -77,7 +95,7 @@ export default function EntityImageManager({
             />
           ) : (
             <div className="grid h-full w-full place-items-center text-xs text-gray-400">
-              No photo
+              Optional photo
             </div>
           )}
         </div>

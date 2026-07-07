@@ -60,12 +60,13 @@ export default async function Page({ params }) {
 
   // 2) Fetch categories under this area + item counts (minimal)
   // IMPORTANT: If you get "more than one relationship" errors, you may need explicit FK names.
-  const { data: categoriesRaw, error: categoriesError } = await supabase
+  let { data: categoriesRaw, error: categoriesError } = await supabase
     .from("storage_categories")
     .select(
       `
       id,
       name,
+      image_path,
       storage_area_id,
       items:items!fk_items_category ( id )
     `
@@ -73,15 +74,43 @@ export default async function Page({ params }) {
     .eq("storage_area_id", id)
     .order("name", { ascending: true });
 
+  const categoryImageColumnMissing =
+    categoriesError?.code === "42703" &&
+    categoriesError?.message?.includes("image_path");
+
+  if (categoryImageColumnMissing) {
+    const fallback = await supabase
+      .from("storage_categories")
+      .select(
+        `
+        id,
+        name,
+        storage_area_id,
+        items:items!fk_items_category ( id )
+      `
+      )
+      .eq("storage_area_id", id)
+      .order("name", { ascending: true });
+
+    categoriesRaw = fallback.data;
+    categoriesError = fallback.error;
+  }
+
   if (categoriesError) {
     console.error("Categories fetch error:", categoriesError?.message || categoriesError);
   }
 
-  const categories = (categoriesRaw ?? []).map((c) => ({
-    id: c.id,
-    name: c.name,
-    itemsCount: (c.items ?? []).length,
-  }));
+  const categories = await Promise.all(
+    (categoriesRaw ?? []).map(async (c) => ({
+      id: c.id,
+      name: c.name,
+      image_path: c.image_path ?? null,
+      imageUrl: categoryImageColumnMissing
+        ? null
+        : await getInventoryImageUrl(c.image_path),
+      itemsCount: (c.items ?? []).length,
+    }))
+  );
 
   const totals = {
     categories: categories.length,
@@ -89,7 +118,7 @@ export default async function Page({ params }) {
   };
 
   return (
-    <main className="page-enter max-w-[1500px] mx-auto p-6 pt-8 min-h-[100vh]">
+    <main className="page-enter max-w-[1500px] mx-auto p-6 pt-8 min-h-[100vh] max-md:px-4 max-md:pb-32 max-md:pt-4">
       <AreaDetailClient
         area={{
           id: area.id,

@@ -405,14 +405,17 @@ function formatTimestamp(value) {
   }).format(date);
 }
 
-function actorName(row) {
+function actorName(row, memberByUserId) {
+  const actorUserId = row.actor_user_id ? String(row.actor_user_id) : null;
+  const member = actorUserId ? memberByUserId.get(actorUserId) : null;
+
   return (
     row.actor_email ||
     row.actor_name ||
     row.user_email ||
     row.member_email ||
-    (row.actor_user_id ? `User ${String(row.actor_user_id).slice(0, 8)}` : null) ||
-    'Unknown user'
+    member?.email ||
+    (actorUserId ? `User ${actorUserId.slice(0, 8)}` : null)
   );
 }
 
@@ -449,6 +452,15 @@ export default function RecentActivity({
         value: member.userId,
         label: memberLabel(member),
       })),
+    [members]
+  );
+  const memberByUserId = useMemo(
+    () =>
+      new Map(
+        members
+          .filter((member) => member?.userId)
+          .map((member) => [String(member.userId), member])
+      ),
     [members]
   );
   const showUserFilter =
@@ -608,6 +620,7 @@ export default function RecentActivity({
           activityItems.map((row, index) => {
             const action = (row.action || '').toLowerCase();
             const entity = (row.entity_type || 'item').toLowerCase();
+            const actor = actorName(row, memberByUserId);
 
             return (
               <motion.li
@@ -635,7 +648,9 @@ export default function RecentActivity({
                     </p>
                     <p className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-500">
                       <FaUserCircle className="h-3 w-3 shrink-0 text-[var(--stocksense-brand)]" />
-                      <span className="truncate">By {actorName(row)}</span>
+                      <span className="truncate">
+                        {actor ? `By ${actor}` : 'Household activity'}
+                      </span>
                     </p>
                   </div>
                 </div>

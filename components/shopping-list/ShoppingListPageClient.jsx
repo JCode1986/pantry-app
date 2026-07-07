@@ -478,7 +478,7 @@ export default function ShoppingListPageClient({
               <FaShoppingBasket className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold tracking-tight text-stocksense-teal md:text-2xl">
+              <h1 className="text-xl font-semibold tracking-tight text-gray-950 md:text-2xl md:text-stocksense-teal">
                 Shopping List
               </h1>
               <p className="text-sm text-gray-500">
@@ -556,7 +556,7 @@ export default function ShoppingListPageClient({
               className="mt-4 overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3"
             >
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <p className="text-sm text-[var(--stocksense-brand)]">
+                <p className="text-sm text-gray-700">
                   Bulk actions for{" "}
                   <span className="font-semibold">{selectedCount}</span>{" "}
                   item{selectedCount === 1 ? "" : "s"}
@@ -683,7 +683,7 @@ export default function ShoppingListPageClient({
                           <div className="text-[10px] font-semibold uppercase text-gray-400">
                             Qty
                           </div>
-                          <div className="text-base font-semibold leading-5 text-stocksense-teal">
+                          <div className="text-base font-semibold leading-5 text-gray-950 md:text-stocksense-teal">
                             {item.quantity ?? 0}
                           </div>
                         </div>

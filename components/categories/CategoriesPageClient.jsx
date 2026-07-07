@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Input, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
 import { FaSearch, FaTags, FaTrash } from "react-icons/fa";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
+import EntityImageManager from "@/components/inventory/EntityImageManager";
 import {
   modalBodyClass,
   modalContentClass,
@@ -79,6 +80,8 @@ export default function CategoriesPageClient({
             {
               id: item.categoryId,
               name: item.categoryName ?? "Category",
+              image_path: null,
+              imageUrl: null,
               insertedAt: null,
               storageArea: {
                 id: item.storageAreaId ?? null,
@@ -192,6 +195,28 @@ export default function CategoriesPageClient({
     emitInventoryChange({
       entity: "category",
       action: "updated",
+      id: activeCategory.id,
+    });
+  };
+
+  const handleCategoryImageChange = ({ imagePath, imageUrl }) => {
+    if (!activeCategory?.id) return;
+
+    setCategories((prev) =>
+      prev.map((category) =>
+        category.id === activeCategory.id
+          ? {
+              ...category,
+              image_path: imagePath ?? null,
+              imageUrl: imageUrl ?? null,
+            }
+          : category
+      )
+    );
+
+    emitInventoryChange({
+      entity: "category",
+      action: imagePath ? "image_updated" : "image_removed",
       id: activeCategory.id,
     });
   };
@@ -361,7 +386,7 @@ export default function CategoriesPageClient({
               className="mt-4 overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3"
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-[var(--stocksense-brand)]">
+                <p className="text-sm text-gray-700">
                   Bulk actions for <span className="font-semibold">{selectedCount}</span>{" "}
                   categor{selectedCount === 1 ? "y" : "ies"}
                 </p>
@@ -420,8 +445,21 @@ export default function CategoriesPageClient({
                     className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border border-stocksense-gray"
                   />
                 )}
+                {c.imageUrl ? (
+                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
+                    <img
+                      src={c.imageUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
+                    <FaTags className="h-4 w-4" />
+                  </div>
+                )}
                 <div className="min-w-0">
-                  <div className="truncate text-[15px] font-semibold leading-5 text-stocksense-teal sm:text-base">
+                  <div className="truncate text-[15px] font-semibold leading-5 text-gray-950 sm:text-base md:text-stocksense-teal">
                     {c.name}
                   </div>
                   <div className="mt-1 text-sm text-gray-500 truncate">
@@ -472,7 +510,7 @@ export default function CategoriesPageClient({
           {() => (
             <>
               <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
-                <div className="text-lg font-semibold text-[var(--stocksense-brand)]">
+                <div className="text-lg font-semibold text-gray-950">
                   {activeCategory?.name || "Category"}
                 </div>
                 <div className="text-sm text-gray-500">
@@ -499,6 +537,16 @@ export default function CategoriesPageClient({
                       Save name
                     </Button>
                   </div>
+                )}
+
+                {canEditInventory && activeCategory?.id && (
+                  <EntityImageManager
+                    entityType="category"
+                    entityId={activeCategory.id}
+                    imageUrl={activeCategory.imageUrl}
+                    label="Category photo"
+                    onChange={handleCategoryImageChange}
+                  />
                 )}
 
                 {/* Items preview */}

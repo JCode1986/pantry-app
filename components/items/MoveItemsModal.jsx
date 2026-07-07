@@ -114,10 +114,10 @@ export default function MoveItemsModal({
             initial={{ scale: 0.95, opacity: 0, y: 10 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 10 }}
-            className="w-full max-w-md rounded-2xl border border-[var(--stocksense-brand-border)] bg-white p-5 text-gray-700 shadow-xl space-y-4"
+            className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-5 text-gray-700 shadow-xl space-y-4"
             style={modalContentStyle}
           >
-            <h2 className="text-lg font-semibold text-[var(--stocksense-brand)]">
+            <h2 className="text-lg font-semibold text-gray-950">
               Move {moveModal.itemIds.length} item
               {moveModal.itemIds.length > 1 ? "s" : ""}
             </h2>
@@ -198,7 +198,7 @@ export default function MoveItemsModal({
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={closeModal}
-                className="cursor-pointer rounded-lg border border-[var(--stocksense-brand-border)] px-3 py-1.5 text-sm text-[var(--stocksense-brand)] hover:bg-[var(--stocksense-brand-soft)]"
+                className="cursor-pointer rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>

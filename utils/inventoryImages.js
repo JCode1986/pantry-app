@@ -5,6 +5,7 @@ export const INVENTORY_IMAGE_BUCKET = "inventory-images";
 export const INVENTORY_IMAGE_ENTITY = {
   LOCATION: "location",
   STORAGE_AREA: "storage_area",
+  CATEGORY: "category",
   ITEM: "item",
 };
 

@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
 import StorageAreasSection from '@/components/locations/StorageAreasSection';
-import Link from 'next/link';
+import LocationDetailHeaderClient from '@/components/locations/LocationDetailHeaderClient';
 import { notFound } from 'next/navigation';
 import { createPageMetadata, NO_INDEX_ROBOTS } from '@/utils/metadata';
 import { getCanEditInventoryForUser } from '@/utils/households';
@@ -130,44 +130,33 @@ export default async function Page({ params }) {
   }));
 
   const locationImageUrl = await getInventoryImageUrl(location.image_path);
+  const totalAreas = storageAreas.length;
+  const totalCategories = storageAreas.reduce(
+    (sum, area) => sum + (area.categories?.length ?? 0),
+    0
+  );
+  const totalItems = storageAreas.reduce(
+    (sum, area) =>
+      sum +
+      (area.categories ?? []).reduce(
+        (categorySum, category) => categorySum + (category.items?.length ?? 0),
+        0
+      ),
+    0
+  );
 
   return (
-    <main className="page-enter max-w-[1500px] mx-auto px-5 py-8 min-h-[100vh]">
-      <header className="mb-6 overflow-hidden rounded-2xl border border-stocksense-gray bg-white shadow-sm">
-        <div className="border-t-4 border-[var(--entity-location-accent)] p-5">
-          <Link
-            href="/locations"
-            className="inline-flex items-center text-sm font-medium text-[var(--stocksense-brand)] hover:underline"
-          >
-            Back to locations
-          </Link>
-          <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div className="flex min-w-0 gap-4">
-              {locationImageUrl && (
-                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-location-border)] bg-white">
-                  <img
-                    src={locationImageUrl}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              )}
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Location
-                </p>
-                <h1 className="mt-1 truncate text-3xl font-semibold tracking-tight text-stocksense-teal">
-                  {location.name}
-                </h1>
-                <p className="mt-2 max-w-2xl text-sm text-gray-500">
-                  Manage this location while seeing the hierarchy clearly: storage
-                  areas contain categories, and categories contain items.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+    <main className="page-enter max-w-[1500px] mx-auto px-5 py-8 min-h-[100vh] max-md:px-4 max-md:pb-32 max-md:pt-4">
+      <LocationDetailHeaderClient
+        location={location}
+        imageUrl={locationImageUrl}
+        canEditInventory={canEditInventory}
+        stats={{
+          totalAreas,
+          totalCategories,
+          totalItems,
+        }}
+      />
       <StorageAreasSection
         locationName={location?.name}
         locationId={location.id}

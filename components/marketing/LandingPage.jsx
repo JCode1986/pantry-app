@@ -29,16 +29,16 @@ import WhereKeepLogo from '@/components/ui/WhereKeepLogo';
 
 const heroProofPoints = [
   'Start free in minutes',
-  'Location > storage area > category > item',
-  'Scan barcodes and add photos',
+  'Home > room > bin > item',
+  'Add photos, barcodes, and notes',
 ];
 
 const features = [
   {
     icon: FaMapMarkedAlt,
-    title: 'Map inventory to real spaces',
+    title: 'Remember the real-world spot',
     description:
-      'Organize by location, storage area, and a flexible category such as item type, shelf, bin, or grouping.',
+      'Organize by the way people actually remember things: place, room, shelf, bin, basket, and item.',
   },
   {
     icon: FaBarcode,
@@ -48,9 +48,9 @@ const features = [
   },
   {
     icon: FaSearch,
-    title: 'Search and filter deeply',
+    title: 'Ask where things are',
     description:
-      'Narrow inventory by text, location, area, category, expiration, and stock status.',
+      'Search by item name, barcode, location, room, container, stock level, or expiration window.',
   },
   {
     icon: FaBell,
@@ -66,9 +66,9 @@ const features = [
   },
   {
     icon: FaImage,
-    title: 'Recognize items visually',
+    title: 'Make storage visual',
     description:
-      'Add photos for locations, storage areas, and items so people can confirm what they are looking at faster.',
+      'Add photos for locations, storage areas, containers, and items so everyone can recognize the right spot faster.',
   },
   {
     icon: FaCamera,
@@ -98,14 +98,14 @@ const features = [
 
 const outcomes = [
   {
-    title: 'Stop rebuying what is already on a shelf',
+    title: 'Know where the thing lives',
     description:
-      'Search across the whole household before another grocery run, hardware-store stop, or bulk order.',
+      'Turn "I know I own it" into a specific place, shelf, bin, or basket instead of another long search.',
   },
   {
     title: 'Make "where is it?" searchable',
     description:
-      'Keep locations, storage areas, categories, quantities, and expiration dates connected.',
+      'Keep locations, storage areas, containers, quantities, and expiration dates connected.',
   },
   {
     title: 'Use leftovers before they become waste',
@@ -122,11 +122,11 @@ const outcomes = [
 const conversionStats = [
   {
     value: '50',
-    label: 'free items to prove the workflow',
+    label: 'free items to map the first spaces',
   },
   {
-    value: 'Unlimited',
-    label: 'items and locations on Plus',
+    value: 'Room',
+    label: 'to shelf and bin paths',
   },
   {
     value: '5',
@@ -139,7 +139,7 @@ const audiences = [
     icon: FaHome,
     title: 'Busy homes',
     description:
-      'Pantry, fridge leftovers, freezer meals, garage, bathroom, cleaning, storage bins, and everything people forget they already bought.',
+      'Pantry, fridge leftovers, freezer meals, garage, bathroom, cleaning supplies, storage bins, and everything people forget where they put.',
     accent: 'var(--entity-location-accent)',
     soft: 'var(--entity-location-soft)',
     border: 'var(--entity-location-border)',
@@ -155,9 +155,9 @@ const audiences = [
   },
   {
     icon: FaStore,
-    title: 'Small inventory teams',
+    title: 'Small shared spaces',
     description:
-      'Let helpers or customers view what is available while the account owner controls who can change inventory.',
+      'Let helpers or customers view what is available while the account owner controls who can change stored item details.',
     accent: 'var(--entity-item-accent)',
     soft: 'var(--entity-item-soft)',
     border: 'var(--entity-item-border)',
@@ -166,16 +166,16 @@ const audiences = [
 
 const workflow = [
   {
-    title: 'Set up places',
-    description: 'Create locations, storage areas, and categories that match how your home is actually organized.',
+    title: 'Create your home',
+    description: 'Start with the real places people use: kitchen, garage, pantry, closet, office, or storage room.',
   },
   {
-    title: 'Track items',
-    description: 'Add quantities and expiration dates, then get dashboard reminders for what is expired or expiring soon.',
+    title: 'Add where it lives',
+    description: 'Attach the item to the shelf, bin, basket, or area where someone would actually look for it.',
   },
   {
-    title: 'Restock confidently',
-    description: 'Use the shopping list and recent activity to keep restocking decisions connected to real inventory.',
+    title: 'Search before you rebuy',
+    description: 'Use search, photos, shopping list, and recent activity to keep the household aligned.',
   },
 ];
 
@@ -205,8 +205,8 @@ const inventoryLoop = [
   },
   {
     icon: FaMapMarkedAlt,
-    title: 'Place',
-    description: 'Assign the location, storage area, and category or shelf that match the real setup.',
+    title: 'Confirm location',
+    description: 'Choose the room, storage area, shelf, bin, or grouping that matches the real setup.',
   },
   {
     icon: FaSearch,
@@ -223,23 +223,23 @@ const inventoryLoop = [
 const hierarchyLevels = [
   {
     icon: FaHome,
-    label: 'Location',
+    label: 'Home or place',
     example: 'Home, school, work, store',
-    description: 'The broad place or site where inventory lives.',
+    description: 'The broad place where the item lives.',
     tone: 'brand',
   },
   {
     icon: FaLayerGroup,
-    label: 'Storage area',
+    label: 'Room or area',
     example: 'Kitchen pantry, garage shelf',
-    description: 'The specific physical area inside that location.',
+    description: 'The physical room or storage area inside that place.',
     tone: 'success',
   },
   {
     icon: FaClipboardList,
-    label: 'Category',
-    example: 'Snacks, shelf 1, bin A, power tools',
-    description: 'The type, shelf, bin, or grouping that makes sense inside that storage area.',
+    label: 'Container or shelf',
+    example: 'White basket, shelf 1, bin A',
+    description: 'The shelf, bin, basket, or grouping that makes the item easy to find.',
     tone: 'warning',
   },
   {
@@ -252,15 +252,15 @@ const hierarchyLevels = [
 ];
 
 const hierarchyExamples = [
-  'Home > Kitchen pantry > Snacks > Granola bars',
-  'Home > Garage > Shelf 1 > Power drill',
+  'Home > Kitchen pantry > White basket > Granola bars',
+  'Home > Garage shelf > Tool bin > Power drill',
   'Work > Supply closet > Paper goods > Printer paper',
   'School > Classroom cabinet > Bin A > Glue sticks',
 ];
 
 const spreadsheetComparison = [
   {
-    oldWay: 'Rows get stale when multiple people touch inventory.',
+    oldWay: 'Rows get stale when multiple people update the same home list.',
     newWay: 'Roles decide who can edit, and recent activity shows what changed.',
   },
   {
@@ -269,7 +269,7 @@ const spreadsheetComparison = [
   },
   {
     oldWay: 'A spreadsheet says "garage" but not which bin or shelf.',
-    newWay: 'Locations, storage areas, categories, photos, and item details stay connected.',
+    newWay: 'Places, rooms, containers, photos, and item details stay connected.',
   },
   {
     oldWay: 'Restocking happens in a separate notes app.',
@@ -304,7 +304,7 @@ const faqs = [
   {
     question: 'What makes this better than a spreadsheet?',
     answer:
-      'WhereKeep connects item location, shopping status, activity, permissions, and filters instead of leaving everyone to maintain rows manually.',
+      'WhereKeep connects each item to a real place, shopping status, activity, permissions, and filters instead of leaving everyone to maintain rows manually.',
   },
   {
     question: 'Can people view inventory without changing it?',
@@ -401,16 +401,21 @@ function HeroStatStrip() {
   );
 }
 
-function ActivityLine({ action, name, detail }) {
+function SearchResultLine({ name, path, detail, tone = 'brand' }) {
+  const toneClass = getPreviewToneClass(tone);
+
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm">
-      <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[var(--stocksense-brand)]" />
-      <div className="min-w-0">
-        <div className="truncate text-sm font-medium text-gray-800">
-          {action} <span className="text-gray-500">{name}</span>
+    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-gray-800">{name}</div>
+          <div className="mt-1 text-xs leading-5 text-gray-600">{path}</div>
         </div>
-        <div className="text-xs text-gray-500">{detail}</div>
+        <span className={`shrink-0 rounded-full border px-2 py-0.5 text-xs ${toneClass}`}>
+          Found
+        </span>
       </div>
+      <div className="mt-1 text-xs text-gray-500">{detail}</div>
     </div>
   );
 }
@@ -424,48 +429,60 @@ function InventoryPreview() {
             <FaLayerGroup />
           </div>
           <div>
-            <div className="text-sm font-semibold text-gray-900">WhereKeep command center</div>
-            <div className="text-xs text-gray-500">Inventory, restocking, roles, and activity in one place</div>
+            <div className="text-sm font-semibold text-gray-900">Your home memory</div>
+            <div className="text-xs text-gray-500">Find what you own and exactly where it lives</div>
           </div>
         </div>
         <div className="hidden rounded-full border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-1 text-xs font-medium text-[var(--stocksense-brand)] sm:block">
-          Family inventory
+          Household ready
         </div>
       </div>
 
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
-        <PreviewMetric icon={FaHome} label="Locations" value="4" />
-        <PreviewMetric icon={FaBoxOpen} label="Tracked items" value="138" tone="success" />
+        <PreviewMetric icon={FaHome} label="Spaces" value="4" />
+        <PreviewMetric icon={FaBoxOpen} label="Things remembered" value="138" tone="success" />
         <PreviewMetric icon={FaBell} label="Need attention" value="9" tone="warning" />
       </div>
 
       <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_1.2fr]">
         <div className="space-y-2">
-          <div className="text-xs font-semibold uppercase text-gray-600">Locations</div>
+          <div className="text-xs font-semibold uppercase text-gray-600">Home spaces</div>
           <PreviewRow label="Home" value="104" />
           <PreviewRow label="Work" value="22" />
           <PreviewRow label="School" value="12" tone="muted" />
         </div>
 
         <div className="space-y-2">
-          <div className="text-xs font-semibold uppercase text-gray-600">Storage areas</div>
+          <div className="text-xs font-semibold uppercase text-gray-600">Rooms and areas</div>
           <PreviewRow label="Kitchen pantry" value="58" />
           <PreviewRow label="Garage shelf" value="34" />
           <PreviewRow label="Classroom cabinet" value="12" tone="muted" />
         </div>
 
         <div className="space-y-2">
-          <div className="text-xs font-semibold uppercase text-gray-600">Shopping list</div>
-          <PreviewRow label="Paper towels" value="Needed" />
-          <PreviewRow label="Pasta sauce" value="Purchased" tone="success" />
-          <PreviewRow label="Coffee filters" value="Qty 1" tone="warning" />
+          <div className="text-xs font-semibold uppercase text-gray-600">Stored in</div>
+          <PreviewRow label="White basket" value="12" />
+          <PreviewRow label="Blue document box" value="8" tone="success" />
+          <PreviewRow label="Holiday bin" value="23" tone="warning" />
         </div>
 
         <div className="space-y-2">
-          <div className="text-xs font-semibold uppercase text-gray-600">Recent activity</div>
-          <ActivityLine action="Scanned" name="Olive oil" detail="Barcode match added to pantry" />
-          <ActivityLine action="Moved" name="Rice" detail="Pantry to Bulk storage" />
-          <ActivityLine action="Purchased" name="Paper towels" detail="Shopping list" />
+          <div className="text-xs font-semibold uppercase text-gray-600">Search anything</div>
+          <div className="flex items-center gap-2 rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-2 text-sm font-medium text-[var(--stocksense-brand)]">
+            <FaSearch className="h-3.5 w-3.5" />
+            Where are the batteries?
+          </div>
+          <SearchResultLine
+            name="AA batteries"
+            path="Home > Hall closet > Clear bin"
+            detail="Updated 2 weeks ago"
+          />
+          <SearchResultLine
+            name="Passport"
+            path="Home > Bedroom closet > Blue document box"
+            detail="Added with photo"
+            tone="success"
+          />
         </div>
       </div>
     </div>
@@ -565,7 +582,7 @@ function HierarchySection() {
         <SectionHeader
           eyebrow="How it is organized"
           title="A simple hierarchy that matches real life."
-          description="WhereKeep is built around the way people naturally ask for something: what place is it in, what area is it stored in, what shelf or grouping is it under, and what exact item am I looking for?"
+          description="WhereKeep is built around the way people naturally ask for something: what home is it in, what room or area is it stored in, what shelf or container is it under, and what exact item am I looking for?"
         />
 
         <div className="grid gap-4 md:grid-cols-4">
@@ -649,19 +666,19 @@ export default function LandingPage() {
           <div className="grid flex-1 content-center gap-10 py-12">
             <div className="max-w-3xl">
               <div className="mb-4 inline-flex rounded-full border border-[var(--stocksense-brand-border)] bg-white/85 px-3 py-1 text-xs font-semibold text-[var(--stocksense-brand)] shadow-sm backdrop-blur">
-                Inventory software for homes, families, and small shared spaces
+                Your home's memory for everything you store
               </div>
               <h1 className="text-5xl font-semibold tracking-tight text-[var(--stocksense-brand)] sm:text-6xl md:text-7xl">
                 WhereKeep
               </h1>
               <p className="mt-5 max-w-2xl text-2xl font-semibold leading-tight text-gray-900 sm:text-3xl">
-                The shared inventory app that helps people stop buying duplicates.
+                Find everything you own, right where you left it.
               </p>
               <p className="mt-4 max-w-2xl text-base leading-7 text-gray-700">
-                Scan barcodes, add photos, map every item to a real place, and
-                turn restocking into a shopping list everyone can trust. Start
-                free, then upgrade when unlimited inventory or shared household
-                roles save more than another forgotten duplicate costs.
+                WhereKeep helps your household remember the real spot for each
+                item: pantry basket, closet box, garage shelf, freezer drawer,
+                or storage bin. Add photos and barcodes when they help, then
+                search before you buy a duplicate or tear apart the house.
               </p>
 
               <div className="mt-7 flex flex-col gap-3 sm:flex-row">
@@ -699,7 +716,7 @@ export default function LandingPage() {
           <SectionHeader
             eyebrow="Fast capture"
             title="The add flow is built for real life, not perfect data entry."
-            description="People can scan a barcode, pick a photo from the camera roll, take a new picture on mobile, or type manually when product lookup does not find a match."
+            description="Start with the minimum that helps later: what it is, where it lives, and a photo or barcode when useful. Extra details stay optional until they matter."
           />
 
           <div className="grid gap-4 md:grid-cols-4">
@@ -714,8 +731,8 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-5 py-14">
           <SectionHeader
             eyebrow="Why people keep using it"
-            title="It solves the everyday inventory problems that cost time and money."
-            description="The product loop is simple: organize what you have, find it fast, restock only what is needed, and keep everyone aligned."
+            title="It solves the everyday search problem first."
+            description="The product loop is simple: remember what you have, find it fast, restock only what is needed, and keep everyone aligned."
           />
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -745,8 +762,8 @@ export default function LandingPage() {
               A few avoided duplicate purchases can cover the plan.
             </h2>
             <p className="mt-3 text-sm leading-6 text-gray-600 sm:text-base">
-              WhereKeep is easiest to sell when the value is concrete: fewer
-              repeated purchases, less time searching, cleaner restocking, and
+              WhereKeep is easiest to trust when the value is concrete: less
+              time searching, fewer repeated purchases, cleaner restocking, and
               fewer accidental edits in shared households.
             </p>
             <div className="mt-5 inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
@@ -768,7 +785,7 @@ export default function LandingPage() {
           <SectionHeader
             eyebrow="Built for real users"
             title="One product, different permission levels."
-            description="WhereKeep can fit a home pantry, a family inventory, or a small shared stockroom without giving everyone edit access."
+            description="WhereKeep can fit a home pantry, family storage, or a small shared stockroom without giving everyone edit access."
           />
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -783,7 +800,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-5 py-14">
           <SectionHeader
             eyebrow="Features"
-            title="Everything connects from inventory to restocking."
+            title="Everything connects from finding to restocking."
             description="WhereKeep covers the full loop: organize, find, update, delete, move, purchase, and audit changes."
           />
 
@@ -817,7 +834,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-5 py-14">
           <SectionHeader
             eyebrow="Workflow"
-            title="A practical system for keeping up."
+            title="A practical system for remembering where things are."
             description="Start simple, then let the same data support larger homes, multiple storage places, and shared responsibility."
           />
 
@@ -850,7 +867,7 @@ export default function LandingPage() {
               Invite people without handing over the whole system.
             </h2>
             <p className="mt-3 text-sm leading-6 text-gray-600 sm:text-base">
-              Shared inventory is only valuable when the right people can help.
+              A shared home memory is only valuable when the right people can help.
               Family roles let the owner choose who can change data and who can
               only view it.
             </p>
@@ -894,7 +911,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-5 py-14">
           <SectionHeader
             eyebrow="Why upgrade"
-            title="Paid plans are for the moment inventory becomes worth protecting."
+            title="Paid plans are for the moment your home memory becomes worth sharing."
             description="WhereKeep becomes most valuable when there are more items, more places, more people, and more restocking decisions to keep aligned."
           />
 
@@ -954,9 +971,9 @@ export default function LandingPage() {
                   Start with one shelf. Grow into the whole household.
                 </h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-700">
-                  Create a free account, map the first location, and upgrade
-                  when unlimited inventory or shared access becomes the obvious
-                  next step.
+                  Create a free account, map the first real spot, and upgrade
+                  when unlimited items or shared access becomes the obvious next
+                  step.
                 </p>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row">

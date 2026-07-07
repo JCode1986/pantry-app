@@ -74,19 +74,19 @@ const modalContentStyle = {
 };
 
 const modalContentClass =
-  'flex w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white text-gray-700 sm:w-full';
+  'flex w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white text-gray-700 shadow-xl sm:w-full';
 
 const modalHeaderClass =
-  'shrink-0 border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-base font-semibold text-[var(--stocksense-brand)]';
+  'shrink-0 border-b border-gray-200 bg-white text-base font-semibold text-gray-950';
 
 const modalBodyClass = 'min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pt-5';
 
 const modalFooterClass =
-  'flex shrink-0 flex-col-reverse gap-2 border-t border-[var(--stocksense-brand-border)] bg-white sm:flex-row sm:justify-end';
+  'flex shrink-0 flex-col-reverse gap-2 border-t border-gray-200 bg-white sm:flex-row sm:justify-end';
 
 const modalInputClassNames = {
   inputWrapper:
-    'border-[var(--stocksense-brand-border)] bg-white focus-within:border-[var(--stocksense-brand)]',
+    'border-gray-200 bg-white focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]',
   label: 'text-gray-700',
   input: 'text-gray-900 placeholder:text-gray-400',
 };
@@ -1134,7 +1134,7 @@ export default function StorageAreasSection({
       {/* Top: Summary & tools */}
       <motion.div
         variants={pageItemVariants}
-        className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm"
+        className="rounded-2xl border border-stocksense-gray bg-white p-4 shadow-sm max-md:hidden md:p-5"
       >
         <div className="flex flex-col gap-4">
           <div>
@@ -1246,12 +1246,34 @@ export default function StorageAreasSection({
 
       {/* Mobile hierarchy */}
       <motion.div variants={pageVariants} className="grid grid-cols-1 gap-3 md:hidden">
+        <motion.div variants={pageItemVariants} className="flex items-end justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-gray-950">
+              Storage areas
+            </h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Browse the places inside this location.
+            </p>
+          </div>
+          {canEditInventory && storageAreas.length > 0 && (
+            <button
+              onClick={openCreateAreaModal}
+              className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white"
+            >
+              <FaPlus className="h-3 w-3" /> Add
+            </button>
+          )}
+        </motion.div>
+
         {storageAreas.length === 0 && (
           <motion.div
             variants={pageItemVariants}
-            className="rounded-2xl border border-dashed border-stocksense-gray bg-white p-6 text-center shadow-sm"
+            className="rounded-2xl border border-dashed border-gray-200 bg-white p-6 text-center shadow-sm"
           >
-            <h2 className="text-lg font-semibold text-stocksense-teal">
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]">
+              <FaWarehouse className="h-6 w-6" />
+            </div>
+            <h2 className="mt-4 text-lg font-semibold text-gray-950">
               No storage areas yet
             </h2>
             <p className="mt-2 text-sm text-gray-500">
@@ -1268,7 +1290,7 @@ export default function StorageAreasSection({
                 </OpenGlobalAddItemButton>
                 <button
                   onClick={openCreateAreaModal}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 py-2 text-sm font-medium text-[var(--stocksense-brand)]"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-[var(--stocksense-brand)] shadow-sm"
                 >
                   <FaPlus /> New storage area
                 </button>
@@ -1883,7 +1905,7 @@ export default function StorageAreasSection({
           {() => (
             <>
               <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
-                <span className="text-[var(--stocksense-brand)]">
+                <span className="text-gray-950">
                   {activeMobileCategory?.category?.name || 'Category'}
                 </span>
                 <span className="text-sm font-normal text-gray-500">

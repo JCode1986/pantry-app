@@ -397,7 +397,7 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
               className="mt-4 overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3"
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-[var(--stocksense-brand)]">
+                <p className="text-sm text-gray-700">
                   Bulk actions for <span className="font-semibold">{selectedCount}</span>{" "}
                   storage area{selectedCount === 1 ? "" : "s"}
                 </p>
@@ -470,7 +470,7 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
                   </div>
                 )}
                 <div className="min-w-0">
-                  <div className="truncate text-[15px] font-semibold leading-5 text-stocksense-teal sm:text-base">{a.name}</div>
+                  <div className="truncate text-[15px] font-semibold leading-5 text-gray-950 sm:text-base md:text-stocksense-teal">{a.name}</div>
                   <div className="mt-1 text-sm text-gray-500 truncate">{a.location?.name}</div>
                 </div>
               </div>
@@ -479,7 +479,7 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
                 <span className="rounded-xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] px-2.5 py-1 text-center text-xs text-[var(--entity-area-accent)]">
                   {a.categoriesCount} {a.categoriesCount === 1 ? "category" : "categories"}
                 </span>
-                <span className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-2.5 py-1 text-center text-xs text-[var(--stocksense-brand)]">
+                <span className="rounded-xl border border-gray-200 bg-gray-50 px-2.5 py-1 text-center text-xs text-gray-600 md:border-[var(--stocksense-brand-border)] md:bg-[var(--stocksense-brand-soft)] md:text-[var(--stocksense-brand)]">
                   {a.itemsCount} {a.itemsCount === 1 ? "item" : "items"}
                 </span>
               </div>
@@ -530,7 +530,7 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
           {() => (
             <>
               <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
-                <div className="text-lg font-semibold text-[var(--stocksense-brand)]">
+                <div className="text-lg font-semibold text-gray-950">
                   {activeArea?.name || "Storage Area"}
                 </div>
                 <div className="text-sm text-gray-500">{activeArea?.location?.name}</div>
@@ -569,11 +569,11 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
 
                 {/* Stats */}
                 <div className="flex gap-2 flex-wrap">
-                  <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
+                  <span className="px-2.5 py-1 rounded-full text-xs bg-gray-50 text-gray-600 border border-gray-200">
                     {activeArea?.categoriesCount ?? 0}{" "}
                     {(activeArea?.categoriesCount ?? 0) === 1 ? "category" : "categories"}
                   </span>
-                  <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
+                  <span className="px-2.5 py-1 rounded-full text-xs bg-gray-50 text-gray-600 border border-gray-200">
                     {activeArea?.itemsCount ?? 0}{" "}
                     {(activeArea?.itemsCount ?? 0) === 1 ? "item" : "items"}
                   </span>

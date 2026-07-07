@@ -81,14 +81,80 @@ export const viewport = {
   themeColor: "#0E7488",
 };
 
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function toDateString(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+async function getNavigationAttentionCounts(supabase, withinDays = 3) {
+  const today = toDateString(new Date());
+  const cutoff = toDateString(addDays(new Date(), withinDays));
+
+  const [
+    { count: expiredCount = 0, error: expiredError },
+    { count: expiringSoonCount = 0, error: expiringSoonError },
+    { count: shoppingListNeededItems = 0, error: shoppingListError },
+  ] = await Promise.all([
+    supabase
+      .from("items")
+      .select("*", { count: "exact", head: true })
+      .not("expiration_date", "is", null)
+      .lt("expiration_date", today),
+    supabase
+      .from("items")
+      .select("*", { count: "exact", head: true })
+      .not("expiration_date", "is", null)
+      .gte("expiration_date", today)
+      .lte("expiration_date", cutoff),
+    supabase
+      .from("shopping_list_items")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "needed"),
+  ]);
+
+  if (expiredError || expiringSoonError || shoppingListError) {
+    console.error("Navigation attention count error:", {
+      expiredError,
+      expiringSoonError,
+      shoppingListError,
+    });
+    return {
+      expiredCount: 0,
+      expiringSoonCount: 0,
+      shoppingListNeededItems: 0,
+    };
+  }
+
+  return {
+    expiredCount: expiredCount ?? 0,
+    expiringSoonCount: expiringSoonCount ?? 0,
+    shoppingListNeededItems: shoppingListNeededItems ?? 0,
+  };
+}
+
 export default async function RootLayout({ children }) {
   const session = await getSessionForLayout(); // ✅ read-only
   let currentUser = session?.user?.user ?? null;
   let canEditInventory = true;
+  let attentionCounts = {
+    expiredCount: 0,
+    expiringSoonCount: 0,
+    shoppingListNeededItems: 0,
+  };
+  let supabase = null;
 
   if (!currentUser?.id) {
     try {
-      const supabase = await createClient();
+      supabase = await createClient();
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -109,12 +175,24 @@ export default async function RootLayout({ children }) {
     } catch (err) {
       console.error("Navigation household role error:", err);
     }
+
+    try {
+      if (!supabase) supabase = await createClient();
+      attentionCounts = await getNavigationAttentionCounts(supabase);
+    } catch (err) {
+      console.error("Navigation attention count error:", err);
+    }
   }
 
   const pageContent = (
     <>
-      {currentUser?.id && <Navigation canEditInventory={canEditInventory} />}
-      <div className="bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10">
+      {currentUser?.id && (
+        <Navigation
+          canEditInventory={canEditInventory}
+          attentionCounts={attentionCounts}
+        />
+      )}
+      <div className={`bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10 ${currentUser?.id ? "pb-24 pt-[61px] md:pb-0 md:pt-0" : ""}`}>
         {children}
       </div>
     </>

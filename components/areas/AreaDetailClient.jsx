@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -19,13 +20,25 @@ import {
   ModalBody,
   ModalFooter,
 } from "@heroui/react";
-import { FaPlus, FaSearch, FaEllipsisV, FaTag, FaChevronLeft } from "react-icons/fa";
+import {
+  FaChevronLeft,
+  FaEdit,
+  FaEllipsisV,
+  FaPlus,
+  FaSearch,
+  FaTag,
+  FaTrash,
+} from "react-icons/fa";
 
 import {
   addCategory,
+  deleteStorageArea,
   updateCategoryName,
   deleteCategory,
+  updateStorageArea,
 } from "@/app/actions/server";
+import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
+import EntityImageManager from "@/components/inventory/EntityImageManager";
 import {
   modalBodyClass,
   modalContentClass,
@@ -65,16 +78,24 @@ export default function AreaDetailClient({
   initialCategories,
   canEditInventory = true,
 }) {
+  const router = useRouter();
+  const [areaName, setAreaName] = useState(area?.name ?? "");
+  const [areaImageUrl, setAreaImageUrl] = useState(area?.imageUrl ?? null);
   const [categories, setCategories] = useState(initialCategories ?? []);
   const [search, setSearch] = useState("");
   const [newCategory, setNewCategory] = useState("");
 
   const [isSaving, setIsSaving] = useState(false);
+  const [editAreaOpen, setEditAreaOpen] = useState(false);
+  const [editAreaName, setEditAreaName] = useState(area?.name ?? "");
+  const [deleteAreaOpen, setDeleteAreaOpen] = useState(false);
+  const [isDeletingArea, setIsDeletingArea] = useState(false);
 
   const [renameModal, setRenameModal] = useState({
     open: false,
     id: null,
     name: "",
+    imageUrl: null,
   });
 
   const [deleteModal, setDeleteModal] = useState({
@@ -140,6 +161,64 @@ export default function AreaDetailClient({
 
   // ---------------- Actions ----------------
 
+  const handleRenameArea = async () => {
+    if (!canEditInventory) return;
+    const name = editAreaName.trim();
+    if (!name || !area?.id) return;
+
+    const previousName = areaName;
+    setIsSaving(true);
+    setAreaName(name);
+
+    try {
+      const result = await updateStorageArea(area.id, name);
+      if (result?.error) throw result.error;
+      setEditAreaOpen(false);
+      emitInventoryChange({
+        entity: "storage_area",
+        action: "updated",
+        id: area.id,
+      });
+      router.refresh();
+    } catch (e) {
+      console.error("updateStorageArea failed:", e);
+      setAreaName(previousName);
+      setEditAreaName(previousName);
+      alert("Failed to update storage area. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAreaImageChange = ({ imageUrl }) => {
+    setAreaImageUrl(imageUrl ?? null);
+    emitInventoryChange({
+      entity: "storage_area",
+      action: imageUrl ? "image_updated" : "image_removed",
+      id: area?.id,
+    });
+  };
+
+  const handleDeleteArea = async () => {
+    if (!canEditInventory || !area?.id) return;
+
+    setIsDeletingArea(true);
+    try {
+      const result = await deleteStorageArea(area.id);
+      if (result?.error) throw result.error;
+      emitInventoryChange({
+        entity: "storage_area",
+        action: "deleted",
+        id: area.id,
+      });
+      router.replace("/areas");
+    } catch (e) {
+      console.error("deleteStorageArea failed:", e);
+      setIsDeletingArea(false);
+      alert("Failed to delete storage area. Please try again.");
+    }
+  };
+
   const handleAddCategory = async () => {
     if (!canEditInventory) return;
     const name = newCategory.trim();
@@ -149,7 +228,14 @@ export default function AreaDetailClient({
 
     // Optimistic insert (temp id)
     const tempId = `temp-${Date.now()}`;
-    const optimistic = { id: tempId, name, itemsCount: 0, _optimistic: true };
+    const optimistic = {
+      id: tempId,
+      name,
+      image_path: null,
+      imageUrl: null,
+      itemsCount: 0,
+      _optimistic: true,
+    };
 
     setCategories((prev) =>
       [...prev, optimistic].sort((a, b) => a.name.localeCompare(b.name))
@@ -170,7 +256,13 @@ export default function AreaDetailClient({
         prev
           .map((c) =>
             c.id === tempId
-              ? { id: created.id, name: created.name, itemsCount: 0 }
+              ? {
+                  id: created.id,
+                  name: created.name,
+                  image_path: created.image_path ?? null,
+                  imageUrl: null,
+                  itemsCount: 0,
+                }
               : c
           )
           .sort((a, b) => a.name.localeCompare(b.name))
@@ -213,7 +305,7 @@ export default function AreaDetailClient({
       const result = await updateCategoryName(id, name);
       if (result?.error) throw result.error;
 
-      setRenameModal({ open: false, id: null, name: "" });
+      setRenameModal({ open: false, id: null, name: "", imageUrl: null });
       emitInventoryChange({
         entity: "category",
         action: "updated",
@@ -233,6 +325,25 @@ export default function AreaDetailClient({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleCategoryImageChange = ({ imageUrl }) => {
+    const id = renameModal.id;
+    if (!id) return;
+
+    setRenameModal((prev) => ({ ...prev, imageUrl: imageUrl ?? null }));
+    setCategories((prev) =>
+      prev.map((category) =>
+        String(category.id) === String(id)
+          ? { ...category, imageUrl: imageUrl ?? null }
+          : category
+      )
+    );
+    emitInventoryChange({
+      entity: "category",
+      action: imageUrl ? "image_updated" : "image_removed",
+      id,
+    });
   };
 
   const handleDelete = async () => {
@@ -282,23 +393,23 @@ export default function AreaDetailClient({
           <span className="text-gray-300">/</span>
           <span className="text-gray-600">{area?.location?.name || "Location"}</span>
           <span className="text-gray-300">/</span>
-          <span className="font-medium text-gray-800">{area?.name || "Area"}</span>
+          <span className="font-medium text-gray-800">{areaName || "Area"}</span>
         </div>
 
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div>
             <div className="flex items-center gap-3">
-              {area?.imageUrl && (
+              {areaImageUrl && (
                 <div className="h-14 w-14 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
                   <img
-                    src={area.imageUrl}
+                    src={areaImageUrl}
                     alt=""
                     className="h-full w-full object-cover"
                   />
                 </div>
               )}
               <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-stocksense-teal">
-                {area?.name}
+                {areaName}
               </h1>
             </div>
             <p className="text-sm text-gray-500">
@@ -336,6 +447,29 @@ export default function AreaDetailClient({
                 storageAreaId: area?.id,
               }}
             />
+            {canEditInventory && (
+              <>
+                <Button
+                  variant="flat"
+                  className="rounded-xl border border-amber-200 bg-amber-50 text-amber-700"
+                  onPress={() => {
+                    setEditAreaName(areaName);
+                    setEditAreaOpen(true);
+                  }}
+                  startContent={<FaEdit />}
+                >
+                  Edit
+                </Button>
+                <Button
+                  variant="flat"
+                  className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
+                  onPress={() => setDeleteAreaOpen(true)}
+                  startContent={<FaTrash />}
+                >
+                  Delete
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </motion.div>
@@ -348,7 +482,7 @@ export default function AreaDetailClient({
             <Input
               value={newCategory}
               onValueChange={setNewCategory}
-              placeholder={`Add a category in ${area?.name} (e.g., Fruits, Snacks)`}
+              placeholder={`Add a category in ${areaName} (e.g., Fruits, Snacks)`}
               radius="lg"
               variant="bordered"
               className="w-full"
@@ -393,9 +527,19 @@ export default function AreaDetailClient({
                   <div className="flex items-start justify-between gap-2">
                     <Link href={`/categories/${cat.id}`} className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <div className="rounded-xl p-2 bg-[var(--stocksense-brand-soft)] border border-[var(--stocksense-brand-border)] text-[var(--stocksense-brand)]">
-                          <FaTag />
-                        </div>
+                        {cat.imageUrl ? (
+                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-gray-50">
+                            <img
+                              src={cat.imageUrl}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-2 text-[var(--stocksense-brand)]">
+                            <FaTag />
+                          </div>
+                        )}
                         <div className="min-w-0">
                           <h3 className="truncate text-[15px] font-semibold leading-5 text-stocksense-teal group-hover:underline sm:text-base">
                             {cat.name}
@@ -416,12 +560,17 @@ export default function AreaDetailClient({
                         </DropdownTrigger>
                         <DropdownMenu aria-label="Category actions">
                           <DropdownItem
-                            key="rename"
+                            key="edit"
                             onPress={() =>
-                              setRenameModal({ open: true, id: cat.id, name: cat.name })
+                              setRenameModal({
+                                open: true,
+                                id: cat.id,
+                                name: cat.name,
+                                imageUrl: cat.imageUrl ?? null,
+                              })
                             }
                           >
-                            Rename
+                            Edit
                           </DropdownItem>
                           <DropdownItem
                             key="delete"
@@ -475,17 +624,79 @@ export default function AreaDetailClient({
         )}
       </div>
 
-      {/* Rename Modal */}
+      {canEditInventory && (
+        <Modal
+          isOpen={editAreaOpen}
+          onOpenChange={setEditAreaOpen}
+          placement="center"
+          scrollBehavior="inside"
+        >
+          <ModalContent className={modalContentClass} style={modalContentStyle}>
+            {(onClose) => (
+              <>
+                <ModalHeader className={modalHeaderClass}>
+                  Edit storage area
+                </ModalHeader>
+                <ModalBody className={`space-y-3 ${modalBodyClass}`}>
+                  <Input
+                    label="Storage area name"
+                    value={editAreaName}
+                    onValueChange={setEditAreaName}
+                    variant="bordered"
+                    radius="lg"
+                    isDisabled={isSaving}
+                    classNames={modalInputClassNames}
+                  />
+                  <EntityImageManager
+                    entityType="storage_area"
+                    entityId={area?.id}
+                    imageUrl={areaImageUrl}
+                    label="Storage area photo"
+                    onChange={handleAreaImageChange}
+                  />
+                </ModalBody>
+                <ModalFooter className={modalFooterClass}>
+                  <Button variant="light" onPress={onClose} isDisabled={isSaving}>
+                    Cancel
+                  </Button>
+                  <Button
+                    className="rounded-xl bg-[var(--stocksense-brand)] text-white"
+                    onPress={handleRenameArea}
+                    isLoading={isSaving}
+                    isDisabled={!editAreaName.trim()}
+                  >
+                    Save changes
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalContent>
+        </Modal>
+      )}
+
+      {canEditInventory && (
+        <ConfirmDeleteModal
+          isOpen={deleteAreaOpen}
+          isDeleting={isDeletingArea}
+          onCancel={() => setDeleteAreaOpen(false)}
+          onConfirm={handleDeleteArea}
+          title={`Delete storage area "${areaName}"?`}
+          description={`This will delete "${areaName}" and all categories and items inside it. This cannot be undone.`}
+        />
+      )}
+
+      {/* Edit Category Modal */}
       {canEditInventory && <Modal
         isOpen={renameModal.open}
         onOpenChange={(open) => setRenameModal((p) => ({ ...p, open }))}
         placement="center"
+        scrollBehavior="inside"
       >
         <ModalContent className={modalContentClass} style={modalContentStyle}>
           {(onClose) => (
             <>
-              <ModalHeader className={modalHeaderClass}>Rename category</ModalHeader>
-              <ModalBody className={modalBodyClass}>
+              <ModalHeader className={modalHeaderClass}>Edit category</ModalHeader>
+              <ModalBody className={`space-y-3 ${modalBodyClass}`}>
                 <Input
                   value={renameModal.name}
                   onValueChange={(v) => setRenameModal((p) => ({ ...p, name: v }))}
@@ -494,6 +705,13 @@ export default function AreaDetailClient({
                   label="Category name"
                   isDisabled={isSaving}
                   classNames={modalInputClassNames}
+                />
+                <EntityImageManager
+                  entityType="category"
+                  entityId={renameModal.id}
+                  imageUrl={renameModal.imageUrl}
+                  label="Category photo"
+                  onChange={handleCategoryImageChange}
                 />
               </ModalBody>
               <ModalFooter className={modalFooterClass}>
@@ -505,7 +723,7 @@ export default function AreaDetailClient({
                   onPress={handleRename}
                   isDisabled={isSaving || !renameModal.name.trim()}
                 >
-                  Save
+                  Save changes
                 </Button>
               </ModalFooter>
             </>

@@ -62,7 +62,7 @@ export default async function Page() {
   }));
 
   return (
-    <main className="page-enter mx-auto min-h-[100vh] max-w-[1500px] p-6 pt-8">
+    <main className="page-enter mx-auto min-h-[100vh] max-w-[1500px] p-6 pt-8 max-md:px-4 max-md:pb-32 max-md:pt-4">
       <ShoppingListPageClient
         initialItems={result.data?.items ?? []}
         initialError={result.error || hierarchyError}
