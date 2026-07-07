@@ -8,6 +8,8 @@ import {
   uploadInventoryImage,
 } from "@/app/actions/server";
 
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
 export default function EntityImageManager({
   entityType,
   entityId,
@@ -19,9 +21,15 @@ export default function EntityImageManager({
   const cameraInputRef = useRef(null);
   const [isWorking, setIsWorking] = useState(false);
   const [error, setError] = useState("");
+  const displayLabel = /optional/i.test(label) ? label : `${label} optional`;
 
   const uploadImage = async (file) => {
     if (!file || !entityType || !entityId) return;
+
+    if (file.size > MAX_IMAGE_BYTES) {
+      setError("Images must be 5 MB or smaller.");
+      return;
+    }
 
     setIsWorking(true);
     setError("");
@@ -29,15 +37,25 @@ export default function EntityImageManager({
     const formData = new FormData();
     formData.append("image", file);
 
-    const result = await uploadInventoryImage(entityType, entityId, formData);
-    setIsWorking(false);
+    try {
+      const result = await uploadInventoryImage(entityType, entityId, formData);
 
-    if (result?.error) {
-      setError(typeof result.error === "string" ? result.error : "Could not upload image.");
-      return;
+      if (result?.error) {
+        setError(typeof result.error === "string" ? result.error : "Could not upload image.");
+        return;
+      }
+
+      onChange?.(result.data);
+    } catch (err) {
+      console.error("uploadInventoryImage request error:", err);
+      setError(
+        err?.message === "aborted"
+          ? "The upload was interrupted. Try a smaller image or choose it again."
+          : "Could not upload image."
+      );
+    } finally {
+      setIsWorking(false);
     }
-
-    onChange?.(result.data);
   };
 
   const removeImage = async () => {
@@ -58,26 +76,26 @@ export default function EntityImageManager({
   };
 
   return (
-    <div className="rounded-xl border border-stocksense-gray bg-gray-50/70 p-3">
+    <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-3 max-md:bg-white">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+        <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
           <FaImage className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
-          {label}
+          {displayLabel}
         </div>
         {isWorking && <FaSpinner className="h-3.5 w-3.5 animate-spin text-gray-400" />}
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="h-24 w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:w-32">
+        <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:h-32 sm:w-44">
           {imageUrl ? (
             <img
               src={imageUrl}
               alt=""
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain"
             />
           ) : (
             <div className="grid h-full w-full place-items-center text-xs text-gray-400">
-              No photo
+              Optional photo
             </div>
           )}
         </div>
@@ -110,7 +128,7 @@ export default function EntityImageManager({
             <Button
               size="sm"
               variant="flat"
-              className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] sm:hidden"
+              className="min-h-10 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] sm:hidden"
               isDisabled={isWorking || !entityId}
               onPress={() => cameraInputRef.current?.click()}
               startContent={<FaCamera className="h-3.5 w-3.5" />}
@@ -120,27 +138,27 @@ export default function EntityImageManager({
             <Button
               size="sm"
               variant="flat"
-              className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
+              className="min-h-10 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
               isDisabled={isWorking || !entityId}
               onPress={() => fileInputRef.current?.click()}
               startContent={<FaUpload className="h-3.5 w-3.5" />}
             >
-              {imageUrl ? "Choose replacement" : "Choose image"}
+              {imageUrl ? "Change photo" : "Add photo"}
             </Button>
             {imageUrl && (
               <Button
                 size="sm"
                 variant="flat"
-                className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
+                className="min-h-10 rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
                 isDisabled={isWorking}
                 onPress={removeImage}
                 startContent={<FaTrash className="h-3.5 w-3.5" />}
               >
-                Remove
+                Remove photo
               </Button>
             )}
           </div>
-          <p className="text-xs leading-5 text-gray-500">
+          <p className="text-xs leading-5 text-gray-500 max-md:hidden">
             Take a photo or choose one from your camera roll. Max 5 MB.
           </p>
           {error && <p className="text-xs text-rose-700">{error}</p>}

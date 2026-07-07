@@ -321,6 +321,49 @@ async function enrichMovedActivityItems(supabase, items) {
   });
 }
 
+async function enrichActivityActors(items, householdId) {
+  if (!householdId || !items?.length) return items;
+
+  const actorIds = [
+    ...new Set(
+      items
+        .map((row) => normalizeId(row.actor_user_id))
+        .filter(Boolean)
+    ),
+  ];
+
+  if (actorIds.length === 0) return items;
+
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("household_members")
+      .select("user_id, email")
+      .eq("household_id", householdId)
+      .in("user_id", actorIds);
+
+    if (error) throw error;
+
+    const emailByUserId = new Map(
+      (data ?? [])
+        .filter((member) => member.user_id && member.email)
+        .map((member) => [String(member.user_id), member.email])
+    );
+
+    if (emailByUserId.size === 0) return items;
+
+    return items.map((row) => {
+      if (row.actor_email) return row;
+
+      const actorEmail = emailByUserId.get(String(row.actor_user_id));
+      return actorEmail ? { ...row, actor_email: actorEmail } : row;
+    });
+  } catch (err) {
+    console.error("enrichActivityActors error:", err);
+    return items;
+  }
+}
+
 async function getAuthedUser() {
   const { user, error } = await getVerifiedSession();
 
@@ -383,7 +426,7 @@ export async function getActivityFilterOptionsAction() {
 }
 
 export async function getRecentActivityAction(filters = {}) {
-  const { error: authError } = await getAuthedUser();
+  const { user, error: authError } = await getAuthedUser();
   if (authError) {
     return {
       data: { items: [], nextCursor: null, hasMore: false },
@@ -397,6 +440,11 @@ export async function getRecentActivityAction(filters = {}) {
   const cursor = normalizeText(filters.cursor);
 
   try {
+    const { household } = await getHouseholdForUser({
+      userId: user.id,
+      email: user.email,
+      createIfMissing: true,
+    });
     const supabase = await createClient();
     let query = supabase
       .from("recent_activity")
@@ -420,10 +468,11 @@ export async function getRecentActivityAction(filters = {}) {
     if (error) throw error;
 
     const rows = data ?? [];
-    const items = await enrichMovedActivityItems(
+    const movedItems = await enrichMovedActivityItems(
       supabase,
       rows.slice(0, limit)
     );
+    const items = await enrichActivityActors(movedItems, household?.id);
 
     return {
       data: {

@@ -19,12 +19,15 @@ import {
   FaBarcode,
   FaCamera,
   FaCheckCircle,
+  FaChevronDown,
   FaImage,
   FaMapMarkerAlt,
+  FaMicrophone,
   FaPlus,
   FaSearch,
   FaSpinner,
   FaTags,
+  FaTimes,
   FaTrash,
   FaUpload,
   FaWarehouse,
@@ -33,6 +36,7 @@ import {
   addItemWithPath,
   getInventoryHierarchy,
   lookupProductByBarcode,
+  parseQuickAddVoiceText,
   uploadInventoryImage,
 } from "@/app/actions/server";
 import { toNonNegativeInteger } from "@/utils/pantry/date";
@@ -135,6 +139,18 @@ function byId(items, id) {
   return (items ?? []).find((item) => String(item.id) === String(id)) ?? null;
 }
 
+function normalizeMatchName(value) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function byName(items, name) {
+  const target = normalizeMatchName(name);
+  if (!target) return null;
+  return (
+    (items ?? []).find((item) => normalizeMatchName(item?.name) === target) ?? null
+  );
+}
+
 function AddItemMessage({ message, upgradeHref, onLinkClick, className = "" }) {
   if (!message) return null;
 
@@ -178,14 +194,14 @@ function NewPathField({
       className={`overflow-hidden rounded-xl border p-3 shadow-sm ${
         isInvalid
           ? "border-rose-200 bg-rose-50/60"
-          : "border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]"
+          : "border-gray-200 bg-gray-50/70"
       }`}
     >
       <div className="mb-2 flex items-center gap-2">
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--stocksense-brand)] text-white">
           <Icon className="h-3.5 w-3.5" />
         </span>
-        <span className="text-sm font-semibold text-[var(--stocksense-brand)]">{title}</span>
+        <span className="text-sm font-semibold text-gray-900">{title}</span>
       </div>
       <Input
         label={label}
@@ -200,7 +216,7 @@ function NewPathField({
         classNames={{
           ...getModalInputClassNames(isInvalid),
           inputWrapper:
-            `border-[var(--stocksense-brand-border)] bg-white shadow-none focus-within:border-[var(--stocksense-brand)] ${
+            `border-gray-200 bg-white shadow-none focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)] ${
               isInvalid ? invalidInputWrapperClass : ""
             }`,
         }}
@@ -253,6 +269,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   const router = useRouter();
   const imageInputRef = useRef(null);
   const cameraInputRef = useRef(null);
+  const speechRecognitionRef = useRef(null);
   const [locations, setLocations] = useState([]);
   const [locationId, setLocationId] = useState(NEW_VALUE);
   const [storageAreaId, setStorageAreaId] = useState(NEW_VALUE);
@@ -270,6 +287,12 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   const [selectedImageFile, setSelectedImageFile] = useState(null);
   const [selectedImagePreview, setSelectedImagePreview] = useState("");
   const [imageMessage, setImageMessage] = useState("");
+  const [isBarcodeExpanded, setIsBarcodeExpanded] = useState(false);
+  const [quickAddMessage, setQuickAddMessage] = useState("");
+  const [quickAddTranscript, setQuickAddTranscript] = useState("");
+  const [isListening, setIsListening] = useState(false);
+  const [isParsingVoice, setIsParsingVoice] = useState(false);
+  const [mobileAddedToast, setMobileAddedToast] = useState(null);
 
   const selectedLocation = useMemo(
     () => byId(locations, locationId),
@@ -289,6 +312,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   const hasExistingCategories = categories.length > 0;
   const validationMessage =
     "Choose or create a location, storage area, and category before adding the item.";
+  const isQuickAdding = isListening || isParsingVoice;
 
   const getValidationErrors = useCallback(
     ({
@@ -325,6 +349,13 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
       setMessage("");
       setUpgradeHref("");
       setValidationErrors(emptyValidationErrors);
+      setForm((prev) => ({
+        ...prev,
+        itemName:
+          typeof initialContext?.itemName === "string"
+            ? initialContext.itemName.trim()
+            : "",
+      }));
 
       const result = await getInventoryHierarchy();
       if (cancelled) return;
@@ -364,6 +395,13 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   }, [selectedImagePreview]);
 
   useEffect(() => {
+    return () => {
+      speechRecognitionRef.current?.abort?.();
+      speechRecognitionRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
     const hasVisibleValidationErrors = Object.values(validationErrors).some(Boolean);
     const nextValidationErrors = getValidationErrors();
     const hasCurrentValidationErrors = Object.values(nextValidationErrors).some(Boolean);
@@ -395,12 +433,12 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   };
 
   const selectImageFile = (file) => {
-    if (!file) return;
+    if (!file) return false;
 
     const validationMessage = validateImageFile(file);
     if (validationMessage) {
       setImageMessage(validationMessage);
-      return;
+      return false;
     }
 
     setSelectedImageFile(file);
@@ -409,6 +447,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
       if (current?.startsWith("blob:")) URL.revokeObjectURL(current);
       return URL.createObjectURL(file);
     });
+    return true;
   };
 
   const updateForm = (key, value) => {
@@ -427,14 +466,229 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
     }
   };
 
+  const applyQuickAddFields = (fields, sourceLabel) => {
+    if (!fields) return;
+
+    const nextItemName =
+      typeof fields.itemName === "string" ? fields.itemName.trim() : "";
+    const nextBarcode = cleanBarcode(fields.barcode);
+    const hasQuantity = fields.quantity !== null && fields.quantity !== undefined;
+    const nextQuantity = hasQuantity && Number.isFinite(Number(fields.quantity))
+      ? String(Math.max(0, Math.min(9999, Math.round(Number(fields.quantity)))))
+      : "";
+    const nextExpirationDate =
+      typeof fields.expirationDate === "string" ? fields.expirationDate.trim() : "";
+    const nextLocationName =
+      typeof fields.locationName === "string" ? fields.locationName.trim() : "";
+    const nextStorageAreaName =
+      typeof fields.storageAreaName === "string"
+        ? fields.storageAreaName.trim()
+        : "";
+    const nextCategoryName =
+      typeof fields.categoryName === "string" ? fields.categoryName.trim() : "";
+
+    let nextLocationId = locationId;
+    let nextStorageAreaId = storageAreaId;
+    let nextCategoryId = categoryId;
+    let nextLocation = selectedLocation;
+    let nextStorageArea = selectedStorageArea;
+    const destinationPatch = {};
+
+    if (nextLocationName) {
+      const matchedLocation = byName(locations, nextLocationName);
+      if (matchedLocation) {
+        nextLocationId = matchedLocation.id;
+        nextLocation = matchedLocation;
+        nextStorageArea = matchedLocation.storageAreas?.[0] ?? null;
+        nextStorageAreaId = nextStorageArea?.id ?? NEW_VALUE;
+        nextCategoryId = nextStorageArea?.categories?.[0]?.id ?? NEW_VALUE;
+        destinationPatch.locationName = "";
+        destinationPatch.storageAreaName = "";
+        destinationPatch.categoryName = "";
+      } else {
+        nextLocationId = NEW_VALUE;
+        nextStorageAreaId = NEW_VALUE;
+        nextCategoryId = NEW_VALUE;
+        nextLocation = null;
+        nextStorageArea = null;
+        destinationPatch.locationName = nextLocationName;
+      }
+    }
+
+    if (nextStorageAreaName) {
+      const matchedStorageArea = byName(
+        nextLocation?.storageAreas ?? EMPTY_LIST,
+        nextStorageAreaName
+      );
+      if (matchedStorageArea) {
+        nextStorageAreaId = matchedStorageArea.id;
+        nextStorageArea = matchedStorageArea;
+        nextCategoryId = matchedStorageArea.categories?.[0]?.id ?? NEW_VALUE;
+        destinationPatch.storageAreaName = "";
+        destinationPatch.categoryName = "";
+      } else {
+        nextStorageAreaId = NEW_VALUE;
+        nextCategoryId = NEW_VALUE;
+        nextStorageArea = null;
+        destinationPatch.storageAreaName = nextStorageAreaName;
+      }
+    }
+
+    if (nextCategoryName) {
+      const matchedCategory = byName(
+        nextStorageArea?.categories ?? EMPTY_LIST,
+        nextCategoryName
+      );
+      if (matchedCategory) {
+        nextCategoryId = matchedCategory.id;
+        destinationPatch.categoryName = "";
+      } else {
+        nextCategoryId = NEW_VALUE;
+        destinationPatch.categoryName = nextCategoryName;
+      }
+    }
+
+    setLocationId(nextLocationId);
+    setStorageAreaId(nextStorageAreaId);
+    setCategoryId(nextCategoryId);
+    setProductPreview(null);
+    setMessage("");
+    setUpgradeHref("");
+    setMobileAddedToast(null);
+
+    if (nextBarcode) {
+      setBarcodeMessage("");
+      setIsBarcodeExpanded(true);
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      ...destinationPatch,
+      ...(nextItemName ? { itemName: nextItemName } : null),
+      ...(nextQuantity ? { quantity: nextQuantity } : null),
+      ...(nextExpirationDate ? { expirationDate: nextExpirationDate } : null),
+      ...(nextBarcode ? { barcode: nextBarcode } : null),
+    }));
+
+    setValidationErrors((prev) => ({
+      ...prev,
+      ...(nextItemName ? { itemName: "" } : null),
+      ...(nextLocationName ? { locationName: "" } : null),
+      ...(nextStorageAreaName ? { storageAreaName: "" } : null),
+      ...(nextCategoryName ? { categoryName: "" } : null),
+    }));
+
+    setQuickAddMessage(`${sourceLabel} filled item details. Review before adding.`);
+  };
+
+  const handleVoiceQuickAdd = () => {
+    if (isParsingVoice) return;
+
+    if (isListening) {
+      speechRecognitionRef.current?.stop?.();
+      return;
+    }
+
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setQuickAddMessage("Voice input is not supported in this browser.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    let didReceiveResult = false;
+    let hadError = false;
+
+    recognition.lang = navigator.language || "en-US";
+    recognition.interimResults = false;
+    recognition.continuous = false;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      setQuickAddTranscript("");
+      setQuickAddMessage("Listening...");
+    };
+
+    recognition.onerror = (event) => {
+      hadError = true;
+      setIsListening(false);
+      setIsParsingVoice(false);
+      setQuickAddMessage(
+        event?.error === "not-allowed" || event?.error === "service-not-allowed"
+          ? "Microphone access was blocked."
+          : "Could not hear that. Try again."
+      );
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      speechRecognitionRef.current = null;
+      if (!didReceiveResult && !hadError) {
+        setQuickAddMessage("No voice input heard. Try again.");
+      }
+    };
+
+    recognition.onresult = async (event) => {
+      didReceiveResult = true;
+      const transcript = Array.from(event.results ?? [])
+        .map((result) => result?.[0]?.transcript)
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+      if (!transcript) {
+        setQuickAddMessage("No voice input heard. Try again.");
+        return;
+      }
+
+      setQuickAddTranscript(transcript);
+      setQuickAddMessage("Parsing voice note...");
+      setIsParsingVoice(true);
+
+      try {
+        const result = await parseQuickAddVoiceText(transcript);
+        if (result?.error) {
+          setQuickAddMessage(
+            typeof result.error === "string"
+              ? result.error
+              : result.error?.message ?? "Voice quick add is unavailable right now."
+          );
+          return;
+        }
+
+        applyQuickAddFields(result?.data, "Voice");
+      } catch (error) {
+        console.error("parseQuickAddVoiceText error:", error);
+        setQuickAddMessage("Voice quick add is unavailable right now.");
+      } finally {
+        setIsParsingVoice(false);
+      }
+    };
+
+    speechRecognitionRef.current?.abort?.();
+    speechRecognitionRef.current = recognition;
+
+    try {
+      recognition.start();
+    } catch (error) {
+      console.error("speech recognition start error:", error);
+      setIsListening(false);
+      setQuickAddMessage("Could not start microphone.");
+    }
+  };
+
   const lookupBarcode = async (barcodeValue) => {
     const barcode = cleanBarcode(barcodeValue ?? form.barcode);
 
     if (!barcode) {
+      setIsBarcodeExpanded(true);
       setBarcodeMessage("Enter or scan a barcode first.");
       return;
     }
 
+    setIsBarcodeExpanded(true);
     setIsScannerOpen(false);
     setIsLookingUpBarcode(true);
     setBarcodeMessage("");
@@ -510,6 +764,8 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
 
   const handleClose = () => {
     if (isSaving) return;
+    speechRecognitionRef.current?.abort?.();
+    speechRecognitionRef.current = null;
     setForm(emptyForm);
     setMessage("");
     setValidationErrors(emptyValidationErrors);
@@ -518,6 +774,12 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
     setProductPreview(null);
     clearSelectedImage();
     setIsScannerOpen(false);
+    setIsBarcodeExpanded(false);
+    setQuickAddMessage("");
+    setQuickAddTranscript("");
+    setIsListening(false);
+    setIsParsingVoice(false);
+    setMobileAddedToast(null);
     setIsLoading(true);
     onClose?.();
   };
@@ -711,11 +973,18 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
     }));
     setProductPreview(null);
     setBarcodeMessage("");
+    setIsBarcodeExpanded(false);
     clearSelectedImage();
     setMessage(imageUploadWarning);
+    setMobileAddedToast({
+      itemId: added.id,
+      itemName: addedName,
+      destinationName: destination || "inventory",
+    });
     onAdded?.({
       itemName: addedName,
       destinationName: destination || "inventory",
+      itemId: added.id,
     });
     if (closeAfterAdd && !imageUploadWarning) {
       setIsLoading(true);
@@ -734,24 +1003,42 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
         placement="center"
         size="3xl"
         scrollBehavior="inside"
+        classNames={{
+          wrapper: "max-md:items-stretch max-md:justify-stretch max-md:p-0",
+          base: "max-md:m-0 max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:w-screen max-md:max-w-none max-md:rounded-none",
+        }}
       >
-        <ModalContent className={modalContentClass} style={modalContentStyle}>
+        <ModalContent
+          className={`${modalContentClass} max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:w-screen max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:bg-gray-50 max-md:shadow-none`}
+          style={modalContentStyle}
+        >
           {() => (
             <>
-            <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
-              <span className="text-[var(--stocksense-brand)]">Add item</span>
-              <span className="text-sm font-normal text-gray-500">
+            <ModalHeader className={`flex flex-col gap-1 max-md:sticky max-md:top-0 max-md:z-20 max-md:px-4 max-md:py-3 ${modalHeaderClass}`}>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-gray-950">Add item</span>
+                <button
+                  type="button"
+                  aria-label="Close add item"
+                  onClick={handleClose}
+                  disabled={isSaving}
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] transition hover:bg-[var(--stocksense-brand-soft)] disabled:opacity-50 md:hidden"
+                >
+                  <FaTimes className="h-4 w-4" />
+                </button>
+              </div>
+              <span className="hidden text-sm font-normal text-gray-500 md:block">
                 Choose where it belongs, or create the missing location, area, or category.
               </span>
             </ModalHeader>
 
-            <ModalBody className={`min-h-[150px] space-y-4 pb-3 ${modalBodyClass}`}>
+            <ModalBody className={`min-h-[150px] space-y-4 pb-3 max-md:bg-gray-50 max-md:px-4 max-md:pb-5 max-md:pt-4 ${modalBodyClass}`}>
               <AnimatePresence initial={false}>
                 <AddItemMessage
                   message={message}
                   upgradeHref={upgradeHref}
                   onLinkClick={handleClose}
-                  className="hidden sm:block"
+                  className="hidden md:block"
                 />
               </AnimatePresence>
 
@@ -776,14 +1063,64 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -6 }}
                     transition={revealTransition}
-                    className="space-y-3 sm:space-y-4"
+                    className="flex min-w-0 flex-col gap-3 sm:gap-4"
                   >
-                    <div className="rounded-2xl border border-stocksense-gray bg-gray-50/70 p-3 sm:bg-white">
-                      <div className="mb-3">
-                        <div className="text-sm font-semibold text-gray-900">
-                          Where it goes
+                    <section className="order-10 md:hidden">
+                      <h2 className="mb-2 text-base font-semibold text-gray-950">
+                        Quick add
+                      </h2>
+                      <div className="grid gap-3">
+                        <button
+                          type="button"
+                          onClick={handleVoiceQuickAdd}
+                          disabled={isParsingVoice || isSaving}
+                          aria-busy={isListening || isParsingVoice}
+                          className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-[var(--stocksense-brand-border)] hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[var(--stocksense-brand)] text-white">
+                            {isListening || isParsingVoice ? (
+                              <FaSpinner className="h-5 w-5 animate-spin" />
+                            ) : (
+                              <FaMicrophone className="h-5 w-5" />
+                            )}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-base font-semibold text-gray-950">
+                              {isListening
+                                ? "Listening..."
+                                : isParsingVoice
+                                ? "Parsing..."
+                                : "Add by voice"}
+                            </span>
+                            <span className="mt-0.5 block text-sm text-gray-500">
+                              {isListening
+                                ? "Speak now"
+                                : isParsingVoice
+                                ? "Filling details"
+                                : "Tell WhereKeep what to add"}
+                            </span>
+                          </span>
+                        </button>
+                      </div>
+                      {quickAddMessage && (
+                        <div className="mt-3 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm">
+                          {quickAddMessage}
                         </div>
-                        <div className="text-xs text-gray-500">
+                      )}
+                      {quickAddTranscript && (
+                        <div className="mt-2 truncate text-xs text-gray-500">
+                          Heard: {quickAddTranscript}
+                        </div>
+                      )}
+                    </section>
+
+                    <div className="order-30 rounded-2xl border border-stocksense-gray bg-gray-50/70 p-3 sm:bg-white md:order-10">
+                      <div className="mb-3">
+                        <div className="text-sm font-semibold text-gray-950">
+                          <span className="md:hidden">Where is it stored?</span>
+                          <span className="hidden md:inline">Where it goes</span>
+                        </div>
+                        <div className="hidden text-xs text-gray-500 md:block">
                           Choose existing places or create the missing ones.
                         </div>
                       </div>
@@ -923,9 +1260,32 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                       </motion.div>
                     </div>
 
-                    <div className="overflow-hidden rounded-2xl border border-stocksense-gray bg-white p-3 shadow-sm">
-                      <div className="mb-3">
-                        <div className="text-sm font-semibold text-gray-900">
+                    <div className="order-40 overflow-hidden rounded-2xl border border-stocksense-gray bg-white shadow-sm md:order-20 md:p-3">
+                      <button
+                        type="button"
+                        onClick={() => setIsBarcodeExpanded((value) => !value)}
+                        className="flex min-h-14 w-full items-center justify-between gap-3 px-3 py-3 text-left md:hidden"
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <FaBarcode className="h-4 w-4 shrink-0 text-[var(--stocksense-brand)]" />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold text-gray-950">
+                              Scan barcode optional
+                            </span>
+                            <span className="block truncate text-xs text-gray-500">
+                              Scan or enter a code
+                            </span>
+                          </span>
+                        </span>
+                        <FaChevronDown
+                          className={`h-4 w-4 shrink-0 text-[var(--stocksense-brand)] transition ${
+                            isBarcodeExpanded ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+
+                      <div className="mb-3 hidden md:block">
+                        <div className="text-sm font-semibold text-gray-950">
                           Barcode (optional)
                         </div>
                         <div className="text-xs text-gray-500">
@@ -933,6 +1293,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                         </div>
                       </div>
 
+                      <div className={`${isBarcodeExpanded ? "block" : "hidden"} border-t border-gray-100 p-3 md:block md:border-t-0 md:p-0`}>
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_190px]">
                         <Input
                           label="Barcode (optional)"
@@ -973,7 +1334,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                       </div>
 
                       {(barcodeMessage || productPreview) && (
-                        <div className="mt-3 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3">
+                        <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50/80 p-3">
                           {productPreview ? (
                             <div className="flex items-center gap-3">
                               {productPreview.imageUrl && (
@@ -986,8 +1347,8 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                                 </div>
                               )}
                               <div className="min-w-0">
-                                <div className="flex items-center gap-1.5 text-sm font-semibold text-[var(--stocksense-brand)]">
-                                  <FaCheckCircle className="h-3.5 w-3.5 shrink-0" />
+                                <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
+                                  <FaCheckCircle className="h-3.5 w-3.5 shrink-0 text-[var(--stocksense-brand)]" />
                                   <span className="truncate">
                                     {productPreview.name || "Product found"}
                                   </span>
@@ -1000,17 +1361,18 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                               </div>
                             </div>
                           ) : (
-                            <div className="text-sm text-[var(--stocksense-brand)]">
+                            <div className="text-sm text-gray-700">
                               {barcodeMessage}
                             </div>
                           )}
                         </div>
                       )}
+                      </div>
                     </div>
 
-                    <div className="rounded-2xl border border-stocksense-gray bg-white p-3 shadow-sm">
+                    <div className="order-20 rounded-2xl border border-stocksense-gray bg-white p-3 shadow-sm md:order-30">
                       <div className="mb-3">
-                        <div className="text-sm font-semibold text-gray-900">
+                        <div className="text-sm font-semibold text-gray-950">
                           Item details
                         </div>
                         <div className="text-xs text-gray-500">
@@ -1056,7 +1418,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                         />
                       </div>
 
-                      <div className="mt-3 rounded-xl border border-stocksense-gray bg-gray-50/70 p-3">
+                      <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50/80 p-3">
                         <input
                           ref={imageInputRef}
                           type="file"
@@ -1082,24 +1444,24 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                         />
 
                         <div className="mb-2 flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                          <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
                             <FaImage className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
-                            Item photo
+                            Item photo optional
                           </div>
                           {selectedImageFile && (
-                            <span className="rounded-full bg-[var(--stocksense-brand-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--stocksense-brand)]">
+                            <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-[var(--stocksense-brand)]">
                               Ready to upload
                             </span>
                           )}
                         </div>
 
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                          <div className="h-28 w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:w-36">
+                          <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:h-32 sm:w-44">
                             {selectedImagePreview || productPreview?.imageUrl ? (
                               <img
                                 src={selectedImagePreview || productPreview.imageUrl}
                                 alt=""
-                                className="h-full w-full object-cover"
+                                className="h-full w-full object-contain"
                               />
                             ) : (
                               <div className="grid h-full w-full place-items-center text-xs text-gray-400">
@@ -1163,36 +1525,84 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
             </ModalBody>
 
             <ModalFooter
-              className="flex shrink-0 flex-col gap-2 border-t border-[var(--stocksense-brand-border)] bg-white sm:flex-row sm:items-center sm:justify-end"
+              className="flex shrink-0 flex-col gap-2 border-t border-gray-200 bg-white max-md:sticky max-md:bottom-0 max-md:z-20 max-md:px-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] max-md:pt-3 sm:flex-row sm:items-center sm:justify-end"
             >
+              <AnimatePresence initial={false}>
+                {mobileAddedToast && (
+                  <motion.div
+                    layout
+                    {...revealMotion}
+                    className="w-full overflow-hidden rounded-2xl border border-gray-200 bg-white p-3 shadow-sm md:hidden"
+                  >
+                    <div className="text-sm font-semibold text-gray-950">
+                      Item added
+                    </div>
+                    <div className="mt-0.5 truncate text-xs text-gray-600">
+                      {mobileAddedToast.itemName} was added to{" "}
+                      {mobileAddedToast.destinationName}.
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
+                        onPress={() => {
+                          handleClose();
+                          router.push("/items");
+                        }}
+                      >
+                        View item
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="rounded-xl bg-[var(--stocksense-brand)] text-white"
+                        onPress={() => {
+                          setMobileAddedToast(null);
+                          setMessage("");
+                        }}
+                      >
+                        Add another
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <AnimatePresence initial={false}>
                 <AddItemMessage
                   message={message}
                   upgradeHref={upgradeHref}
                   onLinkClick={handleClose}
-                  className="w-full sm:hidden"
+                  className="w-full md:hidden"
                 />
               </AnimatePresence>
 
               <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:justify-end">
-                <Button variant="light" className="rounded-xl" onPress={handleClose} isDisabled={isSaving}>
+                <Button variant="light" className="hidden rounded-xl md:inline-flex" onPress={handleClose} isDisabled={isSaving}>
                   Cancel
                 </Button>
                 <Button
                   variant="flat"
-                  className="rounded-xl"
+                  className="hidden rounded-xl md:inline-flex"
                   onPress={() => handleSubmit({ closeAfterAdd: true })}
-                  isDisabled={isSaving || isLoading}
+                  isDisabled={isSaving || isLoading || isQuickAdding}
                 >
                   Add & close
                 </Button>
                 <Button
-                  className="rounded-xl bg-[var(--stocksense-brand)] text-white"
+                  className="min-h-12 rounded-2xl bg-[var(--stocksense-brand)] text-white md:min-h-10 md:rounded-xl"
                   onPress={() => handleSubmit()}
-                  isDisabled={isSaving || isLoading}
+                  isDisabled={isSaving || isLoading || isQuickAdding}
                   startContent={isSaving ? <FaSpinner className="animate-spin" /> : <FaPlus />}
                 >
-                  {isSaving ? "Adding..." : "Add another"}
+                  {isSaving ? (
+                    "Adding..."
+                  ) : (
+                    <>
+                      <span className="md:hidden">Add item</span>
+                      <span className="hidden md:inline">Add another</span>
+                    </>
+                  )}
                 </Button>
               </div>
             </ModalFooter>

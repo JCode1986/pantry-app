@@ -21,11 +21,15 @@ import {
   modalHeaderClass,
   modalInputClassNames,
 } from "@/components/modals/modalTheme";
+import MobileSuggestionChips from "@/components/modals/MobileSuggestionChips";
+import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 
 const EMPTY_FORM = {
   name: "",
   quantity: "1",
 };
+
+const SHOPPING_SUGGESTIONS = ["Milk", "Bread", "Eggs", "Rice", "Dog food"];
 
 export default function AddShoppingListItemModal({
   isOpen,
@@ -103,11 +107,12 @@ export default function AddShoppingListItemModal({
       <ModalContent className={modalContentClass} style={modalContentStyle}>
         {() => (
           <>
-            <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
-              <span className="inline-flex items-center gap-2">
-                <FaShoppingBasket className="h-4 w-4" />
-                Add to shopping list
+            <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
+              <span className="inline-flex min-w-0 flex-1 items-center gap-2 truncate">
+                <FaShoppingBasket className="h-4 w-4 shrink-0" />
+                <span className="truncate">Add to shopping list</span>
               </span>
+              <MobileSheetCloseButton onPress={handleClose} />
             </ModalHeader>
 
             <ModalBody className={`space-y-4 ${modalBodyClass}`}>
@@ -128,6 +133,10 @@ export default function AddShoppingListItemModal({
                 classNames={modalInputClassNames}
                 autoFocus
               />
+              <MobileSuggestionChips
+                suggestions={SHOPPING_SUGGESTIONS}
+                onSelect={(name) => updateForm("name", name)}
+              />
 
               <Input
                 label="Quantity"
@@ -145,7 +154,7 @@ export default function AddShoppingListItemModal({
             <ModalFooter className={modalFooterClass}>
               <Button
                 variant="light"
-                className="rounded-xl"
+                className="rounded-xl max-md:hidden"
                 onPress={handleClose}
                 isDisabled={isSaving}
               >
@@ -153,7 +162,7 @@ export default function AddShoppingListItemModal({
               </Button>
               <Button
                 variant="flat"
-                className="rounded-xl"
+                className="rounded-xl max-md:hidden"
                 onPress={() => handleSubmit({ closeAfterAdd: false })}
                 isDisabled={isSaving}
               >
@@ -165,7 +174,8 @@ export default function AddShoppingListItemModal({
                 isLoading={isSaving}
                 startContent={!isSaving ? <FaPlus /> : null}
               >
-                Add
+                <span className="md:hidden">Create Shopping List Item</span>
+                <span className="max-md:hidden">Add</span>
               </Button>
             </ModalFooter>
           </>

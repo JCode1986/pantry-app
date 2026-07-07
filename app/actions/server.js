@@ -94,6 +94,234 @@ function allowedProductImageUrl(value) {
   return null;
 }
 
+const QUICK_ADD_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    itemName: {
+      type: 'string',
+      description: 'A concise item name suitable for an inventory list.',
+    },
+    quantity: {
+      type: ['integer', 'null'],
+      description: 'Count of identical items. Use 1 when unsure.',
+    },
+    expirationDate: {
+      type: ['string', 'null'],
+      description: 'Expiration, best-by, or use-by date in YYYY-MM-DD format when visible or stated.',
+    },
+    barcode: {
+      type: ['string', 'null'],
+      description: 'Barcode value when visible or stated.',
+    },
+    locationName: {
+      type: ['string', 'null'],
+      description: 'Named location if the user stated one, such as Kitchen or Garage.',
+    },
+    storageAreaName: {
+      type: ['string', 'null'],
+      description: 'Named storage area if the user stated one, such as Pantry or Fridge.',
+    },
+    categoryName: {
+      type: ['string', 'null'],
+      description: 'Named category if the user stated one, such as Snacks or Canned Goods.',
+    },
+    confidence: {
+      type: 'number',
+      description: 'Confidence from 0 to 1 that the item details are correct.',
+    },
+  },
+  required: [
+    'itemName',
+    'quantity',
+    'expirationDate',
+    'barcode',
+    'locationName',
+    'storageAreaName',
+    'categoryName',
+    'confidence',
+  ],
+};
+
+function normalizeQuickAddDate(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
+
+  const date = new Date(`${trimmed}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10) === trimmed ? trimmed : null;
+}
+
+function normalizeOptionalQuickAddName(value) {
+  const normalized = normalizeName(value).slice(0, 120);
+  return normalized || null;
+}
+
+function normalizeQuickAddFields(fields) {
+  const hasQuantity = fields?.quantity !== null && fields?.quantity !== undefined;
+  const quantityValue = hasQuantity && Number.isFinite(Number(fields.quantity))
+    ? Math.max(0, Math.min(9999, Math.round(Number(fields.quantity))))
+    : 1;
+
+  return {
+    itemName: normalizeName(fields?.itemName).slice(0, 120),
+    quantity: quantityValue,
+    expirationDate: normalizeQuickAddDate(fields?.expirationDate),
+    barcode: normalizeBarcode(fields?.barcode) || null,
+    locationName: normalizeOptionalQuickAddName(fields?.locationName),
+    storageAreaName: normalizeOptionalQuickAddName(fields?.storageAreaName),
+    categoryName: normalizeOptionalQuickAddName(fields?.categoryName),
+    confidence: Math.max(0, Math.min(1, Number(fields?.confidence) || 0)),
+  };
+}
+
+function getOpenAIOutputText(payload) {
+  if (typeof payload?.output_text === 'string') return payload.output_text;
+
+  const chunks = [];
+  for (const item of payload?.output ?? []) {
+    for (const content of item?.content ?? []) {
+      if (typeof content?.text === 'string') chunks.push(content.text);
+    }
+  }
+
+  return chunks.join('\n').trim();
+}
+
+function parseQuickAddJson(text) {
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try {
+      return JSON.parse(match[0]);
+    } catch {
+      return null;
+    }
+  }
+}
+
+async function runOpenAIQuickAdd({ content }) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return validationError('AI quick add needs OPENAI_API_KEY in .env.local.');
+  }
+
+  const model =
+    process.env.OPENAI_QUICK_ADD_MODEL || process.env.OPENAI_MODEL || 'gpt-4.1-mini';
+
+  const response = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      instructions:
+        'You extract pantry and household inventory item details for WhereKeep. Return only fields that are visible or explicitly stated. Use null for unknown optional fields. Do not invent storage locations.',
+      input: [
+        {
+          role: 'user',
+          content,
+        },
+      ],
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'wherekeep_quick_add',
+          schema: QUICK_ADD_SCHEMA,
+          strict: true,
+        },
+      },
+      max_output_tokens: 500,
+    }),
+  });
+
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    console.error('runOpenAIQuickAdd error:', payload?.error ?? response.statusText);
+    return validationError(
+      response.status === 401
+        ? 'AI quick add is not configured correctly.'
+        : 'AI quick add is unavailable right now.'
+    );
+  }
+
+  const parsed = parseQuickAddJson(getOpenAIOutputText(payload));
+  const data = normalizeQuickAddFields(parsed);
+  if (!data.itemName) {
+    return validationError('Could not find an item name in that voice note.');
+  }
+
+  return { data, error: null };
+}
+
+function parseQuickAddTextLocally(transcript) {
+  const text = normalizeName(transcript).slice(0, 500);
+  if (!text) return null;
+
+  const numberWords = {
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+  };
+  const quantityMatch = text.match(/\b(\d{1,4})\b/);
+  const wordQuantityMatch = text.match(
+    /\b(one|two|three|four|five|six|seven|eight|nine|ten)\b/i
+  );
+  const quantity = quantityMatch
+    ? Number(quantityMatch[1])
+    : numberWords[wordQuantityMatch?.[1]?.toLowerCase()] ?? 1;
+  const dateMatch = text.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+
+  let itemName = text
+    .replace(/^(please\s+)?(add|put|create|save|log|inventory)\s+/i, '')
+    .replace(/\b(to|in|into|inside|under)\b[\s\S]*$/i, '')
+    .replace(/\b(expiration|expires|expire|best by|use by)\b[\s\S]*$/i, '')
+    .trim();
+
+  itemName = itemName
+    .replace(/^\d{1,4}\s+/i, '')
+    .replace(
+      /^(one|two|three|four|five|six|seven|eight|nine|ten)\s+/i,
+      ''
+    )
+    .replace(
+      /^(items?|packs?|boxes?|bags?|cans?|bottles?|jars?|cartons?|pounds?|ounces?|lbs?|oz|kg|grams?|g)\s+(of\s+)?/i,
+      ''
+    )
+    .trim();
+
+  return normalizeQuickAddFields({
+    itemName,
+    quantity,
+    expirationDate: dateMatch?.[1] ?? null,
+    barcode: null,
+    locationName: null,
+    storageAreaName: null,
+    categoryName: null,
+    confidence: 0.45,
+  });
+}
+
 async function importRemoteItemImage({ householdId, itemId, imageUrl }) {
   const safeImageUrl = allowedProductImageUrl(imageUrl);
   if (!householdId || !itemId || !safeImageUrl) return null;
@@ -254,6 +482,47 @@ async function recordItemMoveActivity({
   }
 }
 
+async function stampActivityActor({
+  admin,
+  household,
+  user,
+  entityType,
+  entityIds = [],
+  action,
+  since,
+}) {
+  if (!admin || !household?.id || !user?.id || !entityType || !action || !since) {
+    return;
+  }
+
+  const ids = entityIds.map((id) => String(id)).filter(Boolean);
+
+  try {
+    let query = admin
+      .from('activity_events')
+      .update({
+        actor_user_id: user.id,
+        actor_email: user.email ?? null,
+      })
+      .eq('household_id', household.id)
+      .eq('entity_type', entityType)
+      .eq('action', action)
+      .gte('created_at', since)
+      .or('actor_user_id.is.null,actor_email.is.null');
+
+    if (ids.length === 1) {
+      query = query.eq('entity_id', ids[0]);
+    } else if (ids.length > 1) {
+      query = query.in('entity_id', ids);
+    }
+
+    const { error } = await query;
+    if (error) throw error;
+  } catch (err) {
+    console.error('stampActivityActor error:', err);
+  }
+}
+
 async function getCurrentUser() {
   const { user } = await getVerifiedSession();
   return user ?? null;
@@ -357,6 +626,43 @@ async function getImageEntityRecord(admin, entityType, entityId) {
       .from('locations')
       .select('household_id')
       .eq('id', data.location_id)
+      .maybeSingle();
+
+    if (locationError) return { data: null, error: locationError };
+
+    return {
+      data: {
+        id: data.id,
+        image_path: data.image_path,
+        household_id: location?.household_id,
+      },
+      error: null,
+    };
+  }
+
+  if (entityType === INVENTORY_IMAGE_ENTITY.CATEGORY) {
+    const { data, error } = await admin
+      .from('storage_categories')
+      .select('id, image_path, storage_area_id')
+      .eq('id', entityId)
+      .maybeSingle();
+
+    if (error || !data) return { data, error };
+    if (!data.storage_area_id) return { data: null, error: null };
+
+    const { data: area, error: areaError } = await admin
+      .from('storage_areas')
+      .select('location_id')
+      .eq('id', data.storage_area_id)
+      .maybeSingle();
+
+    if (areaError) return { data: null, error: areaError };
+    if (!area?.location_id) return { data: null, error: null };
+
+    const { data: location, error: locationError } = await admin
+      .from('locations')
+      .select('household_id')
+      .eq('id', area.location_id)
       .maybeSingle();
 
     if (locationError) return { data: null, error: locationError };
@@ -513,17 +819,19 @@ async function getCategoryForHousehold(admin, categoryId, householdId) {
 function imageEntityTable(entityType) {
   if (entityType === INVENTORY_IMAGE_ENTITY.LOCATION) return 'locations';
   if (entityType === INVENTORY_IMAGE_ENTITY.STORAGE_AREA) return 'storage_areas';
+  if (entityType === INVENTORY_IMAGE_ENTITY.CATEGORY) return 'storage_categories';
   if (entityType === INVENTORY_IMAGE_ENTITY.ITEM) return 'items';
   return null;
 }
 
 export async function uploadInventoryImage(entityType, entityId, formData) {
+  const startedAt = new Date(Date.now() - 5000).toISOString();
   const normalizedType = normalizeImageEntityType(entityType);
   if (!normalizedType || !entityId) {
     return validationError('Image target is required.');
   }
 
-  const { household, error: permissionError } = await requireInventoryEditor();
+  const { household, user, error: permissionError } = await requireInventoryEditor();
   if (permissionError) return validationError(permissionError);
 
   const file = formData?.get('image');
@@ -576,6 +884,15 @@ export async function uploadInventoryImage(entityType, entityId, formData) {
       await admin.storage.from(INVENTORY_IMAGE_BUCKET).remove([record.image_path]);
     }
 
+    await stampActivityActor({
+      admin,
+      household,
+      user,
+      entityType: normalizedType,
+      entityIds: [entityId],
+      action: 'updated',
+      since: startedAt,
+    });
     revalidateInventoryPaths();
     return {
       data: {
@@ -591,12 +908,13 @@ export async function uploadInventoryImage(entityType, entityId, formData) {
 }
 
 export async function removeInventoryImage(entityType, entityId) {
+  const startedAt = new Date(Date.now() - 5000).toISOString();
   const normalizedType = normalizeImageEntityType(entityType);
   if (!normalizedType || !entityId) {
     return validationError('Image target is required.');
   }
 
-  const { household, error: permissionError } = await requireInventoryEditor();
+  const { household, user, error: permissionError } = await requireInventoryEditor();
   if (permissionError) return validationError(permissionError);
 
   try {
@@ -624,6 +942,15 @@ export async function removeInventoryImage(entityType, entityId) {
       await admin.storage.from(INVENTORY_IMAGE_BUCKET).remove([record.image_path]);
     }
 
+    await stampActivityActor({
+      admin,
+      household,
+      user,
+      entityType: normalizedType,
+      entityIds: [entityId],
+      action: 'updated',
+      since: startedAt,
+    });
     revalidateInventoryPaths();
     return { data: { imagePath: null, imageUrl: null }, error: null };
   } catch (err) {
@@ -640,11 +967,12 @@ export async function getLocations() {
 }
 
 export async function addLocation(name) {
+  const startedAt = new Date(Date.now() - 5000).toISOString();
   const normalizedName = normalizeName(name);
   if (!normalizedName) return validationError('Location name is required');
 
   const supabase = await createClient();
-  const { household, error: permissionError } = await requireInventoryEditor();
+  const { household, user, error: permissionError } = await requireInventoryEditor();
   if (permissionError) return validationError(permissionError);
   const limitError = await enforceLocationLimit(supabase);
   if (limitError) return upgradeLimitError(limitError);
@@ -657,30 +985,61 @@ export async function addLocation(name) {
     .single();
 
   if (error) throw error;
+  await stampActivityActor({
+    admin,
+    household,
+    user,
+    entityType: 'location',
+    entityIds: [data.id],
+    action: 'added',
+    since: startedAt,
+  });
   revalidateInventoryPaths();
   return { data, error: null };
 }
 
 export async function updateLocationName(id, newName) {
+  const startedAt = new Date(Date.now() - 5000).toISOString();
   const normalizedName = normalizeName(newName);
   if (!id || !normalizedName) return validationError('Location name is required');
 
-  const { error: permissionError } = await requireInventoryEditor();
+  const { household, user, error: permissionError } = await requireInventoryEditor();
   if (permissionError) return validationError(permissionError);
 
   const supabase = await createClient();
+  const admin = createAdminClient();
   const { error } = await supabase.from('locations').update({ name: normalizedName }).eq('id', id);
   if (error) throw error;
+  await stampActivityActor({
+    admin,
+    household,
+    user,
+    entityType: 'location',
+    entityIds: [id],
+    action: 'updated',
+    since: startedAt,
+  });
   revalidateInventoryPaths();
 }
 
 export async function deleteLocation(id) {
-  const { error: permissionError } = await requireInventoryEditor();
+  const startedAt = new Date(Date.now() - 5000).toISOString();
+  const { household, user, error: permissionError } = await requireInventoryEditor();
   if (permissionError) return validationError(permissionError);
 
   const supabase = await createClient();
+  const admin = createAdminClient();
   const { error } = await supabase.from('locations').delete().eq('id', id);
   if (error) throw error;
+  await stampActivityActor({
+    admin,
+    household,
+    user,
+    entityType: 'location',
+    entityIds: [id],
+    action: 'deleted',
+    since: startedAt,
+  });
   revalidateInventoryPaths();
 }
 
@@ -704,12 +1063,13 @@ export async function getStorageAreas(locationId) {
 
 // ✅ Add a new storage area
 export async function addStorageArea(locationId, name) {
+  const startedAt = new Date(Date.now() - 5000).toISOString();
   const normalizedName = normalizeName(name);
   if (!locationId || !normalizedName) {
     return validationError('Location and storage area name are required');
   }
 
-  const { household, error: permissionError } = await requireInventoryEditor();
+  const { household, user, error: permissionError } = await requireInventoryEditor();
   if (permissionError) return validationError(permissionError);
 
   const admin = createAdminClient();
@@ -731,19 +1091,30 @@ export async function addStorageArea(locationId, name) {
     return { error: error.message };
   }
 
+  await stampActivityActor({
+    admin,
+    household,
+    user,
+    entityType: 'storage_area',
+    entityIds: [data.id],
+    action: 'added',
+    since: startedAt,
+  });
   revalidateInventoryPaths([`/locations/${locationId}`]);
   return { data };
 }
 
 // updateStorageArea
 export async function updateStorageArea(id, name) {
+  const startedAt = new Date(Date.now() - 5000).toISOString();
   const normalizedName = normalizeName(name);
   if (!id || !normalizedName) return validationError('Storage area name is required');
 
-  const { error: permissionError } = await requireInventoryEditor();
+  const { household, user, error: permissionError } = await requireInventoryEditor();
   if (permissionError) return validationError(permissionError);
 
   const supabase = await createClient();
+  const admin = createAdminClient();
 
   const { data, error } = await supabase
     .from('storage_areas')
@@ -753,16 +1124,27 @@ export async function updateStorageArea(id, name) {
     .single();
 
   if (error) return { error };
+  await stampActivityActor({
+    admin,
+    household,
+    user,
+    entityType: 'storage_area',
+    entityIds: [id],
+    action: 'updated',
+    since: startedAt,
+  });
   revalidateInventoryPaths();
   return { data };
 }
 
 // deleteStorageArea
 export async function deleteStorageArea(id) {
-  const { error: permissionError } = await requireInventoryEditor();
+  const startedAt = new Date(Date.now() - 5000).toISOString();
+  const { household, user, error: permissionError } = await requireInventoryEditor();
   if (permissionError) return validationError(permissionError);
 
   const supabase = await createClient();
+  const admin = createAdminClient();
 
   const { error } = await supabase
     .from('storage_areas')
@@ -770,6 +1152,15 @@ export async function deleteStorageArea(id) {
     .eq('id', id);
 
   if (error) return { error };
+  await stampActivityActor({
+    admin,
+    household,
+    user,
+    entityType: 'storage_area',
+    entityIds: [id],
+    action: 'deleted',
+    since: startedAt,
+  });
   revalidateInventoryPaths();
   return { success: true };
 }
@@ -841,17 +1232,74 @@ export async function lookupProductByBarcode(barcode) {
   }
 }
 
+export async function parseQuickAddVoiceText(transcript) {
+  const { error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
+
+  const text = normalizeName(transcript).slice(0, 500);
+  if (!text) return validationError('Tell WhereKeep what to add.');
+
+  if (!process.env.OPENAI_API_KEY) {
+    const data = parseQuickAddTextLocally(text);
+    if (!data?.itemName) {
+      return validationError('Could not find an item name in that voice note.');
+    }
+    return {
+      data: {
+        ...data,
+        usedAi: false,
+      },
+      error: null,
+    };
+  }
+
+  try {
+    const result = await runOpenAIQuickAdd({
+      content: [
+        {
+          type: 'input_text',
+          text: `Parse this voice note into one inventory item. The user may include quantity, expiration date, barcode, location, storage area, or category. Voice note: "${text}"`,
+        },
+      ],
+    });
+
+    return result?.data
+      ? {
+          data: {
+            ...result.data,
+            usedAi: true,
+          },
+          error: null,
+        }
+      : result;
+  } catch (err) {
+    console.error('parseQuickAddVoiceText error:', err);
+    const fallback = parseQuickAddTextLocally(text);
+    if (fallback?.itemName) {
+      return {
+        data: {
+          ...fallback,
+          usedAi: false,
+        },
+        error: null,
+      };
+    }
+    return validationError('Voice quick add is unavailable right now.');
+  }
+}
+
 export async function addItem(
   categoryId,
   { name, quantity = 0, expiration_date = null, barcode = '', productImageUrl = null }
 ) {
+  const startedAt = new Date(Date.now() - 5000).toISOString();
   const normalizedName = normalizeName(name);
   const normalizedBarcode = normalizeBarcode(barcode);
   if (!categoryId || !normalizedName) {
     return validationError('Category and item name are required');
   }
 
-  const { household, error: permissionError } = await requireInventoryEditor();
+  const { household, user, error: permissionError } = await requireInventoryEditor();
   if (permissionError) return validationError(permissionError);
 
   const supabase = await createClient();
@@ -891,6 +1339,15 @@ export async function addItem(
     imageUrl: productImageUrl,
   });
 
+  await stampActivityActor({
+    admin,
+    household,
+    user,
+    entityType: 'item',
+    entityIds: [data.id],
+    action: 'added',
+    since: startedAt,
+  });
   revalidateInventoryPaths();
   return {
     data: {
@@ -1077,12 +1534,13 @@ export async function addItemWithPath({
   barcode = '',
   productImageUrl = null,
 }) {
+  const startedAt = new Date(Date.now() - 5000).toISOString();
   const normalizedItemName = normalizeName(itemName);
   const normalizedBarcode = normalizeBarcode(barcode);
   if (!normalizedItemName) return validationError('Item name is required');
 
   const supabase = await createClient();
-  const { household, error: permissionError } = await requireInventoryEditor();
+  const { household, user, error: permissionError } = await requireInventoryEditor();
   if (permissionError) return validationError(permissionError);
   const itemLimitError = await enforceItemLimit(supabase);
   if (itemLimitError) return upgradeLimitError(itemLimitError);
@@ -1215,6 +1673,51 @@ export async function addItemWithPath({
     imageUrl: productImageUrl,
   });
 
+  await Promise.all([
+    createdLocation
+      ? stampActivityActor({
+          admin,
+          household,
+          user,
+          entityType: 'location',
+          entityIds: [finalLocationId],
+          action: 'added',
+          since: startedAt,
+        })
+      : null,
+    createdStorageArea
+      ? stampActivityActor({
+          admin,
+          household,
+          user,
+          entityType: 'storage_area',
+          entityIds: [finalStorageAreaId],
+          action: 'added',
+          since: startedAt,
+        })
+      : null,
+    createdCategory
+      ? stampActivityActor({
+          admin,
+          household,
+          user,
+          entityType: 'category',
+          entityIds: [finalCategoryId],
+          action: 'added',
+          since: startedAt,
+        })
+      : null,
+    stampActivityActor({
+      admin,
+      household,
+      user,
+      entityType: 'item',
+      entityIds: [data.id],
+      action: 'added',
+      since: startedAt,
+    }),
+  ]);
+
   revalidateInventoryPaths();
 
   return {
@@ -1238,10 +1741,12 @@ export async function addItemWithPath({
 
 // actions/server.js
 export async function updateItem(itemId, updates) {
-  const { error: permissionError } = await requireInventoryEditor();
+  const startedAt = new Date(Date.now() - 5000).toISOString();
+  const { household, user, error: permissionError } = await requireInventoryEditor();
   if (permissionError) return validationError(permissionError);
 
   const supabase = await createClient();
+  const admin = createAdminClient();
 
   // Normalize keys coming from the client
   const payload = {};
@@ -1278,29 +1783,50 @@ export async function updateItem(itemId, updates) {
     return { error: error.message };
   }
 
+  await stampActivityActor({
+    admin,
+    household,
+    user,
+    entityType: 'item',
+    entityIds: [itemId],
+    action: 'updated',
+    since: startedAt,
+  });
   revalidateInventoryPaths();
   return { data };
 }
 
 
 export async function deleteItem(itemId) {
-  const { error: permissionError } = await requireInventoryEditor();
+  const startedAt = new Date(Date.now() - 5000).toISOString();
+  const { household, user, error: permissionError } = await requireInventoryEditor();
   if (permissionError) return validationError(permissionError);
 
   const supabase = await createClient();
+  const admin = createAdminClient();
   const { error } = await supabase.from('items').delete().eq('id', itemId);
   if (error) throw error;
+  await stampActivityActor({
+    admin,
+    household,
+    user,
+    entityType: 'item',
+    entityIds: [itemId],
+    action: 'deleted',
+    since: startedAt,
+  });
   revalidateInventoryPaths();
   return { success: true };
 }
 
 export async function addCategory(storageAreaId, name) {
+  const startedAt = new Date(Date.now() - 5000).toISOString();
   const normalizedName = normalizeName(name);
   if (!storageAreaId || !normalizedName) {
     return validationError('Storage area and category name are required');
   }
 
-  const { household, error: permissionError } = await requireInventoryEditor();
+  const { household, user, error: permissionError } = await requireInventoryEditor();
   if (permissionError) return validationError(permissionError);
 
   const admin = createAdminClient();
@@ -1321,19 +1847,30 @@ export async function addCategory(storageAreaId, name) {
     console.error('addCategory error:', error);
     return { data: null, error };
   }
+  await stampActivityActor({
+    admin,
+    household,
+    user,
+    entityType: 'category',
+    entityIds: [data.id],
+    action: 'added',
+    since: startedAt,
+  });
   revalidateInventoryPaths();
   return { data, error: null };
 }
 
 
 export async function updateCategoryName(categoryId, name) {
+  const startedAt = new Date(Date.now() - 5000).toISOString();
   const normalizedName = normalizeName(name);
   if (!categoryId || !normalizedName) return validationError('Category name is required');
 
-  const { error: permissionError } = await requireInventoryEditor();
+  const { household, user, error: permissionError } = await requireInventoryEditor();
   if (permissionError) return validationError(permissionError);
 
   const supabase = await createClient();
+  const admin = createAdminClient();
   const { data, error } = await supabase
     .from('storage_categories')
     .update({ name: normalizedName })
@@ -1342,21 +1879,41 @@ export async function updateCategoryName(categoryId, name) {
     .single();
 
   if (error) return { error };
+  await stampActivityActor({
+    admin,
+    household,
+    user,
+    entityType: 'category',
+    entityIds: [categoryId],
+    action: 'updated',
+    since: startedAt,
+  });
   revalidateInventoryPaths();
   return { data };
 }
 
 export async function deleteCategory(categoryId) {
-  const { error: permissionError } = await requireInventoryEditor();
+  const startedAt = new Date(Date.now() - 5000).toISOString();
+  const { household, user, error: permissionError } = await requireInventoryEditor();
   if (permissionError) return validationError(permissionError);
 
   const supabase = await createClient();
+  const admin = createAdminClient();
   const { error } = await supabase
     .from('storage_categories')
     .delete()
     .eq('id', categoryId);
 
   if (error) return { error };
+  await stampActivityActor({
+    admin,
+    household,
+    user,
+    entityType: 'category',
+    entityIds: [categoryId],
+    action: 'deleted',
+    since: startedAt,
+  });
   revalidateInventoryPaths();
   return { success: true };
 }

@@ -1,10 +1,18 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Input, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
-import { FaSearch, FaTags, FaTrash } from "react-icons/fa";
+import {
+  FaChevronRight,
+  FaSearch,
+  FaTags,
+  FaTrash,
+} from "react-icons/fa";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
+import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
+import EntityImageManager from "@/components/inventory/EntityImageManager";
 import {
   modalBodyClass,
   modalContentClass,
@@ -36,6 +44,7 @@ export default function CategoriesPageClient({
   initialCategories,
   canEditInventory = true,
 }) {
+  const router = useRouter();
   const [categories, setCategories] = useState(initialCategories ?? []);
   const [search, setSearch] = useState("");
 
@@ -79,6 +88,8 @@ export default function CategoriesPageClient({
             {
               id: item.categoryId,
               name: item.categoryName ?? "Category",
+              image_path: null,
+              imageUrl: null,
               insertedAt: null,
               storageArea: {
                 id: item.storageAreaId ?? null,
@@ -196,18 +207,46 @@ export default function CategoriesPageClient({
     });
   };
 
+  const handleCategoryImageChange = ({ imagePath, imageUrl }) => {
+    if (!activeCategory?.id) return;
+
+    setCategories((prev) =>
+      prev.map((category) =>
+        category.id === activeCategory.id
+          ? {
+              ...category,
+              image_path: imagePath ?? null,
+              imageUrl: imageUrl ?? null,
+            }
+          : category
+      )
+    );
+
+    emitInventoryChange({
+      entity: "category",
+      action: imagePath ? "image_updated" : "image_removed",
+      id: activeCategory.id,
+    });
+  };
+
   const openDelete = () => {
     if (!canEditInventory) return;
     if (!activeCategory) return;
+    openDeleteForCategory(activeCategory);
+  };
+
+  const openDeleteForCategory = (category) => {
+    if (!canEditInventory || !category) return;
+
     setDeleteDialog({
       open: true,
       isDeleting: false,
       mode: "single",
       payload: {
-        categoryId: activeCategory.id,
-        name: activeCategory.name,
-        storageAreaName: activeCategory.storageArea?.name,
-        locationName: activeCategory.location?.name,
+        categoryId: category.id,
+        name: category.name,
+        storageAreaName: category.storageArea?.name,
+        locationName: category.location?.name,
       },
     });
   };
@@ -292,10 +331,124 @@ export default function CategoriesPageClient({
       animate="show"
       className="space-y-6"
     >
+      <motion.section variants={pageItemVariants} className="md:hidden">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-950">
+              Categories
+            </h1>
+            <p className="mt-1 text-sm text-gray-600">
+              Groups of items across every location
+            </p>
+          </div>
+        </div>
+
+        <div className="relative mt-4">
+          <FaSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search categories..."
+            className="h-11 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-3 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-[var(--stocksense-brand)]"
+          />
+        </div>
+      </motion.section>
+
+      <motion.section variants={pageSectionVariants} className="grid gap-3 md:hidden">
+        {filtered.length === 0 ? (
+          <motion.div
+            key="mobile-empty"
+            variants={pageItemVariants}
+            className="rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-7 text-center shadow-sm"
+          >
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
+              <FaTags className="h-6 w-6" />
+            </div>
+            <h2 className="mt-4 text-lg font-semibold text-gray-950">
+              No categories found
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Try a different search or add an item to create a category.
+            </p>
+            {canEditInventory && (
+              <div className="mt-5 flex justify-center">
+                <OpenGlobalAddItemButton canEditInventory={canEditInventory} />
+              </div>
+            )}
+          </motion.div>
+        ) : (
+          filtered.map((category) => (
+            <motion.article
+              key={category.id}
+              layout
+              variants={pageItemVariants}
+              className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
+            >
+              <button
+                type="button"
+                onClick={() => router.push(`/categories/${category.id}`)}
+                className="flex min-h-[112px] w-full items-center gap-4 p-4 text-left transition active:scale-[0.99]"
+              >
+                {category.imageUrl ? (
+                  <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-category-border)] bg-white">
+                    <img
+                      src={category.imageUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
+                    <FaTags className="h-7 w-7" />
+                  </div>
+                )}
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-lg font-semibold leading-6 text-gray-950">
+                    {category.name}
+                  </p>
+                  <p className="mt-1 truncate text-sm text-gray-500">
+                    {category.location?.name}
+                  </p>
+                  <p className="truncate text-sm text-gray-500">
+                    {category.storageArea?.name}
+                  </p>
+                  <div className="mt-2 text-sm leading-5 text-gray-500">
+                    {category.itemsCount ?? 0}{" "}
+                    {(category.itemsCount ?? 0) === 1 ? "item" : "items"}
+                  </div>
+                </div>
+
+                <FaChevronRight className="h-4 w-4 shrink-0 text-[var(--stocksense-brand)]" />
+              </button>
+
+              {canEditInventory && (
+                <div className="grid grid-cols-2 gap-2 border-t border-gray-200 bg-gray-50 p-3">
+                  <button
+                    type="button"
+                    onClick={() => openDrawer(category)}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 text-sm font-semibold text-amber-700"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openDeleteForCategory(category)}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 text-sm font-semibold text-rose-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
+            </motion.article>
+          ))
+        )}
+      </motion.section>
+
       {/* Header */}
       <motion.div
         variants={pageItemVariants}
-        className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm"
+        className="rounded-2xl border border-stocksense-gray bg-white p-4 shadow-sm max-md:hidden md:p-5"
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -303,7 +456,7 @@ export default function CategoriesPageClient({
               <FaTags className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-stocksense-teal">
+              <h1 className="text-xl font-semibold tracking-tight text-gray-950 md:text-2xl">
                 Categories
               </h1>
               <p className="text-sm text-gray-500">
@@ -361,7 +514,7 @@ export default function CategoriesPageClient({
               className="mt-4 overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3"
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-[var(--stocksense-brand)]">
+                <p className="text-sm text-gray-700">
                   Bulk actions for <span className="font-semibold">{selectedCount}</span>{" "}
                   categor{selectedCount === 1 ? "y" : "ies"}
                 </p>
@@ -385,7 +538,7 @@ export default function CategoriesPageClient({
       {/* List */}
       <motion.div
         variants={pageSectionVariants}
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        className="grid grid-cols-1 gap-4 max-md:hidden sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
       >
         <AnimatePresence initial={false}>
           {filtered.map((c) => (
@@ -420,8 +573,21 @@ export default function CategoriesPageClient({
                     className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border border-stocksense-gray"
                   />
                 )}
+                {c.imageUrl ? (
+                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
+                    <img
+                      src={c.imageUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
+                    <FaTags className="h-4 w-4" />
+                  </div>
+                )}
                 <div className="min-w-0">
-                  <div className="truncate text-[15px] font-semibold leading-5 text-stocksense-teal sm:text-base">
+                  <div className="truncate text-[15px] font-semibold leading-5 text-gray-950 sm:text-base">
                     {c.name}
                   </div>
                   <div className="mt-1 text-sm text-gray-500 truncate">
@@ -471,13 +637,14 @@ export default function CategoriesPageClient({
         <ModalContent className={modalContentClass} style={modalContentStyle}>
           {() => (
             <>
-              <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
-                <div className="text-lg font-semibold text-[var(--stocksense-brand)]">
+              <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass} max-md:flex-row max-md:gap-3`}>
+                <div className="min-w-0 flex-1 truncate text-lg font-semibold text-gray-950">
                   {activeCategory?.name || "Category"}
                 </div>
-                <div className="text-sm text-gray-500">
+                <div className="text-sm text-gray-500 max-md:hidden">
                   {activeCategory?.location?.name} → {activeCategory?.storageArea?.name}
                 </div>
+                <MobileSheetCloseButton onPress={closeDrawer} />
               </ModalHeader>
 
               <ModalBody className={`space-y-4 ${modalBodyClass}`}>
@@ -494,16 +661,38 @@ export default function CategoriesPageClient({
                     <Button
                       onClick={handleRename}
                       isDisabled={!renameValue.trim()}
-                      className="rounded-xl bg-[var(--stocksense-brand)] text-white w-full"
+                      className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                     >
                       Save name
                     </Button>
                   </div>
                 )}
 
+                {canEditInventory && activeCategory?.id && (
+                  <EntityImageManager
+                    entityType="category"
+                    entityId={activeCategory.id}
+                    imageUrl={activeCategory.imageUrl}
+                    label="Category photo"
+                    onChange={handleCategoryImageChange}
+                  />
+                )}
+
+                {canEditInventory && activeCategory?.id && (
+                  <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
+                    <p className="text-sm font-semibold text-gray-950">Danger zone</p>
+                    <Button
+                      className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
+                      onClick={openDelete}
+                    >
+                      Delete category
+                    </Button>
+                  </div>
+                )}
+
                 {/* Items preview */}
                 <div>
-                  <div className="text-sm font-semibold text-stocksense-teal mb-2">
+                  <div className="mb-2 text-sm font-semibold text-gray-950">
                     Items ({activeCategory?.itemsCount ?? 0})
                   </div>
 
@@ -514,7 +703,7 @@ export default function CategoriesPageClient({
                         className="rounded-xl border border-stocksense-gray bg-white p-3 flex justify-between gap-3"
                       >
                         <div className="min-w-0">
-                          <div className="font-medium text-stocksense-teal truncate">{it.name}</div>
+                          <div className="truncate font-medium text-gray-950">{it.name}</div>
                           <div className="text-sm text-gray-500 truncate">
                             Qty: {it.quantity ?? 0} • Exp: {it.expiration_date || "—"}
                           </div>
@@ -538,15 +727,24 @@ export default function CategoriesPageClient({
               </ModalBody>
 
               <ModalFooter className={modalFooterClass}>
-                <Button variant="light" className="rounded-xl" onClick={closeDrawer}>
+                <Button variant="light" className="rounded-xl max-md:hidden" onClick={closeDrawer}>
                   Close
                 </Button>
                 {canEditInventory && (
                   <Button
-                    className="rounded-xl bg-rose-600 text-white"
+                    className="rounded-xl bg-rose-600 text-white max-md:hidden"
                     onClick={openDelete}
                   >
                     Delete category
+                  </Button>
+                )}
+                {canEditInventory && (
+                  <Button
+                    onClick={handleRename}
+                    isDisabled={!renameValue.trim()}
+                    className="rounded-xl bg-[var(--stocksense-brand)] text-white md:hidden"
+                  >
+                    Save changes
                   </Button>
                 )}
               </ModalFooter>

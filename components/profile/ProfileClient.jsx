@@ -8,6 +8,7 @@ import { Button, Input, Select, SelectItem } from "@heroui/react";
 import {
   FaBoxOpen,
   FaCheckCircle,
+  FaChevronDown,
   FaClock,
   FaClipboard,
   FaCopy,
@@ -190,6 +191,138 @@ function LegalResourceButton({ href, label, description }) {
   );
 }
 
+function MobileProfileCard({ children, className = "" }) {
+  return (
+    <section
+      className={`rounded-2xl border border-stocksense-gray bg-white p-4 shadow-sm ${className}`}
+    >
+      {children}
+    </section>
+  );
+}
+
+function MobileSectionHeader({ icon: Icon, title, description }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0">
+        <h2 className="text-base font-semibold text-gray-950">{title}</h2>
+        {description ? (
+          <p className="mt-0.5 text-sm leading-5 text-gray-500">{description}</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+const MOBILE_PROFILE_DROPDOWN_TRANSITION = {
+  duration: 0.2,
+  ease: [0.16, 1, 0.3, 1],
+};
+
+function MobileAccordionCard({
+  icon: Icon,
+  title,
+  summary,
+  children,
+  defaultOpen = false,
+  id,
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <section
+      id={id}
+      className="overflow-hidden rounded-2xl border border-stocksense-gray bg-white shadow-sm"
+    >
+      <button
+        type="button"
+        className="flex min-h-16 w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
+        onClick={() => setIsOpen((value) => !value)}
+        aria-expanded={isOpen}
+      >
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+          <Icon className="h-4 w-4" />
+        </div>
+        <span className="min-w-0 flex-1">
+          <span className="block text-base font-semibold text-gray-950">{title}</span>
+          {summary ? (
+            <span className="mt-0.5 block truncate text-sm text-gray-500">
+              {summary}
+            </span>
+          ) : null}
+        </span>
+        <FaChevronDown
+          className={`h-3.5 w-3.5 shrink-0 text-[var(--stocksense-brand)] transition-transform duration-200 ease-out ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0, y: -4 }}
+            animate={{ height: "auto", opacity: 1, y: 0 }}
+            exit={{ height: 0, opacity: 0, y: -4 }}
+            transition={MOBILE_PROFILE_DROPDOWN_TRANSITION}
+            className="overflow-hidden border-t border-gray-100"
+          >
+            <div className="px-4 py-4">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+}
+
+function MobileInlineAccordion({ title, children, defaultOpen = false }) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+      <button
+        type="button"
+        className="flex min-h-11 w-full cursor-pointer items-center justify-between px-3 text-left text-sm font-semibold text-gray-900"
+        onClick={() => setIsOpen((value) => !value)}
+        aria-expanded={isOpen}
+      >
+        {title}
+        <FaChevronDown
+          className={`h-3.5 w-3.5 text-[var(--stocksense-brand)] transition-transform duration-200 ease-out ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0, y: -4 }}
+            animate={{ height: "auto", opacity: 1, y: 0 }}
+            exit={{ height: 0, opacity: 0, y: -4 }}
+            transition={MOBILE_PROFILE_DROPDOWN_TRANSITION}
+            className="overflow-hidden border-t border-gray-200"
+          >
+            <div className="p-3">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function MobileInfoRow({ label, value }) {
+  return (
+    <div className="flex items-start justify-between gap-3 border-b border-gray-100 py-2.5 last:border-b-0">
+      <span className="shrink-0 text-sm text-gray-500">{label}</span>
+      <span className="min-w-0 break-words text-right text-sm font-medium text-gray-900">
+        {value}
+      </span>
+    </div>
+  );
+}
+
 function AppearancePreview({ theme, font }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -298,7 +431,7 @@ function BillingSection({ billing, billingError, billingLoading, onCheckout, onP
           className={`mt-4 rounded-xl border px-3 py-2 text-sm ${
             billing.cancelAtPeriodEnd
               ? "border-amber-200 bg-amber-50 text-amber-800"
-              : "border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
+              : "border-gray-200 bg-gray-50 text-gray-700"
           }`}
         >
           {billing.cancelAtPeriodEnd
@@ -481,7 +614,7 @@ function SharingSection({
           )}
 
           {isFamily && !isOwner && (
-            <div className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-3 text-sm text-[var(--stocksense-brand)]">
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-700">
               {sharing.currentUserRole === "viewer"
                 ? "You have view-only access. You can browse inventory, shopping list, and activity without changing household data."
                 : "You can view and manage this shared inventory. Only the household owner can invite new members."}
@@ -707,6 +840,20 @@ export default function ProfileClient({
   const effectivePlanId = getEffectivePlanId(billing);
   const appearancePlanId = sharing?.effectivePlanId || effectivePlanId;
   const canCustomizeAppearance = appearancePlanId !== "free";
+  const currentPlan = getBillingPlan(effectivePlanId);
+  const renewalDate = formatBillingDate(billing.currentPeriodEnd);
+  const paidPlans = BILLING_PLANS.filter((plan) => plan.id !== "free");
+  const sharingMembers = sharing?.members ?? [];
+  const sharingInvites = sharing?.invites ?? [];
+  const sharingIsFamily = sharing?.effectivePlanId === "family";
+  const sharingIsOwner = sharing?.currentUserRole === "owner";
+  const sharingMaxMembers = sharing?.maxMembers ?? null;
+  const sharingMemberCount = sharing?.memberCount ?? sharingMembers.length;
+  const sharingMemberLimitLabel =
+    sharingMaxMembers === null
+      ? `${sharingMemberCount} members`
+      : `${sharingMemberCount}/${sharingMaxMembers} members`;
+  const accountStatus = user.emailConfirmed ? "Active" : "Email pending";
 
   const initials = useMemo(() => {
     const email = user?.email || "";
@@ -1006,14 +1153,14 @@ export default function ProfileClient({
     >
       <motion.header
         variants={itemVariants}
-        className="rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm"
+        className="rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm max-md:hidden"
       >
         <div className="flex items-center gap-4">
           <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-stocksense-teal to-stocksense-sky text-lg font-semibold text-white shadow-sm">
             {initials}
           </div>
           <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-tight text-stocksense-teal">
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-950">
               Profile
             </h1>
             <p className="mt-1 break-words text-sm text-gray-500">
@@ -1023,11 +1170,457 @@ export default function ProfileClient({
         </div>
       </motion.header>
 
-      {requiresPasswordSetup && <PasswordSetupNotice />}
+      {requiresPasswordSetup && (
+        <div className="max-md:hidden">
+          <PasswordSetupNotice />
+        </div>
+      )}
 
-      <BillingReturnNotice />
+      <div className="max-md:hidden">
+        <BillingReturnNotice />
+      </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
+      <div className="space-y-4 pb-24 md:hidden">
+        <MobileProfileCard>
+          <div className="flex items-start gap-3">
+            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[var(--stocksense-brand)] text-base font-semibold text-white shadow-sm">
+              {initials}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="break-words text-base font-semibold text-gray-950">
+                {user.email}
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                  <p className="text-xs text-gray-500">Current plan</p>
+                  <p className="mt-0.5 truncate text-sm font-semibold text-gray-950">
+                    {currentPlan.name}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                  <p className="text-xs text-gray-500">Status</p>
+                  <p className="mt-0.5 truncate text-sm font-semibold text-gray-950">
+                    {accountStatus}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </MobileProfileCard>
+
+        {requiresPasswordSetup && <PasswordSetupNotice />}
+        <BillingReturnNotice />
+
+        <MobileProfileCard>
+          <MobileSectionHeader
+            icon={FaPalette}
+            title="Appearance"
+            description={`${selectedTheme.label} theme with ${selectedFont.label} font.`}
+          />
+
+          <div className="mt-4 space-y-4">
+            {!canCustomizeAppearance && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+                Theme and font customization is included with Plus and Family.{" "}
+                <Link href="#mobile-billing" className="font-semibold underline">
+                  View plans
+                </Link>
+              </div>
+            )}
+
+            <Select
+              label="Color theme"
+              selectedKeys={new Set([preferences.themeId])}
+              onSelectionChange={handleThemeChange}
+              isDisabled={savingPreferences || !canCustomizeAppearance}
+              variant="bordered"
+              radius="lg"
+              startContent={<FaPalette className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />}
+              classNames={themedSelectClassNames}
+            >
+              {THEME_OPTIONS.map((theme) => (
+                <SelectItem key={theme.id} textValue={theme.label}>
+                  {theme.label} - {theme.description}
+                </SelectItem>
+              ))}
+            </Select>
+
+            <Select
+              label="Font family"
+              selectedKeys={new Set([preferences.fontId])}
+              onSelectionChange={handleFontChange}
+              isDisabled={savingPreferences || !canCustomizeAppearance}
+              variant="bordered"
+              radius="lg"
+              startContent={<FaFont className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />}
+              classNames={themedSelectClassNames}
+            >
+              {FONT_OPTIONS.map((font) => (
+                <SelectItem key={font.id} textValue={font.label}>
+                  {font.label} - {font.description}
+                </SelectItem>
+              ))}
+            </Select>
+
+            <Button
+              variant="flat"
+              className="w-full rounded-xl border border-stocksense-gray bg-white text-gray-700"
+              onPress={() => updatePreferences(DEFAULT_PREFERENCES)}
+              isLoading={savingPreferences}
+              isDisabled={savingPreferences || !canCustomizeAppearance}
+              startContent={<FaRedo className="h-3.5 w-3.5" />}
+            >
+              Reset appearance
+            </Button>
+
+            {appearanceMessage && (
+              <div
+                className={`rounded-xl border px-3 py-2 text-sm ${
+                  appearanceMessage.type === "success"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-rose-200 bg-rose-50 text-rose-700"
+                }`}
+                role={appearanceMessage.type === "success" ? "status" : "alert"}
+              >
+                {appearanceMessage.text}
+              </div>
+            )}
+          </div>
+        </MobileProfileCard>
+
+        <MobileAccordionCard
+          id="mobile-billing"
+          icon={FaCreditCard}
+          title="Billing"
+          summary={`${currentPlan.name}${billing.status ? ` - ${billing.status}` : ""}`}
+        >
+          <div className="space-y-3">
+            {renewalDate && (
+              <div
+                className={`rounded-xl border px-3 py-2 text-sm ${
+                  billing.cancelAtPeriodEnd
+                    ? "border-amber-200 bg-amber-50 text-amber-800"
+                    : "border-gray-200 bg-gray-50 text-gray-700"
+                }`}
+              >
+                {billing.cancelAtPeriodEnd
+                  ? `Access ends on ${renewalDate}.`
+                  : `Renews on ${renewalDate}.`}
+              </div>
+            )}
+
+            {billingError && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                {billingError}
+              </div>
+            )}
+
+            <Button
+              variant="flat"
+              className="w-full rounded-xl border border-stocksense-gray bg-white text-gray-700"
+              onPress={handleBillingPortal}
+              isLoading={billingLoading === "portal"}
+              isDisabled={billingLoading === "portal" || !billing.hasStripeCustomer}
+              startContent={<FaExternalLinkAlt className="h-3.5 w-3.5" />}
+            >
+              {billing.hasStripeCustomer ? "Manage billing" : "Billing portal available after checkout"}
+            </Button>
+
+            <div className="grid gap-2">
+              {paidPlans.map((plan) => (
+                <div
+                  key={plan.id}
+                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-950">{plan.name}</p>
+                      <p className="mt-0.5 text-xs leading-5 text-gray-500">
+                        {plan.audience}
+                      </p>
+                    </div>
+                    {effectivePlanId === plan.id ? (
+                      <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                        Current
+                      </span>
+                    ) : null}
+                  </div>
+                  {effectivePlanId !== plan.id && (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <BillingPlanButton
+                        plan={plan}
+                        interval={BILLING_INTERVALS.monthly}
+                        currentPlanId={effectivePlanId}
+                        onCheckout={handleCheckout}
+                        isLoading={billingLoading === `${plan.id}:monthly`}
+                      />
+                      <BillingPlanButton
+                        plan={plan}
+                        interval={BILLING_INTERVALS.yearly}
+                        currentPlanId={effectivePlanId}
+                        onCheckout={handleCheckout}
+                        isLoading={billingLoading === `${plan.id}:yearly`}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </MobileAccordionCard>
+
+        <MobileProfileCard>
+          <MobileSectionHeader
+            icon={FaUserFriends}
+            title="Family sharing"
+            description={
+              sharing
+                ? `${sharing.household?.name ?? "My Household"} - ${sharingMemberLimitLabel}`
+                : "Household sharing settings"
+            }
+          />
+
+          <div className="mt-4 space-y-4">
+            {sharingError && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                {sharingError}
+              </div>
+            )}
+
+            {sharing && (
+              <>
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3">
+                  <MobileInfoRow
+                    label="Household"
+                    value={sharing.household?.name ?? "My Household"}
+                  />
+                  <MobileInfoRow label="Members" value={sharingMemberLimitLabel} />
+                  <MobileInfoRow
+                    label="Your role"
+                    value={formatHouseholdRole(sharing.currentUserRole)}
+                  />
+                </div>
+
+                {!sharingIsFamily && sharingIsOwner && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+                    Upgrade to Family to invite household members.{" "}
+                    <Link href="#mobile-billing" className="font-semibold underline">
+                      View Family plan
+                    </Link>
+                  </div>
+                )}
+
+                {sharingIsFamily && sharingIsOwner && (
+                  <form onSubmit={handleCreateInvite} className="space-y-3">
+                    <Input
+                      label="Invite by email"
+                      type="email"
+                      value={inviteEmail}
+                      onValueChange={setInviteEmail}
+                      isDisabled={sharingLoading === "invite" || !sharing.canInvite}
+                      classNames={{
+                        inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
+                      }}
+                    />
+                    <Select
+                      label="Role"
+                      selectedKeys={new Set([inviteRole])}
+                      onSelectionChange={(keys) => {
+                        const value = Array.from(keys)[0];
+                        if (value) setInviteRole(String(value));
+                      }}
+                      isDisabled={sharingLoading === "invite" || !sharing.canInvite}
+                      variant="bordered"
+                      radius="lg"
+                      classNames={themedSelectClassNames}
+                    >
+                      {HOUSEHOLD_ROLE_OPTIONS.map((role) => (
+                        <SelectItem key={role.id} textValue={role.label}>
+                          {role.label} - {role.description}
+                        </SelectItem>
+                      ))}
+                    </Select>
+                    <Button
+                      type="submit"
+                      className="h-12 w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
+                      isLoading={sharingLoading === "invite"}
+                      isDisabled={sharingLoading === "invite" || !sharing.canInvite}
+                      startContent={<FaUserPlus className="h-3.5 w-3.5" />}
+                    >
+                      Send invite
+                    </Button>
+                  </form>
+                )}
+
+                {sharingMessage && (
+                  <div
+                    className={`rounded-xl border px-3 py-2 text-sm ${
+                      sharingMessage.type === "success"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border-rose-200 bg-rose-50 text-rose-700"
+                    }`}
+                    role={sharingMessage.type === "success" ? "status" : "alert"}
+                  >
+                    {sharingMessage.text}
+                  </div>
+                )}
+
+                <MobileInlineAccordion title="Members">
+                  <div className="space-y-2">
+                    {sharingMembers.map((member) => (
+                      <div
+                        key={member.userId}
+                        className="rounded-xl border border-gray-200 bg-white px-3 py-2"
+                      >
+                        <p className="truncate text-sm font-medium text-gray-900">
+                          {member.email}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {formatHouseholdRole(member.role)}
+                        </p>
+                      </div>
+                    ))}
+                    {sharingInvites.length > 0 && (
+                      <p className="text-xs text-gray-500">
+                        {sharingInvites.length} pending invite{sharingInvites.length === 1 ? "" : "s"}.
+                      </p>
+                    )}
+                  </div>
+                </MobileInlineAccordion>
+              </>
+            )}
+          </div>
+        </MobileProfileCard>
+
+        <MobileProfileCard>
+          <MobileSectionHeader
+            icon={FaKey}
+            title="Password & security"
+            description="Change the password used for future logins."
+          />
+
+          <form onSubmit={handlePasswordSubmit} className="mt-4 space-y-4" noValidate>
+            <AnimatePresence mode="popLayout">
+              {error && (
+                <StatusMessage key="mobile-error" type="error">
+                  {error}
+                </StatusMessage>
+              )}
+              {success && (
+                <StatusMessage key="mobile-success" type="success">
+                  {success}
+                </StatusMessage>
+              )}
+            </AnimatePresence>
+
+            <Input
+              label="New password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onValueChange={setPassword}
+              autoComplete="new-password"
+              isInvalid={showPasswordError}
+              errorMessage={showPasswordError ? "Use at least 6 characters." : undefined}
+              endContent={
+                <button
+                  type="button"
+                  className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-gray-400"
+                  onClick={() => setShowPassword((value) => !value)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <FaEyeSlash className="h-4 w-4" /> : <FaEye className="h-4 w-4" />}
+                </button>
+              }
+              classNames={{
+                inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
+              }}
+            />
+
+            <Input
+              label="Confirm password"
+              type={showPassword ? "text" : "password"}
+              value={confirmPassword}
+              onValueChange={setConfirmPassword}
+              autoComplete="new-password"
+              isInvalid={showConfirmError}
+              errorMessage={showConfirmError ? "Passwords do not match." : undefined}
+              classNames={{
+                inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
+              }}
+            />
+
+            <Button
+              type="submit"
+              className="h-12 w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
+              isLoading={savingPassword}
+              isDisabled={savingPassword}
+            >
+              {savingPassword ? "Updating..." : "Update password"}
+            </Button>
+          </form>
+        </MobileProfileCard>
+
+        <MobileAccordionCard
+          icon={FaUserCircle}
+          title="Account details"
+          summary={user.email}
+        >
+          <div className="rounded-xl border border-gray-200 bg-gray-50 px-3">
+            <MobileInfoRow label="Email" value={user.email} />
+            <MobileInfoRow
+              label="Email status"
+              value={user.emailConfirmed ? "Confirmed" : "Not confirmed"}
+            />
+            <MobileInfoRow label="Provider" value={user.provider} />
+            <MobileInfoRow label="Role" value={user.role} />
+            <MobileInfoRow label="Created" value={user.createdAtLabel} />
+            <MobileInfoRow label="Last sign in" value={user.lastSignInLabel} />
+          </div>
+          {user.id && (
+            <Button
+              variant="flat"
+              className="mt-3 w-full rounded-xl border border-stocksense-gray bg-white text-gray-700"
+              onPress={handleCopyUserId}
+              startContent={<FaClipboard />}
+            >
+              {copiedUserId ? "Copied user ID" : "Copy user ID"}
+            </Button>
+          )}
+        </MobileAccordionCard>
+
+        <MobileProfileCard>
+          <MobileSectionHeader
+            icon={FaShieldAlt}
+            title="Legal and support"
+            description="Terms, privacy, and billing settings."
+          />
+          <div className="mt-4 grid gap-2">
+            <Link
+              href="/terms"
+              className="flex min-h-11 items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-gray-900"
+            >
+              Terms
+              <FaExternalLinkAlt className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+            </Link>
+            <Link
+              href="/privacy"
+              className="flex min-h-11 items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-gray-900"
+            >
+              Privacy
+              <FaExternalLinkAlt className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+            </Link>
+            <Link
+              href="#mobile-billing"
+              className="flex min-h-11 items-center justify-between rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 text-sm font-semibold text-[var(--stocksense-brand)]"
+            >
+              Billing and plan settings
+              <FaExternalLinkAlt className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </MobileProfileCard>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 max-md:hidden lg:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
         <div className="space-y-6">
           <BillingSection
             billing={billing}

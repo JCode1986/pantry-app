@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
-import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
+import CategoryDetailClient from "@/components/categories/CategoryDetailClient";
 import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
 import { getCanEditInventoryForUser } from "@/utils/households";
 import { getInventoryImageUrl } from "@/utils/inventoryImages";
@@ -47,12 +46,13 @@ export default async function CategoryDetailPage({ params }) {
   } = await supabase.auth.getUser();
   const canEditInventory = await getCanEditInventoryForUser(user);
 
-  const { data: category, error } = await supabase
+  let { data: category, error } = await supabase
     .from("storage_categories")
     .select(
       `
       id,
       name,
+      image_path,
       storage_area:storage_areas!fk_storage_area (
         id,
         name,
@@ -66,12 +66,50 @@ export default async function CategoryDetailPage({ params }) {
         name,
         quantity,
         expiration_date,
+        barcode,
+        category_id,
         image_path
       )
     `
     )
     .eq("id", id)
     .single();
+
+  const categoryImageColumnMissing =
+    error?.code === "42703" && error?.message?.includes("image_path");
+
+  if (categoryImageColumnMissing) {
+    const fallback = await supabase
+      .from("storage_categories")
+      .select(
+        `
+        id,
+        name,
+        storage_area:storage_areas!fk_storage_area (
+          id,
+          name,
+          location:locations (
+            id,
+            name
+          )
+        ),
+        items:items!fk_items_category (
+          id,
+          name,
+          quantity,
+          expiration_date,
+          barcode,
+          category_id,
+          image_path
+        )
+      `
+      )
+      .eq("id", id)
+      .single();
+
+    category = fallback.data;
+    error = fallback.error;
+  }
 
   if (error || !category) {
     console.error("Category fetch error:", error?.message || error);
@@ -87,83 +125,77 @@ export default async function CategoryDetailPage({ params }) {
   const area = category.storage_area;
   const location = area?.location;
 
+  const [
+    { data: moveCategoriesRaw, error: moveCategoriesError },
+    { data: moveAreasRaw, error: moveAreasError },
+    { data: moveLocationsRaw, error: moveLocationsError },
+  ] = await Promise.all([
+    supabase
+      .from("storage_categories")
+      .select("id, name, storage_area_id")
+      .order("name", { ascending: true }),
+    supabase
+      .from("storage_areas")
+      .select("id, name, location_id")
+      .order("name", { ascending: true }),
+    supabase
+      .from("locations")
+      .select("id, name")
+      .order("name", { ascending: true }),
+  ]);
+
+  if (moveCategoriesError) {
+    console.error("Move categories fetch error:", moveCategoriesError);
+  }
+  if (moveAreasError) {
+    console.error("Move areas fetch error:", moveAreasError);
+  }
+  if (moveLocationsError) {
+    console.error("Move locations fetch error:", moveLocationsError);
+  }
+
+  const categoriesByArea = new Map();
+  for (const moveCategory of moveCategoriesRaw ?? []) {
+    const key = String(moveCategory.storage_area_id);
+    if (!categoriesByArea.has(key)) categoriesByArea.set(key, []);
+    categoriesByArea.get(key).push({
+      id: moveCategory.id,
+      name: moveCategory.name,
+    });
+  }
+
+  const areasByLocation = new Map();
+  for (const moveArea of moveAreasRaw ?? []) {
+    const key = String(moveArea.location_id);
+    if (!areasByLocation.has(key)) areasByLocation.set(key, []);
+    areasByLocation.get(key).push({
+      id: moveArea.id,
+      name: moveArea.name,
+      categories: categoriesByArea.get(String(moveArea.id)) ?? [],
+    });
+  }
+
+  const moveLocations = (moveLocationsRaw ?? []).map((moveLocation) => ({
+    id: moveLocation.id,
+    name: moveLocation.name,
+    storage_areas: areasByLocation.get(String(moveLocation.id)) ?? [],
+  }));
+
   return (
-    <main className="page-enter max-w-[1500px] mx-auto p-6 pt-8 min-h-[100vh] space-y-5">
-      <nav className="content-enter text-sm text-gray-500">
-        <Link href="/categories" className="hover:underline">
-          Categories
-        </Link>
-        {area?.id && (
-          <>
-            {" "}
-            /{" "}
-            <Link href={`/areas/${area.id}`} className="hover:underline">
-              {area.name}
-            </Link>
-          </>
-        )}
-        {" "}
-        / <span className="text-gray-700">{category.name}</span>
-      </nav>
-
-      <header className="content-enter rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-stocksense-teal">
-              {category.name}
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              {location?.name ?? "Unknown location"} / {area?.name ?? "Unknown area"}
-            </p>
-            <div className="mt-3 inline-flex px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
-              <strong>{items.length}</strong>&nbsp;{items.length === 1 ? "item" : "items"}
-            </div>
-          </div>
-
-          {canEditInventory && (
-            <OpenGlobalAddItemButton
-              context={{
-                locationId: location?.id,
-                storageAreaId: area?.id,
-                categoryId: category.id,
-              }}
-            />
-          )}
-        </div>
-      </header>
-
-      <section className="content-stagger grid grid-cols-1 gap-3">
-        {items.map((item) => (
-          <div
-            key={item.id}
-            className="flex items-start gap-3 rounded-2xl border border-stocksense-gray bg-white p-4 shadow-sm"
-          >
-            {item.imageUrl && (
-              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
-                <img
-                  src={item.imageUrl}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              </div>
-            )}
-            <div className="min-w-0">
-              <div className="truncate font-semibold text-stocksense-teal">
-                {item.name}
-              </div>
-              <div className="mt-1 text-sm text-gray-500">
-                Qty: {item.quantity ?? 0} / Exp: {item.expiration_date || "None"}
-              </div>
-            </div>
-          </div>
-        ))}
-
-        {items.length === 0 && (
-          <div className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center text-gray-500">
-            No items in this category yet.
-          </div>
-        )}
-      </section>
-    </main>
+    <CategoryDetailClient
+      category={{
+        id: category.id,
+        name: category.name,
+        image_path: category.image_path ?? null,
+        imageUrl: categoryImageColumnMissing
+          ? null
+          : await getInventoryImageUrl(category.image_path),
+      }}
+      area={area ? { id: area.id, name: area.name } : null}
+      location={location ? { id: location.id, name: location.name } : null}
+      initialItems={items}
+      moveLocations={moveLocations}
+      canEditInventory={canEditInventory}
+    />
   );
 }

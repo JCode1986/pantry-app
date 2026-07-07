@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Input,
@@ -38,6 +38,7 @@ import {
 import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
 import { emitInventoryChange } from "@/utils/clientEvents";
 import EntityImageManager from "@/components/inventory/EntityImageManager";
+import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import {
   daysUntil,
   isExpiringSoon,
@@ -81,6 +82,19 @@ const STOCK_FILTERS = {
 const STOCK_FILTER_LABELS = {
   [STOCK_FILTERS.IN_STOCK]: "In stock",
   [STOCK_FILTERS.LOW_OR_EMPTY]: "Low or empty",
+};
+const SORT_OPTIONS = {
+  NAME_ASC: "name_asc",
+  NAME_DESC: "name_desc",
+  EXPIRATION_ASC: "expiration_asc",
+  QUANTITY_ASC: "quantity_asc",
+};
+
+const SORT_LABELS = {
+  [SORT_OPTIONS.NAME_ASC]: "Name A-Z",
+  [SORT_OPTIONS.NAME_DESC]: "Name Z-A",
+  [SORT_OPTIONS.EXPIRATION_ASC]: "Expiration soonest",
+  [SORT_OPTIONS.QUANTITY_ASC]: "Quantity low to high",
 };
 
 function PaginationControls({
@@ -160,9 +174,11 @@ export default function ItemsPageClient({
   );
   const [stockFilter, setStockFilter] = useState(STOCK_FILTERS.ALL);
   const [expDays, setExpDays] = useState(normalizedInitialExpirationDays);
+  const [sortBy, setSortBy] = useState(SORT_OPTIONS.NAME_ASC);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(
     hasInitialExpirationFilter
   );
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   // drawer state
@@ -177,6 +193,9 @@ export default function ItemsPageClient({
 
   // bulk selection (Set of item IDs)
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [mobileSelectionMode, setMobileSelectionMode] = useState(false);
+  const mobileLongPressTimerRef = useRef(null);
+  const mobileLongPressTriggeredRef = useRef(false);
 
   // move modal state (used for both single + bulk)
   const [moveModalOpen, setMoveModalOpen] = useState(false);
@@ -285,6 +304,14 @@ export default function ItemsPageClient({
     };
   }, [moveLocations]);
 
+  useEffect(() => {
+    return () => {
+      if (mobileLongPressTimerRef.current) {
+        window.clearTimeout(mobileLongPressTimerRef.current);
+      }
+    };
+  }, []);
+
   const normalizedSearch = search.trim().toLowerCase();
 
   const locationOptions = useMemo(() => moveLocations || [], [moveLocations]);
@@ -359,6 +386,13 @@ export default function ItemsPageClient({
   ]);
 
   const filtersAreActive = activeFilterCount > 0;
+  const mobileSheetFilterCount = [
+    locationFilter !== ALL_FILTER_KEY,
+    areaFilter !== ALL_FILTER_KEY,
+    categoryFilter !== ALL_FILTER_KEY,
+    expirationFilter !== EXPIRATION_FILTERS.ALL,
+    stockFilter !== STOCK_FILTERS.ALL,
+  ].filter(Boolean).length;
   const advancedFiltersAreActive =
     areaFilter !== ALL_FILTER_KEY ||
     categoryFilter !== ALL_FILTER_KEY ||
@@ -430,7 +464,7 @@ export default function ItemsPageClient({
   ]);
 
   const filteredItems = useMemo(() => {
-    return (items || []).filter((it) => {
+    const nextItems = (items || []).filter((it) => {
       const nameOk = !normalizedSearch || containsQuery(it.name, normalizedSearch);
       const barcodeOk = !normalizedSearch || containsQuery(it.barcode, normalizedSearch);
 
@@ -475,6 +509,28 @@ export default function ItemsPageClient({
         stockOk
       );
     });
+
+    return [...nextItems].sort((a, b) => {
+      if (sortBy === SORT_OPTIONS.NAME_DESC) {
+        return (b.name || "").localeCompare(a.name || "");
+      }
+
+      if (sortBy === SORT_OPTIONS.EXPIRATION_ASC) {
+        const aDays = daysUntil(a.expiration_date);
+        const bDays = daysUntil(b.expiration_date);
+        if (aDays !== bDays) return aDays - bDays;
+        return (a.name || "").localeCompare(b.name || "");
+      }
+
+      if (sortBy === SORT_OPTIONS.QUANTITY_ASC) {
+        const aQuantity = toNonNegativeInteger(a.quantity, 0);
+        const bQuantity = toNonNegativeInteger(b.quantity, 0);
+        if (aQuantity !== bQuantity) return aQuantity - bQuantity;
+        return (a.name || "").localeCompare(b.name || "");
+      }
+
+      return (a.name || "").localeCompare(b.name || "");
+    });
   }, [
     areaFilter,
     categoryFilter,
@@ -483,6 +539,7 @@ export default function ItemsPageClient({
     items,
     locationFilter,
     normalizedSearch,
+    sortBy,
     stockFilter,
   ]);
 
@@ -542,6 +599,56 @@ export default function ItemsPageClient({
 
   const clearSelection = () => setSelectedIds(new Set());
 
+  const enterMobileSelection = (id) => {
+    if (!canEditInventory) return;
+    setMobileSelectionMode(true);
+
+    if (!id) return;
+
+    const key = String(id);
+    setSelectedIds((prev) => {
+      if (prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+  };
+
+  const cancelMobileSelection = () => {
+    setMobileSelectionMode(false);
+    clearSelection();
+  };
+
+  const clearMobileLongPressTimer = () => {
+    if (!mobileLongPressTimerRef.current) return;
+    window.clearTimeout(mobileLongPressTimerRef.current);
+    mobileLongPressTimerRef.current = null;
+  };
+
+  const startMobileLongPress = (id) => {
+    if (!canEditInventory || mobileSelectionMode) return;
+    clearMobileLongPressTimer();
+    mobileLongPressTimerRef.current = window.setTimeout(() => {
+      mobileLongPressTriggeredRef.current = true;
+      enterMobileSelection(id);
+      mobileLongPressTimerRef.current = null;
+    }, 450);
+  };
+
+  const handleMobileItemPress = (item) => {
+    if (mobileLongPressTriggeredRef.current) {
+      mobileLongPressTriggeredRef.current = false;
+      return;
+    }
+
+    if (mobileSelectionMode) {
+      toggleSelect(item.id);
+      return;
+    }
+
+    openDrawer(item);
+  };
+
   const selectAllFiltered = () => {
     if (!canEditInventory) return;
     setSelectedIds((prev) => {
@@ -589,7 +696,28 @@ export default function ItemsPageClient({
     setExpirationFilter(EXPIRATION_FILTERS.ALL);
     setStockFilter(STOCK_FILTERS.ALL);
     setExpDays(7);
+    setSortBy(SORT_OPTIONS.NAME_ASC);
     clearSelection();
+    setMobileSelectionMode(false);
+  };
+
+  const applyMobileQuickFilter = (filter) => {
+    if (filter === "expiring") {
+      setExpirationFilter((current) =>
+        current === EXPIRATION_FILTERS.SOON
+          ? EXPIRATION_FILTERS.ALL
+          : EXPIRATION_FILTERS.SOON
+      );
+      return;
+    }
+
+    if (filter === "stock") {
+      setStockFilter((current) =>
+        current === STOCK_FILTERS.LOW_OR_EMPTY
+          ? STOCK_FILTERS.ALL
+          : STOCK_FILTERS.LOW_OR_EMPTY
+      );
+    }
   };
 
   const clearFilter = (filterId) => {
@@ -860,6 +988,7 @@ export default function ItemsPageClient({
 
     setMoveModalOpen(false);
     clearSelection();
+    setMobileSelectionMode(false);
     emitInventoryChange({
       entity: "item",
       action: "moved",
@@ -963,6 +1092,7 @@ export default function ItemsPageClient({
         });
         closeDelete();
         clearSelection();
+        setMobileSelectionMode(false);
 
         // If the drawer is open on an item that got deleted, close it.
         if (drawerOpen && activeItemId && deletedSet.has(String(activeItemId))) {
@@ -1020,12 +1150,170 @@ export default function ItemsPageClient({
       variants={pageSectionVariants}
       initial="hidden"
       animate="show"
-      className="space-y-6"
+      className="space-y-6 max-md:space-y-4 max-md:pb-24"
     >
+      <motion.section
+        variants={pageItemVariants}
+        className={
+          mobileSelectionMode
+            ? "sticky top-[4.75rem] z-30 md:hidden"
+            : "space-y-3 md:hidden"
+        }
+      >
+        {mobileSelectionMode ? (
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-lg">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h1 className="text-xl font-semibold tracking-tight text-gray-950">
+                  {selectedCount} selected
+                </h1>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  Tap cards to adjust selection.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={cancelMobileSelection}
+                className="min-h-10 shrink-0 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <button
+                type="button"
+                onClick={toggleSelectAllFiltered}
+                disabled={filteredItems.length === 0}
+                className="min-h-11 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 text-sm font-semibold text-[var(--stocksense-brand)] disabled:opacity-50"
+              >
+                {allFilteredSelected ? "Deselect all" : "Select all"}
+              </button>
+              <span className="flex min-h-11 items-center rounded-xl border border-gray-200 bg-gray-50 px-3 text-xs font-medium text-gray-500">
+                {filteredItems.length} matching
+              </span>
+            </div>
+
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Button
+                className="min-h-11 rounded-xl bg-[var(--stocksense-brand)] text-sm font-semibold text-white"
+                onClick={() => openMove("bulk")}
+                isDisabled={selectedCount === 0}
+              >
+                Move
+              </Button>
+              <Button
+                className="min-h-11 rounded-xl bg-rose-600 text-sm font-semibold text-white"
+                onClick={openDeleteBulk}
+                isDisabled={selectedCount === 0}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h1 className="text-2xl font-semibold tracking-tight text-gray-950">
+                    Items
+                  </h1>
+                  <p className="mt-0.5 text-sm text-gray-500">
+                    {totals.total} {totals.total === 1 ? "item" : "items"} stored
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {canEditInventory && filteredItems.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => enterMobileSelection()}
+                      className="min-h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 shadow-sm"
+                    >
+                      Select
+                    </button>
+                  )}
+                  <OpenGlobalAddItemButton
+                    canEditInventory={canEditInventory}
+                    className="min-h-10 rounded-xl bg-[var(--stocksense-brand)] px-3 text-sm font-semibold text-white"
+                  >
+                    Add
+                  </OpenGlobalAddItemButton>
+                </div>
+              </div>
+
+              <Input
+                value={search}
+                onValueChange={setSearch}
+                placeholder="Search items"
+                startContent={<FaSearch className="text-gray-400" />}
+                classNames={{
+                  inputWrapper:
+                    "min-h-12 rounded-2xl border border-stocksense-gray bg-white shadow-sm",
+                }}
+              />
+
+              <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+                <button
+                  type="button"
+                  onClick={() => applyMobileQuickFilter("expiring")}
+                  className={`min-h-10 shrink-0 rounded-full border px-4 text-sm font-semibold transition ${
+                    expirationFilter === EXPIRATION_FILTERS.SOON
+                      ? "border-orange-200 bg-orange-50 text-orange-700"
+                      : "border-gray-200 bg-white text-gray-700"
+                  }`}
+                >
+                  Expiring soon
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyMobileQuickFilter("stock")}
+                  className={`min-h-10 shrink-0 rounded-full border px-4 text-sm font-semibold transition ${
+                    stockFilter === STOCK_FILTERS.LOW_OR_EMPTY
+                      ? "border-rose-200 bg-rose-50 text-rose-700"
+                      : "border-gray-200 bg-white text-gray-700"
+                  }`}
+                >
+                  Low stock
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterSheetOpen(true)}
+                  className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-800 shadow-sm"
+                >
+                  <FaFilter className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+                  Filters
+                  {mobileSheetFilterCount > 0 && (
+                    <span className="rounded-full bg-[var(--stocksense-brand)] px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                      {mobileSheetFilterCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {filtersAreActive && (
+                <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+                  {activeFilterChips.map((chip) => (
+                    <button
+                      key={chip.id}
+                      type="button"
+                      onClick={() => clearFilter(chip.id)}
+                      className="inline-flex min-h-8 max-w-[240px] shrink-0 items-center gap-1.5 rounded-full border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 text-xs font-medium text-[var(--stocksense-brand)]"
+                      title={`Clear ${chip.label}`}
+                    >
+                      <span className="truncate">{chip.label}</span>
+                      <FaTimes className="h-2.5 w-2.5 shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              )}
+          </div>
+        )}
+      </motion.section>
+
       {/* Header */}
       <motion.div
         variants={pageItemVariants}
-        className="rounded-2xl border border-stocksense-gray bg-white p-4 md:p-5 shadow-sm"
+        className="rounded-2xl border border-stocksense-gray bg-white p-4 shadow-sm max-md:hidden md:p-5"
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -1033,7 +1321,7 @@ export default function ItemsPageClient({
               <FaBoxOpen className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-stocksense-teal">
+              <h1 className="text-xl font-semibold tracking-tight text-stocksense-teal md:text-2xl">
                 Items
               </h1>
               <p className="text-sm text-gray-500">
@@ -1340,17 +1628,167 @@ export default function ItemsPageClient({
 
       {/* List */}
       <motion.div variants={pageSectionVariants} className="space-y-4">
-        <PaginationControls
-          currentPage={safeCurrentPage}
-          totalPages={totalPages}
-          startItem={startItem}
-          endItem={endItem}
-          totalItems={filteredItems.length}
-          onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
-          onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-        />
+        <div className="max-md:hidden">
+          <PaginationControls
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            startItem={startItem}
+            endItem={endItem}
+            totalItems={filteredItems.length}
+            onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+            onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+          />
+        </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="space-y-3 md:hidden">
+          <AnimatePresence initial={false}>
+            {paginatedItems.map((it) => {
+              const expirationDays = daysUntil(it.expiration_date);
+              const expired = expirationDays < 0;
+              const soon =
+                expirationDays >= 0 && expirationDays <= toPositiveInteger(expDays, 7);
+              const quantity = toNonNegativeInteger(it.quantity, 0);
+              const lowStock = quantity <= 1;
+              const selected = selectedIds.has(String(it.id));
+              const path = [
+                it.location?.name || "Unknown location",
+                it.area?.name || "Storage area",
+                it.category?.name || "Category",
+              ].join(" > ");
+
+              return (
+                <motion.div
+                  key={it.id}
+                  variants={pageItemVariants}
+                  initial="hidden"
+                  animate="show"
+                  exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
+                  role="button"
+                  tabIndex={0}
+                  onPointerDown={() => startMobileLongPress(it.id)}
+                  onPointerUp={clearMobileLongPressTimer}
+                  onPointerLeave={clearMobileLongPressTimer}
+                  onPointerCancel={clearMobileLongPressTimer}
+                  onContextMenu={(event) => event.preventDefault()}
+                  onClick={() => handleMobileItemPress(it)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleMobileItemPress(it);
+                    }
+                  }}
+                  className={`flex w-full gap-3 rounded-2xl border bg-white p-3 text-left shadow-sm transition active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)] ${
+                    selected
+                      ? "border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]"
+                      : "border-stocksense-gray"
+                  }`}
+                >
+                  {mobileSelectionMode && (
+                    <div className="mt-7 shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleSelect(it.id)}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onPointerUp={(event) => event.stopPropagation()}
+                        onClick={(event) => event.stopPropagation()}
+                        className="h-5 w-5 cursor-pointer rounded border-gray-300 text-[var(--stocksense-brand)]"
+                        aria-label={`Select ${it.name}`}
+                      />
+                    </div>
+                  )}
+
+                  <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 text-[var(--stocksense-brand)]">
+                    {it.imageUrl ? (
+                      <img
+                        src={it.imageUrl}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <FaBoxOpen className="h-7 w-7" />
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 items-start gap-2">
+                      <h2 className="min-w-0 flex-1 truncate text-base font-semibold leading-5 text-gray-950">
+                        {it.name}
+                      </h2>
+                      <FaChevronRight className="mt-1 h-3.5 w-3.5 shrink-0 text-[var(--stocksense-brand)]" />
+                    </div>
+
+                    <p className="mt-1 truncate text-sm text-gray-500">{path}</p>
+                    <p className="mt-2 text-sm font-medium text-gray-800">
+                      Qty: {quantity}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {it.expiration_date
+                        ? `Expires ${it.expiration_date}`
+                        : "No expiration date"}
+                    </p>
+
+                    {(expired || soon || lowStock) && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {(expired || soon) && (
+                          <span
+                            className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                              expired
+                                ? "border-rose-200 bg-rose-50 text-rose-700"
+                                : "border-orange-200 bg-orange-50 text-orange-700"
+                            }`}
+                          >
+                            {expired ? "Expired" : "Expiring soon"}
+                          </span>
+                        )}
+                        {lowStock && (
+                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                            Low stock
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+
+            {filteredItems.length === 0 && (
+              <motion.div
+                key="mobile-empty"
+                variants={pageItemVariants}
+                initial="hidden"
+                animate="show"
+                exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
+                className="rounded-2xl border border-stocksense-gray bg-white px-5 py-8 text-center shadow-sm"
+              >
+                <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+                  <FaBoxOpen className="h-6 w-6" />
+                </div>
+                <h2 className="mt-4 text-lg font-semibold text-gray-950">
+                  {items.length === 0 ? "No items yet" : "No matching items"}
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  {items.length === 0
+                    ? "Start adding things you want to keep track of."
+                    : "Try changing your search or filters."}
+                </p>
+                {items.length === 0 ? (
+                  <div className="mt-5">
+                    <OpenGlobalAddItemButton
+                      canEditInventory={canEditInventory}
+                      className="min-h-11 rounded-xl bg-[var(--stocksense-brand)] px-4 font-semibold text-white"
+                    >
+                      Add item
+                    </OpenGlobalAddItemButton>
+                  </div>
+                ) : null}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 max-md:hidden sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <AnimatePresence initial={false}>
         {paginatedItems.map((it) => {
           const soon = isExpiringSoon(it.expiration_date, expDays);
@@ -1469,6 +1907,188 @@ export default function ItemsPageClient({
         )}
       </motion.div>
 
+      <Modal
+        isOpen={filterSheetOpen}
+        onOpenChange={setFilterSheetOpen}
+        placement="bottom"
+        size="full"
+        classNames={{
+          wrapper: "items-end md:hidden",
+          base: "m-0 w-full max-w-none rounded-t-3xl border-0 bg-white shadow-2xl md:hidden",
+        }}
+      >
+        <ModalContent
+          className="max-h-[88dvh] w-full overflow-hidden rounded-t-3xl bg-white text-gray-700 md:hidden"
+          style={modalContentStyle}
+        >
+          {() => (
+            <>
+              <ModalHeader className="sticky top-0 z-20 flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-lg font-semibold text-gray-950">Filters</h2>
+                </div>
+                <MobileSheetCloseButton onPress={() => setFilterSheetOpen(false)} />
+              </ModalHeader>
+
+              <ModalBody className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 pb-6">
+                <Select
+                  aria-label="Filter by location"
+                  label="Location"
+                  selectedKeys={new Set([locationFilter])}
+                  onSelectionChange={(keys) =>
+                    handleLocationFilterChange(getSelectedValue(keys) || ALL_FILTER_KEY)
+                  }
+                  variant="bordered"
+                  radius="lg"
+                  classNames={themedSelectClassNames}
+                >
+                  <SelectItem key={ALL_FILTER_KEY}>All locations</SelectItem>
+                  {locationOptions.map((location) => (
+                    <SelectItem key={String(location.id)}>
+                      {location.name}
+                    </SelectItem>
+                  ))}
+                </Select>
+
+                <Select
+                  aria-label="Filter by storage area"
+                  label="Storage Area"
+                  selectedKeys={new Set([areaFilter])}
+                  onSelectionChange={(keys) =>
+                    handleAreaFilterChange(getSelectedValue(keys) || ALL_FILTER_KEY)
+                  }
+                  isDisabled={areaOptions.length === 0}
+                  variant="bordered"
+                  radius="lg"
+                  classNames={themedSelectClassNames}
+                >
+                  <SelectItem key={ALL_FILTER_KEY}>All storage areas</SelectItem>
+                  {areaOptions.map((area) => (
+                    <SelectItem key={String(area.id)}>
+                      {locationFilter === ALL_FILTER_KEY
+                        ? `${area.name} - ${area.locationName}`
+                        : area.name}
+                    </SelectItem>
+                  ))}
+                </Select>
+
+                <Select
+                  aria-label="Filter by category"
+                  label="Category"
+                  selectedKeys={new Set([categoryFilter])}
+                  onSelectionChange={(keys) =>
+                    setCategoryFilter(getSelectedValue(keys) || ALL_FILTER_KEY)
+                  }
+                  isDisabled={categoryOptions.length === 0}
+                  variant="bordered"
+                  radius="lg"
+                  classNames={themedSelectClassNames}
+                >
+                  <SelectItem key={ALL_FILTER_KEY}>All categories</SelectItem>
+                  {categoryOptions.map((category) => (
+                    <SelectItem key={String(category.id)}>
+                      {locationFilter === ALL_FILTER_KEY
+                        ? `${category.name} - ${category.areaName} - ${category.locationName}`
+                        : areaFilter === ALL_FILTER_KEY
+                          ? `${category.name} - ${category.areaName}`
+                          : category.name}
+                    </SelectItem>
+                  ))}
+                </Select>
+
+                <div className="grid grid-cols-[minmax(0,1fr)_88px] gap-2">
+                  <Select
+                    aria-label="Filter by expiration"
+                    label="Expiration"
+                    selectedKeys={new Set([expirationFilter])}
+                    onSelectionChange={(keys) =>
+                      setExpirationFilter(
+                        getSelectedValue(keys) || EXPIRATION_FILTERS.ALL
+                      )
+                    }
+                    variant="bordered"
+                    radius="lg"
+                    classNames={themedSelectClassNames}
+                  >
+                    <SelectItem key={EXPIRATION_FILTERS.ALL}>
+                      Any expiration
+                    </SelectItem>
+                    <SelectItem key={EXPIRATION_FILTERS.EXPIRED}>
+                      Expired
+                    </SelectItem>
+                    <SelectItem key={EXPIRATION_FILTERS.SOON}>
+                      Expiring soon
+                    </SelectItem>
+                    <SelectItem key={EXPIRATION_FILTERS.NONE}>
+                      No expiration
+                    </SelectItem>
+                  </Select>
+
+                  <input
+                    aria-label="Expiring soon day window"
+                    type="number"
+                    min={1}
+                    value={expDays}
+                    onChange={(event) =>
+                      setExpDays(toPositiveInteger(event.target.value, 7))
+                    }
+                    className={`min-h-14 rounded-xl border border-stocksense-gray px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)] ${
+                      expirationFilter !== EXPIRATION_FILTERS.SOON
+                        ? "bg-gray-100 text-gray-400"
+                        : "bg-white text-gray-800"
+                    }`}
+                    disabled={expirationFilter !== EXPIRATION_FILTERS.SOON}
+                  />
+                </div>
+
+                <Select
+                  aria-label="Filter by stock"
+                  label="Stock"
+                  selectedKeys={new Set([stockFilter])}
+                  onSelectionChange={(keys) =>
+                    setStockFilter(getSelectedValue(keys) || STOCK_FILTERS.ALL)
+                  }
+                  variant="bordered"
+                  radius="lg"
+                  classNames={themedSelectClassNames}
+                >
+                  <SelectItem key={STOCK_FILTERS.ALL}>Any stock</SelectItem>
+                  <SelectItem key={STOCK_FILTERS.IN_STOCK}>In stock</SelectItem>
+                  <SelectItem key={STOCK_FILTERS.LOW_OR_EMPTY}>
+                    Low or empty
+                  </SelectItem>
+                </Select>
+
+                <Select
+                  aria-label="Sort items"
+                  label="Sort by"
+                  selectedKeys={new Set([sortBy])}
+                  onSelectionChange={(keys) =>
+                    setSortBy(getSelectedValue(keys) || SORT_OPTIONS.NAME_ASC)
+                  }
+                  variant="bordered"
+                  radius="lg"
+                  classNames={themedSelectClassNames}
+                >
+                  {Object.entries(SORT_LABELS).map(([key, label]) => (
+                    <SelectItem key={key}>{label}</SelectItem>
+                  ))}
+                </Select>
+              </ModalBody>
+
+              <ModalFooter className="sticky bottom-0 z-20 border-t border-gray-200 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+                <Button
+                  className="min-h-12 w-full rounded-xl bg-[var(--stocksense-brand)] text-base font-semibold text-white"
+                  onClick={() => setFilterSheetOpen(false)}
+                >
+                  Apply filters
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
       {/* Drawer (single item) */}
       <Modal
         isOpen={drawerOpen}
@@ -1483,14 +2103,17 @@ export default function ItemsPageClient({
         <ModalContent className={modalContentClass} style={modalContentStyle}>
           {() => (
             <>
-              <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
-                <div className="text-lg font-semibold text-[var(--stocksense-brand)]">
-                  {activeItem?.name || "Item"}
+              <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-lg font-semibold text-gray-950">
+                    {activeItem?.name || "Item"}
+                  </div>
+                  <div className="truncate text-sm text-gray-500">
+                    {activeItem?.location?.name || "Unknown location"} • {activeItem?.area?.name || "—"} •{" "}
+                    {activeItem?.category?.name || "—"}
+                  </div>
                 </div>
-                <div className="text-sm text-gray-500">
-                  {activeItem?.location?.name || "Unknown location"} • {activeItem?.area?.name || "—"} •{" "}
-                  {activeItem?.category?.name || "—"}
-                </div>
+                <MobileSheetCloseButton onPress={closeDrawer} />
               </ModalHeader>
 
               <ModalBody className={`space-y-5 ${modalBodyClass}`}>
@@ -1553,11 +2176,11 @@ export default function ItemsPageClient({
                       onChange={handleActiveItemImageChange}
                     />
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 max-md:flex-col">
                       <Button
                         onClick={saveEdits}
                         isDisabled={!hasItemEditChanges}
-                        className="rounded-xl bg-[var(--stocksense-brand)] text-white w-full"
+                        className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                       >
                         Save changes
                       </Button>
@@ -1566,6 +2189,15 @@ export default function ItemsPageClient({
                         className="w-full rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
                       >
                         Move
+                      </Button>
+                    </div>
+                    <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
+                      <p className="text-sm font-semibold text-gray-950">Danger zone</p>
+                      <Button
+                        className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
+                        onClick={openDeleteSingle}
+                      >
+                        Delete item
                       </Button>
                     </div>
                   </>
@@ -1596,12 +2228,24 @@ export default function ItemsPageClient({
               </ModalBody>
 
               <ModalFooter className={modalFooterClass}>
-                <Button variant="light" className="rounded-xl" onClick={closeDrawer}>
+                <Button variant="light" className="rounded-xl max-md:hidden" onClick={closeDrawer}>
                   Close
                 </Button>
                 {canEditInventory && (
-                  <Button className="rounded-xl bg-rose-600 text-white" onClick={openDeleteSingle}>
+                  <Button
+                    className="rounded-xl bg-rose-600 text-white max-md:hidden"
+                    onClick={openDeleteSingle}
+                  >
                     Delete
+                  </Button>
+                )}
+                {canEditInventory && (
+                  <Button
+                    className="rounded-xl bg-[var(--stocksense-brand)] text-white md:hidden"
+                    onClick={saveEdits}
+                    isDisabled={!hasItemEditChanges}
+                  >
+                    Save changes
                   </Button>
                 )}
               </ModalFooter>
@@ -1615,16 +2259,31 @@ export default function ItemsPageClient({
         <ModalContent className={modalContentClass} style={modalContentStyle}>
           {() => (
             <>
-              <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
-                <div className="text-lg font-semibold text-[var(--stocksense-brand)]">
-                  Move {selectedCount > 0 && !drawerOpen ? `${selectedCount} items` : "item"}
+              <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-lg font-semibold text-gray-950">
+                    Move {selectedCount > 0 && !drawerOpen ? `${selectedCount} items` : "item"}
+                  </div>
+                  <div className="truncate text-sm text-gray-500">
+                    Choose the destination category.
+                  </div>
                 </div>
-                <div className="text-sm text-gray-500">
-                  Choose the destination category.
-                </div>
+                <MobileSheetCloseButton onPress={() => setMoveModalOpen(false)} />
               </ModalHeader>
 
               <ModalBody className={`space-y-4 ${modalBodyClass}`}>
+                {drawerOpen && activeItem ? (
+                  <div className="rounded-2xl border border-gray-200 bg-white p-3">
+                    <p className="text-xs font-medium uppercase text-gray-500">
+                      Current
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-gray-950">
+                      {activeItem.location?.name || "Unknown location"} &gt;{" "}
+                      {activeItem.area?.name || "Storage area"} &gt;{" "}
+                      {activeItem.category?.name || "Category"}
+                    </p>
+                  </div>
+                ) : null}
                 <Select
                   label="Location"
                   selectedKeys={
@@ -1716,7 +2375,11 @@ export default function ItemsPageClient({
               </ModalBody>
 
               <ModalFooter className={modalFooterClass}>
-                <Button variant="light" className="rounded-xl" onClick={() => setMoveModalOpen(false)}>
+                <Button
+                  variant="light"
+                  className="rounded-xl max-md:hidden"
+                  onClick={() => setMoveModalOpen(false)}
+                >
                   Cancel
                 </Button>
                 <Button

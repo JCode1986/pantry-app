@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Button,
@@ -40,12 +40,13 @@ import {
   modalHeaderClass,
   themedSelectClassNames,
 } from "@/components/modals/modalTheme";
+import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 
 const FILTERS = [
+  { value: "all", label: "All" },
   { value: "needed", label: "Needed" },
   { value: "purchased", label: "Purchased" },
   { value: "dismissed", label: "Dismissed" },
-  { value: "all", label: "All" },
 ];
 
 const STATUS_LABELS = {
@@ -103,6 +104,13 @@ function formatDate(value) {
   });
 }
 
+function isMobileViewport() {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia("(max-width: 767px)").matches
+  );
+}
+
 export default function ShoppingListPageClient({
   initialItems = [],
   initialError = null,
@@ -119,6 +127,9 @@ export default function ShoppingListPageClient({
   );
   const [pendingId, setPendingId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [mobileSelectionMode, setMobileSelectionMode] = useState(false);
+  const mobileLongPressTimerRef = useRef(null);
+  const mobileLongPressTriggeredRef = useRef(false);
   const [bulkAction, setBulkAction] = useState(null);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [moveDialog, setMoveDialog] = useState({
@@ -167,6 +178,14 @@ export default function ShoppingListPageClient({
     if (visibleItems.length === 0) return false;
     return visibleItems.every((item) => selectedIds.has(String(item.id)));
   }, [selectedIds, visibleItems]);
+
+  useEffect(() => {
+    return () => {
+      if (mobileLongPressTimerRef.current) {
+        window.clearTimeout(mobileLongPressTimerRef.current);
+      }
+    };
+  }, []);
 
   const counts = useMemo(() => {
     return items.reduce(
@@ -243,6 +262,60 @@ export default function ShoppingListPageClient({
 
   function clearSelection() {
     setSelectedIds(new Set());
+  }
+
+  function enterMobileSelection(id) {
+    if (!canEditInventory) return;
+    setMobileSelectionMode(true);
+
+    if (!id) return;
+
+    const key = String(id);
+    setSelectedIds((current) => {
+      if (current.has(key)) return current;
+      const next = new Set(current);
+      next.add(key);
+      return next;
+    });
+  }
+
+  function cancelMobileSelection() {
+    setMobileSelectionMode(false);
+    clearSelection();
+  }
+
+  function clearMobileLongPressTimer() {
+    if (!mobileLongPressTimerRef.current) return;
+    window.clearTimeout(mobileLongPressTimerRef.current);
+    mobileLongPressTimerRef.current = null;
+  }
+
+  function startMobileLongPress(id) {
+    if (!isMobileViewport() || !canEditInventory || mobileSelectionMode) return;
+    clearMobileLongPressTimer();
+    mobileLongPressTimerRef.current = window.setTimeout(() => {
+      mobileLongPressTriggeredRef.current = true;
+      enterMobileSelection(id);
+      mobileLongPressTimerRef.current = null;
+    }, 450);
+  }
+
+  function handleMobileItemPress(item) {
+    if (!isMobileViewport()) return;
+
+    if (mobileLongPressTriggeredRef.current) {
+      mobileLongPressTriggeredRef.current = false;
+      return;
+    }
+
+    if (mobileSelectionMode) {
+      toggleSelect(item.id);
+      return;
+    }
+
+    if (!canEditInventory) return;
+    setMessage(null);
+    setEditingItem(item);
   }
 
   function getSelectedValue(keys) {
@@ -345,6 +418,7 @@ export default function ShoppingListPageClient({
       )
     );
     clearSelection();
+    setMobileSelectionMode(false);
     setMessage({
       type: "success",
       text: `Updated ${updatedById.size} shopping list item${
@@ -418,6 +492,7 @@ export default function ShoppingListPageClient({
       current.filter((item) => !deletedIds.has(String(item.id)))
     );
     clearSelection();
+    setMobileSelectionMode(false);
     setIsBulkDeleteOpen(false);
     setMessage({
       type: "success",
@@ -469,16 +544,169 @@ export default function ShoppingListPageClient({
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="space-y-6"
+      className="space-y-6 max-md:space-y-4 max-md:pb-24"
     >
-      <section className="rounded-2xl border border-stocksense-gray bg-white p-4 shadow-sm md:p-5">
+      <motion.section
+        className={
+          mobileSelectionMode
+            ? "sticky top-[4.75rem] z-30 md:hidden"
+            : "space-y-3 md:hidden"
+        }
+      >
+        {mobileSelectionMode ? (
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-lg">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-xl font-semibold tracking-tight text-gray-950">
+                  {selectedCount} selected
+                </h2>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  Tap cards to adjust selection.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={cancelMobileSelection}
+                className="min-h-10 shrink-0 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <button
+                type="button"
+                onClick={toggleSelectAllVisible}
+                disabled={visibleItems.length === 0 || isBulkBusy}
+                className="min-h-11 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 text-sm font-semibold text-[var(--stocksense-brand)] disabled:opacity-50"
+              >
+                {allVisibleSelected ? "Deselect all" : "Select all"}
+              </button>
+              <span className="flex min-h-11 items-center rounded-xl border border-gray-200 bg-gray-50 px-3 text-xs font-medium text-gray-500">
+                {visibleItems.length} matching
+              </span>
+            </div>
+
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Button
+                className="min-h-11 rounded-xl bg-emerald-600 text-sm font-semibold text-white"
+                isLoading={bulkAction === "purchased"}
+                isDisabled={
+                  selectedCount === 0 || (isBulkBusy && bulkAction !== "purchased")
+                }
+                onPress={() => bulkUpdateStatus("purchased")}
+              >
+                Purchased
+              </Button>
+              <Button
+                className="min-h-11 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-sm font-semibold text-[var(--stocksense-brand)]"
+                isLoading={bulkAction === "needed"}
+                isDisabled={
+                  selectedCount === 0 || (isBulkBusy && bulkAction !== "needed")
+                }
+                onPress={() => bulkUpdateStatus("needed")}
+              >
+                Need again
+              </Button>
+              <Button
+                variant="flat"
+                className="min-h-11 rounded-xl text-sm font-semibold"
+                isLoading={bulkAction === "dismissed"}
+                isDisabled={
+                  selectedCount === 0 || (isBulkBusy && bulkAction !== "dismissed")
+                }
+                onPress={() => bulkUpdateStatus("dismissed")}
+              >
+                Dismiss
+              </Button>
+              <Button
+                color="danger"
+                variant="flat"
+                className="min-h-11 rounded-xl text-sm font-semibold"
+                isDisabled={selectedCount === 0 || isBulkBusy}
+                onPress={() => setIsBulkDeleteOpen(true)}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h1 className="text-2xl font-semibold tracking-tight text-gray-950">
+                    Shopping List
+                  </h1>
+                  <p className="mt-0.5 text-sm text-gray-500">
+                    {counts.needed} needed
+                  </p>
+                </div>
+                {canEditInventory && (
+                  <div className="flex shrink-0 items-center gap-2">
+                    {visibleItems.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => enterMobileSelection()}
+                        disabled={isBulkBusy}
+                        className="min-h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 shadow-sm disabled:opacity-50"
+                      >
+                        Select
+                      </button>
+                    )}
+                    <Button
+                      className="min-h-10 rounded-xl bg-[var(--stocksense-brand)] px-3 text-sm font-semibold text-white"
+                      onPress={() => {
+                        setMessage(null);
+                        setIsAddModalOpen(true);
+                      }}
+                      startContent={<FaPlus />}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+                {FILTERS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setFilter(option.value)}
+                    className={`min-h-10 shrink-0 rounded-full border px-4 text-sm font-semibold transition ${
+                      filter === option.value
+                        ? "border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
+                        : "border-gray-200 bg-white text-gray-700"
+                    }`}
+                  >
+                    {option.label} ({counts[option.value] ?? 0})
+                  </button>
+                ))}
+              </div>
+
+              {message ? (
+                <p
+                  className={`rounded-xl border px-3 py-2 text-sm ${
+                    message.type === "error"
+                      ? "border-rose-200 bg-rose-50 text-rose-700"
+                      : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  }`}
+                >
+                  {message.text}
+                </p>
+              ) : null}
+          </div>
+        )}
+      </motion.section>
+
+      <section className="rounded-2xl border border-stocksense-gray bg-white p-4 shadow-sm max-md:hidden md:p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div className="rounded-xl border border-[var(--entity-shopping-border)] bg-[var(--entity-shopping-accent)] p-3 text-white shadow-sm">
               <FaShoppingBasket className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold tracking-tight text-stocksense-teal md:text-2xl">
+              <h1 className="text-xl font-semibold tracking-tight text-gray-950 md:text-2xl">
                 Shopping List
               </h1>
               <p className="text-sm text-gray-500">
@@ -506,22 +734,24 @@ export default function ShoppingListPageClient({
             </div>
 
             {canEditInventory && (
-              <Button
-                className="rounded-xl bg-[var(--stocksense-brand)] text-white"
-                onPress={() => {
-                  setMessage(null);
-                  setIsAddModalOpen(true);
-                }}
-                startContent={<FaPlus />}
-              >
-                Add item
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  className="rounded-xl bg-[var(--stocksense-brand)] text-white"
+                  onPress={() => {
+                    setMessage(null);
+                    setIsAddModalOpen(true);
+                  }}
+                  startContent={<FaPlus />}
+                >
+                  Add item
+                </Button>
+              </div>
             )}
           </div>
         </div>
 
         {canEditInventory && (
-          <div className="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4 max-md:hidden sm:flex-row sm:items-center sm:justify-between">
             <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-600">
               <input
                 type="checkbox"
@@ -553,10 +783,10 @@ export default function ShoppingListPageClient({
               animate={{ opacity: 1, height: "auto", y: 0 }}
               exit={{ opacity: 0, height: 0, y: -6 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className="mt-4 overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3"
+              className="mt-4 overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3 max-md:hidden"
             >
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <p className="text-sm text-[var(--stocksense-brand)]">
+                <p className="text-sm text-gray-700">
                   Bulk actions for{" "}
                   <span className="font-semibold">{selectedCount}</span>{" "}
                   item{selectedCount === 1 ? "" : "s"}
@@ -638,6 +868,12 @@ export default function ShoppingListPageClient({
                 initial="hidden"
                 animate="show"
                 exit="exit"
+                onPointerDown={() => startMobileLongPress(item.id)}
+                onPointerUp={clearMobileLongPressTimer}
+                onPointerLeave={clearMobileLongPressTimer}
+                onPointerCancel={clearMobileLongPressTimer}
+                onContextMenu={(event) => event.preventDefault()}
+                onClick={() => handleMobileItemPress(item)}
                 className={`relative h-full overflow-hidden rounded-2xl border bg-white p-3.5 shadow-sm transition sm:p-4 ${
                   isSelected
                     ? "border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]/40"
@@ -648,6 +884,22 @@ export default function ShoppingListPageClient({
 
                 <div className="flex h-full flex-col justify-between gap-3 pt-1">
                   <div className="flex items-start gap-2.5">
+                    {mobileSelectionMode && (
+                      <div className="mt-0.5 shrink-0 md:hidden">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(item.id)}
+                          disabled={isDisabled}
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onPointerUp={(event) => event.stopPropagation()}
+                          onClick={(event) => event.stopPropagation()}
+                          aria-label={`Select ${item.name}`}
+                          className="h-5 w-5 cursor-pointer rounded border border-stocksense-gray"
+                        />
+                      </div>
+                    )}
+
                     {canEditInventory && (
                       <input
                         type="checkbox"
@@ -655,7 +907,7 @@ export default function ShoppingListPageClient({
                         onChange={() => toggleSelect(item.id)}
                         disabled={isDisabled}
                         aria-label={`Select ${item.name}`}
-                        className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border border-stocksense-gray"
+                        className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border border-stocksense-gray max-md:hidden"
                       />
                     )}
 
@@ -683,7 +935,7 @@ export default function ShoppingListPageClient({
                           <div className="text-[10px] font-semibold uppercase text-gray-400">
                             Qty
                           </div>
-                          <div className="text-base font-semibold leading-5 text-stocksense-teal">
+                          <div className="text-base font-semibold leading-5 text-gray-950 md:text-stocksense-teal">
                             {item.quantity ?? 0}
                           </div>
                         </div>
@@ -698,7 +950,7 @@ export default function ShoppingListPageClient({
                   </div>
 
                   {canEditInventory && (
-                  <div className="grid grid-cols-[minmax(82px,1.25fr)_minmax(58px,1fr)_36px_36px_36px] gap-1.5">
+                  <div className="grid grid-cols-[minmax(82px,1.25fr)_minmax(58px,1fr)_36px_36px_36px] gap-1.5 max-md:hidden">
                     {item.status === "needed" ? (
                       <Button
                         size="sm"
@@ -824,6 +1076,11 @@ export default function ShoppingListPageClient({
         isOpen={Boolean(editingItem)}
         onClose={() => setEditingItem(null)}
         onUpdated={handleUpdated}
+        onDelete={(item) => {
+          setEditingItem(null);
+          setMessage(null);
+          setDeleteCandidate(item);
+        }}
       />}
       {canEditInventory && <Modal
         isOpen={moveDialog.open}
@@ -838,13 +1095,16 @@ export default function ShoppingListPageClient({
         <ModalContent className={modalContentClass} style={modalContentStyle}>
           {() => (
             <>
-              <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
-                <span>Move to inventory</span>
-                {moveDialog.item?.name ? (
-                  <span className="text-sm font-normal text-gray-500">
-                    {moveDialog.item.name}
-                  </span>
-                ) : null}
+              <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">Move to inventory</span>
+                  {moveDialog.item?.name ? (
+                    <span className="block truncate text-sm font-normal text-gray-500">
+                      {moveDialog.item.name}
+                    </span>
+                  ) : null}
+                </span>
+                <MobileSheetCloseButton onPress={closeMoveDialog} />
               </ModalHeader>
 
               <ModalBody className={`space-y-4 ${modalBodyClass}`}>
@@ -921,7 +1181,7 @@ export default function ShoppingListPageClient({
               <ModalFooter className={modalFooterClass}>
                 <Button
                   variant="light"
-                  className="rounded-xl"
+                  className="rounded-xl max-md:hidden"
                   isDisabled={moveDialog.isMoving}
                   onPress={closeMoveDialog}
                 >

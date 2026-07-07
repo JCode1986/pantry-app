@@ -24,6 +24,7 @@ import {
   modalInputClassNames,
   themedSelectClassNames,
 } from "@/components/modals/modalTheme";
+import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 
 const STATUS_OPTIONS = [
   { value: "needed", label: "Needed" },
@@ -44,6 +45,7 @@ export default function EditShoppingListItemModal({
   isOpen,
   onClose,
   onUpdated,
+  onDelete,
 }) {
   const [form, setForm] = useState(() => itemToForm(item));
   const [message, setMessage] = useState("");
@@ -127,11 +129,12 @@ export default function EditShoppingListItemModal({
       <ModalContent className={modalContentClass} style={modalContentStyle}>
         {() => (
           <>
-            <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
-              <span className="inline-flex items-center gap-2">
-                <FaEdit className="h-4 w-4" />
-                Edit shopping list item
+            <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
+              <span className="inline-flex min-w-0 flex-1 items-center gap-2 truncate">
+                <FaEdit className="h-4 w-4 shrink-0" />
+                <span className="truncate">Edit shopping list item</span>
               </span>
+              <MobileSheetCloseButton onPress={handleClose} />
             </ModalHeader>
 
             <ModalBody className={`space-y-4 ${modalBodyClass}`}>
@@ -182,12 +185,26 @@ export default function EditShoppingListItemModal({
                   ))}
                 </Select>
               </div>
+              {onDelete && item ? (
+                <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
+                  <p className="text-sm font-semibold text-gray-950">Danger zone</p>
+                  <Button
+                    className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
+                    onPress={() => {
+                      handleClose();
+                      onDelete(item);
+                    }}
+                  >
+                    Delete shopping list item
+                  </Button>
+                </div>
+              ) : null}
             </ModalBody>
 
             <ModalFooter className={modalFooterClass}>
               <Button
                 variant="light"
-                className="rounded-xl"
+                className="rounded-xl max-md:hidden"
                 onPress={handleClose}
                 isDisabled={isSaving}
               >
