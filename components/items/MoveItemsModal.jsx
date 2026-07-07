@@ -235,7 +235,7 @@ export default function MoveItemsModal({
               </div>
             </div>
 
-            <div className="flex shrink-0 justify-end gap-2 border-t border-gray-200 bg-white pt-2 max-md:sticky max-md:bottom-[var(--wherekeep-keyboard-inset,0px)] max-md:z-20 max-md:flex-col-reverse max-md:px-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)]">
+            <div className="flex shrink-0 justify-end gap-2 border-t border-gray-200 bg-white pt-2 max-md:sticky max-md:bottom-0 max-md:z-20 max-md:flex-col-reverse max-md:px-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)]">
               <button
                 onClick={closeModal}
                 className="min-h-11 cursor-pointer rounded-xl border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 max-md:hidden"

@@ -239,7 +239,7 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
               </span>
             </ModalHeader>
 
-            <ModalBody className={`space-y-4 max-md:bg-gray-50 max-md:px-4 max-md:pb-28 max-md:pt-3 ${modalBodyClass}`}>
+            <ModalBody className={`${modalBodyClass} flex flex-col space-y-4 max-md:bg-gray-50 max-md:px-4 max-md:!pb-4 max-md:pt-3`}>
               <Input
                 autoFocus
                 value={query}
@@ -273,16 +273,16 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
               )}
 
               {recentSearches.length > 0 && (
-                <div className="flex gap-2 overflow-x-auto pb-1">
+                <div className="flex flex-wrap gap-2 overflow-visible">
                   {recentSearches.map((term) => (
                     <button
                       key={term}
                       type="button"
                       onClick={() => setQuery(term)}
-                      className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-[var(--stocksense-brand-border)] bg-white px-3 text-sm font-medium text-[var(--stocksense-brand)] shadow-sm"
+                      className="inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-full border border-[var(--stocksense-brand-border)] bg-white px-3 text-sm font-medium text-[var(--stocksense-brand)] shadow-sm"
                     >
-                      <FaHistory className="h-3 w-3" />
-                      <span>{term}</span>
+                      <FaHistory className="h-3 w-3 shrink-0" />
+                      <span className="min-w-0 truncate">{term}</span>
                     </button>
                   ))}
                 </div>
@@ -294,7 +294,7 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
                 </div>
               )}
 
-              <div className="min-h-[220px] space-y-2 overflow-x-hidden max-md:min-h-[55dvh] max-md:pb-4">
+              <div className="min-h-[220px] flex-1 space-y-2 overflow-x-hidden max-md:min-h-0 max-md:pb-4">
                 <AnimatePresence initial={false}>
                   {results.map((item) => {
                     const imageUrl = item.imageUrl;
