@@ -16,6 +16,7 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  mobileSheetModalClassNames,
 } from "@/components/modals/modalTheme";
 import { emitInventoryChange } from "@/utils/clientEvents";
 
@@ -231,7 +232,13 @@ export default function LocationDetailHeaderClient({
       </header>
 
       {canEditInventory && (
-        <Modal isOpen={editOpen} onOpenChange={setEditOpen} placement="center">
+        <Modal
+          isOpen={editOpen}
+          onOpenChange={setEditOpen}
+          placement="center"
+          scrollBehavior="inside"
+          classNames={mobileSheetModalClassNames}
+        >
           <ModalContent className={modalContentClass} style={modalContentStyle}>
             {(onClose) => (
               <>

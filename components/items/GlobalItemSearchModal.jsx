@@ -21,6 +21,7 @@ import {
   FaMicrophone,
   FaPlus,
   FaSearch,
+  FaShoppingBasket,
   FaSpinner,
   FaTimes,
 } from "react-icons/fa";
@@ -37,7 +38,17 @@ import {
 const RECENT_SEARCHES_KEY = "wherekeep:recent-item-searches";
 const MAX_RECENT_SEARCHES = 6;
 
+function isShoppingListResult(item) {
+  return (
+    item?.type === "shopping_list_item" ||
+    (item?.status &&
+      (item?.sourceItemId !== undefined || item?.sourceCategoryId !== undefined))
+  );
+}
+
 function itemPath(item) {
+  if (isShoppingListResult(item)) return "Shopping list";
+
   const parts = [
     item.location?.name,
     item.storageArea?.name,
@@ -45,6 +56,17 @@ function itemPath(item) {
   ].filter(Boolean);
 
   return parts.length ? parts.join(" > ") : "No location path";
+}
+
+function shoppingStatusLabel(status) {
+  switch (status) {
+    case "purchased":
+      return "Purchased";
+    case "dismissed":
+      return "Dismissed";
+    default:
+      return "Needed";
+  }
 }
 
 function formatExpirationDate(value) {
@@ -78,6 +100,7 @@ function getStoredRecentSearches() {
 export default function GlobalItemSearchModal({ isOpen, onClose }) {
   const router = useRouter();
   const requestId = useRef(0);
+  const [shouldAutoFocusSearch, setShouldAutoFocusSearch] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -135,6 +158,10 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
 
   useEffect(() => {
     if (!isOpen) return;
+    setShouldAutoFocusSearch(
+      typeof window !== "undefined" &&
+        window.matchMedia("(min-width: 768px)").matches
+    );
     setRecentSearches(getStoredRecentSearches());
     setToastMessage("");
   }, [isOpen]);
@@ -193,6 +220,10 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
   const openResult = (item) => {
     rememberSearch(item.name || trimmedQuery);
     onClose?.();
+    if (isShoppingListResult(item)) {
+      router.push("/shopping-list");
+      return;
+    }
     if (item.category?.id) {
       router.push(`/categories/${item.category.id}`);
       return;
@@ -235,13 +266,13 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
                 </button>
               </div>
               <span className="hidden text-sm font-normal text-gray-500 md:block">
-                Search item names across every location, area, and category.
+                Search inventory and shopping list items.
               </span>
             </ModalHeader>
 
             <ModalBody className={`${modalBodyClass} flex flex-col space-y-4 max-md:bg-gray-50 max-md:px-4 max-md:!pb-4 max-md:pt-3`}>
               <Input
-                autoFocus
+                autoFocus={shouldAutoFocusSearch}
                 value={query}
                 onValueChange={setQuery}
                 placeholder="Search your home..."
@@ -299,10 +330,11 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
                   {results.map((item) => {
                     const imageUrl = item.imageUrl;
                     const expirationLabel = formatExpirationDate(item.expirationDate);
+                    const isShoppingListItem = isShoppingListResult(item);
 
                     return (
                       <motion.button
-                        key={item.id}
+                        key={`${item.type ?? "inventory_item"}:${item.id}`}
                         layout
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -322,8 +354,18 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
                                 />
                               </div>
                             ) : (
-                              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-gray-200 bg-gray-50 text-[var(--stocksense-brand)]">
-                                <FaBoxOpen className="h-5 w-5" />
+                              <div
+                                className={`grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-gray-200 bg-gray-50 ${
+                                  isShoppingListItem
+                                    ? "text-[var(--entity-shopping-accent)]"
+                                    : "text-[var(--stocksense-brand)]"
+                                }`}
+                              >
+                                {isShoppingListItem ? (
+                                  <FaShoppingBasket className="h-5 w-5" />
+                                ) : (
+                                  <FaBoxOpen className="h-5 w-5" />
+                                )}
                               </div>
                             )}
                             <div className="min-w-0 flex-1">
@@ -331,11 +373,20 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
                                 <span className="min-w-0 truncate font-semibold text-gray-950">
                                   {item.name}
                                 </span>
+                                {isShoppingListItem && (
+                                  <span className="shrink-0 rounded-full border border-[var(--entity-shopping-border)] bg-[var(--entity-shopping-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--entity-shopping-accent)]">
+                                    Shopping
+                                  </span>
+                                )}
                               </div>
 
                               <div className="mt-1 grid gap-1 text-sm text-gray-600">
                                 <span className="inline-flex min-w-0 items-start gap-2">
-                                  <FaMapMarkerAlt className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--stocksense-brand)]" />
+                                  {isShoppingListItem ? (
+                                    <FaShoppingBasket className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--entity-shopping-accent)]" />
+                                  ) : (
+                                    <FaMapMarkerAlt className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--stocksense-brand)]" />
+                                  )}
                                   <span className="min-w-0 truncate">
                                     {itemPath(item)}
                                   </span>
@@ -345,6 +396,12 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
                                     <FaBoxOpen className="h-3 w-3" />
                                     Qty: {item.quantity ?? 0}
                                   </span>
+                                  {isShoppingListItem && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <FaShoppingBasket className="h-3 w-3" />
+                                      {shoppingStatusLabel(item.status)}
+                                    </span>
+                                  )}
                                   {expirationLabel && (
                                     <span className="inline-flex items-center gap-1">
                                       <FaCalendarAlt className="h-3 w-3" />

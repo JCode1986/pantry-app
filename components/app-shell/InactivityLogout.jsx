@@ -280,8 +280,15 @@ export default function InactivityLogout({ isAuthenticated: serverAuthenticated 
       isDismissable={false}
       isOpen={warningOpen}
       placement="center"
+      classNames={{
+        wrapper: "max-md:items-end",
+        base: "max-md:m-0 max-md:w-screen max-md:max-w-none max-md:rounded-b-none max-md:rounded-t-2xl",
+      }}
     >
-      <ModalContent className={modalContentClass} style={modalContentStyle}>
+      <ModalContent
+        className={`${modalContentClass} max-md:h-auto max-md:max-h-[85svh] max-md:rounded-b-none max-md:rounded-t-2xl max-md:border max-md:border-gray-200 max-md:bg-white max-md:shadow-2xl`}
+        style={modalContentStyle}
+      >
         <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
           Session timeout
         </ModalHeader>

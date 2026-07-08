@@ -44,6 +44,7 @@ import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import EntityImageManager from "@/components/inventory/EntityImageManager";
 import MobileSuggestionChips from "@/components/modals/MobileSuggestionChips";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
+import useDesktopAutoFocus from "@/components/modals/useDesktopAutoFocus";
 import {
   modalBodyClass,
   modalContentClass,
@@ -51,6 +52,7 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  mobileSheetModalClassNames,
 } from "@/components/modals/modalTheme";
 import { containsQuery } from "@/utils/pantry/search";
 import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
@@ -105,6 +107,9 @@ export default function AreaDetailClient({
     name: "",
     imageUrl: null,
   });
+  const shouldAutoFocus = useDesktopAutoFocus(
+    mobileAddOpen || editAreaOpen || renameModal.open
+  );
 
   const [deleteModal, setDeleteModal] = useState({
     open: false,
@@ -822,6 +827,7 @@ export default function AreaDetailClient({
           }}
           placement="center"
           scrollBehavior="inside"
+          classNames={mobileSheetModalClassNames}
         >
           <ModalContent className={modalContentClass} style={modalContentStyle}>
             {() => (
@@ -840,7 +846,7 @@ export default function AreaDetailClient({
                     variant="bordered"
                     isDisabled={isSaving}
                     classNames={modalInputClassNames}
-                    autoFocus
+                    autoFocus={shouldAutoFocus}
                   />
                   <MobileSuggestionChips
                     suggestions={CATEGORY_SUGGESTIONS}
@@ -870,6 +876,7 @@ export default function AreaDetailClient({
           onOpenChange={setEditAreaOpen}
           placement="center"
           scrollBehavior="inside"
+          classNames={mobileSheetModalClassNames}
         >
           <ModalContent className={modalContentClass} style={modalContentStyle}>
             {(onClose) => (
@@ -949,6 +956,7 @@ export default function AreaDetailClient({
         onOpenChange={(open) => setRenameModal((p) => ({ ...p, open }))}
         placement="center"
         scrollBehavior="inside"
+        classNames={mobileSheetModalClassNames}
       >
         <ModalContent className={modalContentClass} style={modalContentStyle}>
           {(onClose) => (

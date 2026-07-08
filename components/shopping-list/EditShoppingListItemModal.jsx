@@ -23,9 +23,11 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  mobileSheetModalClassNames,
   themedSelectClassNames,
 } from "@/components/modals/modalTheme";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
+import useDesktopAutoFocus from "@/components/modals/useDesktopAutoFocus";
 
 const STATUS_OPTIONS = [
   { value: "needed", label: "Needed" },
@@ -51,6 +53,7 @@ export default function EditShoppingListItemModal({
   const [form, setForm] = useState(() => itemToForm(item));
   const [message, setMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const shouldAutoFocus = useDesktopAutoFocus(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -136,6 +139,8 @@ export default function EditShoppingListItemModal({
       }}
       placement="center"
       size="md"
+      scrollBehavior="inside"
+      classNames={mobileSheetModalClassNames}
     >
       <ModalContent className={modalContentClass} style={modalContentStyle}>
         {() => (
@@ -163,7 +168,7 @@ export default function EditShoppingListItemModal({
                 radius="lg"
                 isDisabled={isSaving}
                 classNames={modalInputClassNames}
-                autoFocus
+                autoFocus={shouldAutoFocus}
               />
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

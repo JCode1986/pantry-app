@@ -41,6 +41,7 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  mobileSheetModalClassNames,
 } from "@/components/modals/modalTheme";
 import { emitInventoryChange } from "@/utils/clientEvents";
 import { toNonNegativeInteger } from "@/utils/pantry/date";
@@ -794,6 +795,7 @@ export default function CategoryDetailClient({
           onOpenChange={setEditCategoryOpen}
           placement="center"
           scrollBehavior="inside"
+          classNames={mobileSheetModalClassNames}
         >
           <ModalContent className={modalContentClass} style={modalContentStyle}>
             {(onClose) => (
@@ -864,6 +866,7 @@ export default function CategoryDetailClient({
           }}
           placement="center"
           scrollBehavior="inside"
+          classNames={mobileSheetModalClassNames}
         >
           <ModalContent className={modalContentClass} style={modalContentStyle}>
             {() => (

@@ -1420,22 +1420,36 @@ export async function searchItems(query) {
 
   const supabase = await createClient();
 
-  const { data: itemsRaw, error: itemsError } = await supabase
-    .from('items')
-    .select('id, name, quantity, expiration_date, category_id, image_path, barcode')
-    .or(`name.ilike.%${term}%,barcode.ilike.%${term}%`)
-    .order('name', { ascending: true })
-    .limit(50);
+  const [
+    { data: itemsRaw, error: itemsError },
+    { data: shoppingListItemsRaw, error: shoppingListItemsError },
+  ] = await Promise.all([
+    supabase
+      .from('items')
+      .select('id, name, quantity, expiration_date, category_id, image_path, barcode')
+      .or(`name.ilike.%${term}%,barcode.ilike.%${term}%`)
+      .order('name', { ascending: true })
+      .limit(50),
+    supabase
+      .from('shopping_list_items')
+      .select('id, name, quantity, status, source_item_id, source_category_id, image_path, created_at, updated_at')
+      .ilike('name', `%${term}%`)
+      .order('name', { ascending: true })
+      .limit(30),
+  ]);
 
   if (itemsError) {
     console.error('searchItems item error:', itemsError);
     return { data: [], error: itemsError.message };
   }
 
-  const items = itemsRaw ?? [];
-  if (items.length === 0) {
-    return { data: [], error: null };
+  if (shoppingListItemsError) {
+    console.error('searchItems shopping list error:', shoppingListItemsError);
+    return { data: [], error: shoppingListItemsError.message };
   }
+
+  const items = itemsRaw ?? [];
+  const shoppingListItems = shoppingListItemsRaw ?? [];
 
   const categoryIds = [
     ...new Set(items.map((item) => item.category_id).filter(Boolean)),
@@ -1490,44 +1504,62 @@ export async function searchItems(query) {
     (locationsRaw ?? []).map((location) => [String(location.id), location])
   );
 
-  return {
-    data: await Promise.all(items.map(async (item) => {
-      const category = item.category_id
-        ? categoryMap.get(String(item.category_id))
-        : null;
-      const area = category?.storage_area_id
-        ? areaMap.get(String(category.storage_area_id))
-        : null;
-      const location = area?.location_id
-        ? locationMap.get(String(area.location_id))
-        : null;
+  const inventoryResults = await Promise.all(items.map(async (item) => {
+    const category = item.category_id
+      ? categoryMap.get(String(item.category_id))
+      : null;
+    const area = category?.storage_area_id
+      ? areaMap.get(String(category.storage_area_id))
+      : null;
+    const location = area?.location_id
+      ? locationMap.get(String(area.location_id))
+      : null;
 
-      return {
-        id: item.id,
-        name: item.name,
-        quantity: item.quantity ?? 0,
-        expirationDate: item.expiration_date ?? null,
-        barcode: item.barcode ?? null,
-        imageUrl: await getInventoryImageUrl(item.image_path),
-        category: category
-          ? { id: category.id, name: category.name }
-          : null,
-        storageArea: area
-          ? {
-              id: area.id,
-              name: area.name,
-              imageUrl: await getInventoryImageUrl(area.image_path),
-            }
-          : null,
-        location: location
-          ? {
-              id: location.id,
-              name: location.name,
-              imageUrl: await getInventoryImageUrl(location.image_path),
-            }
-          : null,
-      };
-    })),
+    return {
+      type: 'inventory_item',
+      id: item.id,
+      name: item.name,
+      quantity: item.quantity ?? 0,
+      expirationDate: item.expiration_date ?? null,
+      barcode: item.barcode ?? null,
+      imageUrl: await getInventoryImageUrl(item.image_path),
+      category: category
+        ? { id: category.id, name: category.name }
+        : null,
+      storageArea: area
+        ? {
+            id: area.id,
+            name: area.name,
+            imageUrl: await getInventoryImageUrl(area.image_path),
+          }
+        : null,
+      location: location
+        ? {
+            id: location.id,
+            name: location.name,
+            imageUrl: await getInventoryImageUrl(location.image_path),
+          }
+        : null,
+    };
+  }));
+
+  const shoppingListResults = await Promise.all(
+    shoppingListItems.map(async (item) => ({
+      type: 'shopping_list_item',
+      id: item.id,
+      name: item.name,
+      quantity: item.quantity ?? 0,
+      status: item.status ?? 'needed',
+      sourceItemId: item.source_item_id ?? null,
+      sourceCategoryId: item.source_category_id ?? null,
+      imageUrl: await getInventoryImageUrl(item.image_path),
+      createdAt: item.created_at ?? null,
+      updatedAt: item.updated_at ?? null,
+    }))
+  );
+
+  return {
+    data: [...inventoryResults, ...shoppingListResults],
     error: null,
   };
 }

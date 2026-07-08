@@ -21,9 +21,11 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  mobileSheetModalClassNames,
 } from "@/components/modals/modalTheme";
 import MobileSuggestionChips from "@/components/modals/MobileSuggestionChips";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
+import useDesktopAutoFocus from "@/components/modals/useDesktopAutoFocus";
 
 const EMPTY_FORM = {
   name: "",
@@ -54,6 +56,7 @@ export default function AddShoppingListItemModal({
   const [imagePreview, setImagePreview] = useState("");
   const [imageMessage, setImageMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const shouldAutoFocus = useDesktopAutoFocus(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -184,6 +187,8 @@ export default function AddShoppingListItemModal({
       }}
       placement="center"
       size="md"
+      scrollBehavior="inside"
+      classNames={mobileSheetModalClassNames}
     >
       <ModalContent className={modalContentClass} style={modalContentStyle}>
         {() => (
@@ -212,7 +217,7 @@ export default function AddShoppingListItemModal({
                 radius="lg"
                 isDisabled={isSaving}
                 classNames={modalInputClassNames}
-                autoFocus
+                autoFocus={shouldAutoFocus}
               />
               <MobileSuggestionChips
                 suggestions={SHOPPING_SUGGESTIONS}
