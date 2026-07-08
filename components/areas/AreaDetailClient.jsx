@@ -834,6 +834,16 @@ export default function AreaDetailClient({
               <>
                 <ModalHeader className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}>
                   <span className="min-w-0 flex-1 truncate">Create Category</span>
+                  <Button
+                    size="sm"
+                    className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
+                    onPress={handleAddCategory}
+                    isDisabled={isSaving || !newCategory.trim()}
+                    isLoading={isSaving}
+                    startContent={!isSaving ? <FaPlus className="h-3.5 w-3.5" /> : null}
+                  >
+                    Create
+                  </Button>
                   <MobileSheetCloseButton onPress={() => setMobileAddOpen(false)} />
                 </ModalHeader>
                 <ModalBody className={`space-y-4 ${modalBodyClass}`}>
@@ -853,9 +863,9 @@ export default function AreaDetailClient({
                     onSelect={setNewCategory}
                   />
                 </ModalBody>
-                <ModalFooter className={modalFooterClass}>
+                <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
                   <Button
-                    className="rounded-xl bg-[var(--stocksense-brand)] text-white"
+                    className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                     onPress={handleAddCategory}
                     isDisabled={isSaving || !newCategory.trim()}
                     isLoading={isSaving}
@@ -883,6 +893,15 @@ export default function AreaDetailClient({
               <>
                 <ModalHeader className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}>
                   <span className="min-w-0 flex-1 truncate">Edit storage area</span>
+                  <Button
+                    size="sm"
+                    className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
+                    onPress={handleRenameArea}
+                    isLoading={isSaving}
+                    isDisabled={!editAreaName.trim()}
+                  >
+                    Save
+                  </Button>
                   <MobileSheetCloseButton onPress={onClose} />
                 </ModalHeader>
                 <ModalBody className={`space-y-3 ${modalBodyClass}`}>
@@ -915,7 +934,7 @@ export default function AreaDetailClient({
                     </Button>
                   </div>
                 </ModalBody>
-                <ModalFooter className={modalFooterClass}>
+                <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
                   <Button
                     variant="light"
                     onPress={onClose}
@@ -925,7 +944,7 @@ export default function AreaDetailClient({
                     Cancel
                   </Button>
                   <Button
-                    className="rounded-xl bg-[var(--stocksense-brand)] text-white"
+                    className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                     onPress={handleRenameArea}
                     isLoading={isSaving}
                     isDisabled={!editAreaName.trim()}
@@ -963,6 +982,14 @@ export default function AreaDetailClient({
             <>
               <ModalHeader className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}>
                 <span className="min-w-0 flex-1 truncate">Edit category</span>
+                <Button
+                  size="sm"
+                  className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
+                  onPress={handleRename}
+                  isDisabled={isSaving || !renameModal.name.trim()}
+                >
+                  Save
+                </Button>
                 <MobileSheetCloseButton onPress={onClose} />
               </ModalHeader>
               <ModalBody className={`space-y-3 ${modalBodyClass}`}>
@@ -1000,7 +1027,7 @@ export default function AreaDetailClient({
                   </Button>
                 </div>
               </ModalBody>
-              <ModalFooter className={modalFooterClass}>
+              <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
                 <Button
                   variant="light"
                   onPress={onClose}
@@ -1010,7 +1037,7 @@ export default function AreaDetailClient({
                   Cancel
                 </Button>
                 <Button
-                  className="bg-[var(--stocksense-brand)] text-white"
+                  className="bg-[var(--stocksense-brand)] text-white max-md:hidden"
                   onPress={handleRename}
                   isDisabled={isSaving || !renameModal.name.trim()}
                 >

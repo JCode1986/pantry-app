@@ -198,6 +198,15 @@ export default function AddShoppingListItemModal({
                 <FaShoppingBasket className="h-4 w-4 shrink-0" />
                 <span className="truncate">Add to shopping list</span>
               </span>
+              <Button
+                size="sm"
+                className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
+                onPress={() => handleSubmit({ closeAfterAdd: true })}
+                isLoading={isSaving}
+                startContent={!isSaving ? <FaPlus className="h-3.5 w-3.5" /> : null}
+              >
+                Add
+              </Button>
               <MobileSheetCloseButton onPress={handleClose} />
             </ModalHeader>
 
@@ -318,7 +327,7 @@ export default function AddShoppingListItemModal({
               </div>
             </ModalBody>
 
-            <ModalFooter className={modalFooterClass}>
+            <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
               <Button
                 variant="light"
                 className="rounded-xl max-md:hidden"
@@ -336,7 +345,7 @@ export default function AddShoppingListItemModal({
                 Add another
               </Button>
               <Button
-                className="rounded-xl bg-[var(--stocksense-brand)] text-white"
+                className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                 onPress={() => handleSubmit({ closeAfterAdd: true })}
                 isLoading={isSaving}
                 startContent={!isSaving ? <FaPlus /> : null}

@@ -74,11 +74,19 @@ function serializeMember(member) {
 }
 
 function serializeInvite(invite, appUrl) {
+  const expiresAt = invite.expires_at ? new Date(invite.expires_at) : null;
+  const isExpired =
+    invite.status === "expired" ||
+    (invite.status === "pending" &&
+      expiresAt &&
+      !Number.isNaN(expiresAt.getTime()) &&
+      expiresAt < new Date());
+
   return {
     id: invite.id,
     email: invite.email,
     role: normalizeHouseholdRole(invite.role),
-    status: invite.status,
+    status: isExpired ? "expired" : invite.status,
     expiresAt: invite.expires_at,
     createdAt: invite.created_at,
     link: `${appUrl}/invite/${invite.token}`,
@@ -136,6 +144,7 @@ async function sendInviteEmail({ admin, email, householdName, inviteToken, appUr
       household_name: householdName,
       household_invite_token: inviteToken,
       household_invite_role: normalizeHouseholdRole(role),
+      requires_password_setup: true,
     },
   });
 
@@ -151,6 +160,108 @@ async function sendInviteEmail({ admin, email, householdName, inviteToken, appUr
   }
 
   return { sent: true, emailType: "invite", error: null };
+}
+
+async function prepareExistingHouseholdForInviteAcceptance({
+  admin,
+  fromHouseholdId,
+  toHouseholdId,
+  userId,
+  mergeExistingData = false,
+}) {
+  if (!fromHouseholdId || !toHouseholdId || fromHouseholdId === toHouseholdId) {
+    return { error: null };
+  }
+
+  const { data: existingHousehold, error: householdError } = await admin
+    .from("households")
+    .select("id, owner_id")
+    .eq("id", fromHouseholdId)
+    .maybeSingle();
+
+  if (householdError) throw householdError;
+  if (!existingHousehold) return { error: null };
+
+  if (existingHousehold.owner_id !== userId) {
+    return {
+      error:
+        "This account already belongs to another household. Leave that household before accepting this invite.",
+    };
+  }
+
+  const { count: otherMemberCount, error: membersError } = await admin
+    .from("household_members")
+    .select("*", { count: "exact", head: true })
+    .eq("household_id", fromHouseholdId)
+    .neq("user_id", userId);
+
+  if (membersError) throw membersError;
+
+  if ((otherMemberCount ?? 0) > 0) {
+    return {
+      error:
+        "This account owns a household with other members. Remove those members before joining another household.",
+    };
+  }
+
+  const [
+    { count: locationCount, error: locationCountError },
+    { count: shoppingListItemCount, error: shoppingListItemCountError },
+  ] = await Promise.all([
+    admin
+      .from("locations")
+      .select("*", { count: "exact", head: true })
+      .eq("household_id", fromHouseholdId),
+    admin
+      .from("shopping_list_items")
+      .select("*", { count: "exact", head: true })
+      .eq("household_id", fromHouseholdId),
+  ]);
+
+  if (locationCountError) throw locationCountError;
+  if (shoppingListItemCountError) throw shoppingListItemCountError;
+
+  const dataSummary = {
+    locations: locationCount ?? 0,
+    shoppingListItems: shoppingListItemCount ?? 0,
+  };
+  const hasSavedData =
+    dataSummary.locations > 0 || dataSummary.shoppingListItems > 0;
+
+  if (hasSavedData && !mergeExistingData) {
+    return {
+      requiresMerge: true,
+      dataSummary,
+    };
+  }
+
+  const scopedTableUpdates = [
+    admin
+      .from("locations")
+      .update({ household_id: toHouseholdId })
+      .eq("household_id", fromHouseholdId),
+    admin
+      .from("shopping_list_items")
+      .update({ household_id: toHouseholdId })
+      .eq("household_id", fromHouseholdId),
+    admin
+      .from("activity_events")
+      .update({ household_id: toHouseholdId })
+      .eq("household_id", fromHouseholdId),
+  ];
+
+  const updateResults = await Promise.all(scopedTableUpdates);
+  const updateError = updateResults.find((result) => result.error)?.error;
+  if (updateError) throw updateError;
+
+  const { error: inviteDeleteError } = await admin
+    .from("household_invites")
+    .delete()
+    .eq("household_id", fromHouseholdId);
+
+  if (inviteDeleteError) throw inviteDeleteError;
+
+  return { error: null };
 }
 
 export async function getHouseholdSharingAction() {
@@ -172,7 +283,7 @@ export async function getHouseholdSharingAction() {
           .from("household_invites")
           .select("id, email, role, status, token, expires_at, created_at")
           .eq("household_id", household.id)
-          .eq("status", "pending")
+          .in("status", ["pending", "expired"])
           .order("created_at", { ascending: false }),
       ]);
 
@@ -319,7 +430,7 @@ export async function revokeHouseholdInviteAction(inviteId) {
       .update({ status: "revoked" })
       .eq("id", inviteId)
       .eq("household_id", household.id)
-      .eq("status", "pending");
+      .in("status", ["pending", "expired"]);
 
     if (error) throw error;
 
@@ -327,6 +438,88 @@ export async function revokeHouseholdInviteAction(inviteId) {
     return { data: { id: inviteId }, error: null };
   } catch (err) {
     return actionError(err?.message || "Could not revoke invite.");
+  }
+}
+
+export async function resendHouseholdInviteAction(inviteId) {
+  if (!inviteId) return actionError("Invite is required.");
+
+  const context = await getAuthedHousehold({ createIfMissing: true });
+  if (context.error) return actionError(context.error);
+
+  const { user, household, member } = context;
+  if (!canManageHousehold(member, household, user.id)) {
+    return actionError("Only the household owner can resend invites.");
+  }
+
+  try {
+    const admin = createAdminClient();
+    const billing = await getHouseholdBilling(household);
+    if (billing.effectivePlanId !== "family") {
+      return actionError("Upgrade to Family before inviting household members.");
+    }
+
+    const { data: existingInvite, error: inviteLookupError } = await admin
+      .from("household_invites")
+      .select("id, email, role, status")
+      .eq("id", inviteId)
+      .eq("household_id", household.id)
+      .in("status", ["pending", "expired"])
+      .maybeSingle();
+
+    if (inviteLookupError) throw inviteLookupError;
+    if (!existingInvite) return actionError("That invite is no longer active.");
+
+    const { data: existingMember, error: existingMemberError } = await admin
+      .from("household_members")
+      .select("user_id")
+      .eq("household_id", household.id)
+      .eq("email", existingInvite.email)
+      .maybeSingle();
+
+    if (existingMemberError) throw existingMemberError;
+    if (existingMember) {
+      return actionError("That email is already in this household.");
+    }
+
+    const token = createInviteToken();
+    const { data: invite, error: updateError } = await admin
+      .from("household_invites")
+      .update({
+        token,
+        status: "pending",
+        expires_at: getInviteExpirationDate(),
+        invited_by: user.id,
+      })
+      .eq("id", existingInvite.id)
+      .eq("household_id", household.id)
+      .select("id, email, role, status, token, expires_at, created_at")
+      .single();
+
+    if (updateError) throw updateError;
+
+    const appUrl = getCanonicalAppUrl();
+    const emailResult = await sendInviteEmail({
+      admin,
+      email: invite.email,
+      householdName: household.name,
+      inviteToken: token,
+      appUrl,
+      role: normalizeHouseholdRole(invite.role),
+    });
+
+    revalidatePath("/profile");
+    return {
+      data: {
+        invite: serializeInvite(invite, appUrl),
+        emailSent: emailResult.sent,
+        emailType: emailResult.emailType ?? null,
+        emailError: emailResult.error,
+      },
+      error: null,
+    };
+  } catch (err) {
+    return actionError(err?.message || "Could not resend invite.");
   }
 }
 
@@ -476,8 +669,9 @@ export async function getHouseholdInvitePreviewAction(token) {
   }
 }
 
-export async function acceptHouseholdInviteAction(token) {
+export async function acceptHouseholdInviteAction(token, options = {}) {
   if (!token) return actionError("Invite link is missing.");
+  const mergeExistingData = Boolean(options?.mergeExistingData);
 
   const { user, error: authError } = await getAuthedUser();
   if (authError) return actionError(authError);
@@ -531,30 +725,26 @@ export async function acceptHouseholdInviteAction(token) {
       existingMembership?.household_id &&
       existingMembership.household_id !== invite.household_id
     ) {
-      const { count: personalLocationCount, error: countError } = await admin
-        .from("locations")
-        .select("*", { count: "exact", head: true })
-        .eq("household_id", existingMembership.household_id);
+      const preparation = await prepareExistingHouseholdForInviteAcceptance({
+        admin,
+        fromHouseholdId: existingMembership.household_id,
+        toHouseholdId: invite.household_id,
+        userId: user.id,
+        mergeExistingData,
+      });
 
-      if (countError) throw countError;
-
-      if ((personalLocationCount ?? 0) > 0) {
-        return actionError(
-          "This account already has its own household with inventory. Use a different email or move that data before joining."
-        );
+      if (preparation.error) return actionError(preparation.error);
+      if (preparation.requiresMerge) {
+        return {
+          data: {
+            requiresMerge: true,
+            householdName: household?.name || "Household",
+            role: normalizeHouseholdRole(invite.role),
+            dataSummary: preparation.dataSummary,
+          },
+          error: null,
+        };
       }
-
-      await admin
-        .from("household_members")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("household_id", existingMembership.household_id);
-
-      await admin
-        .from("households")
-        .delete()
-        .eq("id", existingMembership.household_id)
-        .eq("owner_id", user.id);
     }
 
     const { error: insertError } = await admin
@@ -571,6 +761,19 @@ export async function acceptHouseholdInviteAction(token) {
 
     if (insertError) throw insertError;
 
+    if (
+      existingMembership?.household_id &&
+      existingMembership.household_id !== invite.household_id
+    ) {
+      const { error: deleteOldHouseholdError } = await admin
+        .from("households")
+        .delete()
+        .eq("id", existingMembership.household_id)
+        .eq("owner_id", user.id);
+
+      if (deleteOldHouseholdError) throw deleteOldHouseholdError;
+    }
+
     const { error: updateInviteError } = await admin
       .from("household_invites")
       .update({
@@ -582,11 +785,15 @@ export async function acceptHouseholdInviteAction(token) {
 
     if (updateInviteError) throw updateInviteError;
 
+    const requiresPasswordSetup = Boolean(
+      user.invited_at || user.user_metadata?.household_invite_token
+    );
+
     const { data: updatedUser, error: updateUserError } =
       await admin.auth.admin.updateUserById(user.id, {
         user_metadata: {
           ...(user.user_metadata ?? {}),
-          requires_password_setup: true,
+          requires_password_setup: requiresPasswordSetup,
         },
       });
 
@@ -600,7 +807,7 @@ export async function acceptHouseholdInviteAction(token) {
           ...user,
           user_metadata: {
             ...(user.user_metadata ?? {}),
-            requires_password_setup: true,
+            requires_password_setup: requiresPasswordSetup,
           },
         },
       };
@@ -617,6 +824,7 @@ export async function acceptHouseholdInviteAction(token) {
     return {
       data: {
         householdName: household?.name || "Household",
+        requiresPasswordSetup,
       },
       error: null,
     };

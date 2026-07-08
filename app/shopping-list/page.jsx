@@ -11,7 +11,15 @@ export const metadata = createPageMetadata({
   robots: NO_INDEX_ROBOTS,
 });
 
-export default async function Page() {
+const SHOPPING_LIST_FILTERS = new Set(["all", "needed", "purchased", "dismissed"]);
+
+function normalizeShoppingListFilter(value) {
+  return SHOPPING_LIST_FILTERS.has(value) ? value : "needed";
+}
+
+export default async function Page({ searchParams }) {
+  const resolvedSearchParams = await searchParams;
+  const initialFilter = normalizeShoppingListFilter(resolvedSearchParams?.status);
   const supabase = await createClient();
   const {
     data: { user },
@@ -66,6 +74,7 @@ export default async function Page() {
       <ShoppingListPageClient
         initialItems={result.data?.items ?? []}
         initialError={result.error || hierarchyError}
+        initialFilter={initialFilter}
         moveLocations={moveLocations}
         canEditInventory={canEditInventory}
       />

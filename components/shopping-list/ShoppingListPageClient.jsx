@@ -51,6 +51,12 @@ const FILTERS = [
   { value: "dismissed", label: "Dismissed" },
 ];
 
+const FILTER_VALUES = new Set(FILTERS.map((filter) => filter.value));
+
+function normalizeFilter(value) {
+  return FILTER_VALUES.has(value) ? value : "needed";
+}
+
 const STATUS_LABELS = {
   needed: "Needed",
   purchased: "Purchased",
@@ -133,11 +139,12 @@ function isMobileViewport() {
 export default function ShoppingListPageClient({
   initialItems = [],
   initialError = null,
+  initialFilter = "needed",
   moveLocations = [],
   canEditInventory = true,
 }) {
   const [items, setItems] = useState(() => sortItems(initialItems));
-  const [filter, setFilter] = useState("needed");
+  const [filter, setFilter] = useState(() => normalizeFilter(initialFilter));
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [deleteCandidate, setDeleteCandidate] = useState(null);
@@ -154,6 +161,7 @@ export default function ShoppingListPageClient({
   const [moveDialog, setMoveDialog] = useState({
     open: false,
     item: null,
+    itemIds: [],
     isMoving: false,
     locationId: null,
     areaId: null,
@@ -168,6 +176,10 @@ export default function ShoppingListPageClient({
   const selectedCount = selectedIds.size;
   const isBulkBusy = Boolean(bulkAction);
   const safeMoveLocations = moveLocations ?? [];
+
+  useEffect(() => {
+    setFilter(normalizeFilter(initialFilter));
+  }, [initialFilter]);
 
   const selectedMoveLocation = useMemo(() => {
     return (
@@ -190,7 +202,10 @@ export default function ShoppingListPageClient({
 
   const canMoveToInventory =
     canEditInventory &&
-    Boolean(moveDialog.item?.id && moveDialog.categoryId) &&
+    Boolean(
+      moveDialog.categoryId &&
+        (moveDialog.item?.id || (moveDialog.itemIds?.length ?? 0) > 0)
+    ) &&
     !moveDialog.isMoving;
 
   const allVisibleSelected = useMemo(() => {
@@ -355,6 +370,26 @@ export default function ShoppingListPageClient({
     setMoveDialog({
       open: true,
       item,
+      itemIds: item?.id ? [String(item.id)] : [],
+      isMoving: false,
+      locationId: firstLocation?.id ?? null,
+      areaId: firstArea?.id ?? null,
+      categoryId: firstCategory?.id ?? null,
+    });
+  }
+
+  function openBulkMoveDialog() {
+    if (!canEditInventory) return;
+    if (selectedIds.size === 0) return;
+    const firstLocation = safeMoveLocations[0] ?? null;
+    const firstArea = firstLocation?.storage_areas?.[0] ?? null;
+    const firstCategory = firstArea?.categories?.[0] ?? null;
+
+    setMessage(null);
+    setMoveDialog({
+      open: true,
+      item: null,
+      itemIds: Array.from(selectedIds),
       isMoving: false,
       locationId: firstLocation?.id ?? null,
       areaId: firstArea?.id ?? null,
@@ -367,6 +402,7 @@ export default function ShoppingListPageClient({
     setMoveDialog({
       open: false,
       item: null,
+      itemIds: [],
       isMoving: false,
       locationId: null,
       areaId: null,
@@ -459,36 +495,67 @@ export default function ShoppingListPageClient({
     if (!canEditInventory) return;
     if (!canMoveToInventory) return;
 
-    const itemId = moveDialog.item.id;
+    const itemIds =
+      moveDialog.itemIds?.length > 0
+        ? moveDialog.itemIds
+        : moveDialog.item?.id
+          ? [String(moveDialog.item.id)]
+          : [];
+
+    if (itemIds.length === 0) return;
+
     setMoveDialog((current) => ({ ...current, isMoving: true }));
     setMessage(null);
 
-    const result = await moveShoppingListItemToInventoryAction(itemId, {
-      categoryId: moveDialog.categoryId,
-    });
+    const results = [];
+    for (const itemId of itemIds) {
+      results.push(
+        await moveShoppingListItemToInventoryAction(itemId, {
+          categoryId: moveDialog.categoryId,
+        })
+      );
+    }
 
-    if (result.error) {
-      setMessage({ type: "error", text: result.error });
+    const movedItems = results
+      .filter((result) => !result?.error)
+      .map((result) => result.data)
+      .filter(Boolean);
+    const movedIds = new Set(
+      movedItems.map((entry) => String(entry.shoppingListItem?.id)).filter(Boolean)
+    );
+    const failedResults = results.filter((result) => result?.error);
+
+    if (movedIds.size === 0) {
+      setMessage({
+        type: "error",
+        text: failedResults[0]?.error ?? "Could not move selected items.",
+      });
       setMoveDialog((current) => ({ ...current, isMoving: false }));
       return;
     }
 
-    setItems((current) => current.filter((item) => item.id !== itemId));
+    setItems((current) => current.filter((item) => !movedIds.has(String(item.id))));
     setSelectedIds((current) => {
       const next = new Set(current);
-      next.delete(String(itemId));
+      movedIds.forEach((id) => next.delete(id));
       return next;
     });
+    setMobileSelectionMode(false);
     closeMoveDialog();
     setMessage({
-      type: "success",
-      text: `Moved "${result.data?.inventoryItem?.name ?? "item"}" to inventory.`,
+      type: failedResults.length > 0 ? "error" : "success",
+      text:
+        failedResults.length > 0
+          ? `Moved ${movedIds.size} item${movedIds.size === 1 ? "" : "s"} to inventory. ${failedResults.length} failed.`
+          : `Moved ${movedIds.size} item${movedIds.size === 1 ? "" : "s"} to inventory.`,
     });
     emitInventoryChange({
       entity: "shopping_list_item",
       action: "deleted",
-      id: itemId,
-      movedToInventoryItemId: result.data?.inventoryItem?.id,
+      ids: Array.from(movedIds),
+      movedToInventoryItemIds: movedItems
+        .map((entry) => entry.inventoryItem?.id)
+        .filter(Boolean),
     });
   }
 
@@ -614,6 +681,17 @@ export default function ShoppingListPageClient({
             </div>
 
             <div className="mt-2 grid grid-cols-2 gap-2">
+              <Button
+                className="min-h-11 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-sm font-semibold text-[var(--stocksense-brand)]"
+                isLoading={moveDialog.isMoving}
+                isDisabled={
+                  selectedCount === 0 || isBulkBusy || safeMoveLocations.length === 0
+                }
+                onPress={openBulkMoveDialog}
+                startContent={!moveDialog.isMoving ? <FaExchangeAlt /> : null}
+              >
+                Move
+              </Button>
               <Button
                 className="min-h-11 rounded-xl bg-emerald-600 text-sm font-semibold text-white"
                 isLoading={bulkAction === "purchased"}
@@ -835,6 +913,16 @@ export default function ShoppingListPageClient({
                 </p>
 
                 <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
+                    isLoading={moveDialog.isMoving}
+                    isDisabled={isBulkBusy || safeMoveLocations.length === 0}
+                    onPress={openBulkMoveDialog}
+                    startContent={!moveDialog.isMoving ? <FaExchangeAlt /> : null}
+                  >
+                    Move to inventory
+                  </Button>
                   <Button
                     size="sm"
                     className="rounded-xl bg-emerald-600 text-white"
@@ -1135,6 +1223,15 @@ export default function ShoppingListPageClient({
         isOpen={Boolean(editingItem)}
         onClose={() => setEditingItem(null)}
         onUpdated={handleUpdated}
+        onMoveToInventory={(item) => {
+          setEditingItem(null);
+          openMoveDialog(item);
+        }}
+        isMovingToInventory={
+          Boolean(editingItem?.id) &&
+          moveDialog.isMoving &&
+          moveDialog.itemIds?.includes(String(editingItem.id))
+        }
         onDelete={(item) => {
           setEditingItem(null);
           setMessage(null);
@@ -1162,6 +1259,10 @@ export default function ShoppingListPageClient({
                   {moveDialog.item?.name ? (
                     <span className="block truncate text-sm font-normal text-gray-500">
                       {moveDialog.item.name}
+                    </span>
+                  ) : moveDialog.itemIds?.length > 1 ? (
+                    <span className="block truncate text-sm font-normal text-gray-500">
+                      {moveDialog.itemIds.length} selected items
                     </span>
                   ) : null}
                 </span>

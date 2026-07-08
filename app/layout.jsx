@@ -7,7 +7,9 @@ import { getPreferenceBootScript } from "@/utils/appPreferences";
 import { siteConfig } from "@/utils/metadata";
 import {
   canEditHouseholdInventory,
+  getHouseholdBilling,
   getHouseholdForUser,
+  normalizeHouseholdRole,
 } from "@/utils/households";
 import { createClient } from "@/utils/supabase/server";
 
@@ -184,6 +186,8 @@ export default async function RootLayout({ children }) {
   };
   let navigationSummary = {
     householdName: "",
+    householdRole: "",
+    isFamilyPlan: false,
   };
   let supabase = null;
 
@@ -206,9 +210,12 @@ export default async function RootLayout({ children }) {
         email: currentUser.email,
         createIfMissing: true,
       });
+      const billing = await getHouseholdBilling(household);
       canEditInventory = canEditHouseholdInventory(member);
       navigationSummary = {
         householdName: household?.name || "",
+        householdRole: normalizeHouseholdRole(member?.role),
+        isFamilyPlan: billing.effectivePlanId === "family",
       };
     } catch (err) {
       console.error("Navigation household role error:", err);

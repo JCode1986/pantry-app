@@ -2111,6 +2111,15 @@ export default function StorageAreasSection({
                 ? `Edit storage area in ${areaModal.locationName || locationName}`
                 : `Create new storage in ${areaModal.locationName || locationName}`}
             </span>
+            <Button
+              size="sm"
+              radius="full"
+              onPress={submitAreaModal}
+              isDisabled={!areaModal.name.trim()}
+              className={`${modalPrimaryButtonClass} h-10 shrink-0 px-4 text-sm font-semibold md:hidden`}
+            >
+              {areaModal.mode === 'edit' ? 'Save' : 'Create'}
+            </Button>
             <MobileSheetCloseButton onPress={closeAreaModal} />
           </ModalHeader>
           <ModalBody className={modalBodyClass}>
@@ -2157,7 +2166,7 @@ export default function StorageAreasSection({
               </div>
             )}
           </ModalBody>
-          <ModalFooter className={modalFooterClass}>
+          <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
             <Button
               variant="light"
               radius="lg"
@@ -2171,7 +2180,7 @@ export default function StorageAreasSection({
               radius="lg"
               onPress={submitAreaModal}
               isDisabled={!areaModal.name.trim()}
-              className={modalPrimaryButtonClass}
+              className={`${modalPrimaryButtonClass} max-md:hidden`}
             >
               {areaModal.mode === 'edit' ? (
                 'Save changes'
@@ -2201,6 +2210,15 @@ export default function StorageAreasSection({
                 ? `Edit category in ${categoryModal.areaName || 'storage area'}`
                 : `Create new category in ${categoryModal.areaName || 'storage area'}`}
             </span>
+            <Button
+              size="sm"
+              radius="full"
+              onPress={submitCategoryModal}
+              isDisabled={!categoryModal.name.trim()}
+              className={`${modalPrimaryButtonClass} h-10 shrink-0 px-4 text-sm font-semibold md:hidden`}
+            >
+              {categoryModal.mode === 'edit' ? 'Save' : 'Create'}
+            </Button>
             <MobileSheetCloseButton onPress={closeCategoryModal} />
           </ModalHeader>
           <ModalBody className={modalBodyClass}>
@@ -2244,7 +2262,7 @@ export default function StorageAreasSection({
               </div>
             )}
           </ModalBody>
-          <ModalFooter className={modalFooterClass}>
+          <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
             <Button
               variant="light"
               radius="lg"
@@ -2258,7 +2276,7 @@ export default function StorageAreasSection({
               radius="lg"
               onPress={submitCategoryModal}
               isDisabled={!categoryModal.name.trim()}
-              className={modalPrimaryButtonClass}
+              className={`${modalPrimaryButtonClass} max-md:hidden`}
             >
               {categoryModal.mode === 'edit' ? (
                 'Save changes'
@@ -2288,6 +2306,15 @@ export default function StorageAreasSection({
                 ? `Edit item in ${itemModal.categoryName || 'category'}`
                 : `Create new item in ${itemModal.categoryName || 'category'}`}
             </span>
+            <Button
+              size="sm"
+              radius="full"
+              onPress={submitItemModal}
+              isDisabled={!itemModal.name.trim()}
+              className={`${modalPrimaryButtonClass} h-10 shrink-0 px-4 text-sm font-semibold md:hidden`}
+            >
+              {itemModal.mode === 'edit' ? 'Save' : 'Add'}
+            </Button>
             <MobileSheetCloseButton onPress={closeItemModal} />
           </ModalHeader>
           <ModalBody className={`space-y-3 ${modalBodyClass}`}>
@@ -2360,7 +2387,7 @@ export default function StorageAreasSection({
               </div>
             )}
           </ModalBody>
-          <ModalFooter className={modalFooterClass}>
+          <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
             <Button
               variant="light"
               radius="lg"
@@ -2374,7 +2401,7 @@ export default function StorageAreasSection({
               radius="lg"
               onPress={submitItemModal}
               isDisabled={!itemModal.name.trim()}
-              className={modalPrimaryButtonClass}
+              className={`${modalPrimaryButtonClass} max-md:hidden`}
             >
               {itemModal.mode === 'edit' ? (
                 'Save changes'
