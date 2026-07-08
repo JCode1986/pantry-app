@@ -1069,10 +1069,14 @@ export default function Navigation({
         onOpenChange={setShowAddActionSheet}
         placement="bottom"
         classNames={{
-          base: "mx-0 mb-0 rounded-b-none rounded-t-2xl sm:mx-auto sm:mb-4 sm:rounded-2xl",
+          wrapper: "max-md:items-end",
+          base: "mx-0 mb-0 max-md:w-screen max-md:max-w-none rounded-b-none rounded-t-2xl sm:mx-auto sm:mb-4 sm:rounded-2xl",
         }}
       >
-        <ModalContent className={modalContentClass} style={modalContentStyle}>
+        <ModalContent
+          className={`${modalContentClass} max-md:h-auto max-md:max-h-[85svh] max-md:rounded-b-none max-md:rounded-t-2xl max-md:border max-md:border-gray-200 max-md:bg-white max-md:shadow-2xl`}
+          style={modalContentStyle}
+        >
           {(onClose) => (
             <>
               <ModalHeader className={modalHeaderClass}>
@@ -1174,8 +1178,15 @@ export default function Navigation({
         isOpen={showLogoutModal}
         onOpenChange={setShowLogoutModal}
         placement="center"
+        classNames={{
+          wrapper: "max-md:items-end",
+          base: "max-md:m-0 max-md:w-screen max-md:max-w-none max-md:rounded-b-none max-md:rounded-t-2xl",
+        }}
       >
-        <ModalContent className={modalContentClass} style={modalContentStyle}>
+        <ModalContent
+          className={`${modalContentClass} max-md:h-auto max-md:max-h-[80svh] max-md:rounded-b-none max-md:rounded-t-2xl max-md:border max-md:border-gray-200 max-md:bg-white max-md:shadow-2xl`}
+          style={modalContentStyle}
+        >
           {(onClose) => (
             <>
               <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>

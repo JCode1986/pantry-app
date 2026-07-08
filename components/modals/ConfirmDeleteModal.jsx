@@ -50,6 +50,7 @@ export default function ConfirmDeleteModal({
       className="max-w-md"
       classNames={{
         wrapper: "max-md:items-end",
+        base: "max-md:m-0 max-md:w-screen max-md:max-w-none max-md:rounded-b-none max-md:rounded-t-2xl",
       }}
     >
       <ModalContent

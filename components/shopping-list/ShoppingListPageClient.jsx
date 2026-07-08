@@ -39,6 +39,7 @@ import {
   modalContentStyle,
   modalFooterClass,
   modalHeaderClass,
+  mobileSheetModalClassNames,
   themedSelectClassNames,
 } from "@/components/modals/modalTheme";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
@@ -1149,6 +1150,8 @@ export default function ShoppingListPageClient({
         isDismissable={!moveDialog.isMoving}
         placement="center"
         size="md"
+        scrollBehavior="inside"
+        classNames={mobileSheetModalClassNames}
       >
         <ModalContent className={modalContentClass} style={modalContentStyle}>
           {() => (

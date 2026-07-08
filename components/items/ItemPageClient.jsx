@@ -33,6 +33,7 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  mobileSheetModalClassNames,
   themedSelectClassNames,
 } from "@/components/modals/modalTheme";
 import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
@@ -2297,7 +2298,14 @@ export default function ItemsPageClient({
       </Modal>
 
       {/* Move Modal (single + bulk) */}
-      {canEditInventory && <Modal isOpen={moveModalOpen} onOpenChange={setMoveModalOpen} size="md">
+      {canEditInventory && <Modal
+        isOpen={moveModalOpen}
+        onOpenChange={setMoveModalOpen}
+        size="md"
+        placement="center"
+        scrollBehavior="inside"
+        classNames={mobileSheetModalClassNames}
+      >
         <ModalContent className={modalContentClass} style={modalContentStyle}>
           {() => (
             <>

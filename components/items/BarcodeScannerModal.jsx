@@ -228,8 +228,16 @@ export default function BarcodeScannerModal({ isOpen, onOpenChange, onScan }) {
       placement="center"
       size="lg"
       scrollBehavior="inside"
+      classNames={{
+        wrapper:
+          "max-md:items-stretch max-md:justify-stretch max-md:overflow-hidden max-md:p-0",
+        base: "max-md:m-0 max-md:h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:max-h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:w-screen max-md:max-w-none max-md:rounded-none",
+      }}
     >
-      <ModalContent className={modalContentClass} style={modalContentStyle}>
+      <ModalContent
+        className={`${modalContentClass} max-md:h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:max-h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:w-screen max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:bg-gray-50 max-md:shadow-none`}
+        style={modalContentStyle}
+      >
         {() => (
           <>
             <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
@@ -306,7 +314,7 @@ export default function BarcodeScannerModal({ isOpen, onOpenChange, onScan }) {
               </div>
             </ModalBody>
 
-            <ModalFooter className="flex shrink-0 flex-col gap-2 border-t border-[var(--stocksense-brand-border)] bg-white sm:flex-row sm:justify-end">
+            <ModalFooter className="flex shrink-0 flex-col gap-2 border-t border-[var(--stocksense-brand-border)] bg-white max-md:sticky max-md:bottom-0 max-md:z-20 max-md:px-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)] sm:flex-row sm:justify-end">
               <ScannerMessage message={message} className="w-full sm:hidden" />
               <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:justify-end">
                 <Button variant="light" className="rounded-xl" onPress={() => onOpenChange?.(false)}>

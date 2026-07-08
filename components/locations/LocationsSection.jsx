@@ -36,6 +36,7 @@ import { emitInventoryChange } from '@/utils/clientEvents';
 import EntityImageManager from '@/components/inventory/EntityImageManager';
 import MobileSuggestionChips from '@/components/modals/MobileSuggestionChips';
 import MobileSheetCloseButton from '@/components/modals/MobileSheetCloseButton';
+import useDesktopAutoFocus from '@/components/modals/useDesktopAutoFocus';
 
 const modalContentStyle = {
   fontFamily: 'var(--stocksense-font-family)',
@@ -43,6 +44,12 @@ const modalContentStyle = {
 
 const modalContentClass =
   'flex w-[calc(100vw-1rem)] max-h-[calc(100svh-1rem)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white text-gray-700 shadow-xl sm:w-full max-md:h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:max-h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:w-screen max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:bg-gray-50 max-md:shadow-none';
+
+const mobileSheetModalClassNames = {
+  wrapper:
+    'max-md:items-stretch max-md:justify-stretch max-md:overflow-hidden max-md:p-0',
+  base: 'max-md:m-0 max-md:h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:max-h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:w-screen max-md:max-w-none max-md:rounded-none',
+};
 
 const modalHeaderClass =
   'shrink-0 border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-base font-semibold text-[var(--stocksense-brand)] max-md:sticky max-md:top-0 max-md:z-20 max-md:px-4 max-md:py-3';
@@ -98,6 +105,7 @@ export default function LocationsSection({ locations, canEditInventory = true })
     imageUrl: null,
     image_path: null,
   });
+  const shouldAutoFocus = useDesktopAutoFocus(locationModal.open);
   const [message, setMessage] = useState('');
   const [locationImageMessage, setLocationImageMessage] = useState('');
   const [upgradeHref, setUpgradeHref] = useState('');
@@ -938,6 +946,8 @@ export default function LocationsSection({ locations, canEditInventory = true })
         onOpenChange={(open) => !open && closeLocationModal()}
         placement="center"
         backdrop="blur"
+        scrollBehavior="inside"
+        classNames={mobileSheetModalClassNames}
       >
         <ModalContent className={modalContentClass} style={modalContentStyle}>
           <ModalHeader className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}>
@@ -959,7 +969,7 @@ export default function LocationsSection({ locations, canEditInventory = true })
               variant="bordered"
               radius="lg"
               classNames={modalInputClassNames}
-              autoFocus
+              autoFocus={shouldAutoFocus}
             />
             {locationModal.mode === 'create' && (
               <MobileSuggestionChips
