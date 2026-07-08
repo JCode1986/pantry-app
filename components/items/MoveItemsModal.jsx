@@ -137,7 +137,7 @@ export default function MoveItemsModal({
             initial={{ scale: 0.95, opacity: 0, y: 10 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 10 }}
-            className="flex w-full max-w-md flex-col rounded-2xl border border-gray-200 bg-white text-gray-700 shadow-xl max-md:h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:bg-gray-50 max-md:shadow-none md:space-y-4 md:p-5"
+            className="wherekeep-modal-content flex w-full max-w-md flex-col rounded-2xl border border-gray-200 bg-white text-gray-700 shadow-xl max-md:h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:bg-gray-50 max-md:shadow-none md:space-y-4 md:p-5"
             style={modalContentStyle}
           >
             <div className="flex shrink-0 gap-3 border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] max-md:sticky max-md:top-0 max-md:z-20 max-md:px-4 max-md:py-3 md:block">
@@ -154,7 +154,7 @@ export default function MoveItemsModal({
               <MobileSheetCloseButton onPress={closeModal} />
             </div>
 
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain max-md:px-4 max-md:py-4">
+            <div className="wherekeep-modal-body min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain max-md:px-4 max-md:py-4">
               {currentPath ? (
                 <div className="rounded-2xl border border-gray-200 bg-white p-3">
                   <p className="text-xs font-medium uppercase text-gray-500">
@@ -235,7 +235,7 @@ export default function MoveItemsModal({
               </div>
             </div>
 
-            <div className="flex shrink-0 justify-end gap-2 border-t border-gray-200 bg-white pt-2 max-md:sticky max-md:bottom-0 max-md:z-20 max-md:flex-col-reverse max-md:px-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)]">
+            <div className="wherekeep-modal-footer flex shrink-0 justify-end gap-2 border-t border-gray-200 bg-white pt-2 max-md:sticky max-md:bottom-0 max-md:z-20 max-md:flex-col-reverse max-md:px-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)]">
               <button
                 onClick={closeModal}
                 className="min-h-11 cursor-pointer rounded-xl border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 max-md:hidden"
