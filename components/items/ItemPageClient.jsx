@@ -21,6 +21,7 @@ import {
   FaChevronRight,
   FaFilter,
   FaSearch,
+  FaShoppingBasket,
   FaTimes,
 } from "react-icons/fa";
 import { updateItem, deleteItem, updateItemLocation } from "@/app/actions/server";
@@ -222,6 +223,7 @@ export default function ItemsPageClient({
     areaId: null,
     categoryId: null,
   });
+  const [shoppingListMoveAction, setShoppingListMoveAction] = useState(null);
 
   // delete modal (single/bulk)
   const [deleteDialog, setDeleteDialog] = useState({
@@ -1012,6 +1014,77 @@ export default function ItemsPageClient({
       action: "moved",
       ids,
     });
+  };
+
+  const moveItemsToShoppingList = async (ids, actionKey) => {
+    if (!canEditInventory) return;
+    const itemIds = [...new Set((ids ?? []).map((id) => String(id)).filter(Boolean))];
+    if (itemIds.length === 0 || shoppingListMoveAction) return;
+
+    setShoppingListMoveAction(actionKey);
+
+    try {
+      const results = [];
+      for (const itemId of itemIds) {
+        results.push(await deleteItemAndAddToShoppingListAction(itemId));
+      }
+
+      const movedIds = new Set(
+        results
+          .filter((result) => !result?.error && result.data?.deletedItemId)
+          .map((result) => String(result.data.deletedItemId))
+      );
+      const failedResults = results.filter((result) => result?.error);
+
+      if (movedIds.size === 0) {
+        alert(failedResults[0]?.error || "Could not move item to shopping list.");
+        return;
+      }
+
+      setItems((prev) => prev.filter((item) => !movedIds.has(String(item.id))));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        movedIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      setMoveModalOpen(false);
+      setMobileSelectionMode(false);
+
+      if (drawerOpen && activeItemId && movedIds.has(String(activeItemId))) {
+        closeDrawer();
+      }
+
+      if (failedResults.length > 0) {
+        alert(
+          `Moved ${movedIds.size} item${movedIds.size === 1 ? "" : "s"} to the shopping list. ${failedResults.length} failed.`
+        );
+      }
+
+      emitInventoryChange({
+        entity: "shopping_list_item",
+        action: "added",
+        sourceEntity: "item",
+        sourceAction: "deleted",
+        ids: results
+          .map((result) => result.data?.shoppingListItem?.id)
+          .filter(Boolean),
+        deletedItemIds: Array.from(movedIds),
+      });
+    } catch (error) {
+      console.error("Move to shopping list error:", error);
+      alert("There was a problem moving one or more items to the shopping list.");
+    } finally {
+      setShoppingListMoveAction(null);
+    }
+  };
+
+  const confirmMoveSelectionToShoppingList = () => {
+    if (drawerOpen && activeItem) {
+      moveItemsToShoppingList([activeItem.id], "single-shopping-list");
+      return;
+    }
+
+    moveItemsToShoppingList(Array.from(selectedIds), "bulk-shopping-list");
   };
 
   // ---- delete helpers (single + bulk) ----
@@ -2144,6 +2217,16 @@ export default function ItemsPageClient({
                     {activeItem?.category?.name || "—"}
                   </div>
                 </div>
+                {canEditInventory ? (
+                  <Button
+                    size="sm"
+                    className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
+                    onClick={saveEdits}
+                    isDisabled={!hasItemEditChanges}
+                  >
+                    Save
+                  </Button>
+                ) : null}
                 <MobileSheetCloseButton onPress={closeDrawer} />
               </ModalHeader>
 
@@ -2270,7 +2353,7 @@ export default function ItemsPageClient({
                 )}
               </ModalBody>
 
-              <ModalFooter className={modalFooterClass}>
+              <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
                 <Button variant="light" className="rounded-xl max-md:hidden" onClick={closeDrawer}>
                   Close
                 </Button>
@@ -2280,15 +2363,6 @@ export default function ItemsPageClient({
                     onClick={openDeleteSingle}
                   >
                     Delete
-                  </Button>
-                )}
-                {canEditInventory && (
-                  <Button
-                    className="rounded-xl bg-[var(--stocksense-brand)] text-white md:hidden"
-                    onClick={saveEdits}
-                    isDisabled={!hasItemEditChanges}
-                  >
-                    Save changes
                   </Button>
                 )}
               </ModalFooter>
@@ -2429,8 +2503,22 @@ export default function ItemsPageClient({
                   variant="light"
                   className="rounded-xl max-md:hidden"
                   onClick={() => setMoveModalOpen(false)}
+                  isDisabled={Boolean(shoppingListMoveAction)}
                 >
                   Cancel
+                </Button>
+                <Button
+                  className="rounded-xl border border-[var(--entity-shopping-border)] bg-white text-[var(--entity-shopping-accent)]"
+                  onClick={confirmMoveSelectionToShoppingList}
+                  isLoading={Boolean(shoppingListMoveAction)}
+                  isDisabled={
+                    Boolean(shoppingListMoveAction) ||
+                    (!drawerOpen && selectedIds.size === 0) ||
+                    (drawerOpen && !activeItem)
+                  }
+                  startContent={!shoppingListMoveAction ? <FaShoppingBasket /> : null}
+                >
+                  Move to shopping list
                 </Button>
                 <Button
                   className="rounded-xl bg-[var(--stocksense-brand)] text-white"
@@ -2439,7 +2527,7 @@ export default function ItemsPageClient({
                     if (selectedIds.size > 0 && !drawerOpen) confirmMoveBulk();
                     else confirmMoveSingle();
                   }}
-                  isDisabled={!canConfirmMove}
+                  isDisabled={!canConfirmMove || Boolean(shoppingListMoveAction)}
                 >
                   Move
                 </Button>
@@ -2460,7 +2548,7 @@ export default function ItemsPageClient({
           deleteDialog.mode === "single" ? confirmDeleteAndAddToShoppingList : null
         }
         secondaryConfirmLabel={
-          deleteDialog.mode === "single" ? "Delete and add to shopping list" : null
+          deleteDialog.mode === "single" ? "Move to shopping list" : null
         }
         secondaryConfirmClassName="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700"
         title={

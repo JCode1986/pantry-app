@@ -956,6 +956,16 @@ export default function LocationsSection({ locations, canEditInventory = true })
                 ? `Edit location ${locationModal.name || ''}`
                 : 'Create Location'}
             </span>
+            <Button
+              size="sm"
+              radius="full"
+              onPress={handleSubmitLocation}
+              isDisabled={!locationModal.name.trim() || isSavingLocation}
+              isLoading={isSavingLocation}
+              className="h-10 shrink-0 bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
+            >
+              {locationModal.mode === 'edit' ? 'Save' : 'Create'}
+            </Button>
             <MobileSheetCloseButton onPress={closeLocationModal} />
           </ModalHeader>
           <ModalBody className={`space-y-4 ${modalBodyClass}`}>
@@ -1107,7 +1117,7 @@ export default function LocationsSection({ locations, canEditInventory = true })
               </div>
             )}
           </ModalBody>
-          <ModalFooter className={modalFooterClass}>
+          <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
             <Button
               variant="light"
               radius="lg"
@@ -1122,7 +1132,7 @@ export default function LocationsSection({ locations, canEditInventory = true })
               onPress={handleSubmitLocation}
               isDisabled={!locationModal.name.trim() || isSavingLocation}
               isLoading={isSavingLocation}
-              className="bg-[var(--stocksense-brand)] text-white"
+              className="bg-[var(--stocksense-brand)] text-white max-md:hidden"
             >
               {locationModal.mode === 'edit' ? (
                 'Save changes'

@@ -221,7 +221,10 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
     rememberSearch(item.name || trimmedQuery);
     onClose?.();
     if (isShoppingListResult(item)) {
-      router.push("/shopping-list");
+      const status = ["needed", "purchased", "dismissed"].includes(item.status)
+        ? item.status
+        : "needed";
+      router.push(`/shopping-list?status=${encodeURIComponent(status)}`);
       return;
     }
     if (item.category?.id) {

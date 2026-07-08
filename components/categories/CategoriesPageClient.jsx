@@ -644,6 +644,16 @@ export default function CategoriesPageClient({
                 <div className="text-sm text-gray-500 max-md:hidden">
                   {activeCategory?.location?.name} → {activeCategory?.storageArea?.name}
                 </div>
+                {canEditInventory && (
+                  <Button
+                    size="sm"
+                    className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
+                    onClick={handleRename}
+                    isDisabled={!renameValue.trim()}
+                  >
+                    Save
+                  </Button>
+                )}
                 <MobileSheetCloseButton onPress={closeDrawer} />
               </ModalHeader>
 
@@ -726,7 +736,7 @@ export default function CategoriesPageClient({
                 </div>
               </ModalBody>
 
-              <ModalFooter className={modalFooterClass}>
+              <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
                 <Button variant="light" className="rounded-xl max-md:hidden" onClick={closeDrawer}>
                   Close
                 </Button>
@@ -736,15 +746,6 @@ export default function CategoriesPageClient({
                     onClick={openDelete}
                   >
                     Delete category
-                  </Button>
-                )}
-                {canEditInventory && (
-                  <Button
-                    onClick={handleRename}
-                    isDisabled={!renameValue.trim()}
-                    className="rounded-xl bg-[var(--stocksense-brand)] text-white md:hidden"
-                  >
-                    Save changes
                   </Button>
                 )}
               </ModalFooter>

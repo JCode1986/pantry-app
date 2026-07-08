@@ -786,16 +786,26 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
     const product = result?.data;
     if (!product?.found) {
       setBarcodeMessage("No product match found. You can still add it manually.");
+      setValidationErrors((prev) => ({ ...prev, itemName: "Item name is required." }));
       return;
     }
 
     setProductPreview(product);
+    const productName = typeof product.name === "string" ? product.name.trim() : "";
     setForm((prev) => ({
       ...prev,
       barcode: product.barcode || barcode,
-      itemName: prev.itemName.trim() ? prev.itemName : product.name || prev.itemName,
+      itemName: prev.itemName.trim() ? prev.itemName : productName || prev.itemName,
     }));
-    setBarcodeMessage(product.name ? "Product details added." : "Product image found.");
+    if (productName) {
+      setValidationErrors((prev) => ({ ...prev, itemName: "" }));
+      setBarcodeMessage("Product details added.");
+    } else {
+      setValidationErrors((prev) => ({ ...prev, itemName: "Item name is required." }));
+      setBarcodeMessage(
+        "Barcode scanned, but no item name was found. Enter an item name below to add it."
+      );
+    }
   };
 
   const selectLocation = (value) => {
@@ -1090,15 +1100,28 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
             <ModalHeader className={`flex flex-col gap-1 max-md:sticky max-md:top-0 max-md:z-20 max-md:px-4 max-md:py-3 ${modalHeaderClass}`}>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[var(--stocksense-brand)]">Add item</span>
-                <button
-                  type="button"
-                  aria-label="Close add item"
-                  onClick={handleClose}
-                  disabled={isSaving}
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] transition hover:bg-[var(--stocksense-brand-soft)] disabled:opacity-50 md:hidden"
-                >
-                  <FaTimes className="h-4 w-4" />
-                </button>
+                <div className="flex shrink-0 items-center gap-2 md:hidden">
+                  <Button
+                    size="sm"
+                    className="h-10 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white"
+                    onPress={() => handleSubmit()}
+                    isDisabled={isSaving || isLoading || isQuickAdding}
+                    startContent={
+                      isSaving ? <FaSpinner className="h-3.5 w-3.5 animate-spin" /> : <FaPlus className="h-3.5 w-3.5" />
+                    }
+                  >
+                    {isSaving ? "Adding" : "Add"}
+                  </Button>
+                  <button
+                    type="button"
+                    aria-label="Close add item"
+                    onClick={handleClose}
+                    disabled={isSaving}
+                    className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] transition hover:bg-[var(--stocksense-brand-soft)] disabled:opacity-50"
+                  >
+                    <FaTimes className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
               <span className="hidden text-sm font-normal text-gray-500 md:block">
                 Choose where it belongs, or create the missing location, area, or category.
@@ -1362,6 +1385,21 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                       </motion.div>
                     </div>
 
+                    <label className="order-[45] flex min-h-14 w-full cursor-pointer items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm md:hidden">
+                      <span className="min-w-0">
+                        <span className="block">Keep adding here</span>
+                        <span className="block truncate text-xs font-normal text-gray-500">
+                          Preserve this location and method
+                        </span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={keepAdding}
+                        onChange={(event) => updateKeepAdding(event.target.checked)}
+                        className="h-5 w-5 shrink-0 rounded border-gray-300"
+                      />
+                    </label>
+
                     <div className={`${methodOrder.barcode} overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white shadow-sm md:order-20 md:border-stocksense-gray md:p-3`}>
                       <button
                         type="button"
@@ -1469,6 +1507,11 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                                     {productPreview.name || "Product found"}
                                   </span>
                                 </div>
+                                {barcodeMessage ? (
+                                  <div className="mt-1 text-xs font-medium text-amber-700">
+                                    {barcodeMessage}
+                                  </div>
+                                ) : null}
                                 <div className="mt-0.5 text-xs text-gray-600">
                                   {[productPreview.brand, productPreview.barcode]
                                     .filter(Boolean)
@@ -1706,21 +1749,6 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                 />
               </AnimatePresence>
 
-              <label className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-gray-800 md:hidden">
-                <span className="min-w-0">
-                  <span className="block">Keep adding here</span>
-                  <span className="block truncate text-xs font-normal text-gray-500">
-                    Preserve this location and method
-                  </span>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={keepAdding}
-                  onChange={(event) => updateKeepAdding(event.target.checked)}
-                  className="h-5 w-5 shrink-0 rounded border-gray-300"
-                />
-              </label>
-
               <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:justify-end">
                 <Button variant="light" className="hidden rounded-xl md:inline-flex" onPress={handleClose} isDisabled={isSaving}>
                   Cancel
@@ -1734,7 +1762,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                   Add & close
                 </Button>
                 <Button
-                  className="min-h-12 rounded-2xl bg-[var(--stocksense-brand)] text-white md:min-h-10 md:rounded-xl"
+                  className="hidden min-h-12 rounded-2xl bg-[var(--stocksense-brand)] text-white md:inline-flex md:min-h-10 md:rounded-xl"
                   onPress={() => handleSubmit()}
                   isDisabled={isSaving || isLoading || isQuickAdding}
                   startContent={isSaving ? <FaSpinner className="animate-spin" /> : <FaPlus />}

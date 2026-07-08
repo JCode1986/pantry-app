@@ -39,6 +39,7 @@ import {
 import {
   createHouseholdInviteAction,
   removeHouseholdMemberAction,
+  resendHouseholdInviteAction,
   revokeHouseholdInviteAction,
   updateHouseholdMemberRoleAction,
 } from "@/app/actions/household";
@@ -555,6 +556,7 @@ function SharingSection({
   onInviteRoleChange,
   onCreateInvite,
   onCopyInvite,
+  onResendInvite,
   onRevokeInvite,
   onRemoveMember,
   onUpdateMemberRole,
@@ -764,6 +766,7 @@ function SharingSection({
                         <div className="text-xs text-gray-500">
                           {formatHouseholdRole(invite.role)} access - Expires{" "}
                           {formatBillingDate(invite.expiresAt) ?? "soon"}
+                          {invite.status === "expired" ? " - Expired" : ""}
                         </div>
                       </div>
                       <div className="flex shrink-0 gap-2">
@@ -775,6 +778,16 @@ function SharingSection({
                           startContent={<FaCopy className="h-3.5 w-3.5" />}
                         >
                           {copiedInviteId === invite.id ? "Copied" : "Copy"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          className="rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
+                          onPress={() => onResendInvite(invite.id)}
+                          isLoading={loading === `resend:${invite.id}`}
+                          startContent={<FaEnvelope className="h-3.5 w-3.5" />}
+                        >
+                          Resend
                         </Button>
                         <Button
                           size="sm"
@@ -1120,6 +1133,38 @@ export default function ProfileClient({
       ...current,
       invites: (current?.invites ?? []).filter((invite) => invite.id !== inviteId),
     }));
+  };
+
+  const handleResendInvite = async (inviteId) => {
+    setSharingLoading(`resend:${inviteId}`);
+    setSharingMessage(null);
+
+    const result = await resendHouseholdInviteAction(inviteId);
+    setSharingLoading(null);
+
+    if (result?.error) {
+      setSharingMessage({ type: "error", text: result.error });
+      return;
+    }
+
+    const invite = result?.data?.invite;
+    if (invite) {
+      setSharing((current) => ({
+        ...current,
+        invites: (current?.invites ?? []).map((existing) =>
+          existing.id === invite.id ? invite : existing
+        ),
+      }));
+      const sentExistingUserLink = result?.data?.emailType === "magic_link";
+      setSharingMessage({
+        type: result?.data?.emailSent ? "success" : "error",
+        text: result?.data?.emailSent
+          ? sentExistingUserLink
+            ? "Invite resent as a login link because that email already has an account."
+            : "Invite email resent."
+          : `Invite was refreshed, but the email was not sent: ${result?.data?.emailError || "Unknown email error"}. Copy the invite link and send it manually.`,
+      });
+    }
   };
 
   const handleRequestRemoveMember = (member) => {
@@ -1709,6 +1754,7 @@ export default function ProfileClient({
             onInviteRoleChange={setInviteRole}
             onCreateInvite={handleCreateInvite}
             onCopyInvite={handleCopyInvite}
+            onResendInvite={handleResendInvite}
             onRevokeInvite={handleRevokeInvite}
             onRemoveMember={handleRequestRemoveMember}
             onUpdateMemberRole={handleUpdateMemberRole}

@@ -28,6 +28,13 @@ function formatAccountDate(value) {
   }).format(date);
 }
 
+function needsInvitePasswordSetup(account) {
+  return Boolean(
+    account?.user_metadata?.requires_password_setup &&
+      (account?.invited_at || account?.user_metadata?.household_invite_token)
+  );
+}
+
 export default async function ProfilePage() {
   const session = await getSessionForLayout();
   const token = session?.user?.access_token;
@@ -48,7 +55,7 @@ export default async function ProfilePage() {
     emailConfirmed: Boolean(account.email_confirmed_at || account.confirmed_at),
     createdAtLabel: formatAccountDate(account.created_at),
     lastSignInLabel: formatAccountDate(account.last_sign_in_at),
-    requiresPasswordSetup: Boolean(account.user_metadata?.requires_password_setup),
+    requiresPasswordSetup: needsInvitePasswordSetup(account),
   };
   const preferencesResult = await getUserPreferencesAction();
   const preferences = preferencesResult?.data ?? DEFAULT_PREFERENCES;

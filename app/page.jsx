@@ -67,6 +67,13 @@ function getGreeting() {
   return 'Good evening';
 }
 
+function needsInvitePasswordSetup(user) {
+  return Boolean(
+    user?.user_metadata?.requires_password_setup &&
+      (user?.invited_at || user?.user_metadata?.household_invite_token)
+  );
+}
+
 function LandingStructuredData() {
   const jsonLd = {
     "@context": "https://schema.org",
@@ -280,7 +287,7 @@ export default async function HomePage() {
     );
   }
 
-  if (currentUser?.user_metadata?.requires_password_setup) {
+  if (needsInvitePasswordSetup(currentUser)) {
     redirect('/profile?setup=password');
   }
 

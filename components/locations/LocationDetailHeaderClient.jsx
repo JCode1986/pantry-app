@@ -244,6 +244,15 @@ export default function LocationDetailHeaderClient({
               <>
                 <ModalHeader className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}>
                   <span className="min-w-0 flex-1 truncate">Edit location</span>
+                  <Button
+                    size="sm"
+                    className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
+                    onPress={saveLocation}
+                    isLoading={isSaving}
+                    isDisabled={!editName.trim()}
+                  >
+                    Save
+                  </Button>
                   <MobileSheetCloseButton onPress={onClose} />
                 </ModalHeader>
                 <ModalBody className={`space-y-3 ${modalBodyClass}`}>
@@ -278,7 +287,7 @@ export default function LocationDetailHeaderClient({
                     </Button>
                   </div>
                 </ModalBody>
-                <ModalFooter className={modalFooterClass}>
+                <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
                   <Button
                     variant="light"
                     onPress={onClose}
@@ -288,7 +297,7 @@ export default function LocationDetailHeaderClient({
                     Cancel
                   </Button>
                   <Button
-                    className="rounded-xl bg-[var(--stocksense-brand)] text-white"
+                    className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                     onPress={saveLocation}
                     isLoading={isSaving}
                     isDisabled={!editName.trim()}

@@ -663,6 +663,16 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
                   </div>
                   <div className="truncate text-sm text-gray-500">{activeArea?.location?.name}</div>
                 </div>
+                {canEditInventory && (
+                  <Button
+                    size="sm"
+                    className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
+                    onClick={handleRename}
+                    isDisabled={!renameValue.trim()}
+                  >
+                    Save
+                  </Button>
+                )}
                 <MobileSheetCloseButton onPress={closeDrawer} />
               </ModalHeader>
 
@@ -755,7 +765,7 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
                 </div>
               </ModalBody>
 
-              <ModalFooter className={modalFooterClass}>
+              <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
                 <Button variant="light" className="rounded-xl max-md:hidden" onClick={closeDrawer}>
                   Close
                 </Button>
@@ -765,15 +775,6 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
                     onClick={openDelete}
                   >
                     Delete area
-                  </Button>
-                )}
-                {canEditInventory && (
-                  <Button
-                    onClick={handleRename}
-                    isDisabled={!renameValue.trim()}
-                    className="rounded-xl bg-[var(--stocksense-brand)] text-white md:hidden"
-                  >
-                    Save changes
                   </Button>
                 )}
               </ModalFooter>

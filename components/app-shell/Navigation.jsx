@@ -321,6 +321,13 @@ function CountBadge({ value }) {
   );
 }
 
+function formatHouseholdRole(role) {
+  if (role === "owner") return "Owner";
+  if (role === "viewer") return "Viewer";
+  if (role === "editor") return "Editor";
+  return "";
+}
+
 function MobileMenu({
   isOpen,
   activeHref,
@@ -331,6 +338,9 @@ function MobileMenu({
   counts = {},
 }) {
   const householdName = navigationSummary.householdName || "Household inventory";
+  const householdRole = navigationSummary.isFamilyPlan
+    ? formatHouseholdRole(navigationSummary.householdRole)
+    : "";
   const itemCount = counts.itemsCount ?? 0;
   const locationCount = counts.locationsCount ?? 0;
 
@@ -382,6 +392,11 @@ function MobileMenu({
               <p className="truncate text-base font-semibold text-gray-950">
                 {householdName}
               </p>
+              {householdRole ? (
+                <p className="mt-2 inline-flex rounded-full border border-[var(--stocksense-brand-border)] bg-white px-2.5 py-1 text-xs font-semibold text-[var(--stocksense-brand)]">
+                  {householdRole}
+                </p>
+              ) : null}
               <p className="mt-1 text-sm text-gray-600">
                 {itemCount} item{itemCount === 1 ? "" : "s"} organized
               </p>

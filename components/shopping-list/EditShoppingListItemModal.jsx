@@ -12,7 +12,7 @@ import {
   Select,
   SelectItem,
 } from "@heroui/react";
-import { FaEdit } from "react-icons/fa";
+import { FaEdit, FaExchangeAlt } from "react-icons/fa";
 import { updateShoppingListItemAction } from "@/app/actions/shoppingList";
 import { toNonNegativeInteger } from "@/utils/pantry/date";
 import EntityImageManager from "@/components/inventory/EntityImageManager";
@@ -49,6 +49,8 @@ export default function EditShoppingListItemModal({
   onClose,
   onUpdated,
   onDelete,
+  onMoveToInventory,
+  isMovingToInventory = false,
 }) {
   const [form, setForm] = useState(() => itemToForm(item));
   const [message, setMessage] = useState("");
@@ -79,7 +81,7 @@ export default function EditShoppingListItemModal({
   };
 
   const handleClose = () => {
-    if (isSaving) return;
+    if (isSaving || isMovingToInventory) return;
     setMessage("");
     onClose?.();
   };
@@ -150,6 +152,15 @@ export default function EditShoppingListItemModal({
                 <FaEdit className="h-4 w-4 shrink-0" />
                 <span className="truncate">Edit shopping list item</span>
               </span>
+              <Button
+                size="sm"
+                className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
+                onPress={handleSave}
+                isLoading={isSaving}
+                isDisabled={!hasChanges}
+              >
+                Save
+              </Button>
               <MobileSheetCloseButton onPress={handleClose} />
             </ModalHeader>
 
@@ -210,6 +221,21 @@ export default function EditShoppingListItemModal({
                 onChange={handleImageChange}
               />
 
+              {onMoveToInventory && item ? (
+                <div className="rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3">
+                  <p className="text-sm font-semibold text-gray-950">Inventory</p>
+                  <Button
+                    className="mt-3 min-h-11 w-full rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
+                    onPress={() => onMoveToInventory(item)}
+                    isLoading={isMovingToInventory}
+                    isDisabled={isSaving}
+                    startContent={!isMovingToInventory ? <FaExchangeAlt /> : null}
+                  >
+                    Move to inventory
+                  </Button>
+                </div>
+              ) : null}
+
               {onDelete && item ? (
                 <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
                   <p className="text-sm font-semibold text-gray-950">Danger zone</p>
@@ -226,7 +252,7 @@ export default function EditShoppingListItemModal({
               ) : null}
             </ModalBody>
 
-            <ModalFooter className={modalFooterClass}>
+            <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
               <Button
                 variant="light"
                 className="rounded-xl max-md:hidden"
@@ -236,7 +262,7 @@ export default function EditShoppingListItemModal({
                 Cancel
               </Button>
               <Button
-                className="rounded-xl bg-[var(--stocksense-brand)] text-white"
+                className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                 onPress={handleSave}
                 isLoading={isSaving}
                 isDisabled={!hasChanges}

@@ -2,11 +2,17 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Button } from "@heroui/react";
+import {
+  Button,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+} from "@heroui/react";
 import { motion } from "framer-motion";
 import { FaCheckCircle, FaEnvelopeOpenText, FaSignInAlt, FaUserFriends } from "react-icons/fa";
 import { acceptHouseholdInviteAction } from "@/app/actions/household";
-import SiteFooter from "@/components/app-shell/SiteFooter";
 
 function formatInviteRole(role) {
   return role === "viewer" ? "Viewer" : "Editor";
@@ -21,13 +27,15 @@ export default function AcceptInviteClient({
 }) {
   const [loading, setLoading] = useState(false);
   const [accepted, setAccepted] = useState(false);
+  const [requiresPasswordSetup, setRequiresPasswordSetup] = useState(false);
+  const [mergePrompt, setMergePrompt] = useState(null);
   const [error, setError] = useState(previewError ?? null);
 
-  const handleAccept = async () => {
+  const handleAccept = async ({ mergeExistingData = false } = {}) => {
     setLoading(true);
     setError(null);
 
-    const result = await acceptHouseholdInviteAction(token);
+    const result = await acceptHouseholdInviteAction(token, { mergeExistingData });
     setLoading(false);
 
     if (result?.error) {
@@ -35,12 +43,19 @@ export default function AcceptInviteClient({
       return;
     }
 
+    if (result?.data?.requiresMerge) {
+      setMergePrompt(result.data);
+      return;
+    }
+
+    setRequiresPasswordSetup(Boolean(result?.data?.requiresPasswordSetup));
+    setMergePrompt(null);
     setAccepted(true);
   };
 
   return (
     <>
-    <main className="page-enter flex min-h-[100vh] items-center justify-center px-4 py-10">
+    <main className="page-enter fixed inset-0 z-[90] flex min-h-[100svh] items-center justify-center overflow-y-auto bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10 px-4 py-10">
       <motion.section
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -80,13 +95,23 @@ export default function AcceptInviteClient({
                 </p>
               </div>
 
-              <Button
-                as={Link}
-                href="/profile#change-password"
-                className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
-              >
-                Set password
-              </Button>
+              {requiresPasswordSetup ? (
+                <Button
+                  as={Link}
+                  href="/profile#change-password"
+                  className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
+                >
+                  Set password
+                </Button>
+              ) : (
+                <Button
+                  as={Link}
+                  href="/"
+                  className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
+                >
+                  Continue
+                </Button>
+              )}
             </div>
           ) : (
             <>
@@ -117,7 +142,7 @@ export default function AcceptInviteClient({
               {isAuthenticated ? (
                 <Button
                   className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
-                  onPress={handleAccept}
+                  onPress={() => handleAccept()}
                   isLoading={loading}
                   isDisabled={loading || Boolean(previewError)}
                   startContent={<FaCheckCircle className="h-4 w-4" />}
@@ -149,7 +174,58 @@ export default function AcceptInviteClient({
         </div>
       </motion.section>
     </main>
-    <SiteFooter compact />
+    <Modal
+      isOpen={Boolean(mergePrompt)}
+      onOpenChange={() => {}}
+      isDismissable={false}
+      hideCloseButton
+      backdrop="blur"
+      placement="center"
+      className="max-w-md"
+      classNames={{
+        wrapper: "z-[100] max-md:items-end",
+        base: "max-md:m-0 max-md:w-screen max-md:max-w-none max-md:rounded-b-none max-md:rounded-t-2xl",
+      }}
+    >
+      <ModalContent className="border border-gray-200 bg-white text-gray-800 shadow-2xl max-md:rounded-b-none max-md:rounded-t-2xl">
+        <ModalHeader className="border-b border-amber-200 bg-amber-50 text-gray-950">
+          Existing inventory found
+        </ModalHeader>
+        <ModalBody className="space-y-3 px-5 py-4 text-sm leading-5 text-amber-900">
+          <p>
+            This account already has saved inventory. To join{" "}
+            {mergePrompt?.householdName ?? preview?.householdName ?? "this Family household"}{" "}
+            with this account, you need to merge your existing data into the household.
+          </p>
+          <p>
+            If you do not want to merge your data, cancel and delete your existing inventory first, or join with a different email.
+          </p>
+          {mergePrompt?.role === "viewer" ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+              You are being invited as a Viewer. After merging, you will be able to view the merged data, but you will not be able to edit it unless the owner changes your role to Editor.
+            </p>
+          ) : null}
+        </ModalBody>
+        <ModalFooter className="flex flex-col-reverse gap-2 border-t border-gray-200 px-5 py-4 sm:flex-row sm:justify-end">
+          <Button
+            className="min-h-11 rounded-xl border border-gray-200 bg-white text-gray-700"
+            onPress={() => setMergePrompt(null)}
+            isDisabled={loading}
+          >
+            Cancel
+          </Button>
+          <Button
+            className="min-h-11 rounded-xl bg-[var(--stocksense-brand)] text-white"
+            onPress={() => handleAccept({ mergeExistingData: true })}
+            isLoading={loading}
+            isDisabled={loading}
+            startContent={!loading ? <FaCheckCircle className="h-4 w-4" /> : null}
+          >
+            Join and merge data
+          </Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
     </>
   );
 }

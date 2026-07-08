@@ -18,11 +18,34 @@ export async function login({ email, password, redirectTo = "/" }) {
     };
   }
 
+  let sessionUser = data.session.user;
+
+  if (sessionUser?.user_metadata?.requires_password_setup) {
+    const nextUserMetadata = {
+      ...(sessionUser.user_metadata ?? {}),
+      requires_password_setup: false,
+    };
+
+    const { data: updateData, error: updateError } = await supa.auth.updateUser({
+      data: nextUserMetadata,
+    });
+
+    if (!updateError && updateData?.user) {
+      sessionUser = updateData.user;
+    } else if (updateError) {
+      console.error("Password setup metadata cleanup failed:", updateError);
+      sessionUser = {
+        ...sessionUser,
+        user_metadata: nextUserMetadata,
+      };
+    }
+  }
+
   session.user = {
     access_token: data.session.access_token,
     refresh_token: data.session.refresh_token,
     expires_at: data.session.expires_at,
-    user: data.session.user,
+    user: sessionUser,
   };
   await session.save();
 
