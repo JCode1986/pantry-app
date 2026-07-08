@@ -1949,7 +1949,7 @@ export default function ItemsPageClient({
         }}
       >
         <ModalContent
-          className="max-h-[88svh] w-full overflow-hidden rounded-t-3xl bg-white text-gray-700 md:hidden"
+          className="wherekeep-modal-content max-h-[88svh] w-full overflow-hidden rounded-t-3xl bg-white text-gray-700 md:hidden"
           style={modalContentStyle}
         >
           {() => (
@@ -1961,7 +1961,7 @@ export default function ItemsPageClient({
                 <MobileSheetCloseButton onPress={() => setFilterSheetOpen(false)} />
               </ModalHeader>
 
-              <ModalBody className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 pb-6">
+              <ModalBody className="wherekeep-modal-body min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 pb-6">
                 <Select
                   aria-label="Filter by location"
                   label="Location"
@@ -2107,7 +2107,7 @@ export default function ItemsPageClient({
                 </Select>
               </ModalBody>
 
-              <ModalFooter className="sticky bottom-0 z-20 border-t border-gray-200 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)]">
+              <ModalFooter className="wherekeep-modal-footer sticky bottom-0 z-20 border-t border-gray-200 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)]">
                 <Button
                   className="min-h-12 w-full rounded-xl bg-[var(--stocksense-brand)] text-base font-semibold text-white"
                   onClick={() => setFilterSheetOpen(false)}

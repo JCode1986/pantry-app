@@ -1644,7 +1644,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
             </ModalBody>
 
             <ModalFooter
-              className="flex shrink-0 flex-col gap-2 border-t border-gray-200 bg-white max-md:sticky max-md:bottom-0 max-md:z-20 max-md:px-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)] sm:flex-row sm:items-center sm:justify-end"
+              className="wherekeep-modal-footer flex shrink-0 flex-col gap-2 border-t border-gray-200 bg-white max-md:sticky max-md:bottom-0 max-md:z-20 max-md:px-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)] sm:flex-row sm:items-center sm:justify-end"
             >
               <AnimatePresence initial={false}>
                 {mobileAddedToast && (

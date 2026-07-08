@@ -35,6 +35,8 @@ export default function MobileViewportInsets() {
         "--wherekeep-keyboard-inset",
         `${usableKeyboardInset}px`
       );
+      root.dataset.wherekeepKeyboard =
+        usableKeyboardInset > 0 ? "open" : "closed";
     };
 
     const resetStableHeight = () => {
@@ -55,6 +57,7 @@ export default function MobileViewportInsets() {
       visualViewport?.removeEventListener("scroll", setInsets);
       root.style.removeProperty("--wherekeep-mobile-sheet-height");
       root.style.removeProperty("--wherekeep-keyboard-inset");
+      delete root.dataset.wherekeepKeyboard;
     };
   }, []);
 
