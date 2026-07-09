@@ -61,6 +61,12 @@ const outcomes = [
   },
 ];
 
+const familyBenefits = [
+  'Owners manage roles and billing',
+  'Editors can add and organize items',
+  'Viewers can search without editing',
+];
+
 const conversionStats = [
   {
     icon: LuPlus,
@@ -82,18 +88,21 @@ const conversionStats = [
 const upgradeReasons = [
   {
     icon: FaChartLine,
-    title: 'Plus removes the ceiling',
-    description: 'Unlimited items, unlimited locations, advanced filters, recent activity, shopping workflow, and appearance customization.',
+    title: 'Track your entire home',
+    description:
+      'Add unlimited items, rooms, storage areas, photos, and details as your organization grows.',
   },
   {
     icon: FaUsers,
-    title: 'Family turns it into a shared system',
-    description: 'Invite up to 5 household members and decide whether each person can edit or only view.',
+    title: 'Share with your household',
+    description:
+      'Invite family members so everyone knows where things are and what needs attention.',
   },
   {
     icon: FaUserCheck,
-    title: 'View-only access protects the data',
-    description: 'Useful for kids, elderly relatives, helpers, customers, or anyone who should see inventory without changing it.',
+    title: 'Keep everyone organized',
+    description:
+      'Give everyone the right access — whether they organize, update, or simply need to find something.',
   },
 ];
 
@@ -157,22 +166,32 @@ const faqs = [
   {
     question: 'Can I start small?',
     answer:
-      'Yes. Start with one location and a handful of items, then upgrade when unlimited inventory is worth it.',
+      "Yes. Start with one shelf, drawer, or storage bin. You can organize more of your home whenever you're ready.",
   },
   {
     question: 'What makes this better than a spreadsheet?',
     answer:
-      'WhereKeep connects each item to a real place, shopping status, activity, permissions, and filters instead of leaving everyone to maintain rows manually.',
+      'Spreadsheets tell you what you own. WhereKeep shows where everything lives, who updated it, and what needs attention.',
   },
   {
-    question: 'Can people view inventory without changing it?',
+    question: 'Can my family use it too?',
     answer:
-      'Yes. Family roles support view-only access for people who should see the data but not edit it.',
+      'Yes. Invite household members and choose whether they can manage items or only search and view what they need.',
   },
   {
     question: 'Can it help reduce food waste?',
     answer:
-      'Yes. Add expiration dates for leftovers, takeout, freezer meals, and pantry food so WhereKeep can surface what needs attention before it is forgotten.',
+      'Yes. Track expiration dates, quantities, and shopping needs so food and supplies do not get forgotten.',
+  },
+  {
+    question: 'Do I need to organize everything first?',
+    answer:
+      'No. Add items as you go. WhereKeep becomes more useful every time you save something.',
+  },
+  {
+    question: 'Can I cancel anytime?',
+    answer:
+      'Yes. You can manage or cancel your subscription whenever you need.',
   },
 ];
 
@@ -527,19 +546,34 @@ export default function LandingPage() {
 
       <ProductPreviewSection />
 
-      <section className="border-y border-gray-200 bg-gray-50">
-        <div className="mx-auto grid max-w-6xl gap-8 px-5 py-14 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
-          <div>
+      <section className="border-y border-[var(--stocksense-brand-border)] bg-white">
+        <div className="mx-auto max-w-6xl px-5 py-14">
+          <div className="grid gap-8 rounded-3xl bg-[var(--stocksense-brand-soft)]/70 p-5 shadow-[0_24px_70px_rgba(14,116,136,0.08)] sm:p-7 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:p-8">
+          <div className="lg:py-6">
             <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--stocksense-brand)]">
               FAMILY SHARING
             </div>
             <h2 className="text-2xl font-semibold tracking-tight text-gray-900 sm:text-3xl">
-              Keep your whole household organized together.
+              Everyone can find what they need.
             </h2>
             <p className="mt-3 text-sm leading-6 text-gray-600 sm:text-base">
-              Invite your family and decide who can add, edit, or view items.
-              Everyone can find what they need without asking where things are.
+              Invite your spouse, kids, or family members and choose what they
+              can do. Viewers can search and find items without changing your
+              home inventory.
             </p>
+            <div className="mt-5 space-y-2.5">
+              {familyBenefits.map((benefit) => (
+                <div
+                  key={benefit}
+                  className="flex items-center gap-2 text-sm font-medium text-gray-700"
+                >
+                  <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white text-[var(--stocksense-brand)] shadow-sm">
+                    <FaCheck className="h-2.5 w-2.5" />
+                  </span>
+                  <span>{benefit}</span>
+                </div>
+              ))}
+            </div>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <PrimaryCta />
               <ComparePlansButton className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50">
@@ -549,15 +583,16 @@ export default function LandingPage() {
           </div>
 
           <FamilySharingVisual />
+          </div>
         </div>
       </section>
 
       <section className="bg-white">
         <div className="mx-auto max-w-6xl px-5 py-14">
           <SectionHeader
-            eyebrow="Why upgrade"
-            title="Upgrade when the problem gets bigger than one shelf."
-            description="WhereKeep becomes most valuable when there are more items, more places, more people, and more restocking decisions to keep aligned."
+            eyebrow="GROWS WITH YOU"
+            title="Start with one shelf. Organize your entire home."
+            description="WhereKeep grows with you — from a single pantry shelf to a complete household system everyone can use."
           />
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -591,7 +626,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-5 py-14">
           <SectionHeader
             eyebrow="Questions"
-            title="Designed to solve the first problem before asking users to upgrade."
+            title="Common questions before getting started."
           />
           <div className="grid gap-4 md:grid-cols-3">
             {faqs.map((faq) => (
@@ -613,21 +648,26 @@ export default function LandingPage() {
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h2 className="text-2xl font-semibold tracking-tight text-gray-900">
-                  Start with one shelf today. Grow into your whole household over time.
+                  Stop searching. Start knowing where everything is.
                 </h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-700">
-                  Create a free account, map the first real spot, and build the
-                  habit before expanding to more rooms, bins, and shared access.
+                  Create your free account, save your first item, and build a home
+                  where everything finally has a place.
                 </p>
               </div>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <PrimaryCta />
-                <Link
-                  href="/login"
-                  className="inline-flex items-center justify-center rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-5 py-3 text-sm font-semibold text-[var(--stocksense-brand)] shadow-sm transition hover:brightness-95"
-                >
-                  Log in
-                </Link>
+              <div>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <PrimaryCta />
+                  <Link
+                    href="/login"
+                    className="inline-flex items-center justify-center rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-5 py-3 text-sm font-semibold text-[var(--stocksense-brand)] shadow-sm transition hover:brightness-95"
+                  >
+                    Log in
+                  </Link>
+                </div>
+                <p className="mt-2 text-center text-xs text-gray-500 sm:text-left lg:text-right">
+                  No credit card required • Start with the free plan
+                </p>
               </div>
             </div>
           </div>

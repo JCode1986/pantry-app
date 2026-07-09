@@ -13,7 +13,6 @@ const privatePaths = [
   "/reset-password",
   "/signup",
   "/shopping-list",
-  "/storage-areas",
 ];
 
 const publicPaths = [
