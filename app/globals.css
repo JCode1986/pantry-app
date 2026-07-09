@@ -137,22 +137,23 @@ input[type="radio"] {
 
 @media (max-width: 767px) {
   html[data-wherekeep-keyboard="open"] .wherekeep-modal-content {
+    max-height: var(--wherekeep-mobile-sheet-height, 100svh) !important;
     overflow-y: auto !important;
     overscroll-behavior: contain;
-    scroll-padding-bottom: calc(var(--wherekeep-keyboard-inset, 0px) + 8rem);
+    scroll-padding-bottom: 6rem;
   }
 
   html[data-wherekeep-keyboard="open"] .wherekeep-modal-body {
     flex: 0 0 auto !important;
     overflow: visible !important;
-    padding-bottom: 1rem !important;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important;
   }
 
   html[data-wherekeep-keyboard="open"] .wherekeep-modal-footer {
     position: static !important;
     bottom: auto !important;
     box-shadow: none !important;
-    margin-bottom: var(--wherekeep-keyboard-inset, 0px);
+    margin-bottom: 0 !important;
     padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important;
   }
 }
