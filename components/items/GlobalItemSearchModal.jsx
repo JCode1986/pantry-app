@@ -234,6 +234,33 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
     router.push("/items");
   };
 
+  const renderSearchInput = ({ autoFocus = false, className = "" } = {}) => (
+    <Input
+      autoFocus={autoFocus}
+      value={query}
+      onValueChange={setQuery}
+      placeholder="Search your home..."
+      startContent={<FaSearch className="text-gray-400" />}
+      endContent={
+        <div className="flex items-center gap-2">
+          {isSearching && <FaSpinner className="animate-spin text-gray-400" />}
+          <button
+            type="button"
+            aria-label="Voice search"
+            onClick={showVoiceSearchToast}
+            className="grid h-8 w-8 place-items-center rounded-full text-[var(--stocksense-brand)] transition hover:bg-[var(--stocksense-brand-soft)]"
+          >
+            <FaMicrophone className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      }
+      variant="bordered"
+      radius="lg"
+      className={className}
+      classNames={modalInputClassNames}
+    />
+  );
+
   return (
     <Modal
       isOpen={isOpen}
@@ -254,11 +281,14 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
       >
         {() => (
           <>
-            <ModalHeader className={`flex flex-col gap-1 max-md:sticky max-md:top-0 max-md:z-20 max-md:border-b max-md:border-[var(--stocksense-brand-border)] max-md:bg-[var(--stocksense-brand-soft)] max-md:px-4 max-md:py-3 ${modalHeaderClass}`}>
+            <ModalHeader className={`flex flex-col gap-2 max-md:sticky max-md:top-0 max-md:z-20 max-md:border-b max-md:border-[var(--stocksense-brand-border)] max-md:bg-[var(--stocksense-brand-soft)] max-md:px-4 max-md:py-3 ${modalHeaderClass}`}>
               <div className="flex items-center justify-between gap-3">
-                <span className="text-[var(--stocksense-brand)]">
+                <span className="hidden text-[var(--stocksense-brand)] md:inline">
                   Search
                 </span>
+                <div className="min-w-0 flex-1 md:hidden">
+                  {renderSearchInput()}
+                </div>
                 <button
                   type="button"
                   aria-label="Close search"
@@ -274,31 +304,10 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
             </ModalHeader>
 
             <ModalBody className={`${modalBodyClass} flex flex-col space-y-4 max-md:bg-gray-50 max-md:px-4 max-md:!pb-4 max-md:pt-3`}>
-              <Input
-                autoFocus={shouldAutoFocusSearch}
-                value={query}
-                onValueChange={setQuery}
-                placeholder="Search your home..."
-                startContent={<FaSearch className="text-gray-400" />}
-                endContent={
-                  <div className="flex items-center gap-2">
-                    {isSearching && (
-                      <FaSpinner className="animate-spin text-gray-400" />
-                    )}
-                    <button
-                      type="button"
-                      aria-label="Voice search"
-                      onClick={showVoiceSearchToast}
-                      className="grid h-8 w-8 place-items-center rounded-full text-[var(--stocksense-brand)] transition hover:bg-[var(--stocksense-brand-soft)]"
-                    >
-                      <FaMicrophone className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                }
-                variant="bordered"
-                radius="lg"
-                classNames={modalInputClassNames}
-              />
+              {renderSearchInput({
+                autoFocus: shouldAutoFocusSearch,
+                className: "max-md:hidden",
+              })}
 
               {toastMessage && (
                 <div className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm">
