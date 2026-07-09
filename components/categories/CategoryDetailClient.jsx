@@ -34,6 +34,7 @@ import EntityImageManager from "@/components/inventory/EntityImageManager";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import MoveItemsModal from "@/components/items/MoveItemsModal";
 import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
+import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
 import {
   modalBodyClass,
   modalContentClass,
@@ -910,16 +911,13 @@ export default function CategoryDetailClient({
                     classNames={modalInputClassNames}
                   />
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <Input
+                    <QuantityStepperInput
                       label="Quantity"
-                      type="number"
                       min={0}
                       value={itemModal.quantity}
                       onValueChange={(value) =>
                         setItemModal((prev) => ({ ...prev, quantity: value }))
                       }
-                      variant="bordered"
-                      radius="lg"
                       classNames={modalInputClassNames}
                     />
                     <Input

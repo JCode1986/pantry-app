@@ -27,6 +27,7 @@ import {
   themedSelectClassNames,
 } from "@/components/modals/modalTheme";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
+import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
 import useDesktopAutoFocus from "@/components/modals/useDesktopAutoFocus";
 
 const STATUS_OPTIONS = [
@@ -183,14 +184,11 @@ export default function EditShoppingListItemModal({
               />
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Input
+                <QuantityStepperInput
                   label="Quantity"
                   value={form.quantity}
                   onValueChange={(value) => updateForm("quantity", value)}
-                  type="number"
                   min={0}
-                  variant="bordered"
-                  radius="lg"
                   isDisabled={isSaving}
                   classNames={modalInputClassNames}
                 />

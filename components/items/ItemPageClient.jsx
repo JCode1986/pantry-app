@@ -24,7 +24,12 @@ import {
   FaShoppingBasket,
   FaTimes,
 } from "react-icons/fa";
-import { updateItem, deleteItem, updateItemLocation } from "@/app/actions/server";
+import {
+  deleteItem,
+  getItemsPageAction,
+  updateItem,
+  updateItemLocation,
+} from "@/app/actions/server";
 import { deleteItemAndAddToShoppingListAction } from "@/app/actions/shoppingList";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import {
@@ -41,6 +46,7 @@ import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
 import { emitInventoryChange } from "@/utils/clientEvents";
 import EntityImageManager from "@/components/inventory/EntityImageManager";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
+import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
 import {
   daysUntil,
   isExpiringSoon,
@@ -81,6 +87,7 @@ const mobileDefaultPanelMotion = {
 };
 
 const ITEMS_PER_PAGE = 25;
+const ITEMS_LOAD_CHUNK_SIZE = 100;
 const ALL_FILTER_KEY = "all";
 const EXPIRATION_FILTERS = {
   ALL: "all",
@@ -168,6 +175,8 @@ function PaginationControls({
 
 export default function ItemsPageClient({
   initialItems,
+  initialTotalItems,
+  initialNextItemsOffset,
   moveLocations,
   canEditInventory = true,
   initialExpirationFilter,
@@ -182,6 +191,15 @@ export default function ItemsPageClient({
     7
   );
   const [items, setItems] = useState(initialItems ?? []);
+  const [totalItemCount, setTotalItemCount] = useState(
+    initialTotalItems ?? initialItems?.length ?? 0
+  );
+  const [nextItemsOffset, setNextItemsOffset] = useState(
+    initialNextItemsOffset ?? null
+  );
+  const [isLoadingMoreItems, setIsLoadingMoreItems] = useState(
+    initialNextItemsOffset !== null && initialNextItemsOffset !== undefined
+  );
 
   // filters
   const [search, setSearch] = useState("");
@@ -315,6 +333,7 @@ export default function ItemsPageClient({
           a.name.localeCompare(b.name)
         );
       });
+      setTotalItemCount((current) => current + 1);
     };
 
     window.addEventListener("stocksense:item-added", handleItemAdded);
@@ -323,6 +342,59 @@ export default function ItemsPageClient({
       window.removeEventListener("stocksense:item-added", handleItemAdded);
     };
   }, [moveLocations]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRemainingItems = async () => {
+      let offset = initialNextItemsOffset;
+      if (offset === null || offset === undefined) {
+        setIsLoadingMoreItems(false);
+        return;
+      }
+
+      setIsLoadingMoreItems(true);
+
+      while (!cancelled && offset !== null && offset !== undefined) {
+        const result = await getItemsPageAction({
+          offset,
+          limit: ITEMS_LOAD_CHUNK_SIZE,
+        });
+
+        if (cancelled) return;
+
+        if (result?.error) {
+          console.error("Could not load more items:", result.error);
+          break;
+        }
+
+        const nextItems = result?.data?.items ?? [];
+        setTotalItemCount(result?.data?.totalCount ?? nextItems.length);
+        setItems((current) => {
+          const existingIds = new Set(current.map((item) => String(item.id)));
+          const merged = [
+            ...current,
+            ...nextItems.filter((item) => !existingIds.has(String(item.id))),
+          ];
+
+          return merged.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+        });
+
+        offset = result?.data?.nextOffset ?? null;
+        setNextItemsOffset(offset);
+
+        if (nextItems.length === 0) break;
+      }
+
+      if (!cancelled) setIsLoadingMoreItems(false);
+    };
+
+    loadRemainingItems();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialNextItemsOffset]);
 
   useEffect(() => {
     return () => {
@@ -600,10 +672,10 @@ export default function ItemsPageClient({
   }, [filteredItems, selectedIds]);
 
   const totals = useMemo(() => {
-    const total = items?.length ?? 0;
+    const total = Math.max(totalItemCount, items?.length ?? 0);
     const expSoon = (items || []).filter((i) => isExpiringSoon(i.expiration_date, expDays)).length;
     return { total, expSoon };
-  }, [items, expDays]);
+  }, [items, expDays, totalItemCount]);
 
   // ---- selection helpers ----
   const toggleSelect = (id) => {
@@ -1042,6 +1114,7 @@ export default function ItemsPageClient({
       }
 
       setItems((prev) => prev.filter((item) => !movedIds.has(String(item.id))));
+      setTotalItemCount((current) => Math.max(0, current - movedIds.size));
       setSelectedIds((prev) => {
         const next = new Set(prev);
         movedIds.forEach((id) => next.delete(id));
@@ -1149,6 +1222,7 @@ export default function ItemsPageClient({
         }
 
         setItems((prev) => prev.filter((x) => x.id !== deleteDialog.payload.itemId));
+        setTotalItemCount((current) => Math.max(0, current - 1));
         emitInventoryChange({
           entity: "item",
           action: "deleted",
@@ -1176,6 +1250,7 @@ export default function ItemsPageClient({
 
         const deletedSet = new Set(ids.map(String));
         setItems((prev) => prev.filter((x) => !deletedSet.has(String(x.id))));
+        setTotalItemCount((current) => Math.max(0, current - deletedSet.size));
         emitInventoryChange({
           entity: "item",
           action: "deleted",
@@ -1214,6 +1289,7 @@ export default function ItemsPageClient({
       }
 
       setItems((prev) => prev.filter((x) => x.id !== deleteDialog.payload.itemId));
+      setTotalItemCount((current) => Math.max(0, current - 1));
       emitInventoryChange({
         entity: "shopping_list_item",
         action: "added",
@@ -1646,6 +1722,12 @@ export default function ItemsPageClient({
               <strong>{totals.expSoon}</strong>{" "}
               expiring soon
             </span>
+
+            {isLoadingMoreItems && (
+              <span className="px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-600 border border-gray-200">
+                Loading {items.length} of {totalItemCount || "more"}
+              </span>
+            )}
 
             {canEditInventory && selectedCount > 0 && (
               <span className="px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-700 border border-gray-200">
@@ -2245,18 +2327,13 @@ export default function ItemsPageClient({
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <div className="text-xs font-medium text-gray-600">Quantity</div>
-                        <Input
-                          value={editQty}
-                          onValueChange={setEditQty}
-                          type="number"
-                          min={0}
-                          variant="bordered"
-                          radius="lg"
-                          classNames={modalInputClassNames}
-                        />
-                      </div>
+                      <QuantityStepperInput
+                        label="Quantity"
+                        value={editQty}
+                        onValueChange={setEditQty}
+                        min={0}
+                        classNames={modalInputClassNames}
+                      />
 
                       <div className="space-y-2">
                         <div className="text-xs font-medium text-gray-600">Expiration date</div>

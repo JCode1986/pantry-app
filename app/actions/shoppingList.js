@@ -10,7 +10,10 @@ import {
   getHouseholdBilling,
   getHouseholdForUser,
 } from "@/utils/households";
-import { getInventoryImageUrl } from "@/utils/inventoryImages";
+import {
+  getInventoryImageUrl,
+  getInventoryImageUrls,
+} from "@/utils/inventoryImages";
 
 const SHOPPING_LIST_STATUSES = new Set(["needed", "purchased", "dismissed"]);
 const SHOPPING_LIST_ITEM_SELECT =
@@ -66,7 +69,16 @@ async function serializeShoppingListItemWithImage(row) {
 }
 
 async function serializeShoppingListItemsWithImages(rows) {
-  return Promise.all((rows ?? []).map(serializeShoppingListItemWithImage));
+  const urlsByPath = await getInventoryImageUrls(
+    (rows ?? []).map((row) => row?.image_path)
+  );
+
+  return (rows ?? []).map((row) =>
+    serializeShoppingListItem({
+      ...row,
+      imageUrl: urlsByPath.get(row?.image_path) ?? null,
+    })
+  );
 }
 
 async function getAuthedHousehold() {
@@ -215,13 +227,22 @@ async function enforceItemLimit() {
   return null;
 }
 
-function revalidateShoppingListPaths() {
+function revalidateShoppingListPaths(extraPaths = []) {
   revalidatePath("/");
-  revalidatePath("/locations");
-  revalidatePath("/areas");
-  revalidatePath("/categories");
-  revalidatePath("/items");
   revalidatePath("/shopping-list");
+  for (const path of [...new Set(extraPaths.filter(Boolean))]) {
+    revalidatePath(path);
+  }
+}
+
+function revalidateShoppingListAndInventoryPaths(extraPaths = []) {
+  revalidateShoppingListPaths([
+    "/locations",
+    "/areas",
+    "/categories",
+    "/items",
+    ...extraPaths,
+  ]);
 }
 
 export async function getShoppingListAction(filters = {}) {
@@ -673,7 +694,9 @@ export async function moveShoppingListItemToInventoryAction(itemId, input = {}) 
       },
     });
 
-    revalidateShoppingListPaths();
+    revalidateShoppingListAndInventoryPaths([
+      destinationPath.categoryId ? `/categories/${destinationPath.categoryId}` : null,
+    ]);
     return {
       data: {
         shoppingListItem: await serializeShoppingListItemWithImage(shoppingListItem),
@@ -769,7 +792,9 @@ export async function deleteItemAndAddToShoppingListAction(itemId) {
       },
     });
 
-    revalidateShoppingListPaths();
+    revalidateShoppingListAndInventoryPaths([
+      path?.categoryId ? `/categories/${path.categoryId}` : null,
+    ]);
     return {
       data: {
         deletedItemId: item.id,

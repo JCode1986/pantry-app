@@ -25,6 +25,7 @@ import {
 } from "@/components/modals/modalTheme";
 import MobileSuggestionChips from "@/components/modals/MobileSuggestionChips";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
+import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
 import useDesktopAutoFocus from "@/components/modals/useDesktopAutoFocus";
 
 const EMPTY_FORM = {
@@ -233,14 +234,11 @@ export default function AddShoppingListItemModal({
                 onSelect={(name) => updateForm("name", name)}
               />
 
-              <Input
+              <QuantityStepperInput
                 label="Quantity"
                 value={form.quantity}
                 onValueChange={(value) => updateForm("quantity", value)}
-                type="number"
                 min={0}
-                variant="bordered"
-                radius="lg"
                 isDisabled={isSaving}
                 classNames={modalInputClassNames}
               />
