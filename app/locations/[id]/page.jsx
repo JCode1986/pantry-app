@@ -4,7 +4,7 @@ import LocationDetailHeaderClient from '@/components/locations/LocationDetailHea
 import { notFound } from 'next/navigation';
 import { createPageMetadata, NO_INDEX_ROBOTS } from '@/utils/metadata';
 import { getCanEditInventoryForUser } from '@/utils/households';
-import { getInventoryImageUrl } from '@/utils/inventoryImages';
+import { getInventoryImageUrls } from '@/utils/inventoryImages';
 
 // export const dynamic = 'force-dynamic'; // optional if you want fresh data on each request
 
@@ -74,27 +74,31 @@ export default async function Page({ params }) {
     console.error('Storage Areas fetch error:', JSON.stringify(storageError, null, 2));
   }
 
+  const imageUrlsByPath = await getInventoryImageUrls([
+    location.image_path,
+    ...(storageAreasRaw ?? []).map((area) => area.image_path),
+    ...(storageAreasRaw ?? []).flatMap((area) =>
+      (area.storage_categories ?? []).flatMap((category) =>
+        (category.items ?? []).map((item) => item.image_path)
+      )
+    ),
+  ]);
+
   // Normalize for the client component
-  const storageAreas = await Promise.all(
-    (storageAreasRaw ?? []).map(async (sa) => ({
+  const storageAreas = (storageAreasRaw ?? []).map((sa) => ({
       id: sa.id,
       name: sa.name,
       image_path: sa.image_path ?? null,
-      imageUrl: await getInventoryImageUrl(sa.image_path),
-      categories: await Promise.all(
-        (sa.storage_categories ?? []).map(async (cat) => ({
+      imageUrl: imageUrlsByPath.get(sa.image_path) ?? null,
+      categories: (sa.storage_categories ?? []).map((cat) => ({
           id: cat.id,
           name: cat.name,
-          items: await Promise.all(
-            (cat.items ?? []).map(async (item) => ({
+          items: (cat.items ?? []).map((item) => ({
               ...item,
-              imageUrl: await getInventoryImageUrl(item.image_path),
-            }))
-          ),
-        }))
-      ),
-    }))
-  );
+              imageUrl: imageUrlsByPath.get(item.image_path) ?? null,
+            })),
+        })),
+    }));
 
   // 3) Fetch ALL locations for the "Move items" modal
   const { data: allLocationsRaw, error: allLocationsError } = await supabase
@@ -129,7 +133,7 @@ export default async function Page({ params }) {
     })),
   }));
 
-  const locationImageUrl = await getInventoryImageUrl(location.image_path);
+  const locationImageUrl = imageUrlsByPath.get(location.image_path) ?? null;
   const totalAreas = storageAreas.length;
   const totalCategories = storageAreas.reduce(
     (sum, area) => sum + (area.categories?.length ?? 0),

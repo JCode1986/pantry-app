@@ -13,6 +13,7 @@ import {
   INVENTORY_IMAGE_BUCKET,
   INVENTORY_IMAGE_ENTITY,
   getInventoryImageUrl,
+  getInventoryImageUrls,
 } from '@/utils/inventoryImages';
 
 function normalizeName(value) {
@@ -32,19 +33,23 @@ function upgradeLimitError(message) {
 }
 
 function revalidateInventoryPaths(extraPaths = []) {
-  const paths = [
-    '/',
-    '/locations',
-    '/areas',
-    '/categories',
-    '/items',
-    '/shopping-list',
-    ...extraPaths,
-  ];
+  const paths = ['/', ...extraPaths];
 
   for (const path of [...new Set(paths.filter(Boolean))]) {
     revalidatePath(path);
   }
+}
+
+function revalidateEntityPaths(entityType, extraPaths = []) {
+  const pathsByEntity = {
+    [INVENTORY_IMAGE_ENTITY.LOCATION]: ['/locations', '/areas', '/items'],
+    [INVENTORY_IMAGE_ENTITY.STORAGE_AREA]: ['/locations', '/areas', '/items'],
+    [INVENTORY_IMAGE_ENTITY.CATEGORY]: ['/areas', '/categories', '/items'],
+    [INVENTORY_IMAGE_ENTITY.ITEM]: ['/items'],
+    [INVENTORY_IMAGE_ENTITY.SHOPPING_LIST_ITEM]: ['/shopping-list'],
+  };
+
+  revalidateInventoryPaths([...(pathsByEntity[entityType] ?? ['/items']), ...extraPaths]);
 }
 
 function normalizeSearchTerm(value) {
@@ -571,7 +576,7 @@ async function getCurrentPlanLimits() {
 async function countRows(supabase, table) {
   const { count, error } = await supabase
     .from(table)
-    .select('*', { count: 'exact', head: true });
+    .select('id', { count: 'exact', head: true });
 
   if (error) throw error;
   return count ?? 0;
@@ -904,7 +909,7 @@ export async function uploadInventoryImage(entityType, entityId, formData) {
       action: 'updated',
       since: startedAt,
     });
-    revalidateInventoryPaths();
+    revalidateEntityPaths(normalizedType);
     return {
       data: {
         imagePath: path,
@@ -962,7 +967,7 @@ export async function removeInventoryImage(entityType, entityId) {
       action: 'updated',
       since: startedAt,
     });
-    revalidateInventoryPaths();
+    revalidateEntityPaths(normalizedType);
     return { data: { imagePath: null, imageUrl: null }, error: null };
   } catch (err) {
     console.error('removeInventoryImage error:', err);
@@ -972,7 +977,10 @@ export async function removeInventoryImage(entityType, entityId) {
 
 export async function getLocations() {
   const supabase = await createClient();
-  const { data, error } = await supabase.from('locations').select('*').order('created_at', { ascending: true });
+  const { data, error } = await supabase
+    .from('locations')
+    .select('id, name, household_id, image_path, created_at')
+    .order('created_at', { ascending: true });
   if (error) throw error;
   return data;
 }
@@ -1005,7 +1013,7 @@ export async function addLocation(name) {
     action: 'added',
     since: startedAt,
   });
-  revalidateInventoryPaths();
+  revalidateEntityPaths(INVENTORY_IMAGE_ENTITY.LOCATION, [`/locations/${data.id}`]);
   return { data, error: null };
 }
 
@@ -1030,7 +1038,7 @@ export async function updateLocationName(id, newName) {
     action: 'updated',
     since: startedAt,
   });
-  revalidateInventoryPaths();
+  revalidateEntityPaths(INVENTORY_IMAGE_ENTITY.LOCATION, [`/locations/${id}`]);
 }
 
 export async function deleteLocation(id) {
@@ -1051,7 +1059,7 @@ export async function deleteLocation(id) {
     action: 'deleted',
     since: startedAt,
   });
-  revalidateInventoryPaths();
+  revalidateEntityPaths(INVENTORY_IMAGE_ENTITY.LOCATION);
 }
 
 // ✅ Fetch all storage areas for a location
@@ -1060,7 +1068,7 @@ export async function getStorageAreas(locationId) {
 
   const { data, error } = await supabase
     .from('storage_areas')
-    .select('*')
+    .select('id, name, location_id, image_path, created_at')
     .eq('location_id', locationId)
     .order('created_at', { ascending: true });
 
@@ -1111,7 +1119,9 @@ export async function addStorageArea(locationId, name) {
     action: 'added',
     since: startedAt,
   });
-  revalidateInventoryPaths([`/locations/${locationId}`]);
+  revalidateEntityPaths(INVENTORY_IMAGE_ENTITY.STORAGE_AREA, [
+    `/locations/${locationId}`,
+  ]);
   return { data };
 }
 
@@ -1131,7 +1141,7 @@ export async function updateStorageArea(id, name) {
     .from('storage_areas')
     .update({ name: normalizedName })
     .eq('id', id)
-    .select('*')
+    .select('id, name, location_id, image_path, created_at')
     .single();
 
   if (error) return { error };
@@ -1144,7 +1154,10 @@ export async function updateStorageArea(id, name) {
     action: 'updated',
     since: startedAt,
   });
-  revalidateInventoryPaths();
+  revalidateEntityPaths(INVENTORY_IMAGE_ENTITY.STORAGE_AREA, [
+    data?.location_id ? `/locations/${data.location_id}` : null,
+    `/areas/${id}`,
+  ]);
   return { data };
 }
 
@@ -1172,7 +1185,7 @@ export async function deleteStorageArea(id) {
     action: 'deleted',
     since: startedAt,
   });
-  revalidateInventoryPaths();
+  revalidateEntityPaths(INVENTORY_IMAGE_ENTITY.STORAGE_AREA);
   return { success: true };
 }
 
@@ -1336,7 +1349,7 @@ export async function addItem(
         barcode: normalizedBarcode || null,
       },
     ])
-    .select('*')               
+    .select('id, name, quantity, expiration_date, category_id, image_path, barcode')
     .single();                 
 
   if (error) {
@@ -1359,7 +1372,7 @@ export async function addItem(
     action: 'added',
     since: startedAt,
   });
-  revalidateInventoryPaths();
+  revalidateEntityPaths(INVENTORY_IMAGE_ENTITY.ITEM, [`/categories/${categoryId}`]);
   return {
     data: {
       ...data,
@@ -1408,6 +1421,164 @@ export async function getInventoryHierarchy() {
         }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     })),
+    error: null,
+  };
+}
+
+const ITEMS_PAGE_SIZE_DEFAULT = 100;
+const ITEMS_PAGE_SIZE_MAX = 200;
+
+function normalizeRange(value, fallback) {
+  const parsed = Number.parseInt(String(value), 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+async function normalizeItemsForList({
+  itemsRaw = [],
+  categoriesRaw = [],
+  areasRaw = [],
+  locationsRaw = [],
+}) {
+  const categoryMap = new Map(
+    (categoriesRaw ?? []).map((category) => [String(category.id), category])
+  );
+  const areaMap = new Map((areasRaw ?? []).map((area) => [String(area.id), area]));
+  const locationMap = new Map(
+    (locationsRaw ?? []).map((location) => [String(location.id), location])
+  );
+  const urlsByPath = await getInventoryImageUrls(
+    (itemsRaw ?? []).map((item) => item.image_path)
+  );
+
+  return (itemsRaw ?? []).map((item) => {
+    const category = item.category_id
+      ? categoryMap.get(String(item.category_id))
+      : null;
+    const area = category?.storage_area_id
+      ? areaMap.get(String(category.storage_area_id))
+      : null;
+    const location = area?.location_id
+      ? locationMap.get(String(area.location_id))
+      : null;
+
+    return {
+      id: item.id,
+      name: item.name,
+      quantity: item.quantity ?? 0,
+      expiration_date: item.expiration_date ?? null,
+      barcode: item.barcode ?? null,
+      image_path: item.image_path ?? null,
+      imageUrl: urlsByPath.get(item.image_path) ?? null,
+      category_id: item.category_id ?? null,
+      category: category ? { id: category.id, name: category.name } : null,
+      area: area
+        ? {
+            id: area.id,
+            name: area.name,
+          }
+        : null,
+      location: location
+        ? {
+            id: location.id,
+            name: location.name,
+          }
+        : null,
+    };
+  });
+}
+
+export async function getItemsPageAction({ offset = 0, limit = ITEMS_PAGE_SIZE_DEFAULT } = {}) {
+  const safeOffset = normalizeRange(offset, 0);
+  const safeLimit = Math.min(
+    ITEMS_PAGE_SIZE_MAX,
+    Math.max(1, normalizeRange(limit, ITEMS_PAGE_SIZE_DEFAULT))
+  );
+  const supabase = await createClient();
+
+  const { data: itemsRaw, error: itemsError, count } = await supabase
+    .from('items')
+    .select('id, name, quantity, expiration_date, category_id, image_path, barcode', {
+      count: 'exact',
+    })
+    .order('name', { ascending: true })
+    .range(safeOffset, safeOffset + safeLimit - 1);
+
+  if (itemsError) {
+    console.error('getItemsPageAction items error:', itemsError);
+    return {
+      data: { items: [], totalCount: 0, nextOffset: null, hasMore: false },
+      error: itemsError.message,
+    };
+  }
+
+  const items = itemsRaw ?? [];
+  const categoryIds = [
+    ...new Set(items.map((item) => item.category_id).filter(Boolean)),
+  ];
+
+  const { data: categoriesRaw, error: categoriesError } = categoryIds.length
+    ? await supabase
+        .from('storage_categories')
+        .select('id, name, storage_area_id')
+        .in('id', categoryIds)
+    : { data: [], error: null };
+
+  if (categoriesError) {
+    console.error('getItemsPageAction categories error:', categoriesError);
+    return {
+      data: { items: [], totalCount: count ?? 0, nextOffset: null, hasMore: false },
+      error: categoriesError.message,
+    };
+  }
+
+  const areaIds = [
+    ...new Set((categoriesRaw ?? []).map((category) => category.storage_area_id).filter(Boolean)),
+  ];
+  const { data: areasRaw, error: areasError } = areaIds.length
+    ? await supabase
+        .from('storage_areas')
+        .select('id, name, location_id')
+        .in('id', areaIds)
+    : { data: [], error: null };
+
+  if (areasError) {
+    console.error('getItemsPageAction areas error:', areasError);
+    return {
+      data: { items: [], totalCount: count ?? 0, nextOffset: null, hasMore: false },
+      error: areasError.message,
+    };
+  }
+
+  const locationIds = [
+    ...new Set((areasRaw ?? []).map((area) => area.location_id).filter(Boolean)),
+  ];
+  const { data: locationsRaw, error: locationsError } = locationIds.length
+    ? await supabase.from('locations').select('id, name').in('id', locationIds)
+    : { data: [], error: null };
+
+  if (locationsError) {
+    console.error('getItemsPageAction locations error:', locationsError);
+    return {
+      data: { items: [], totalCount: count ?? 0, nextOffset: null, hasMore: false },
+      error: locationsError.message,
+    };
+  }
+
+  const totalCount = count ?? items.length;
+  const nextOffset = safeOffset + items.length;
+
+  return {
+    data: {
+      items: await normalizeItemsForList({
+        itemsRaw: items,
+        categoriesRaw,
+        areasRaw,
+        locationsRaw,
+      }),
+      totalCount,
+      nextOffset: nextOffset < totalCount ? nextOffset : null,
+      hasMore: nextOffset < totalCount,
+    },
     error: null,
   };
 }
@@ -1475,7 +1646,7 @@ export async function searchItems(query) {
   const { data: areasRaw, error: areasError } = areaIds.length
     ? await supabase
         .from('storage_areas')
-        .select('id, name, location_id, image_path')
+        .select('id, name, location_id')
         .in('id', areaIds)
     : { data: [], error: null };
 
@@ -1490,7 +1661,7 @@ export async function searchItems(query) {
   ];
 
   const { data: locationsRaw, error: locationsError } = locationIds.length
-    ? await supabase.from('locations').select('id, name, image_path').in('id', locationIds)
+    ? await supabase.from('locations').select('id, name').in('id', locationIds)
     : { data: [], error: null };
 
   if (locationsError) {
@@ -1503,8 +1674,12 @@ export async function searchItems(query) {
   const locationMap = new Map(
     (locationsRaw ?? []).map((location) => [String(location.id), location])
   );
+  const urlsByPath = await getInventoryImageUrls([
+    ...items.map((item) => item.image_path),
+    ...shoppingListItems.map((item) => item.image_path),
+  ]);
 
-  const inventoryResults = await Promise.all(items.map(async (item) => {
+  const inventoryResults = items.map((item) => {
     const category = item.category_id
       ? categoryMap.get(String(item.category_id))
       : null;
@@ -1522,7 +1697,7 @@ export async function searchItems(query) {
       quantity: item.quantity ?? 0,
       expirationDate: item.expiration_date ?? null,
       barcode: item.barcode ?? null,
-      imageUrl: await getInventoryImageUrl(item.image_path),
+      imageUrl: urlsByPath.get(item.image_path) ?? null,
       category: category
         ? { id: category.id, name: category.name }
         : null,
@@ -1530,21 +1705,18 @@ export async function searchItems(query) {
         ? {
             id: area.id,
             name: area.name,
-            imageUrl: await getInventoryImageUrl(area.image_path),
           }
         : null,
       location: location
         ? {
             id: location.id,
             name: location.name,
-            imageUrl: await getInventoryImageUrl(location.image_path),
           }
         : null,
     };
-  }));
+  });
 
-  const shoppingListResults = await Promise.all(
-    shoppingListItems.map(async (item) => ({
+  const shoppingListResults = shoppingListItems.map((item) => ({
       type: 'shopping_list_item',
       id: item.id,
       name: item.name,
@@ -1552,11 +1724,10 @@ export async function searchItems(query) {
       status: item.status ?? 'needed',
       sourceItemId: item.source_item_id ?? null,
       sourceCategoryId: item.source_category_id ?? null,
-      imageUrl: await getInventoryImageUrl(item.image_path),
+      imageUrl: urlsByPath.get(item.image_path) ?? null,
       createdAt: item.created_at ?? null,
       updatedAt: item.updated_at ?? null,
-    }))
-  );
+    }));
 
   return {
     data: [...inventoryResults, ...shoppingListResults],
@@ -1761,7 +1932,12 @@ export async function addItemWithPath({
     }),
   ]);
 
-  revalidateInventoryPaths();
+  revalidateEntityPaths(INVENTORY_IMAGE_ENTITY.ITEM, [
+    `/categories/${finalCategoryId}`,
+    createdLocation ? '/locations' : null,
+    createdStorageArea ? `/locations/${finalLocationId}` : null,
+    createdCategory ? '/categories' : null,
+  ]);
 
   return {
     data: {
@@ -1818,7 +1994,7 @@ export async function updateItem(itemId, updates) {
     .from('items')
     .update(payload)
     .eq('id', itemId)
-    .select('*')     // return the updated row
+    .select('id, name, quantity, expiration_date, category_id, image_path, barcode')
     .single();
 
   if (error) {
@@ -1835,7 +2011,9 @@ export async function updateItem(itemId, updates) {
     action: 'updated',
     since: startedAt,
   });
-  revalidateInventoryPaths();
+  revalidateEntityPaths(INVENTORY_IMAGE_ENTITY.ITEM, [
+    data?.category_id ? `/categories/${data.category_id}` : null,
+  ]);
   return { data };
 }
 
@@ -1847,6 +2025,11 @@ export async function deleteItem(itemId) {
 
   const supabase = await createClient();
   const admin = createAdminClient();
+  const { data: existingItem } = await supabase
+    .from('items')
+    .select('id, category_id')
+    .eq('id', itemId)
+    .maybeSingle();
   const { error } = await supabase.from('items').delete().eq('id', itemId);
   if (error) throw error;
   await stampActivityActor({
@@ -1858,7 +2041,9 @@ export async function deleteItem(itemId) {
     action: 'deleted',
     since: startedAt,
   });
-  revalidateInventoryPaths();
+  revalidateEntityPaths(INVENTORY_IMAGE_ENTITY.ITEM, [
+    existingItem?.category_id ? `/categories/${existingItem.category_id}` : null,
+  ]);
   return { success: true };
 }
 
@@ -1899,7 +2084,9 @@ export async function addCategory(storageAreaId, name) {
     action: 'added',
     since: startedAt,
   });
-  revalidateInventoryPaths();
+  revalidateEntityPaths(INVENTORY_IMAGE_ENTITY.CATEGORY, [
+    `/areas/${storageAreaId}`,
+  ]);
   return { data, error: null };
 }
 
@@ -1918,7 +2105,7 @@ export async function updateCategoryName(categoryId, name) {
     .from('storage_categories')
     .update({ name: normalizedName })
     .eq('id', categoryId)
-    .select('*')
+    .select('id, name, storage_area_id, image_path, inserted_at')
     .single();
 
   if (error) return { error };
@@ -1931,7 +2118,10 @@ export async function updateCategoryName(categoryId, name) {
     action: 'updated',
     since: startedAt,
   });
-  revalidateInventoryPaths();
+  revalidateEntityPaths(INVENTORY_IMAGE_ENTITY.CATEGORY, [
+    `/categories/${categoryId}`,
+    data?.storage_area_id ? `/areas/${data.storage_area_id}` : null,
+  ]);
   return { data };
 }
 
@@ -1942,6 +2132,11 @@ export async function deleteCategory(categoryId) {
 
   const supabase = await createClient();
   const admin = createAdminClient();
+  const { data: existingCategory } = await supabase
+    .from('storage_categories')
+    .select('id, storage_area_id')
+    .eq('id', categoryId)
+    .maybeSingle();
   const { error } = await supabase
     .from('storage_categories')
     .delete()
@@ -1957,7 +2152,9 @@ export async function deleteCategory(categoryId) {
     action: 'deleted',
     since: startedAt,
   });
-  revalidateInventoryPaths();
+  revalidateEntityPaths(INVENTORY_IMAGE_ENTITY.CATEGORY, [
+    existingCategory?.storage_area_id ? `/areas/${existingCategory.storage_area_id}` : null,
+  ]);
   return { success: true };
 }
 
@@ -2008,7 +2205,7 @@ export async function updateItemLocation(itemId, values) {
     .from('items')
     .update({ category_id: newCategoryId })
     .eq('id', itemId)
-    .select('*')
+    .select('id, name, quantity, expiration_date, category_id, image_path, barcode')
     .single();
 
   if (error) {
@@ -2028,7 +2225,10 @@ export async function updateItemLocation(itemId, values) {
     toPath,
   });
 
-  revalidateInventoryPaths();
+  revalidateEntityPaths(INVENTORY_IMAGE_ENTITY.ITEM, [
+    existingItem.category_id ? `/categories/${existingItem.category_id}` : null,
+    `/categories/${newCategoryId}`,
+  ]);
 
   return { data, error: null };
 }

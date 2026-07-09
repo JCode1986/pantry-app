@@ -171,12 +171,12 @@ async function getExpirationNotifications(supabase, withinDays = 3) {
       .limit(50),
     supabase
       .from('items')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .not('expiration_date', 'is', null)
       .lt('expiration_date', today),
     supabase
       .from('items')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .gte('expiration_date', today)
       .lte('expiration_date', cutoff),
   ]);
@@ -306,14 +306,14 @@ export default async function HomePage() {
   ]);
 
   const getCount = async (table) => {
-    const { count } = await supabase.from(table).select('*', { count: 'exact', head: true });
+    const { count } = await supabase.from(table).select('id', { count: 'exact', head: true });
     return count ?? 0;
   };
 
   const getShoppingListNeededCount = async () => {
     const { count } = await supabase
       .from('shopping_list_items')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('status', 'needed');
 
     return count ?? 0;

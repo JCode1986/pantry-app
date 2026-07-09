@@ -50,6 +50,7 @@ import {
   themedSelectClassNames,
 } from "@/components/modals/modalTheme";
 import BarcodeScannerModal from "@/components/items/BarcodeScannerModal";
+import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
 
 const NEW_VALUE = "__new__";
 const EMPTY_LIST = [];
@@ -1557,15 +1558,12 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                             Boolean(validationErrors.itemName)
                           )}
                         />
-                        <Input
+                        <QuantityStepperInput
                           label="Quantity"
-                          type="number"
                           min={0}
                           value={form.quantity}
                           onValueChange={(value) => updateForm("quantity", value)}
                           isDisabled={isSaving}
-                          variant="bordered"
-                          radius="lg"
                           classNames={modalInputClassNames}
                         />
                         <Input

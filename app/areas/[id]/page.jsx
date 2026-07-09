@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import AreaDetailClient from "@/components/areas/AreaDetailClient";
 import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
 import { getCanEditInventoryForUser } from "@/utils/households";
-import { getInventoryImageUrl } from "@/utils/inventoryImages";
+import { getInventoryImageUrls } from "@/utils/inventoryImages";
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
@@ -100,17 +100,19 @@ export default async function Page({ params }) {
     console.error("Categories fetch error:", categoriesError?.message || categoriesError);
   }
 
-  const categories = await Promise.all(
-    (categoriesRaw ?? []).map(async (c) => ({
+  const imageUrlsByPath = await getInventoryImageUrls([
+    area.image_path,
+    ...(categoriesRaw ?? []).map((category) => category.image_path),
+  ]);
+  const categories = (categoriesRaw ?? []).map((c) => ({
       id: c.id,
       name: c.name,
       image_path: c.image_path ?? null,
       imageUrl: categoryImageColumnMissing
         ? null
-        : await getInventoryImageUrl(c.image_path),
+        : imageUrlsByPath.get(c.image_path) ?? null,
       itemsCount: (c.items ?? []).length,
-    }))
-  );
+    }));
 
   const totals = {
     categories: categories.length,
@@ -128,7 +130,7 @@ export default async function Page({ params }) {
           name: area.location?.name ?? "Unknown location",
         },
         image_path: area.image_path ?? null,
-        imageUrl: await getInventoryImageUrl(area.image_path),
+        imageUrl: imageUrlsByPath.get(area.image_path) ?? null,
       }}
         initialCategories={categories}
         totals={totals}

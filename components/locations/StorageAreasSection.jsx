@@ -44,6 +44,7 @@ import { emitInventoryChange, emitItemAdded } from '@/utils/clientEvents';
 import EntityImageManager from '@/components/inventory/EntityImageManager';
 import MobileSuggestionChips from '@/components/modals/MobileSuggestionChips';
 import MobileSheetCloseButton from '@/components/modals/MobileSheetCloseButton';
+import QuantityStepperInput from '@/components/modals/QuantityStepperInput';
 import useDesktopAutoFocus from '@/components/modals/useDesktopAutoFocus';
 import {
   daysUntil,
@@ -2328,16 +2329,13 @@ export default function StorageAreasSection({
               autoFocus={shouldAutoFocus}
             />
             <div className="grid gap-3 sm:grid-cols-2">
-              <Input
-                type="number"
-                min="0"
+              <QuantityStepperInput
                 label="Quantity"
                 value={itemModal.quantity}
                 onValueChange={(quantity) =>
                   setItemModal((prev) => ({ ...prev, quantity }))
                 }
-                variant="bordered"
-                radius="lg"
+                min={0}
                 classNames={modalInputClassNames}
               />
               <Input

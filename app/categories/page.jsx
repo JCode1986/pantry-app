@@ -2,7 +2,7 @@ import CategoriesPageClient from "@/components/categories/CategoriesPageClient";
 import { createClient } from "@/utils/supabase/server";
 import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
 import { getCanEditInventoryForUser } from "@/utils/households";
-import { getInventoryImageUrl } from "@/utils/inventoryImages";
+import { getInventoryImageUrls } from "@/utils/inventoryImages";
 
 export const metadata = createPageMetadata({
     title: "Categories",
@@ -74,11 +74,15 @@ export default async function Page() {
         console.error("Categories fetch error:", error);
     }
 
-    const categories = await Promise.all((data ?? []).map(async (c) => ({
+    const urlsByPath = await getInventoryImageUrls(
+        (data ?? []).map((category) => category.image_path)
+    );
+
+    const categories = (data ?? []).map((c) => ({
         id: c.id,
         name: c.name,
         image_path: c.image_path ?? null,
-        imageUrl: await getInventoryImageUrl(c.image_path),
+        imageUrl: urlsByPath.get(c.image_path) ?? null,
         insertedAt: c.inserted_at,
         storageArea: {
             id: c.storage_area?.id ?? null,
@@ -90,7 +94,7 @@ export default async function Page() {
         },
         items: c.items ?? [],
         itemsCount: (c.items ?? []).length,
-    })));
+    }));
 
   return (
     <main className="page-enter max-w-[1500px] mx-auto p-6 pt-8 md:min-h-[100vh] max-md:px-4 max-md:pb-0 max-md:pt-4">

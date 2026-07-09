@@ -3,7 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import CategoryDetailClient from "@/components/categories/CategoryDetailClient";
 import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
 import { getCanEditInventoryForUser } from "@/utils/households";
-import { getInventoryImageUrl } from "@/utils/inventoryImages";
+import { getInventoryImageUrls } from "@/utils/inventoryImages";
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
@@ -116,12 +116,14 @@ export default async function CategoryDetailPage({ params }) {
     notFound();
   }
 
-  const items = await Promise.all(
-    (category.items ?? []).map(async (item) => ({
+  const imageUrlsByPath = await getInventoryImageUrls([
+    category.image_path,
+    ...(category.items ?? []).map((item) => item.image_path),
+  ]);
+  const items = (category.items ?? []).map((item) => ({
       ...item,
-      imageUrl: await getInventoryImageUrl(item.image_path),
-    }))
-  );
+      imageUrl: imageUrlsByPath.get(item.image_path) ?? null,
+    }));
   const area = category.storage_area;
   const location = area?.location;
 
@@ -189,7 +191,7 @@ export default async function CategoryDetailPage({ params }) {
         image_path: category.image_path ?? null,
         imageUrl: categoryImageColumnMissing
           ? null
-          : await getInventoryImageUrl(category.image_path),
+          : imageUrlsByPath.get(category.image_path) ?? null,
       }}
       area={area ? { id: area.id, name: area.name } : null}
       location={location ? { id: location.id, name: location.name } : null}

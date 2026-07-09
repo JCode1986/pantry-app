@@ -316,13 +316,13 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
               )}
 
               {recentSearches.length > 0 && (
-                <div className="flex flex-wrap gap-2 overflow-visible">
+                <div className="-mx-4 flex flex-nowrap gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0">
                   {recentSearches.map((term) => (
                     <button
                       key={term}
                       type="button"
                       onClick={() => setQuery(term)}
-                      className="inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-full border border-[var(--stocksense-brand-border)] bg-white px-3 text-sm font-medium text-[var(--stocksense-brand)] shadow-sm"
+                      className="inline-flex min-h-9 max-w-[220px] shrink-0 items-center gap-1.5 rounded-full border border-[var(--stocksense-brand-border)] bg-white px-3 text-sm font-medium text-[var(--stocksense-brand)] shadow-sm md:max-w-full"
                     >
                       <FaHistory className="h-3 w-3 shrink-0" />
                       <span className="min-w-0 truncate">{term}</span>

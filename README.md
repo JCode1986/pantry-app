@@ -150,9 +150,7 @@ The shared logout action in `app/actions/auth.js` destroys the Iron Session and 
 Protected routes include:
 
 - `/locations`
-- `/storage-areas`
 - `/areas`
-- `/storage`
 - `/categories`
 - `/items`
 - `/shopping-list`
