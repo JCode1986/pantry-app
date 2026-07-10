@@ -1,10 +1,22 @@
 "use client";
 
 import { useMemo } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { Select, SelectItem } from "@heroui/react";
 import {
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  Select,
+  SelectItem,
+} from "@heroui/react";
+import {
+  modalBodyClass,
   modalContentStyle,
+  modalContentClass,
+  modalFooterClass,
+  modalHeaderClass,
+  mobileSheetModalClassNames,
   themedSelectClassNames,
 } from "@/components/modals/modalTheme";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
@@ -125,36 +137,34 @@ export default function MoveItemsModal({
   };
 
   return (
-    <AnimatePresence>
-      {moveModal.open && (
-        <motion.div
-          className="fixed inset-0 z-40 flex items-center justify-center overflow-hidden bg-black/40 max-md:items-stretch"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0, y: 10 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.95, opacity: 0, y: 10 }}
-            className="wherekeep-modal-content flex w-full max-w-md flex-col rounded-2xl border border-gray-200 bg-white text-gray-700 shadow-xl max-md:h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:bg-gray-50 max-md:shadow-none md:space-y-4 md:p-5"
-            style={modalContentStyle}
-          >
-            <div className="flex shrink-0 gap-3 border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] max-md:sticky max-md:top-0 max-md:z-20 max-md:px-4 max-md:py-3 md:block">
+    <Modal
+      isOpen={moveModal.open}
+      onOpenChange={(open) => {
+        if (!open) closeModal();
+      }}
+      size="md"
+      placement="center"
+      scrollBehavior="inside"
+      classNames={mobileSheetModalClassNames}
+    >
+      <ModalContent className={modalContentClass} style={modalContentStyle}>
+        {() => (
+          <>
+            <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
               <div className="min-w-0 flex-1">
-                <h2 className="truncate text-lg font-semibold text-[var(--stocksense-brand)]">
+                <div className="truncate text-lg font-semibold text-[var(--stocksense-brand)]">
                   Move {moveModal.itemIds.length} item
                   {moveModal.itemIds.length > 1 ? "s" : ""}
-                </h2>
-                <p className="mt-1 truncate text-sm text-gray-500">
+                </div>
+                <div className="truncate text-sm text-gray-500">
                   Choose where you want to move the selected item
                   {moveModal.itemIds.length > 1 ? "s" : ""}.
-                </p>
+                </div>
               </div>
               <MobileSheetCloseButton onPress={closeModal} />
-            </div>
+            </ModalHeader>
 
-            <div className="wherekeep-modal-body min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain max-md:px-4 max-md:py-4">
+            <ModalBody className={`space-y-4 ${modalBodyClass}`}>
               {currentPath ? (
                 <div className="rounded-2xl border border-gray-200 bg-white p-3">
                   <p className="text-xs font-medium uppercase text-gray-500">
@@ -166,76 +176,76 @@ export default function MoveItemsModal({
                 </div>
               ) : null}
               <div className="space-y-1">
-              <Select
-                label="Location"
-                selectedKeys={
-                  moveModal.targetLocationId
-                    ? new Set([String(moveModal.targetLocationId)])
-                    : new Set()
-                }
-                onSelectionChange={(keys) => handleLocationChange(getSelectedValue(keys))}
-                variant="bordered"
-                radius="lg"
-                classNames={themedSelectClassNames}
-              >
-                {safeLocations.map((location) => (
-                  <SelectItem key={String(location.id)}>
-                    {location.name}
-                  </SelectItem>
-                ))}
-              </Select>
+                <Select
+                  label="Location"
+                  selectedKeys={
+                    moveModal.targetLocationId
+                      ? new Set([String(moveModal.targetLocationId)])
+                      : new Set()
+                  }
+                  onSelectionChange={(keys) => handleLocationChange(getSelectedValue(keys))}
+                  variant="bordered"
+                  radius="lg"
+                  classNames={themedSelectClassNames}
+                >
+                  {safeLocations.map((location) => (
+                    <SelectItem key={String(location.id)}>
+                      {location.name}
+                    </SelectItem>
+                  ))}
+                </Select>
               </div>
 
               <div className="space-y-1">
-              <Select
-                label="Storage area"
-                placeholder="Select area..."
-                selectedKeys={
-                  moveModal.targetAreaId
-                    ? new Set([String(moveModal.targetAreaId)])
-                    : new Set()
-                }
-                onSelectionChange={(keys) => handleAreaChange(getSelectedValue(keys))}
-                variant="bordered"
-                radius="lg"
-                classNames={themedSelectClassNames}
-              >
-                {areasForSelectedLocation.map((area) => (
-                  <SelectItem key={String(area.id)}>{area.name}</SelectItem>
-                ))}
-              </Select>
+                <Select
+                  label="Storage area"
+                  placeholder="Select area..."
+                  selectedKeys={
+                    moveModal.targetAreaId
+                      ? new Set([String(moveModal.targetAreaId)])
+                      : new Set()
+                  }
+                  onSelectionChange={(keys) => handleAreaChange(getSelectedValue(keys))}
+                  variant="bordered"
+                  radius="lg"
+                  classNames={themedSelectClassNames}
+                >
+                  {areasForSelectedLocation.map((area) => (
+                    <SelectItem key={String(area.id)}>{area.name}</SelectItem>
+                  ))}
+                </Select>
               </div>
 
               <div className="space-y-1">
-              <Select
-                label="Category"
-                placeholder="Select category..."
-                selectedKeys={
-                  moveModal.targetCategoryId
-                    ? new Set([String(moveModal.targetCategoryId)])
-                    : new Set()
-                }
-                onSelectionChange={(keys) =>
-                  setMoveModal((prev) => ({
-                    ...prev,
-                    targetCategoryId: getSelectedValue(keys) || null,
-                  }))
-                }
-                isDisabled={!moveModal.targetAreaId}
-                variant="bordered"
-                radius="lg"
-                classNames={themedSelectClassNames}
-              >
-                {selectedArea?.categories?.map((category) => (
-                  <SelectItem key={String(category.id)}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </Select>
+                <Select
+                  label="Category"
+                  placeholder="Select category..."
+                  selectedKeys={
+                    moveModal.targetCategoryId
+                      ? new Set([String(moveModal.targetCategoryId)])
+                      : new Set()
+                  }
+                  onSelectionChange={(keys) =>
+                    setMoveModal((prev) => ({
+                      ...prev,
+                      targetCategoryId: getSelectedValue(keys) || null,
+                    }))
+                  }
+                  isDisabled={!moveModal.targetAreaId}
+                  variant="bordered"
+                  radius="lg"
+                  classNames={themedSelectClassNames}
+                >
+                  {selectedArea?.categories?.map((category) => (
+                    <SelectItem key={String(category.id)}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </Select>
               </div>
-            </div>
+            </ModalBody>
 
-            <div className="wherekeep-modal-footer flex shrink-0 justify-end gap-2 border-t border-gray-200 bg-white pt-2 max-md:sticky max-md:bottom-0 max-md:z-20 max-md:flex-col-reverse max-md:px-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)]">
+            <ModalFooter className={modalFooterClass}>
               <button
                 onClick={closeModal}
                 className="min-h-11 cursor-pointer rounded-xl border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 max-md:hidden"
@@ -249,10 +259,10 @@ export default function MoveItemsModal({
               >
                 Move
               </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+            </ModalFooter>
+          </>
+        )}
+      </ModalContent>
+    </Modal>
   );
 }

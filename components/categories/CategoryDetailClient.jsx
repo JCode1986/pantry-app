@@ -101,10 +101,13 @@ export default function CategoryDetailClient({
     targetCategoryId: null,
     itemIds: [],
   });
+  const [selectedItemIds, setSelectedItemIds] = useState(() => new Set());
   const totalQuantity = items.reduce(
     (sum, item) => sum + Number(item.quantity ?? 0),
     0
   );
+  const selectedCount = selectedItemIds.size;
+  const allItemsSelected = items.length > 0 && selectedCount === items.length;
   const normalizedMoveLocations = useMemo(
     () =>
       (moveLocations ?? []).map((moveLocation) => ({
@@ -160,6 +163,57 @@ export default function CategoryDetailClient({
     };
   }, [area?.id, category?.id, location?.id]);
 
+  useEffect(() => {
+    setSelectedItemIds((current) => {
+      const availableIds = new Set(items.map((item) => String(item.id)));
+      const next = new Set(
+        Array.from(current).filter((itemId) => availableIds.has(String(itemId)))
+      );
+
+      return next.size === current.size ? current : next;
+    });
+  }, [items]);
+
+  const toggleSelectItem = (itemId) => {
+    setSelectedItemIds((current) => {
+      const next = new Set(current);
+      const key = String(itemId);
+
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+
+      return next;
+    });
+  };
+
+  const toggleSelectAllItems = () => {
+    setSelectedItemIds((current) => {
+      if (items.length > 0 && current.size === items.length) {
+        return new Set();
+      }
+
+      return new Set(items.map((item) => String(item.id)));
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedItemIds(new Set());
+  };
+
+  const openMoveItems = (itemIds) => {
+    if (!canEditInventory || itemIds.length === 0) return;
+
+    setMoveModal({
+      open: true,
+      sourceAreaId: area?.id ?? null,
+      sourceCategoryId: category.id,
+      targetLocationId: location?.id ?? null,
+      targetAreaId: area?.id ?? null,
+      targetCategoryId: category.id,
+      itemIds,
+    });
+  };
+
   const openEditItem = (item) => {
     if (!canEditInventory) return;
     setItemModal({
@@ -185,15 +239,24 @@ export default function CategoryDetailClient({
 
   const openMoveItem = (item) => {
     if (!canEditInventory || !item?.id) return;
+    openMoveItems([item.id]);
+  };
 
-    setMoveModal({
+  const openMoveSelected = () => {
+    openMoveItems(Array.from(selectedItemIds));
+  };
+
+  const openDeleteSelected = () => {
+    if (!canEditInventory || selectedCount === 0) return;
+
+    setDeleteDialog({
       open: true,
-      sourceAreaId: area?.id ?? null,
-      sourceCategoryId: category.id,
-      targetLocationId: location?.id ?? null,
-      targetAreaId: area?.id ?? null,
-      targetCategoryId: category.id,
-      itemIds: [item.id],
+      entityType: "items",
+      payload: {
+        itemIds: Array.from(selectedItemIds),
+        count: selectedCount,
+      },
+      isDeleting: false,
     });
   };
 
@@ -333,12 +396,41 @@ export default function CategoryDetailClient({
     setDeleteDialog((prev) => ({ ...prev, isDeleting: true }));
 
     try {
+      if (deleteDialog.entityType === "items") {
+        const itemIds = deleteDialog.payload.itemIds ?? [];
+        const results = await Promise.all(itemIds.map((itemId) => deleteItem(itemId)));
+        const hasError = results.some((result) => result?.error);
+
+        if (hasError) {
+          console.error("bulk delete category detail item errors:", results);
+          setDeleteDialog((prev) => ({ ...prev, isDeleting: false }));
+          return;
+        }
+
+        const deleted = new Set(itemIds.map(String));
+        setItems((prev) => prev.filter((item) => !deleted.has(String(item.id))));
+        clearSelection();
+        emitInventoryChange({
+          entity: "item",
+          action: "deleted",
+          ids: itemIds,
+        });
+        closeDeleteDialog();
+        router.refresh();
+        return;
+      }
+
       if (deleteDialog.entityType === "item") {
         const itemId = deleteDialog.payload.id;
         const result = await deleteItem(itemId);
         if (result?.error) throw result.error;
 
         setItems((prev) => prev.filter((item) => String(item.id) !== String(itemId)));
+        setSelectedItemIds((current) => {
+          const next = new Set(current);
+          next.delete(String(itemId));
+          return next;
+        });
         emitInventoryChange({
           entity: "item",
           action: "deleted",
@@ -390,6 +482,7 @@ export default function CategoryDetailClient({
 
     const moved = new Set(itemIds.map(String));
     setItems((prev) => prev.filter((item) => !moved.has(String(item.id))));
+    clearSelection();
     setMoveModal({
       open: false,
       sourceAreaId: null,
@@ -605,13 +698,79 @@ export default function CategoryDetailClient({
           )}
         </div>
 
+        {canEditInventory && items.length > 0 && (
+          <div className="mt-3 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-950">
+                  {selectedCount} selected
+                </p>
+                <p className="text-xs text-gray-500">
+                  Select items to move or delete together.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={clearSelection}
+                disabled={selectedCount === 0}
+                className="min-h-10 shrink-0 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 disabled:opacity-50"
+              >
+                Clear
+              </button>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={toggleSelectAllItems}
+                className="min-h-11 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 text-sm font-semibold text-[var(--stocksense-brand)]"
+              >
+                {allItemsSelected ? "Deselect" : "Select all"}
+              </button>
+              <button
+                type="button"
+                onClick={openMoveSelected}
+                disabled={selectedCount === 0}
+                className="min-h-11 rounded-xl bg-[var(--stocksense-brand)] px-3 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Move
+              </button>
+              <button
+                type="button"
+                onClick={openDeleteSelected}
+                disabled={selectedCount === 0}
+                className="min-h-11 rounded-xl bg-rose-600 px-3 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="mt-3 grid gap-3">
-          {items.map((item) => (
+          {items.map((item) => {
+            const isSelected = selectedItemIds.has(String(item.id));
+
+            return (
             <article
               key={item.id}
-              className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
+              className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${
+                isSelected
+                  ? "border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]"
+                  : "border-gray-200"
+              }`}
             >
               <div className="flex min-w-0 gap-3 p-4">
+                {canEditInventory && (
+                  <label className="mt-5 flex h-6 w-6 shrink-0 items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelectItem(item.id)}
+                      aria-label={`Select ${item.name}`}
+                      className="h-5 w-5 rounded border-gray-300"
+                    />
+                  </label>
+                )}
                 {item.imageUrl ? (
                   <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-item-border)] bg-white">
                     <img
@@ -666,7 +825,8 @@ export default function CategoryDetailClient({
                 </div>
               )}
             </article>
-          ))}
+            );
+          })}
 
           {items.length === 0 && (
             <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-7 text-center shadow-sm">
@@ -695,11 +855,68 @@ export default function CategoryDetailClient({
         </div>
       </section>
 
+      {canEditInventory && items.length > 0 && (
+        <section className="max-md:hidden rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-gray-950">
+                {selectedCount} selected
+              </p>
+              <p className="text-xs text-gray-500">
+                Select items to move or delete together.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant="flat"
+                className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
+                onPress={toggleSelectAllItems}
+              >
+                {allItemsSelected ? "Deselect all" : "Select all"}
+              </Button>
+              <Button
+                size="sm"
+                variant="flat"
+                className="rounded-xl border border-gray-200 bg-white text-gray-700"
+                onPress={clearSelection}
+                isDisabled={selectedCount === 0}
+              >
+                Clear
+              </Button>
+              <Button
+                size="sm"
+                className="rounded-xl bg-[var(--stocksense-brand)] text-white"
+                onPress={openMoveSelected}
+                isDisabled={selectedCount === 0}
+              >
+                Move
+              </Button>
+              <Button
+                size="sm"
+                className="rounded-xl bg-rose-600 text-white"
+                onPress={openDeleteSelected}
+                isDisabled={selectedCount === 0}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="content-stagger grid grid-cols-1 gap-3 max-md:hidden sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {items.map((item) => (
+        {items.map((item) => {
+          const isSelected = selectedItemIds.has(String(item.id));
+
+          return (
           <article
             key={item.id}
-            className="flex min-w-0 flex-col gap-3 rounded-2xl border border-stocksense-gray bg-white p-4 shadow-sm"
+            className={`flex min-w-0 flex-col gap-3 rounded-2xl border bg-white p-4 shadow-sm ${
+              isSelected
+                ? "border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]"
+                : "border-stocksense-gray"
+            }`}
           >
             <div className="flex min-w-0 gap-3">
               {item.imageUrl ? (
@@ -736,6 +953,17 @@ export default function CategoryDetailClient({
                   )}
                 </div>
               </div>
+              {canEditInventory && (
+                <label className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelectItem(item.id)}
+                    aria-label={`Select ${item.name}`}
+                    className="h-5 w-5 rounded border-gray-300"
+                  />
+                </label>
+              )}
             </div>
 
             {canEditInventory && (
@@ -770,7 +998,8 @@ export default function CategoryDetailClient({
               </div>
             )}
           </article>
-        ))}
+          );
+        })}
 
         {items.length === 0 && (
           <div className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center text-gray-500 sm:col-span-2 lg:col-span-3 xl:col-span-4">
@@ -1014,11 +1243,19 @@ export default function CategoryDetailClient({
           title={
             deleteDialog.entityType === "category"
               ? `Delete category "${deleteDialog.payload?.name ?? categoryName}"?`
+              : deleteDialog.entityType === "items"
+                ? `Delete ${deleteDialog.payload?.count ?? 0} selected item${
+                    deleteDialog.payload?.count === 1 ? "" : "s"
+                  }?`
               : `Delete "${deleteDialog.payload?.name ?? "item"}"?`
           }
           description={
             deleteDialog.entityType === "category"
               ? `This will delete "${deleteDialog.payload?.name ?? categoryName}" and all items inside it. This cannot be undone.`
+              : deleteDialog.entityType === "items"
+                ? `This will permanently delete ${deleteDialog.payload?.count ?? 0} selected item${
+                    deleteDialog.payload?.count === 1 ? "" : "s"
+                  } from ${categoryName}. This cannot be undone.`
               : `This will permanently delete "${deleteDialog.payload?.name ?? "this item"}" from ${categoryName}. This cannot be undone.`
           }
         />
