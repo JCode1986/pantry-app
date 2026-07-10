@@ -17,6 +17,11 @@ const legalLinks = [
   { href: "/privacy", label: "Privacy" },
 ];
 
+const supportLinks = [
+  { href: "/support", label: "Support" },
+  { href: "/contact", label: "Contact" },
+];
+
 export default function SiteFooter({ compact = false, className = "" }) {
   const pathname = usePathname();
 
@@ -40,7 +45,7 @@ export default function SiteFooter({ compact = false, className = "" }) {
 
           <nav
             aria-label="Footer navigation"
-            className="grid gap-6 text-sm sm:grid-cols-2"
+            className="grid gap-6 text-sm sm:grid-cols-3"
           >
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--stocksense-brand)]">
@@ -80,6 +85,23 @@ export default function SiteFooter({ compact = false, className = "" }) {
               </div>
               <div className="mt-3 grid gap-2">
                 {legalLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="text-gray-600 transition hover:text-[var(--stocksense-brand)]"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--stocksense-brand)]">
+                Support
+              </div>
+              <div className="mt-3 grid gap-2">
+                {supportLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
