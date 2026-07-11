@@ -390,11 +390,17 @@ export default async function HomePage() {
   const supabase = await createClient();
   let currentUser = session?.user?.user ?? null;
 
-  if (!currentUser?.id) {
+  try {
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser();
-    currentUser = user ?? null;
+
+    if (!userError && user?.id) {
+      currentUser = user;
+    }
+  } catch (err) {
+    console.error("Dashboard Supabase user error:", err);
   }
 
   if (!currentUser?.id) {
@@ -501,8 +507,8 @@ export default async function HomePage() {
           totals={totals}
         />
 
-        <section className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(280px,0.85fr)]">
-          <div className="space-y-5">
+        <section className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(260px,0.85fr)]">
+          <div className="min-w-0 space-y-5">
             <RecentActivity
               items={activityResult.data.items}
               members={activityFiltersResult.data.members}
@@ -513,8 +519,8 @@ export default async function HomePage() {
             />
             <InventoryByLocation locations={inventoryByLocation} />
           </div>
-          <div>
-            <div className="w-full space-y-5">
+          <div className="min-w-0">
+            <div className="w-full min-w-0 space-y-5">
               <AttentionItemsCard
                 title="Expired"
                 count={expirationNotifications.expiredCount}

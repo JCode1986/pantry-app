@@ -78,17 +78,11 @@ html {
   transition: padding 200ms ease, padding-left 200ms ease;
 }
 
-@media (min-width: 768px) {
-  .wherekeep-auth-shell {
-    padding-top: 0;
-    padding-bottom: 0;
-  }
-}
-
 @media (min-width: 1024px) {
   .wherekeep-auth-shell {
     padding-left: var(--wherekeep-sidebar-offset);
     padding-top: var(--wherekeep-desktop-commandbar-height);
+    padding-bottom: 0;
   }
 
   html {

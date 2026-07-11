@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { logoutAction } from "@/app/actions/auth";
 import {
@@ -32,7 +32,6 @@ import WhereKeepLogo from "@/components/ui/WhereKeepLogo";
 import {
   DEFAULT_PREFERENCES,
   FONT_OPTIONS,
-  PREFERRED_NAME_STORAGE_KEY,
   PREFERENCE_STORAGE_KEY,
   THEME_OPTIONS,
   applyAppPreferences,
@@ -42,13 +41,6 @@ import {
   saveStoredPreferences,
 } from "@/utils/appPreferences";
 import {
-  Navbar,
-  NavbarBrand,
-  NavbarContent,
-  NavbarItem,
-  NavbarMenuToggle,
-  NavbarMenu,
-  NavbarMenuItem,
   Button,
   Input,
   Modal,
@@ -288,7 +280,7 @@ function IconCircle({ icon: Icon, tone = "brand", className = "" }) {
 
 function MobileTopBar({ attentionCount, onOpenMenu, onOpenAttention }) {
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-gray-200 bg-white px-5 py-2 shadow-sm backdrop-blur md:hidden">
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-gray-200 bg-white px-5 py-2 shadow-sm backdrop-blur lg:hidden">
       <div className="grid min-h-11 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-3">
         <button
           type="button"
@@ -1300,7 +1292,7 @@ function MobileMenu({
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-[70] bg-slate-950/20 md:hidden"
+          className="fixed inset-0 z-[70] bg-slate-950/20 lg:hidden"
           variants={menuBackdropVariants}
           initial="hidden"
           animate="show"
@@ -1472,6 +1464,10 @@ function AttentionSheet({
         left: "auto",
       }
     : undefined;
+  const arrowStyle =
+    anchor?.arrowRight !== undefined
+      ? { right: `${anchor.arrowRight}px` }
+      : undefined;
 
   return (
     <AnimatePresence>
@@ -1493,7 +1489,10 @@ function AttentionSheet({
             exit="exit"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="absolute -top-2 right-5 h-4 w-4 rotate-45 border-l border-t border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]" />
+            <div
+              className="absolute -top-2 right-5 h-4 w-4 rotate-45 border-l border-t border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]"
+              style={arrowStyle}
+            />
             <div className="flex items-start justify-between gap-3 rounded-t-2xl border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-4">
               <div className="flex items-start gap-3">
                 <IconCircle
@@ -1681,9 +1680,12 @@ export default function Navigation({
       window.matchMedia("(min-width: 768px)").matches;
 
     if (rect && isDesktop) {
+      const right = Math.max(16, Math.round(window.innerWidth - rect.right));
+
       setAttentionAnchor({
         top: Math.round(rect.bottom + 10),
-        right: Math.max(16, Math.round(window.innerWidth - rect.right)),
+        right,
+        arrowRight: Math.max(8, Math.round(rect.width / 2 - 8)),
       });
     } else {
       setAttentionAnchor(null);
@@ -1788,11 +1790,6 @@ export default function Navigation({
     setPreferredName(savedName);
 
     if (typeof window !== "undefined") {
-      if (savedName) {
-        window.localStorage.setItem(PREFERRED_NAME_STORAGE_KEY, savedName);
-      } else {
-        window.localStorage.removeItem(PREFERRED_NAME_STORAGE_KEY);
-      }
       window.dispatchEvent(
         new CustomEvent("wherekeep:preferred-name-change", {
           detail: { name: savedName },
@@ -2004,20 +2001,13 @@ export default function Navigation({
       : "expanded";
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     updateDesktopSidebarState(isDesktopSidebarCollapsed);
   }, [isDesktopSidebarCollapsed]);
 
   useEffect(() => {
     setPreferences(readStoredPreferences());
-
-    if (typeof window !== "undefined") {
-      setPreferredName(
-        initialPreferredName ||
-          window.localStorage.getItem(PREFERRED_NAME_STORAGE_KEY) ||
-          ""
-      );
-    }
+    setPreferredName(initialPreferredName || "");
   }, [initialPreferredName]);
 
   useEffect(() => {
@@ -2151,13 +2141,9 @@ export default function Navigation({
         counts={liveAttentionCounts}
         navigationSummary={navigationSummary}
         isCollapsed={isDesktopSidebarCollapsed}
-        onToggleCollapsed={() => {
-          setIsDesktopSidebarCollapsed((current) => {
-            const next = !current;
-            updateDesktopSidebarState(next);
-            return next;
-          });
-        }}
+        onToggleCollapsed={() =>
+          setIsDesktopSidebarCollapsed((current) => !current)
+        }
         onOpenSharingPanel={openSharingPanel}
         loggingOut={loggingOut}
         onLogout={() => setShowLogoutModal(true)}
@@ -2214,179 +2200,6 @@ export default function Navigation({
         onSavePreferredName={handleSavePreferredName}
       />
 
-      <Navbar
-        isBordered
-        maxWidth="2xl"
-        isMenuOpen={isMenuOpen}
-        onMenuOpenChange={setIsMenuOpen}
-        className="sticky top-0 z-50 bg-white/90 backdrop-blur max-md:hidden md:bg-white lg:hidden"
-      >
-        <NavbarContent justify="start" className="gap-3">
-          <NavbarMenuToggle
-            aria-label={isMenuOpen ? "Close menu" : "Open menu"}
-            className="hidden md:flex xl:hidden"
-          />
-
-          <NavbarBrand className="absolute left-1/2 z-10 grow-0 -translate-x-1/2 xl:static xl:translate-x-0">
-            <Link href="/" className="flex min-w-0 items-center gap-2">
-              <WhereKeepLogo showWordmark={false} markClassName="h-9" />
-              <span className="truncate bg-gradient-to-r from-[var(--stocksense-brand-border)] via-[var(--stocksense-brand)] to-[var(--stocksense-brand-dark)] bg-clip-text text-xl font-extrabold text-transparent">
-                WhereKeep
-              </span>
-            </Link>
-          </NavbarBrand>
-
-          <NavbarContent className="hidden gap-1 xl:flex" justify="start">
-            {navItems.filter((item) => !item.mobileOnly).map((item) => {
-              const Icon = item.icon;
-              const isActive = activeHref === item.href;
-
-              return (
-                <NavbarItem key={item.href}>
-                  <Link
-                    href={item.href}
-                    className={cx(
-                      "inline-flex items-center gap-1.5 rounded-xl px-2.5 py-2 text-sm font-medium transition",
-                      isActive
-                        ? "border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
-                        : "text-gray-600 hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-                    )}
-                    aria-current={isActive ? "page" : undefined}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
-                </NavbarItem>
-              );
-            })}
-          </NavbarContent>
-        </NavbarContent>
-
-        <NavbarContent justify="end" className="gap-2">
-          <NavbarItem key="desktop-search" className="hidden xl:flex">
-            <Button
-              variant="flat"
-              className="rounded-xl border border-stocksense-gray bg-white text-[var(--stocksense-brand)]"
-              onPress={() => setShowItemSearchModal(true)}
-              startContent={<FaSearch />}
-            >
-              Search
-            </Button>
-          </NavbarItem>
-
-          {canEditInventory && (
-            <NavbarItem key="desktop-add-item" className="hidden xl:flex">
-              <Button
-                className="rounded-xl bg-[var(--stocksense-brand)] text-white"
-                onPress={() => {
-                  setAddItemContext(routeAddItemContext);
-                  setShowAddItemModal(true);
-                }}
-                startContent={<FaPlus />}
-              >
-                Add Item
-              </Button>
-            </NavbarItem>
-          )}
-
-          <NavbarItem key="desktop-logout" className="hidden xl:flex">
-            <Button
-              variant="flat"
-              className={cx(
-                "rounded-xl border",
-                loggingOut
-                  ? "cursor-not-allowed opacity-70"
-                  : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
-              )}
-              onPress={() => setShowLogoutModal(true)}
-              isDisabled={loggingOut}
-              startContent={
-                loggingOut ? (
-                  <FaSpinner className="animate-spin" />
-                ) : (
-                  <FaSignOutAlt />
-                )
-              }
-            >
-              {loggingOut ? "Logging out..." : "Logout"}
-            </Button>
-          </NavbarItem>
-        </NavbarContent>
-
-        {/* Mobile menu */}
-        <NavbarMenu className="pt-6">
-          <div className="px-2 pb-2 text-xs font-medium text-gray-400">
-            Navigation
-          </div>
-
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeHref === item.href;
-
-            return (
-              <NavbarMenuItem key={item.href}>
-                <Link
-                  href={item.href}
-                  onClick={() => setIsMenuOpen(false)}
-                  className={cx(
-                    "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition",
-                    isActive
-                      ? "border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
-                      : "text-gray-700 hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-                  )}
-                  aria-current={isActive ? "page" : undefined}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </Link>
-              </NavbarMenuItem>
-            );
-          })}
-
-          <div className="mt-3 border-t border-gray-200 pt-3">
-            <div className="px-2 pb-2 text-xs font-medium text-gray-400">
-              Legal
-            </div>
-            <div className="grid gap-1 pb-3">
-              <Link
-                href="/terms"
-                onClick={() => setIsMenuOpen(false)}
-                className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-              >
-                Terms
-              </Link>
-              <Link
-                href="/privacy"
-                onClick={() => setIsMenuOpen(false)}
-                className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-700 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-              >
-                Privacy
-              </Link>
-            </div>
-            <Button
-              variant="flat"
-              className={cx(
-                "w-full justify-start rounded-xl border",
-                loggingOut
-                  ? "cursor-not-allowed opacity-70"
-                  : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
-              )}
-              onPress={() => setShowLogoutModal(true)}
-              isDisabled={loggingOut}
-              startContent={
-                loggingOut ? (
-                  <FaSpinner className="animate-spin" />
-                ) : (
-                  <FaSignOutAlt />
-                )
-              }
-            >
-              {loggingOut ? "Logging out..." : "Logout"}
-            </Button>
-          </div>
-        </NavbarMenu>
-      </Navbar>
-
       <MobileMenu
         isOpen={isMenuOpen}
         activeHref={activeHref}
@@ -2411,7 +2224,7 @@ export default function Navigation({
 
       <nav
         className={cx(
-          "fixed inset-x-0 bottom-0 border-t border-gray-200 bg-white px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] backdrop-blur md:hidden",
+          "fixed inset-x-0 bottom-0 border-t border-gray-200 bg-white px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden",
           showItemSearchModal ? "z-[80]" : "z-40"
         )}
       >

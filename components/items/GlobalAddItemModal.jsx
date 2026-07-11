@@ -302,6 +302,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   const [message, setMessage] = useState("");
   const [upgradeHref, setUpgradeHref] = useState("");
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [autoStartBarcodeScanner, setAutoStartBarcodeScanner] = useState(false);
   const [isLookingUpBarcode, setIsLookingUpBarcode] = useState(false);
   const [barcodeMessage, setBarcodeMessage] = useState("");
   const [productPreview, setProductPreview] = useState(null);
@@ -532,6 +533,17 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
     }
   };
 
+  const openBarcodeScanner = (autoStart = false) => {
+    savePreferredAddMethod("barcode");
+    setAutoStartBarcodeScanner(Boolean(autoStart));
+    setIsScannerOpen(true);
+  };
+
+  const handleScannerOpenChange = (open) => {
+    setIsScannerOpen(open);
+    if (!open) setAutoStartBarcodeScanner(false);
+  };
+
   const applyQuickAddFields = (fields, sourceLabel) => {
     if (!fields) return;
 
@@ -758,6 +770,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
 
     setIsBarcodeExpanded(true);
     setIsScannerOpen(false);
+    setAutoStartBarcodeScanner(false);
     setIsLookingUpBarcode(true);
     setBarcodeMessage("");
     setProductPreview(null);
@@ -852,6 +865,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
     setProductPreview(null);
     clearSelectedImage();
     setIsScannerOpen(false);
+    setAutoStartBarcodeScanner(false);
     setIsBarcodeExpanded(true);
     setQuickAddMessage("");
     setQuickAddTranscript("");
@@ -1438,8 +1452,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                       <Button
                         className="mb-3 min-h-12 w-full rounded-2xl bg-[var(--stocksense-brand)] text-base font-semibold text-white md:hidden"
                         onPress={() => {
-                          savePreferredAddMethod("barcode");
-                          setIsScannerOpen(true);
+                          openBarcodeScanner(true);
                         }}
                         isDisabled={isSaving || isLookingUpBarcode}
                         startContent={<FaBarcode />}
@@ -1462,8 +1475,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                           <Button
                             className="hidden rounded-xl bg-[var(--stocksense-brand)] text-white md:inline-flex"
                             onPress={() => {
-                              savePreferredAddMethod("barcode");
-                              setIsScannerOpen(true);
+                              openBarcodeScanner(false);
                             }}
                             isDisabled={isSaving || isLookingUpBarcode}
                             startContent={<FaBarcode />}
@@ -1720,7 +1732,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                           setMessage("");
                           if (addMethod === "barcode") {
                             setIsBarcodeExpanded(true);
-                            setIsScannerOpen(true);
+                            openBarcodeScanner(true);
                           }
                           if (addMethod === "voice") {
                             handleVoiceQuickAdd();
@@ -1784,8 +1796,9 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
       </Modal>
       <BarcodeScannerModal
         isOpen={isScannerOpen}
-        onOpenChange={setIsScannerOpen}
+        onOpenChange={handleScannerOpenChange}
         onScan={lookupBarcode}
+        autoStart={autoStartBarcodeScanner}
       />
     </>
   );
