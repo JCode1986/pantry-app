@@ -11,6 +11,7 @@ import {
   getHouseholdForUser,
   normalizeHouseholdRole,
 } from "@/utils/households";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 
 const geistSans = Geist({
@@ -171,6 +172,59 @@ async function getNavigationAttentionCounts(supabase, withinDays = 3) {
   };
 }
 
+async function getNavigationHouseholdCounts(householdId) {
+  if (!householdId) {
+    return {
+      memberCount: 0,
+      inviteCount: 0,
+    };
+  }
+
+  const admin = createAdminClient();
+  const [
+    { count: memberCount = 0, error: membersError },
+    { count: inviteCount = 0, error: invitesError },
+  ] = await Promise.all([
+    admin
+      .from("household_members")
+      .select("*", { count: "exact", head: true })
+      .eq("household_id", householdId),
+    admin
+      .from("household_invites")
+      .select("*", { count: "exact", head: true })
+      .eq("household_id", householdId)
+      .eq("status", "pending"),
+  ]);
+
+  if (membersError || invitesError) {
+    console.error("Navigation household count error:", {
+      membersError,
+      invitesError,
+    });
+    return {
+      memberCount: 0,
+      inviteCount: 0,
+    };
+  }
+
+  return {
+    memberCount: memberCount ?? 0,
+    inviteCount: inviteCount ?? 0,
+  };
+}
+
+function getPreferredName(user) {
+  const metadata = user?.user_metadata ?? {};
+  const name =
+    metadata.preferred_name ||
+    metadata.display_name ||
+    metadata.full_name ||
+    metadata.name ||
+    "";
+
+  return name ? String(name).split(" ")[0] : "";
+}
+
 export default async function RootLayout({ children }) {
   const session = await getSessionForLayout(); // ✅ read-only
   let currentUser = session?.user?.user ?? null;
@@ -183,11 +237,14 @@ export default async function RootLayout({ children }) {
     storageAreasCount: 0,
     categoriesCount: 0,
     itemsCount: 0,
+    memberCount: 0,
+    inviteCount: 0,
   };
   let navigationSummary = {
     householdName: "",
     householdRole: "",
     isFamilyPlan: false,
+    displayName: "",
   };
   let supabase = null;
 
@@ -216,6 +273,11 @@ export default async function RootLayout({ children }) {
         householdName: household?.name || "",
         householdRole: normalizeHouseholdRole(member?.role),
         isFamilyPlan: billing.effectivePlanId === "family",
+        displayName: getPreferredName(currentUser),
+      };
+      attentionCounts = {
+        ...attentionCounts,
+        ...(await getNavigationHouseholdCounts(household?.id)),
       };
     } catch (err) {
       console.error("Navigation household role error:", err);
@@ -223,7 +285,10 @@ export default async function RootLayout({ children }) {
 
     try {
       if (!supabase) supabase = await createClient();
-      attentionCounts = await getNavigationAttentionCounts(supabase);
+      attentionCounts = {
+        ...attentionCounts,
+        ...(await getNavigationAttentionCounts(supabase)),
+      };
     } catch (err) {
       console.error("Navigation attention count error:", err);
     }
@@ -236,9 +301,10 @@ export default async function RootLayout({ children }) {
           canEditInventory={canEditInventory}
           attentionCounts={attentionCounts}
           navigationSummary={navigationSummary}
+          initialPreferredName={getPreferredName(currentUser)}
         />
       )}
-      <div className={`bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10 ${currentUser?.id ? "min-h-[100svh] pb-24 pt-[61px] md:pb-0 md:pt-0" : ""}`}>
+      <div className={`bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10 ${currentUser?.id ? "wherekeep-auth-shell" : ""}`}>
         {children}
       </div>
     </>

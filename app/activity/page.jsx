@@ -51,6 +51,7 @@ export default async function ActivityPage() {
       </div>
 
       <RecentActivity
+        variant="full"
         items={activityResult.data.items}
         members={filtersResult.data.members}
         effectivePlanId={filtersResult.data.effectivePlanId}

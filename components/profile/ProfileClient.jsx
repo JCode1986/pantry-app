@@ -420,7 +420,7 @@ function BillingSection({ billing, billingError, billingLoading, onCheckout, onP
     <motion.section
       id="billing"
       variants={itemVariants}
-      className="rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm"
+      className="scroll-mt-6 rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm"
     >
       <div className="flex items-start gap-3">
         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
@@ -575,8 +575,9 @@ function SharingSection({
 
   return (
     <motion.section
+      id="members"
       variants={itemVariants}
-      className="rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm"
+      className="scroll-mt-6 rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm"
     >
       <div className="flex items-start gap-3">
         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
@@ -615,7 +616,10 @@ function SharingSection({
           </div>
 
           {!isFamily && isOwner && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+            <div
+              id="invites"
+              className="scroll-mt-6 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800"
+            >
               Upgrade to Family to invite up to 5 household members.{" "}
               <Link href="#billing" className="font-semibold underline">
                 View Family plan
@@ -624,7 +628,10 @@ function SharingSection({
           )}
 
           {isFamily && !isOwner && (
-            <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-700">
+            <div
+              id="invites"
+              className="scroll-mt-6 rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-700"
+            >
               {sharing.currentUserRole === "viewer"
                 ? "You have view-only access. You can browse inventory, shopping list, and activity without changing household data."
                 : "You can view and manage this shared inventory. Only the household owner can invite new members."}
@@ -632,7 +639,11 @@ function SharingSection({
           )}
 
           {isFamily && isOwner && (
-            <form onSubmit={onCreateInvite} className="space-y-3">
+            <form
+              id="invites"
+              onSubmit={onCreateInvite}
+              className="scroll-mt-6 space-y-3"
+            >
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_220px_auto]">
                 <Input
                   label="Invite by email"
@@ -1264,10 +1275,10 @@ export default function ProfileClient({
           </div>
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold tracking-tight text-gray-950">
-              Profile
+              Account Settings
             </h1>
             <p className="mt-1 break-words text-sm text-gray-500">
-              Manage your account security and WhereKeep preferences.
+              Manage your household, billing, preferences, and account security.
             </p>
           </div>
         </div>
@@ -1763,9 +1774,9 @@ export default function ProfileClient({
           />
 
           <motion.section
-            id="change-password"
+            id="security"
             variants={itemVariants}
-            className="rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm"
+            className="scroll-mt-6 rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm"
           >
             <div className="flex items-start gap-3">
               <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
@@ -1851,8 +1862,9 @@ export default function ProfileClient({
           </motion.section>
 
           <motion.section
+            id="preferences"
             variants={itemVariants}
-            className="rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm"
+            className="scroll-mt-6 rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm"
           >
             <div className="flex items-start gap-3">
               <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
@@ -1945,7 +1957,10 @@ export default function ProfileClient({
           variants={itemVariants}
           className="space-y-6"
         >
-          <section className="rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm">
+          <section
+            id="account"
+            className="scroll-mt-6 rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm"
+          >
             <div className="flex items-start gap-3">
               <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
                 <FaUserCircle className="h-5 w-5" />
@@ -2019,7 +2034,10 @@ export default function ProfileClient({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm">
+          <section
+            id="support"
+            className="scroll-mt-6 rounded-2xl border border-stocksense-gray bg-white p-5 shadow-sm"
+          >
             <div className="flex items-start gap-3">
               <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
                 <FaShieldAlt className="h-4 w-4" />

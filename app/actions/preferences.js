@@ -16,9 +16,11 @@ const APPEARANCE_UPGRADE_MESSAGE =
 
 async function createAuthedClient() {
   const {
+    session,
     user,
     accessToken,
     refreshToken,
+    expiresAt,
     error: sessionError,
   } = await getVerifiedSession();
   const userId = user?.id;
@@ -47,7 +49,16 @@ async function createAuthedClient() {
     };
   }
 
-  return { supabase, user, userId, error: null };
+  return {
+    supabase,
+    user,
+    userId,
+    session,
+    accessToken,
+    refreshToken,
+    expiresAt,
+    error: null,
+  };
 }
 
 async function canCustomizeAppearance(user) {
@@ -163,6 +174,72 @@ export async function updateUserPreferencesAction(preferences) {
       themeId: data?.theme_id,
       fontId: data?.font_id,
     }),
+    error: null,
+  };
+}
+
+export async function updatePreferredNameAction(name) {
+  const {
+    supabase,
+    user,
+    session,
+    accessToken,
+    refreshToken,
+    expiresAt,
+    error,
+  } = await createAuthedClient();
+
+  const normalizedName = typeof name === "string" ? name.trim() : "";
+
+  if (error) {
+    return {
+      data: { name: normalizedName },
+      error,
+    };
+  }
+
+  const metadata = user?.user_metadata ?? {};
+  const nextMetadata = {
+    ...metadata,
+    display_name: normalizedName || null,
+    preferred_name: normalizedName || null,
+  };
+
+  const {
+    data: { user: updatedUser },
+    error: updateError,
+  } = await supabase.auth.updateUser({
+    data: nextMetadata,
+  });
+
+  if (updateError) {
+    console.error("updatePreferredNameAction error:", updateError);
+    return {
+      data: { name: normalizedName },
+      error: updateError.message || "Could not save preferred name.",
+    };
+  }
+
+  const savedMetadata = updatedUser?.user_metadata ?? {};
+  const savedName =
+    savedMetadata.preferred_name ||
+    savedMetadata.display_name ||
+    normalizedName;
+
+  if (session?.user && updatedUser?.id) {
+    session.user = {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      expires_at: expiresAt,
+      user: updatedUser,
+    };
+    await session.save();
+  }
+
+  return {
+    data: {
+      name: savedName,
+    },
     error: null,
   };
 }

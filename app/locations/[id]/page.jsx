@@ -57,6 +57,7 @@ export default async function Page({ params }) {
       storage_categories:storage_categories!fk_storage_area (
         id,
         name,
+        image_path,
         items:items!fk_items_category (
           id,
           name,
@@ -79,7 +80,10 @@ export default async function Page({ params }) {
     ...(storageAreasRaw ?? []).map((area) => area.image_path),
     ...(storageAreasRaw ?? []).flatMap((area) =>
       (area.storage_categories ?? []).flatMap((category) =>
-        (category.items ?? []).map((item) => item.image_path)
+        [
+          category.image_path,
+          ...(category.items ?? []).map((item) => item.image_path),
+        ]
       )
     ),
   ]);
@@ -93,6 +97,8 @@ export default async function Page({ params }) {
       categories: (sa.storage_categories ?? []).map((cat) => ({
           id: cat.id,
           name: cat.name,
+          image_path: cat.image_path ?? null,
+          imageUrl: imageUrlsByPath.get(cat.image_path) ?? null,
           items: (cat.items ?? []).map((item) => ({
               ...item,
               imageUrl: imageUrlsByPath.get(item.image_path) ?? null,
@@ -150,7 +156,7 @@ export default async function Page({ params }) {
   );
 
   return (
-    <main className="page-enter max-w-[1500px] mx-auto px-5 py-8 md:min-h-[100vh] max-md:px-4 max-md:pb-0 max-md:pt-4">
+    <main className="page-enter mx-auto max-w-[1500px] px-5 py-8 md:min-h-[100vh] lg:px-6 xl:px-8 max-md:px-4 max-md:pb-0 max-md:pt-4">
       <LocationDetailHeaderClient
         location={location}
         imageUrl={locationImageUrl}

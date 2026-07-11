@@ -8,7 +8,7 @@ import { DEFAULT_PREFERENCES } from "@/utils/appPreferences";
 import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
 
 export const metadata = createPageMetadata({
-  title: "Profile",
+  title: "Account Settings",
   description: "Manage account security, appearance, billing, and family sharing.",
   path: "/profile",
   robots: NO_INDEX_ROBOTS,

@@ -3,9 +3,14 @@ import { redirect } from 'next/navigation';
 import { getSessionForLayout } from './actions/auth';
 import LandingPage from '@/components/marketing/LandingPage';
 import MobileDashboardHome from '@/components/dashboard/MobileDashboardHome';
+import DesktopDashboardToolbar from '@/components/dashboard/DesktopDashboardToolbar';
+import AttentionItemsCard from '@/components/dashboard/AttentionItemsCard';
+import InventoryByLocation from '@/components/dashboard/InventoryByLocation';
 import { createPageMetadata, siteConfig } from '@/utils/metadata';
 import { BILLING_PLANS } from '@/utils/billingPlans';
 import { getCanEditInventoryForUser } from '@/utils/households';
+import { getInventoryImageUrls } from '@/utils/inventoryImages';
+import { LuClock3, LuPackageMinus, LuTriangleAlert } from 'react-icons/lu';
 
 export const metadata = createPageMetadata({
   title: 'Household Inventory Tracker',
@@ -13,26 +18,6 @@ export const metadata = createPageMetadata({
     'WhereKeep helps households find what they already own, remember where it lives, use items before they expire, and restock from the same shared system.',
   path: '/',
 });
-
-function countBy(items, resolveKey) {
-  const counts = new Map();
-
-  for (const item of items) {
-    const key = resolveKey(item);
-    if (!key) continue;
-    counts.set(String(key), (counts.get(String(key)) ?? 0) + 1);
-  }
-
-  return counts;
-}
-
-function mapBreakdown(rows, counts) {
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    item_count: counts.get(String(row.id)) ?? 0,
-  }));
-}
 
 function addDays(date, days) {
   const next = new Date(date);
@@ -51,9 +36,10 @@ function toDateString(date) {
 function getDisplayName(user) {
   const metadata = user?.user_metadata ?? {};
   const name =
+    metadata.preferred_name ||
+    metadata.display_name ||
     metadata.full_name ||
     metadata.name ||
-    metadata.display_name ||
     user?.email?.split('@')[0];
 
   return name ? String(name).split(' ')[0] : 'there';
@@ -100,57 +86,6 @@ function LandingStructuredData() {
       dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
     />
   );
-}
-
-async function getItemBreakdowns(supabase) {
-  const [
-    { data: locationsRaw = [], error: locationsError },
-    { data: areasRaw = [], error: areasError },
-    { data: categoriesRaw = [], error: categoriesError },
-    { data: itemsRaw = [], error: itemsError },
-  ] = await Promise.all([
-    supabase.from('locations').select('id, name').order('name', { ascending: true }),
-    supabase.from('storage_areas').select('id, name, location_id').order('name', { ascending: true }),
-    supabase.from('storage_categories').select('id, name, storage_area_id').order('name', { ascending: true }),
-    supabase.from('items').select('id, category_id'),
-  ]);
-
-  const errors = [locationsError, areasError, categoriesError, itemsError].filter(Boolean);
-  if (errors.length) {
-    console.error('item breakdowns error:', errors);
-    return {
-      byLocation: [],
-      byStorageArea: [],
-      byCategory: [],
-    };
-  }
-
-  const areaToLocation = new Map(
-    areasRaw.map((area) => [String(area.id), area.location_id])
-  );
-  const categoryToArea = new Map(
-    categoriesRaw.map((category) => [String(category.id), category.storage_area_id])
-  );
-  const categoryToLocation = new Map(
-    categoriesRaw.map((category) => {
-      const areaId = categoryToArea.get(String(category.id));
-      return [String(category.id), areaToLocation.get(String(areaId))];
-    })
-  );
-
-  const countsByLocation = countBy(itemsRaw, (item) =>
-    categoryToLocation.get(String(item.category_id))
-  );
-  const countsByStorageArea = countBy(itemsRaw, (item) =>
-    categoryToArea.get(String(item.category_id))
-  );
-  const countsByCategory = countBy(itemsRaw, (item) => item.category_id);
-
-  return {
-    byLocation: mapBreakdown(locationsRaw, countsByLocation),
-    byStorageArea: mapBreakdown(areasRaw, countsByStorageArea),
-    byCategory: mapBreakdown(categoriesRaw, countsByCategory),
-  };
 }
 
 async function getExpirationNotifications(supabase, withinDays = 3) {
@@ -266,6 +201,190 @@ async function getExpirationNotifications(supabase, withinDays = 3) {
   };
 }
 
+async function hydrateDashboardItems(supabase, itemsRaw = []) {
+  if (itemsRaw.length === 0) return [];
+
+  const imageUrlsByPath = await getInventoryImageUrls(
+    itemsRaw.map((item) => item.image_path)
+  );
+  const categoryIds = [
+    ...new Set(itemsRaw.map((item) => item.category_id).filter(Boolean)),
+  ];
+
+  const { data: categoriesRaw = [] } = categoryIds.length
+    ? await supabase
+        .from('storage_categories')
+        .select('id, name, storage_area_id')
+        .in('id', categoryIds)
+    : { data: [] };
+
+  const areaIds = [
+    ...new Set((categoriesRaw ?? []).map((category) => category.storage_area_id).filter(Boolean)),
+  ];
+
+  const { data: areasRaw = [] } = areaIds.length
+    ? await supabase
+        .from('storage_areas')
+        .select('id, name, location_id')
+        .in('id', areaIds)
+    : { data: [] };
+
+  const locationIds = [
+    ...new Set((areasRaw ?? []).map((area) => area.location_id).filter(Boolean)),
+  ];
+
+  const { data: locationsRaw = [] } = locationIds.length
+    ? await supabase.from('locations').select('id, name').in('id', locationIds)
+    : { data: [] };
+
+  const categoryMap = new Map((categoriesRaw ?? []).map((category) => [String(category.id), category]));
+  const areaMap = new Map((areasRaw ?? []).map((area) => [String(area.id), area]));
+  const locationMap = new Map((locationsRaw ?? []).map((location) => [String(location.id), location]));
+
+  return itemsRaw.map((item) => {
+    const category = item.category_id
+      ? categoryMap.get(String(item.category_id))
+      : null;
+    const area = category?.storage_area_id
+      ? areaMap.get(String(category.storage_area_id))
+      : null;
+    const location = area?.location_id
+      ? locationMap.get(String(area.location_id))
+      : null;
+
+    return {
+      id: item.id,
+      name: item.name,
+      quantity: item.quantity ?? 0,
+      expirationDate: item.expiration_date,
+      imageUrl: imageUrlsByPath.get(item.image_path) ?? null,
+      categoryId: category?.id ?? item.category_id ?? null,
+      categoryName: category?.name ?? null,
+      areaName: area?.name ?? null,
+      locationName: location?.name ?? null,
+    };
+  });
+}
+
+async function getDashboardAttentionItems(supabase, withinDays = 3) {
+  const today = toDateString(new Date());
+  const cutoff = toDateString(addDays(new Date(), withinDays));
+
+  const [
+    { data: expiredRaw = [], error: expiredError },
+    { data: expiringSoonRaw = [], error: expiringSoonError },
+    { data: lowStockRaw = [], error: lowStockError },
+    { count: lowStockCount = 0, error: lowStockCountError },
+  ] = await Promise.all([
+    supabase
+      .from('items')
+      .select('id, name, quantity, expiration_date, category_id, image_path')
+      .not('expiration_date', 'is', null)
+      .lt('expiration_date', today)
+      .order('expiration_date', { ascending: true })
+      .limit(3),
+    supabase
+      .from('items')
+      .select('id, name, quantity, expiration_date, category_id, image_path')
+      .not('expiration_date', 'is', null)
+      .gte('expiration_date', today)
+      .lte('expiration_date', cutoff)
+      .order('expiration_date', { ascending: true })
+      .limit(3),
+    supabase
+      .from('items')
+      .select('id, name, quantity, expiration_date, category_id, image_path')
+      .lte('quantity', 1)
+      .order('quantity', { ascending: true })
+      .order('name', { ascending: true })
+      .limit(3),
+    supabase
+      .from('items')
+      .select('id', { count: 'exact', head: true })
+      .lte('quantity', 1),
+  ]);
+
+  const errors = [
+    expiredError,
+    expiringSoonError,
+    lowStockError,
+    lowStockCountError,
+  ].filter(Boolean);
+
+  if (errors.length) {
+    console.error('dashboard attention items error:', errors);
+    return {
+      expiredItems: [],
+      expiringSoonItems: [],
+      lowStockItems: [],
+      lowStockCount: 0,
+    };
+  }
+
+  const [expiredItems, expiringSoonItems, lowStockItems] = await Promise.all([
+    hydrateDashboardItems(supabase, expiredRaw),
+    hydrateDashboardItems(supabase, expiringSoonRaw),
+    hydrateDashboardItems(supabase, lowStockRaw),
+  ]);
+
+  return {
+    expiredItems,
+    expiringSoonItems,
+    lowStockItems,
+    lowStockCount: lowStockCount ?? 0,
+  };
+}
+
+async function getInventoryByLocation(supabase) {
+  const [
+    { data: locationsRaw = [], error: locationsError },
+    { data: areasRaw = [], error: areasError },
+    { data: categoriesRaw = [], error: categoriesError },
+    { data: itemsRaw = [], error: itemsError },
+  ] = await Promise.all([
+    supabase.from('locations').select('id, name').order('name', { ascending: true }),
+    supabase.from('storage_areas').select('id, location_id'),
+    supabase.from('storage_categories').select('id, storage_area_id'),
+    supabase.from('items').select('id, category_id'),
+  ]);
+
+  const errors = [locationsError, areasError, categoriesError, itemsError].filter(Boolean);
+  if (errors.length) {
+    console.error('inventory by location error:', errors);
+    return [];
+  }
+
+  const areaToLocation = new Map(
+    areasRaw.map((area) => [String(area.id), area.location_id])
+  );
+  const categoryToLocation = new Map(
+    categoriesRaw.map((category) => [
+      String(category.id),
+      areaToLocation.get(String(category.storage_area_id)),
+    ])
+  );
+  const itemCountByLocation = new Map();
+
+  for (const item of itemsRaw) {
+    const locationId = categoryToLocation.get(String(item.category_id));
+    if (!locationId) continue;
+    const key = String(locationId);
+    itemCountByLocation.set(key, (itemCountByLocation.get(key) ?? 0) + 1);
+  }
+
+  return locationsRaw
+    .map((location) => ({
+      id: location.id,
+      name: location.name,
+      itemCount: itemCountByLocation.get(String(location.id)) ?? 0,
+    }))
+    .sort(
+      (a, b) =>
+        b.itemCount - a.itemCount ||
+        String(a.name || '').localeCompare(String(b.name || ''))
+    );
+}
+
 export default async function HomePage() {
   const session = await getSessionForLayout();
   const supabase = await createClient();
@@ -294,14 +413,10 @@ export default async function HomePage() {
   const [
     { default: StatsCards },
     { default: RecentActivity },
-    { default: ItemsDonut },
-    { default: ExpirationNotifications },
     { getActivityFilterOptionsAction, getRecentActivityAction },
   ] = await Promise.all([
     import('@/components/dashboard/StatsCards'),
     import('@/components/dashboard/RecentActivity'),
-    import('@/components/dashboard/ItemsDonut'),
-    import('@/components/dashboard/ExpirationNotifications'),
     import('@/app/actions/activity'),
   ]);
 
@@ -336,13 +451,19 @@ export default async function HomePage() {
   ]);
 
   const [activityResult, activityFiltersResult] = await Promise.all([
-    getRecentActivityAction({ limit: 12 }),
+    getRecentActivityAction({ limit: 5 }),
     getActivityFilterOptionsAction(),
   ]);
 
-  const [itemBreakdowns, expirationNotifications, canEditInventory] = await Promise.all([
-    getItemBreakdowns(supabase),
+  const [
+    expirationNotifications,
+    dashboardAttentionItems,
+    inventoryByLocation,
+    canEditInventory,
+  ] = await Promise.all([
     getExpirationNotifications(supabase, 3),
+    getDashboardAttentionItems(supabase, 3),
+    getInventoryByLocation(supabase),
     getCanEditInventoryForUser(currentUser),
   ]);
 
@@ -353,6 +474,8 @@ export default async function HomePage() {
     items,
     shoppingListItems,
     shoppingListNeededItems,
+    expiringSoonItems: expirationNotifications.expiringSoonCount,
+    lowStockItems: dashboardAttentionItems.lowStockCount,
   };
 
   return (
@@ -368,20 +491,18 @@ export default async function HomePage() {
         />
       </div>
 
-      <main className="page-enter mx-auto hidden max-w-[1500px] px-5 py-8 space-y-10 pt-8 min-h-[100vh] md:block">
-        <header className='md:text-left text-center'>
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-950 md:text-3xl">Stock Overview</h1>
-          <p className="text-gray-500 mt-1">Snapshot of your data and what is new.</p>
-        </header>
+      <main className="page-enter mx-auto hidden min-h-[100vh] max-w-[1500px] space-y-5 px-5 py-8 md:block lg:px-6 xl:px-8">
+        <DesktopDashboardToolbar
+          greeting={getGreeting()}
+          userName={getDisplayName(currentUser)}
+        />
 
         <StatsCards
           totals={totals}
         />
 
-        <ExpirationNotifications {...expirationNotifications} />
-
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
+        <section className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(280px,0.85fr)]">
+          <div className="space-y-5">
             <RecentActivity
               items={activityResult.data.items}
               members={activityFiltersResult.data.members}
@@ -390,31 +511,34 @@ export default async function HomePage() {
               initialHasMore={activityResult.data.hasMore}
               initialError={activityResult.error || activityFiltersResult.error}
             />
+            <InventoryByLocation locations={inventoryByLocation} />
           </div>
-          <div className="lg:col-span-1">
-            <div className="w-full space-y-6">
-              <ItemsDonut
-                title="Items by location"
-                data={itemBreakdowns.byLocation}
-                groupSingular="location"
-                groupPlural="locations"
-                tooltip="Shows how many items are stored under each location."
+          <div>
+            <div className="w-full space-y-5">
+              <AttentionItemsCard
+                title="Expired"
+                count={expirationNotifications.expiredCount}
+                items={dashboardAttentionItems.expiredItems}
+                href="/items?expiration=expired"
+                emptyText="No expired items."
+                icon={LuTriangleAlert}
               />
-              <ItemsDonut
-                title="Items by storage areas"
-                data={itemBreakdowns.byStorageArea}
-                emptyText="No storage area data available."
-                groupSingular="storage area"
-                groupPlural="storage areas"
-                tooltip="Shows how many items are stored under each storage area."
+              <AttentionItemsCard
+                title="Expiring soon"
+                count={expirationNotifications.expiringSoonCount}
+                items={dashboardAttentionItems.expiringSoonItems}
+                href="/items?expiration=soon&days=3"
+                emptyText="Nothing is expiring in the next 3 days."
+                icon={LuClock3}
               />
-              <ItemsDonut
-                title="Items by category"
-                data={itemBreakdowns.byCategory}
-                emptyText="No category data available."
-                groupSingular="category"
-                groupPlural="categories"
-                tooltip="Shows how many items are stored under each category."
+              <AttentionItemsCard
+                title="Low stock"
+                count={dashboardAttentionItems.lowStockCount}
+                items={dashboardAttentionItems.lowStockItems}
+                href="/items?stock=low_or_empty"
+                emptyText="No low-stock items."
+                icon={LuPackageMinus}
+                detailType="stock"
               />
             </div>
           </div>

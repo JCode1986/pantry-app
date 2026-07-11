@@ -12,6 +12,10 @@
   --stocksense-brand-dark: #0A5664;
   --stocksense-brand-soft: #E6FAF6;
   --stocksense-brand-border: #9FE7D7;
+  --wherekeep-sidebar-offset: 15rem;
+  --wherekeep-desktop-commandbar-height: 4.25rem;
+  --wherekeep-desktop-page-padding-top: 100px;
+  --wherekeep-desktop-content-top: var(--wherekeep-desktop-page-padding-top);
   --entity-location-accent: color-mix(in oklab, var(--stocksense-brand) 62%, #3b82f6);
   --entity-location-soft: color-mix(in oklab, var(--entity-location-accent) 12%, white);
   --entity-location-border: color-mix(in oklab, var(--entity-location-accent) 28%, white);
@@ -30,6 +34,14 @@
   --entity-warning-accent: color-mix(in oklab, var(--stocksense-brand) 28%, #f59e0b);
   --entity-warning-soft: color-mix(in oklab, var(--entity-warning-accent) 12%, white);
   --entity-warning-border: color-mix(in oklab, var(--entity-warning-accent) 32%, white);
+}
+
+:root[data-wherekeep-sidebar="expanded"] {
+  --wherekeep-sidebar-offset: 15rem;
+}
+
+:root[data-wherekeep-sidebar="collapsed"] {
+  --wherekeep-sidebar-offset: 6rem;
 }
 
 @theme {
@@ -57,6 +69,35 @@ body {
 
 html {
   scroll-behavior: smooth;
+}
+
+.wherekeep-auth-shell {
+  min-height: 100svh;
+  padding-top: 61px;
+  padding-bottom: 6rem;
+  transition: padding 200ms ease, padding-left 200ms ease;
+}
+
+@media (min-width: 768px) {
+  .wherekeep-auth-shell {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .wherekeep-auth-shell {
+    padding-left: var(--wherekeep-sidebar-offset);
+    padding-top: var(--wherekeep-desktop-commandbar-height);
+  }
+
+  html {
+    scroll-padding-top: var(--wherekeep-desktop-content-top);
+  }
+
+  [id] {
+    scroll-margin-top: var(--wherekeep-desktop-content-top);
+  }
 }
 
 :where(
