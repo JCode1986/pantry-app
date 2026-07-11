@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { getVerifiedSession } from "@/lib/verifiedSession";
 import { createClient } from "@/utils/supabase/server";
 import {
@@ -235,6 +236,10 @@ export async function updatePreferredNameAction(name) {
     };
     await session.save();
   }
+
+  revalidatePath("/", "layout");
+  revalidatePath("/");
+  revalidatePath("/profile");
 
   return {
     data: {

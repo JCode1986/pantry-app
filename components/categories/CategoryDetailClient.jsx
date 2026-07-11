@@ -555,23 +555,14 @@ export default function CategoryDetailClient({
               {area?.name ?? "Unknown area"}
             </p>
 
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="mt-4 grid grid-cols-1 gap-2">
               <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
                 <FaBoxOpen className="h-4 w-4 text-[var(--stocksense-brand)]" />
                 <p className="mt-2 text-xl font-semibold leading-none text-gray-950">
                   {items.length}
                 </p>
                 <p className="mt-1 text-[11px] font-medium leading-4 text-gray-500">
-                  Items
-                </p>
-              </div>
-              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
-                <FaBoxOpen className="h-4 w-4 text-[var(--stocksense-brand)]" />
-                <p className="mt-2 text-xl font-semibold leading-none text-gray-950">
-                  {totalQuantity}
-                </p>
-                <p className="mt-1 text-[11px] font-medium leading-4 text-gray-500">
-                  Units
+                  {items.length === 1 ? "Item" : "Items"}
                 </p>
               </div>
             </div>

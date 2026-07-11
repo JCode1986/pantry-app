@@ -35,6 +35,9 @@ import {
   FaTimes,
 } from "react-icons/fa";
 import {
+  addCategory,
+  addLocation,
+  addStorageArea,
   deleteItem,
   getItemsPageAction,
   updateItem,
@@ -99,6 +102,9 @@ const mobileDefaultPanelMotion = {
 const ITEMS_PER_PAGE = 25;
 const ITEMS_LOAD_CHUNK_SIZE = 100;
 const ALL_FILTER_KEY = "all";
+const NEW_LOCATION_VALUE = "__new_location__";
+const NEW_AREA_VALUE = "__new_area__";
+const NEW_CATEGORY_VALUE = "__new_category__";
 const EXPIRATION_FILTERS = {
   ALL: "all",
   EXPIRED: "expired",
@@ -257,6 +263,14 @@ export default function ItemsPageClient({
     areaId: null,
     categoryId: null,
   });
+  const [localMoveLocations, setLocalMoveLocations] = useState(() => moveLocations || []);
+  const [moveCreateNames, setMoveCreateNames] = useState({
+    location: "",
+    area: "",
+    category: "",
+  });
+  const [moveCreateAction, setMoveCreateAction] = useState("");
+  const [moveCreateMessage, setMoveCreateMessage] = useState(null);
   const [shoppingListMoveAction, setShoppingListMoveAction] = useState(null);
 
   // delete modal (single/bulk)
@@ -302,12 +316,24 @@ export default function ItemsPageClient({
   }, [editExp]);
 
   useEffect(() => {
+    setLocalMoveLocations(moveLocations || []);
+  }, [moveLocations]);
+
+  useEffect(() => {
+    if (moveModalOpen) return;
+
+    setMoveCreateNames({ location: "", area: "", category: "" });
+    setMoveCreateAction("");
+    setMoveCreateMessage(null);
+  }, [moveModalOpen]);
+
+  useEffect(() => {
     const handleItemAdded = (event) => {
       const item = event.detail?.item;
       if (!item?.id) return;
 
       const loc =
-        moveLocations.find((l) => String(l.id) === String(item.locationId)) ||
+        localMoveLocations.find((l) => String(l.id) === String(item.locationId)) ||
         null;
       const area =
         (loc?.storage_areas || []).find(
@@ -367,7 +393,7 @@ export default function ItemsPageClient({
     return () => {
       window.removeEventListener("stocksense:item-added", handleItemAdded);
     };
-  }, [moveLocations]);
+  }, [localMoveLocations]);
 
   useEffect(() => {
     let cancelled = false;
@@ -432,7 +458,10 @@ export default function ItemsPageClient({
 
   const normalizedSearch = search.trim().toLowerCase();
 
-  const locationOptions = useMemo(() => moveLocations || [], [moveLocations]);
+  const locationOptions = useMemo(
+    () => localMoveLocations || [],
+    [localMoveLocations]
+  );
 
   const areaOptions = useMemo(() => {
     const locations =
@@ -1000,8 +1029,10 @@ export default function ItemsPageClient({
     // - if bulk: first available in hierarchy
     const seed = mode === "single" ? activeItem : null;
 
-    const currentLocId = seed?.location?.id ?? moveLocations?.[0]?.id ?? null;
-    const loc = moveLocations.find((l) => String(l.id) === String(currentLocId)) || moveLocations[0];
+    const currentLocId = seed?.location?.id ?? locationOptions?.[0]?.id ?? null;
+    const loc =
+      locationOptions.find((l) => String(l.id) === String(currentLocId)) ||
+      locationOptions[0];
 
     const areas = loc?.storage_areas || [];
     const currentAreaId = seed?.area?.id ?? areas?.[0]?.id ?? null;
@@ -1021,22 +1052,134 @@ export default function ItemsPageClient({
   };
 
   const currentLocation = useMemo(() => {
+    if (moveTarget.locationId === NEW_LOCATION_VALUE) return null;
+
     return (
-      moveLocations.find((l) => String(l.id) === String(moveTarget.locationId)) || moveLocations[0]
+      locationOptions.find((l) => String(l.id) === String(moveTarget.locationId)) ||
+      locationOptions[0]
     );
-  }, [moveLocations, moveTarget.locationId]);
+  }, [locationOptions, moveTarget.locationId]);
 
   const currentAreas = currentLocation?.storage_areas || [];
 
   const currentArea = useMemo(() => {
+    if (moveTarget.areaId === NEW_AREA_VALUE) return null;
+
     return currentAreas.find((a) => String(a.id) === String(moveTarget.areaId)) || currentAreas[0];
   }, [currentAreas, moveTarget.areaId]);
 
   const currentCategories = currentArea?.categories || [];
 
+  const showMoveCreateMessage = (type, text) => {
+    setMoveCreateMessage({ type, text });
+    window.setTimeout(() => setMoveCreateMessage(null), 3500);
+  };
+
+  const updateMoveCreateName = (key, value) => {
+    setMoveCreateNames((current) => ({ ...current, [key]: value }));
+  };
+
+  const createMoveLocation = async () => {
+    const name = moveCreateNames.location.trim();
+    if (!name || moveCreateAction) return;
+
+    setMoveCreateAction("location");
+    setMoveCreateMessage(null);
+    const result = await addLocation(name);
+    setMoveCreateAction("");
+
+    if (result?.error) {
+      showMoveCreateMessage("error", result.error?.message || result.error);
+      return;
+    }
+
+    const location = { ...result.data, storage_areas: [] };
+    setLocalMoveLocations((current) => [...current, location]);
+    setMoveTarget({
+      locationId: location.id,
+      areaId: null,
+      categoryId: null,
+    });
+    updateMoveCreateName("location", "");
+    showMoveCreateMessage("success", "Location created.");
+  };
+
+  const createMoveArea = async () => {
+    const name = moveCreateNames.area.trim();
+    const locationId = moveTarget.locationId;
+    if (!name || !locationId || locationId === NEW_LOCATION_VALUE || moveCreateAction) return;
+
+    setMoveCreateAction("area");
+    setMoveCreateMessage(null);
+    const result = await addStorageArea(locationId, name);
+    setMoveCreateAction("");
+
+    if (result?.error) {
+      showMoveCreateMessage("error", result.error?.message || result.error);
+      return;
+    }
+
+    const area = { ...result.data, categories: [] };
+    setLocalMoveLocations((current) =>
+      current.map((location) =>
+        String(location.id) === String(locationId)
+          ? {
+              ...location,
+              storage_areas: [...(location.storage_areas || []), area],
+            }
+          : location
+      )
+    );
+    setMoveTarget((current) => ({
+      ...current,
+      areaId: area.id,
+      categoryId: null,
+    }));
+    updateMoveCreateName("area", "");
+    showMoveCreateMessage("success", "Storage area created.");
+  };
+
+  const createMoveCategory = async () => {
+    const name = moveCreateNames.category.trim();
+    const areaId = moveTarget.areaId;
+    if (!name || !areaId || areaId === NEW_AREA_VALUE || moveCreateAction) return;
+
+    setMoveCreateAction("category");
+    setMoveCreateMessage(null);
+    const result = await addCategory(areaId, name);
+    setMoveCreateAction("");
+
+    if (result?.error) {
+      showMoveCreateMessage("error", result.error?.message || result.error);
+      return;
+    }
+
+    const category = result.data;
+    setLocalMoveLocations((current) =>
+      current.map((location) => ({
+        ...location,
+        storage_areas: (location.storage_areas || []).map((area) =>
+          String(area.id) === String(areaId)
+            ? {
+                ...area,
+                categories: [...(area.categories || []), category],
+              }
+            : area
+        ),
+      }))
+    );
+    setMoveTarget((current) => ({
+      ...current,
+      categoryId: category.id,
+    }));
+    updateMoveCreateName("category", "");
+    showMoveCreateMessage("success", "Category created.");
+  };
+
   const canConfirmMove = useMemo(() => {
     if (!canEditInventory) return false;
     if (!moveTarget.categoryId) return false;
+    if (moveTarget.categoryId === NEW_CATEGORY_VALUE) return false;
 
     const targetCategoryId = String(moveTarget.categoryId);
 
@@ -1071,7 +1214,7 @@ export default function ItemsPageClient({
 
     // Update local breadcrumb based on moveTarget
     const loc =
-      moveLocations.find((l) => String(l.id) === String(moveTarget.locationId)) || null;
+      locationOptions.find((l) => String(l.id) === String(moveTarget.locationId)) || null;
     const area =
       (loc?.storage_areas || []).find((a) => String(a.id) === String(moveTarget.areaId)) || null;
     const cat =
@@ -1121,7 +1264,7 @@ export default function ItemsPageClient({
 
     // Update local breadcrumb based on moveTarget
     const loc =
-      moveLocations.find((l) => String(l.id) === String(moveTarget.locationId)) || null;
+      locationOptions.find((l) => String(l.id) === String(moveTarget.locationId)) || null;
     const area =
       (loc?.storage_areas || []).find((a) => String(a.id) === String(moveTarget.areaId)) || null;
     const cat =
@@ -2670,6 +2813,18 @@ export default function ItemsPageClient({
               </ModalHeader>
 
               <ModalBody className={`space-y-4 ${modalBodyClass}`}>
+                {moveCreateMessage ? (
+                  <div
+                    className={`rounded-2xl border px-3 py-2 text-sm ${
+                      moveCreateMessage.type === "success"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border-rose-200 bg-rose-50 text-rose-700"
+                    }`}
+                  >
+                    {moveCreateMessage.text}
+                  </div>
+                ) : null}
+
                 {drawerOpen && activeItem ? (
                   <div className="rounded-2xl border border-gray-200 bg-white p-3">
                     <p className="text-xs font-medium uppercase text-gray-500">
@@ -2720,9 +2875,18 @@ export default function ItemsPageClient({
                   }
                   onSelectionChange={(keys) => {
                     const locId = getSelectedValue(keys) || null;
+                    if (locId === NEW_LOCATION_VALUE) {
+                      setMoveTarget({
+                        locationId: NEW_LOCATION_VALUE,
+                        areaId: null,
+                        categoryId: null,
+                      });
+                      return;
+                    }
+
                     const loc =
-                      moveLocations.find((l) => String(l.id) === String(locId)) ||
-                      moveLocations[0];
+                      locationOptions.find((l) => String(l.id) === String(locId)) ||
+                      locationOptions[0];
                     const firstArea = loc?.storage_areas?.[0] || null;
                     const firstCat = firstArea?.categories?.[0] || null;
 
@@ -2736,12 +2900,34 @@ export default function ItemsPageClient({
                   radius="lg"
                   classNames={themedSelectClassNames}
                 >
-                  {moveLocations.map((location) => (
+                  {locationOptions.map((location) => (
                     <SelectItem key={String(location.id)}>
                       {location.name}
                     </SelectItem>
                   ))}
+                  <SelectItem key={NEW_LOCATION_VALUE}>+ New location</SelectItem>
                 </Select>
+                {moveTarget.locationId === NEW_LOCATION_VALUE ? (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                    <Input
+                      label="New location"
+                      value={moveCreateNames.location}
+                      onValueChange={(value) => updateMoveCreateName("location", value)}
+                      placeholder="Kitchen, garage, closet..."
+                      variant="bordered"
+                      radius="lg"
+                      classNames={modalInputClassNames}
+                    />
+                    <Button
+                      className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
+                      isLoading={moveCreateAction === "location"}
+                      isDisabled={!moveCreateNames.location.trim() || Boolean(moveCreateAction)}
+                      onPress={createMoveLocation}
+                    >
+                      Create
+                    </Button>
+                  </div>
+                ) : null}
 
                 <Select
                   label="Storage area"
@@ -2753,6 +2939,15 @@ export default function ItemsPageClient({
                   }
                   onSelectionChange={(keys) => {
                     const areaId = getSelectedValue(keys) || null;
+                    if (areaId === NEW_AREA_VALUE) {
+                      setMoveTarget((prev) => ({
+                        ...prev,
+                        areaId: NEW_AREA_VALUE,
+                        categoryId: null,
+                      }));
+                      return;
+                    }
+
                     const area =
                       currentAreas.find((a) => String(a.id) === String(areaId)) ||
                       currentAreas[0];
@@ -2764,7 +2959,7 @@ export default function ItemsPageClient({
                       categoryId: firstCat?.id ?? null,
                     }));
                   }}
-                  isDisabled={!moveTarget.locationId}
+                  isDisabled={!moveTarget.locationId || moveTarget.locationId === NEW_LOCATION_VALUE}
                   variant="bordered"
                   radius="lg"
                   classNames={themedSelectClassNames}
@@ -2772,7 +2967,35 @@ export default function ItemsPageClient({
                   {currentAreas.map((area) => (
                     <SelectItem key={String(area.id)}>{area.name}</SelectItem>
                   ))}
+                  <SelectItem key={NEW_AREA_VALUE}>+ New storage area</SelectItem>
                 </Select>
+                {moveTarget.areaId === NEW_AREA_VALUE ? (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                    <Input
+                      label="New storage area"
+                      value={moveCreateNames.area}
+                      onValueChange={(value) => updateMoveCreateName("area", value)}
+                      placeholder="Pantry, shelf, drawer..."
+                      isDisabled={!moveTarget.locationId || moveTarget.locationId === NEW_LOCATION_VALUE}
+                      variant="bordered"
+                      radius="lg"
+                      classNames={modalInputClassNames}
+                    />
+                    <Button
+                      className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
+                      isLoading={moveCreateAction === "area"}
+                      isDisabled={
+                        !moveCreateNames.area.trim() ||
+                        !moveTarget.locationId ||
+                        moveTarget.locationId === NEW_LOCATION_VALUE ||
+                        Boolean(moveCreateAction)
+                      }
+                      onPress={createMoveArea}
+                    >
+                      Create
+                    </Button>
+                  </div>
+                ) : null}
 
                 <Select
                   label="Category"
@@ -2788,7 +3011,7 @@ export default function ItemsPageClient({
                       categoryId: getSelectedValue(keys) || null,
                     }))
                   }
-                  isDisabled={!moveTarget.areaId}
+                  isDisabled={!moveTarget.areaId || moveTarget.areaId === NEW_AREA_VALUE}
                   variant="bordered"
                   radius="lg"
                   classNames={themedSelectClassNames}
@@ -2798,7 +3021,35 @@ export default function ItemsPageClient({
                       {category.name}
                     </SelectItem>
                   ))}
+                  <SelectItem key={NEW_CATEGORY_VALUE}>+ New category</SelectItem>
                 </Select>
+                {moveTarget.categoryId === NEW_CATEGORY_VALUE ? (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                    <Input
+                      label="New category"
+                      value={moveCreateNames.category}
+                      onValueChange={(value) => updateMoveCreateName("category", value)}
+                      placeholder="Snacks, tools, cleaning..."
+                      isDisabled={!moveTarget.areaId || moveTarget.areaId === NEW_AREA_VALUE}
+                      variant="bordered"
+                      radius="lg"
+                      classNames={modalInputClassNames}
+                    />
+                    <Button
+                      className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
+                      isLoading={moveCreateAction === "category"}
+                      isDisabled={
+                        !moveCreateNames.category.trim() ||
+                        !moveTarget.areaId ||
+                        moveTarget.areaId === NEW_AREA_VALUE ||
+                        Boolean(moveCreateAction)
+                      }
+                      onPress={createMoveCategory}
+                    >
+                      Create
+                    </Button>
+                  </div>
+                ) : null}
               </ModalBody>
 
               <ModalFooter className={modalFooterClass}>

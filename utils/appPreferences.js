@@ -1,5 +1,4 @@
 export const PREFERENCE_STORAGE_KEY = "stocksense.preferences";
-export const PREFERRED_NAME_STORAGE_KEY = "wherekeep.preferredName";
 
 export const THEME_OPTIONS = [
   {

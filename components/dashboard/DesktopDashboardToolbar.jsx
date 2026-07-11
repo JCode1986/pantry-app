@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PREFERRED_NAME_STORAGE_KEY } from "@/utils/appPreferences";
 
 export default function DesktopDashboardToolbar({
   greeting = "Good morning",
@@ -11,32 +10,26 @@ export default function DesktopDashboardToolbar({
   const displayName = preferredName || userName;
 
   useEffect(() => {
-    const syncPreferredName = () => {
-      setPreferredName(
-        window.localStorage.getItem(PREFERRED_NAME_STORAGE_KEY)?.trim() ||
-          userName
-      );
-    };
+    setPreferredName(userName);
+  }, [userName]);
 
+  useEffect(() => {
     const handlePreferredNameChange = (event) => {
       setPreferredName(event.detail?.name?.trim() || "");
     };
 
-    syncPreferredName();
     window.addEventListener(
       "wherekeep:preferred-name-change",
       handlePreferredNameChange
     );
-    window.addEventListener("storage", syncPreferredName);
 
     return () => {
       window.removeEventListener(
         "wherekeep:preferred-name-change",
         handlePreferredNameChange
       );
-      window.removeEventListener("storage", syncPreferredName);
     };
-  }, [userName]);
+  }, []);
 
   return (
     <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

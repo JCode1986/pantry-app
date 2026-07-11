@@ -8,6 +8,7 @@ import {
   DropdownItem,
   DropdownMenu,
   DropdownTrigger,
+  Input,
   Modal,
   ModalBody,
   ModalContent,
@@ -33,6 +34,11 @@ import {
   moveShoppingListItemToInventoryAction,
   updateShoppingListItemAction,
 } from "@/app/actions/shoppingList";
+import {
+  addCategory,
+  addLocation,
+  addStorageArea,
+} from "@/app/actions/server";
 import AddShoppingListItemModal from "@/components/shopping-list/AddShoppingListItemModal";
 import EditShoppingListItemModal from "@/components/shopping-list/EditShoppingListItemModal";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
@@ -43,6 +49,7 @@ import {
   modalContentStyle,
   modalFooterClass,
   modalHeaderClass,
+  modalInputClassNames,
   mobileSheetModalClassNames,
   themedSelectClassNames,
 } from "@/components/modals/modalTheme";
@@ -56,6 +63,9 @@ const FILTERS = [
 ];
 
 const FILTER_VALUES = new Set(FILTERS.map((filter) => filter.value));
+const NEW_LOCATION_VALUE = "__new_location__";
+const NEW_AREA_VALUE = "__new_area__";
+const NEW_CATEGORY_VALUE = "__new_category__";
 
 function normalizeFilter(value) {
   return FILTER_VALUES.has(value) ? value : "needed";
@@ -171,6 +181,14 @@ export default function ShoppingListPageClient({
     areaId: null,
     categoryId: null,
   });
+  const [localMoveLocations, setLocalMoveLocations] = useState(() => moveLocations ?? []);
+  const [moveCreateNames, setMoveCreateNames] = useState({
+    location: "",
+    area: "",
+    category: "",
+  });
+  const [moveCreateAction, setMoveCreateAction] = useState("");
+  const [moveCreateMessage, setMoveCreateMessage] = useState(null);
 
   const visibleItems = useMemo(() => {
     if (filter === "all") return items;
@@ -180,13 +198,27 @@ export default function ShoppingListPageClient({
   const selectedCount = selectedIds.size;
   const selectionMode = selectedCount > 0;
   const isBulkBusy = Boolean(bulkAction);
-  const safeMoveLocations = moveLocations ?? [];
+  const safeMoveLocations = localMoveLocations ?? [];
+
+  useEffect(() => {
+    setLocalMoveLocations(moveLocations ?? []);
+  }, [moveLocations]);
+
+  useEffect(() => {
+    if (moveDialog.open) return;
+
+    setMoveCreateNames({ location: "", area: "", category: "" });
+    setMoveCreateAction("");
+    setMoveCreateMessage(null);
+  }, [moveDialog.open]);
 
   useEffect(() => {
     setFilter(normalizeFilter(initialFilter));
   }, [initialFilter]);
 
   const selectedMoveLocation = useMemo(() => {
+    if (moveDialog.locationId === NEW_LOCATION_VALUE) return null;
+
     return (
       safeMoveLocations.find(
         (location) => String(location.id) === String(moveDialog.locationId)
@@ -199,6 +231,8 @@ export default function ShoppingListPageClient({
   const moveAreas = selectedMoveLocation?.storage_areas ?? [];
 
   const selectedMoveArea = useMemo(() => {
+    if (moveDialog.areaId === NEW_AREA_VALUE) return null;
+
     return (
       moveAreas.find((area) => String(area.id) === String(moveDialog.areaId)) ??
       null
@@ -209,6 +243,7 @@ export default function ShoppingListPageClient({
     canEditInventory &&
     Boolean(
       moveDialog.categoryId &&
+        moveDialog.categoryId !== NEW_CATEGORY_VALUE &&
         (moveDialog.item?.id || (moveDialog.itemIds?.length ?? 0) > 0)
     ) &&
     !moveDialog.isMoving;
@@ -447,6 +482,16 @@ export default function ShoppingListPageClient({
   }
 
   function handleMoveLocationChange(value) {
+    if (value === NEW_LOCATION_VALUE) {
+      setMoveDialog((current) => ({
+        ...current,
+        locationId: NEW_LOCATION_VALUE,
+        areaId: null,
+        categoryId: null,
+      }));
+      return;
+    }
+
     const nextLocation =
       safeMoveLocations.find((location) => String(location.id) === String(value)) ??
       safeMoveLocations[0] ??
@@ -463,6 +508,15 @@ export default function ShoppingListPageClient({
   }
 
   function handleMoveAreaChange(value) {
+    if (value === NEW_AREA_VALUE) {
+      setMoveDialog((current) => ({
+        ...current,
+        areaId: NEW_AREA_VALUE,
+        categoryId: null,
+      }));
+      return;
+    }
+
     const nextArea =
       moveAreas.find((area) => String(area.id) === String(value)) ?? null;
     const firstCategory = nextArea?.categories?.[0] ?? null;
@@ -472,6 +526,129 @@ export default function ShoppingListPageClient({
       areaId: nextArea?.id ?? null,
       categoryId: firstCategory?.id ?? null,
     }));
+  }
+
+  function updateMoveCreateName(key, value) {
+    setMoveCreateNames((current) => ({ ...current, [key]: value }));
+  }
+
+  function showMoveCreateMessage(type, text) {
+    setMoveCreateMessage({ type, text });
+    window.setTimeout(() => setMoveCreateMessage(null), 3500);
+  }
+
+  async function createMoveLocation() {
+    const name = moveCreateNames.location.trim();
+    if (!name || moveCreateAction || moveDialog.isMoving) return;
+
+    setMoveCreateAction("location");
+    setMoveCreateMessage(null);
+    const result = await addLocation(name);
+    setMoveCreateAction("");
+
+    if (result?.error) {
+      showMoveCreateMessage("error", result.error?.message || result.error);
+      return;
+    }
+
+    const location = { ...result.data, storage_areas: [] };
+    setLocalMoveLocations((current) => [...current, location]);
+    setMoveDialog((current) => ({
+      ...current,
+      locationId: location.id,
+      areaId: null,
+      categoryId: null,
+    }));
+    updateMoveCreateName("location", "");
+    showMoveCreateMessage("success", "Location created.");
+  }
+
+  async function createMoveArea() {
+    const name = moveCreateNames.area.trim();
+    const locationId = moveDialog.locationId;
+    if (
+      !name ||
+      !locationId ||
+      locationId === NEW_LOCATION_VALUE ||
+      moveCreateAction ||
+      moveDialog.isMoving
+    ) {
+      return;
+    }
+
+    setMoveCreateAction("area");
+    setMoveCreateMessage(null);
+    const result = await addStorageArea(locationId, name);
+    setMoveCreateAction("");
+
+    if (result?.error) {
+      showMoveCreateMessage("error", result.error?.message || result.error);
+      return;
+    }
+
+    const area = { ...result.data, categories: [] };
+    setLocalMoveLocations((current) =>
+      current.map((location) =>
+        String(location.id) === String(locationId)
+          ? {
+              ...location,
+              storage_areas: [...(location.storage_areas ?? []), area],
+            }
+          : location
+      )
+    );
+    setMoveDialog((current) => ({
+      ...current,
+      areaId: area.id,
+      categoryId: null,
+    }));
+    updateMoveCreateName("area", "");
+    showMoveCreateMessage("success", "Storage area created.");
+  }
+
+  async function createMoveCategory() {
+    const name = moveCreateNames.category.trim();
+    const areaId = moveDialog.areaId;
+    if (
+      !name ||
+      !areaId ||
+      areaId === NEW_AREA_VALUE ||
+      moveCreateAction ||
+      moveDialog.isMoving
+    ) {
+      return;
+    }
+
+    setMoveCreateAction("category");
+    setMoveCreateMessage(null);
+    const result = await addCategory(areaId, name);
+    setMoveCreateAction("");
+
+    if (result?.error) {
+      showMoveCreateMessage("error", result.error?.message || result.error);
+      return;
+    }
+
+    const category = result.data;
+    setLocalMoveLocations((current) =>
+      current.map((location) => ({
+        ...location,
+        storage_areas: (location.storage_areas ?? []).map((area) =>
+          String(area.id) === String(areaId)
+            ? {
+                ...area,
+                categories: [...(area.categories ?? []), category],
+              }
+            : area
+        ),
+      }))
+    );
+    setMoveDialog((current) => ({
+      ...current,
+      categoryId: category.id,
+    }));
+    updateMoveCreateName("category", "");
+    showMoveCreateMessage("success", "Category created.");
   }
 
   function toggleSelectAllVisible() {
@@ -721,7 +898,7 @@ export default function ShoppingListPageClient({
                 className="min-h-11 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-sm font-semibold text-[var(--stocksense-brand)]"
                 isLoading={moveDialog.isMoving}
                 isDisabled={
-                  selectedCount === 0 || isBulkBusy || safeMoveLocations.length === 0
+                  selectedCount === 0 || isBulkBusy
                 }
                 onPress={openBulkMoveDialog}
                 startContent={!moveDialog.isMoving ? <FaExchangeAlt /> : null}
@@ -947,7 +1124,7 @@ export default function ShoppingListPageClient({
                     size="sm"
                     className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
                     isLoading={moveDialog.isMoving}
-                    isDisabled={isBulkBusy || safeMoveLocations.length === 0}
+                    isDisabled={isBulkBusy}
                     onPress={openBulkMoveDialog}
                     startContent={!moveDialog.isMoving ? <FaExchangeAlt /> : null}
                   >
@@ -1208,7 +1385,6 @@ export default function ShoppingListPageClient({
                                   )}
                                   <DropdownItem
                                     key="move"
-                                    isDisabled={safeMoveLocations.length === 0}
                                     onPress={() => openMoveDialog(item)}
                                   >
                                     Move to inventory
@@ -1334,6 +1510,18 @@ export default function ShoppingListPageClient({
               </ModalHeader>
 
               <ModalBody className={`space-y-4 ${modalBodyClass}`}>
+                {moveCreateMessage ? (
+                  <div
+                    className={`rounded-2xl border px-3 py-2 text-sm ${
+                      moveCreateMessage.type === "success"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border-rose-200 bg-rose-50 text-rose-700"
+                    }`}
+                  >
+                    {moveCreateMessage.text}
+                  </div>
+                ) : null}
+
                 <Select
                   label="Location"
                   selectedKeys={
@@ -1354,7 +1542,34 @@ export default function ShoppingListPageClient({
                       {location.name}
                     </SelectItem>
                   ))}
+                  <SelectItem key={NEW_LOCATION_VALUE}>+ New location</SelectItem>
                 </Select>
+                {moveDialog.locationId === NEW_LOCATION_VALUE ? (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                    <Input
+                      label="New location"
+                      value={moveCreateNames.location}
+                      onValueChange={(value) => updateMoveCreateName("location", value)}
+                      placeholder="Kitchen, garage, closet..."
+                      isDisabled={moveDialog.isMoving}
+                      variant="bordered"
+                      radius="lg"
+                      classNames={modalInputClassNames}
+                    />
+                    <Button
+                      className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
+                      isLoading={moveCreateAction === "location"}
+                      isDisabled={
+                        moveDialog.isMoving ||
+                        !moveCreateNames.location.trim() ||
+                        Boolean(moveCreateAction)
+                      }
+                      onPress={createMoveLocation}
+                    >
+                      Create
+                    </Button>
+                  </div>
+                ) : null}
 
                 <Select
                   label="Storage area"
@@ -1367,7 +1582,11 @@ export default function ShoppingListPageClient({
                   onSelectionChange={(keys) =>
                     handleMoveAreaChange(getSelectedValue(keys))
                   }
-                  isDisabled={moveDialog.isMoving || !selectedMoveLocation}
+                  isDisabled={
+                    moveDialog.isMoving ||
+                    !selectedMoveLocation ||
+                    moveDialog.locationId === NEW_LOCATION_VALUE
+                  }
                   variant="bordered"
                   radius="lg"
                   classNames={themedSelectClassNames}
@@ -1375,7 +1594,40 @@ export default function ShoppingListPageClient({
                   {moveAreas.map((area) => (
                     <SelectItem key={String(area.id)}>{area.name}</SelectItem>
                   ))}
+                  <SelectItem key={NEW_AREA_VALUE}>+ New storage area</SelectItem>
                 </Select>
+                {moveDialog.areaId === NEW_AREA_VALUE ? (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                    <Input
+                      label="New storage area"
+                      value={moveCreateNames.area}
+                      onValueChange={(value) => updateMoveCreateName("area", value)}
+                      placeholder="Pantry, shelf, drawer..."
+                      isDisabled={
+                        moveDialog.isMoving ||
+                        !moveDialog.locationId ||
+                        moveDialog.locationId === NEW_LOCATION_VALUE
+                      }
+                      variant="bordered"
+                      radius="lg"
+                      classNames={modalInputClassNames}
+                    />
+                    <Button
+                      className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
+                      isLoading={moveCreateAction === "area"}
+                      isDisabled={
+                        moveDialog.isMoving ||
+                        !moveCreateNames.area.trim() ||
+                        !moveDialog.locationId ||
+                        moveDialog.locationId === NEW_LOCATION_VALUE ||
+                        Boolean(moveCreateAction)
+                      }
+                      onPress={createMoveArea}
+                    >
+                      Create
+                    </Button>
+                  </div>
+                ) : null}
 
                 <Select
                   label="Category"
@@ -1391,7 +1643,11 @@ export default function ShoppingListPageClient({
                       categoryId: getSelectedValue(keys) || null,
                     }))
                   }
-                  isDisabled={moveDialog.isMoving || !moveDialog.areaId}
+                  isDisabled={
+                    moveDialog.isMoving ||
+                    !moveDialog.areaId ||
+                    moveDialog.areaId === NEW_AREA_VALUE
+                  }
                   variant="bordered"
                   radius="lg"
                   classNames={themedSelectClassNames}
@@ -1401,7 +1657,40 @@ export default function ShoppingListPageClient({
                       {category.name}
                     </SelectItem>
                   ))}
+                  <SelectItem key={NEW_CATEGORY_VALUE}>+ New category</SelectItem>
                 </Select>
+                {moveDialog.categoryId === NEW_CATEGORY_VALUE ? (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                    <Input
+                      label="New category"
+                      value={moveCreateNames.category}
+                      onValueChange={(value) => updateMoveCreateName("category", value)}
+                      placeholder="Snacks, tools, cleaning..."
+                      isDisabled={
+                        moveDialog.isMoving ||
+                        !moveDialog.areaId ||
+                        moveDialog.areaId === NEW_AREA_VALUE
+                      }
+                      variant="bordered"
+                      radius="lg"
+                      classNames={modalInputClassNames}
+                    />
+                    <Button
+                      className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
+                      isLoading={moveCreateAction === "category"}
+                      isDisabled={
+                        moveDialog.isMoving ||
+                        !moveCreateNames.category.trim() ||
+                        !moveDialog.areaId ||
+                        moveDialog.areaId === NEW_AREA_VALUE ||
+                        Boolean(moveCreateAction)
+                      }
+                      onPress={createMoveCategory}
+                    >
+                      Create
+                    </Button>
+                  </div>
+                ) : null}
               </ModalBody>
 
               <ModalFooter className={modalFooterClass}>

@@ -222,7 +222,7 @@ function getPreferredName(user) {
     metadata.name ||
     "";
 
-  return name ? String(name).split(" ")[0] : "";
+  return name ? String(name).trim() : "";
 }
 
 export default async function RootLayout({ children }) {
@@ -257,6 +257,22 @@ export default async function RootLayout({ children }) {
       currentUser = user ?? null;
     } catch (err) {
       console.error("Navigation Supabase user error:", err);
+    }
+  }
+
+  if (currentUser?.id) {
+    try {
+      if (!supabase) supabase = await createClient();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (!userError && user?.id === currentUser.id) {
+        currentUser = user;
+      }
+    } catch (err) {
+      console.error("Navigation Supabase display name error:", err);
     }
   }
 

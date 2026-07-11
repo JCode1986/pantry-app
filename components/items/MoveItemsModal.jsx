@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  Button,
+  Input,
   Modal,
   ModalBody,
   ModalContent,
@@ -16,10 +18,20 @@ import {
   modalContentClass,
   modalFooterClass,
   modalHeaderClass,
+  modalInputClassNames,
   mobileSheetModalClassNames,
   themedSelectClassNames,
 } from "@/components/modals/modalTheme";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
+import {
+  addCategory,
+  addLocation,
+  addStorageArea,
+} from "@/app/actions/server";
+
+const NEW_LOCATION_VALUE = "__new_location__";
+const NEW_AREA_VALUE = "__new_area__";
+const NEW_CATEGORY_VALUE = "__new_category__";
 
 function createClosedMoveModal(currentLocationId) {
   return {
@@ -40,10 +52,29 @@ export default function MoveItemsModal({
   storageAreas,
   currentLocationId,
   onConfirm,
+  onDestinationCreated,
 }) {
-  const safeLocations = locationsForMove ?? [];
+  const [localLocations, setLocalLocations] = useState([]);
+  const [newLocationName, setNewLocationName] = useState("");
+  const [newAreaName, setNewAreaName] = useState("");
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [creating, setCreating] = useState("");
+  const [createMessage, setCreateMessage] = useState(null);
+
+  useEffect(() => {
+    setLocalLocations(
+      (locationsForMove ?? []).map((location) => ({
+        ...location,
+        storageAreas: location.storageAreas ?? location.storage_areas ?? [],
+      }))
+    );
+  }, [locationsForMove]);
+
+  const safeLocations = localLocations;
 
   const selectedLocation = useMemo(() => {
+    if (moveModal.targetLocationId === NEW_LOCATION_VALUE) return null;
+
     return (
       safeLocations.find(
         (loc) => String(loc.id) === String(moveModal.targetLocationId)
@@ -53,12 +84,24 @@ export default function MoveItemsModal({
 
   const areasForSelectedLocation = useMemo(() => {
     if (!selectedLocation) return [];
-    return String(selectedLocation.id) === String(currentLocationId)
-      ? storageAreas ?? []
-      : selectedLocation.storageAreas ?? [];
+    if (String(selectedLocation.id) !== String(currentLocationId)) {
+      return selectedLocation.storageAreas ?? [];
+    }
+
+    const byId = new Map();
+    for (const area of storageAreas ?? []) {
+      byId.set(String(area.id), area);
+    }
+    for (const area of selectedLocation.storageAreas ?? []) {
+      byId.set(String(area.id), area);
+    }
+
+    return Array.from(byId.values());
   }, [currentLocationId, selectedLocation, storageAreas]);
 
   const selectedArea = useMemo(() => {
+    if (moveModal.targetAreaId === NEW_AREA_VALUE) return null;
+
     return (
       areasForSelectedLocation.find(
         (area) => String(area.id) === String(moveModal.targetAreaId)
@@ -89,14 +132,34 @@ export default function MoveItemsModal({
   ]);
 
   const canMove =
-    Boolean(moveModal.targetAreaId && moveModal.targetCategoryId) &&
+    Boolean(
+      moveModal.targetAreaId &&
+        moveModal.targetAreaId !== NEW_AREA_VALUE &&
+        moveModal.targetCategoryId &&
+        moveModal.targetCategoryId !== NEW_CATEGORY_VALUE
+    ) &&
     String(moveModal.targetCategoryId) !== String(moveModal.sourceCategoryId);
 
   const closeModal = () => {
+    setNewLocationName("");
+    setNewAreaName("");
+    setNewCategoryName("");
+    setCreateMessage(null);
+    setCreating("");
     setMoveModal(createClosedMoveModal(currentLocationId));
   };
 
   const handleLocationChange = (value) => {
+    if (value === NEW_LOCATION_VALUE) {
+      setMoveModal((prev) => ({
+        ...prev,
+        targetLocationId: NEW_LOCATION_VALUE,
+        targetAreaId: null,
+        targetCategoryId: null,
+      }));
+      return;
+    }
+
     const nextLocation =
       safeLocations.find((loc) => String(loc.id) === String(value)) ??
       safeLocations[0] ??
@@ -119,6 +182,15 @@ export default function MoveItemsModal({
   };
 
   const handleAreaChange = (value) => {
+    if (value === NEW_AREA_VALUE) {
+      setMoveModal((prev) => ({
+        ...prev,
+        targetAreaId: NEW_AREA_VALUE,
+        targetCategoryId: null,
+      }));
+      return;
+    }
+
     const nextArea =
       areasForSelectedLocation.find((area) => String(area.id) === String(value)) ??
       null;
@@ -134,6 +206,135 @@ export default function MoveItemsModal({
   const getSelectedValue = (keys) => {
     const value = Array.from(keys)[0];
     return value ? String(value) : "";
+  };
+
+  const showCreateMessage = (type, text) => {
+    setCreateMessage({ type, text });
+    window.setTimeout(() => setCreateMessage(null), 3500);
+  };
+
+  const createLocation = async () => {
+    const name = newLocationName.trim();
+    if (!name || creating) return;
+
+    setCreating("location");
+    setCreateMessage(null);
+    const result = await addLocation(name);
+    setCreating("");
+
+    if (result?.error) {
+      showCreateMessage("error", result.error?.message || result.error);
+      return;
+    }
+
+    const location = { ...result.data, storageAreas: [] };
+    setLocalLocations((current) => [...current, location]);
+    setMoveModal((prev) => ({
+      ...prev,
+      targetLocationId: location.id,
+      targetAreaId: null,
+      targetCategoryId: null,
+    }));
+    setNewLocationName("");
+    onDestinationCreated?.({ type: "location", location });
+    showCreateMessage("success", "Location created.");
+  };
+
+  const createStorageArea = async () => {
+    const name = newAreaName.trim();
+    const locationId = moveModal.targetLocationId;
+    if (!name || !locationId || locationId === NEW_LOCATION_VALUE || creating) return;
+
+    setCreating("area");
+    setCreateMessage(null);
+    const result = await addStorageArea(locationId, name);
+    setCreating("");
+
+    if (result?.error) {
+      showCreateMessage("error", result.error?.message || result.error);
+      return;
+    }
+
+    const area = { ...result.data, categories: [] };
+    setLocalLocations((current) =>
+      current.map((location) =>
+        String(location.id) === String(locationId)
+          ? {
+              ...location,
+              storageAreas: [...(location.storageAreas ?? []), area],
+            }
+          : location
+      )
+    );
+    setMoveModal((prev) => ({
+      ...prev,
+      targetAreaId: area.id,
+      targetCategoryId: null,
+    }));
+    setNewAreaName("");
+    onDestinationCreated?.({ type: "area", locationId, area });
+    showCreateMessage("success", "Storage area created.");
+  };
+
+  const createCategory = async () => {
+    const name = newCategoryName.trim();
+    const areaId = moveModal.targetAreaId;
+    if (!name || !areaId || areaId === NEW_AREA_VALUE || creating) return;
+
+    setCreating("category");
+    setCreateMessage(null);
+    const result = await addCategory(areaId, name);
+    setCreating("");
+
+    if (result?.error) {
+      showCreateMessage("error", result.error?.message || result.error);
+      return;
+    }
+
+    const category = result.data;
+    setLocalLocations((current) =>
+      current.map((location) => {
+        if (String(location.id) !== String(moveModal.targetLocationId)) {
+          return location;
+        }
+
+        let foundArea = false;
+        const storageAreas = (location.storageAreas ?? []).map((area) => {
+          if (String(area.id) !== String(areaId)) return area;
+
+          foundArea = true;
+          return {
+            ...area,
+            categories: [...(area.categories ?? []), category],
+          };
+        });
+
+        return {
+          ...location,
+          storageAreas: foundArea
+            ? storageAreas
+            : [
+                ...storageAreas,
+                {
+                  ...(selectedArea ?? { id: areaId, name: "Storage area" }),
+                  categories: [...(selectedArea?.categories ?? []), category],
+                },
+              ],
+        };
+      })
+    );
+    setMoveModal((prev) => ({
+      ...prev,
+      targetCategoryId: category.id,
+    }));
+    setNewCategoryName("");
+    onDestinationCreated?.({
+      type: "category",
+      locationId: moveModal.targetLocationId,
+      areaId,
+      category,
+    });
+    showCreateMessage("success", "Category created.");
   };
 
   return (
@@ -165,6 +366,18 @@ export default function MoveItemsModal({
             </ModalHeader>
 
             <ModalBody className={`space-y-4 ${modalBodyClass}`}>
+              {createMessage ? (
+                <div
+                  className={`rounded-2xl border px-3 py-2 text-sm ${
+                    createMessage.type === "success"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-rose-200 bg-rose-50 text-rose-700"
+                  }`}
+                >
+                  {createMessage.text}
+                </div>
+              ) : null}
+
               {currentPath ? (
                 <div className="rounded-2xl border border-gray-200 bg-white p-3">
                   <p className="text-xs font-medium uppercase text-gray-500">
@@ -193,7 +406,29 @@ export default function MoveItemsModal({
                       {location.name}
                     </SelectItem>
                   ))}
+                  <SelectItem key={NEW_LOCATION_VALUE}>+ New location</SelectItem>
                 </Select>
+                {moveModal.targetLocationId === NEW_LOCATION_VALUE ? (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                    <Input
+                      label="New location"
+                      value={newLocationName}
+                      onValueChange={setNewLocationName}
+                      placeholder="Kitchen, garage, closet..."
+                      variant="bordered"
+                      radius="lg"
+                      classNames={modalInputClassNames}
+                    />
+                    <Button
+                      className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
+                      isLoading={creating === "location"}
+                      isDisabled={!newLocationName.trim() || Boolean(creating)}
+                      onPress={createLocation}
+                    >
+                      Create
+                    </Button>
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-1">
@@ -206,6 +441,10 @@ export default function MoveItemsModal({
                       : new Set()
                   }
                   onSelectionChange={(keys) => handleAreaChange(getSelectedValue(keys))}
+                  isDisabled={
+                    !moveModal.targetLocationId ||
+                    moveModal.targetLocationId === NEW_LOCATION_VALUE
+                  }
                   variant="bordered"
                   radius="lg"
                   classNames={themedSelectClassNames}
@@ -213,7 +452,38 @@ export default function MoveItemsModal({
                   {areasForSelectedLocation.map((area) => (
                     <SelectItem key={String(area.id)}>{area.name}</SelectItem>
                   ))}
+                  <SelectItem key={NEW_AREA_VALUE}>+ New storage area</SelectItem>
                 </Select>
+                {moveModal.targetAreaId === NEW_AREA_VALUE ? (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                    <Input
+                      label="New storage area"
+                      value={newAreaName}
+                      onValueChange={setNewAreaName}
+                      placeholder="Pantry, shelf, drawer..."
+                      isDisabled={
+                        !moveModal.targetLocationId ||
+                        moveModal.targetLocationId === NEW_LOCATION_VALUE
+                      }
+                      variant="bordered"
+                      radius="lg"
+                      classNames={modalInputClassNames}
+                    />
+                    <Button
+                      className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
+                      isLoading={creating === "area"}
+                      isDisabled={
+                        !newAreaName.trim() ||
+                        !moveModal.targetLocationId ||
+                        moveModal.targetLocationId === NEW_LOCATION_VALUE ||
+                        Boolean(creating)
+                      }
+                      onPress={createStorageArea}
+                    >
+                      Create
+                    </Button>
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-1">
@@ -231,7 +501,10 @@ export default function MoveItemsModal({
                       targetCategoryId: getSelectedValue(keys) || null,
                     }))
                   }
-                  isDisabled={!moveModal.targetAreaId}
+                  isDisabled={
+                    !moveModal.targetAreaId ||
+                    moveModal.targetAreaId === NEW_AREA_VALUE
+                  }
                   variant="bordered"
                   radius="lg"
                   classNames={themedSelectClassNames}
@@ -241,7 +514,38 @@ export default function MoveItemsModal({
                       {category.name}
                     </SelectItem>
                   ))}
+                  <SelectItem key={NEW_CATEGORY_VALUE}>+ New category</SelectItem>
                 </Select>
+                {moveModal.targetCategoryId === NEW_CATEGORY_VALUE ? (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                    <Input
+                      label="New category"
+                      value={newCategoryName}
+                      onValueChange={setNewCategoryName}
+                      placeholder="Snacks, tools, cleaning..."
+                      isDisabled={
+                        !moveModal.targetAreaId ||
+                        moveModal.targetAreaId === NEW_AREA_VALUE
+                      }
+                      variant="bordered"
+                      radius="lg"
+                      classNames={modalInputClassNames}
+                    />
+                    <Button
+                      className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
+                      isLoading={creating === "category"}
+                      isDisabled={
+                        !newCategoryName.trim() ||
+                        !moveModal.targetAreaId ||
+                        moveModal.targetAreaId === NEW_AREA_VALUE ||
+                        Boolean(creating)
+                      }
+                      onPress={createCategory}
+                    >
+                      Create
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             </ModalBody>
 

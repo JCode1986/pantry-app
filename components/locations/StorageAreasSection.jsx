@@ -1382,6 +1382,42 @@ export default function StorageAreasSection({
     });
   };
 
+  const handleMoveDestinationCreated = ({
+    type,
+    locationId: createdLocationId,
+    area,
+    areaId,
+    category,
+  }) => {
+    if (type === 'area' && String(createdLocationId) === String(locationId) && area?.id) {
+      setStorageAreas((prev) => {
+        if (prev.some((item) => String(item.id) === String(area.id))) return prev;
+        return [...prev, { ...area, categories: [] }];
+      });
+      return;
+    }
+
+    if (type === 'category' && category?.id && areaId) {
+      setStorageAreas((prev) =>
+        prev.map((storageArea) =>
+          String(storageArea.id) === String(areaId)
+            ? {
+                ...storageArea,
+                categories: (storageArea.categories || []).some(
+                  (item) => String(item.id) === String(category.id)
+                )
+                  ? storageArea.categories
+                  : [
+                      ...(storageArea.categories || []),
+                      { ...category, items: [] },
+                    ],
+              }
+            : storageArea
+        )
+      );
+    }
+  };
+
 
 
   // ---------- Filtering ----------
@@ -2913,6 +2949,7 @@ export default function StorageAreasSection({
         storageAreas={storageAreas}
         currentLocationId={locationId}
         onConfirm={handleConfirmMove}
+        onDestinationCreated={handleMoveDestinationCreated}
       />}
 
       {/* Reusable delete confirmation modal */}

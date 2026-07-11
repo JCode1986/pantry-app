@@ -49,17 +49,23 @@ function ScannerMessage({ message, className = "" }) {
   );
 }
 
-export default function BarcodeScannerModal({ isOpen, onOpenChange, onScan }) {
+export default function BarcodeScannerModal({
+  isOpen,
+  onOpenChange,
+  onScan,
+  autoStart = false,
+}) {
   const videoRef = useRef(null);
   const photoInputRef = useRef(null);
   const streamRef = useRef(null);
   const detectorRef = useRef(null);
   const frameRef = useRef(null);
+  const autoStartedRef = useRef(false);
   const [manualBarcode, setManualBarcode] = useState("");
   const [message, setMessage] = useState("");
   const [isStartingCamera, setIsStartingCamera] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
-  const [hasNativeDetector, setHasNativeDetector] = useState(false);
+  const [hasNativeDetector, setHasNativeDetector] = useState(null);
 
   useEffect(() => {
     setHasNativeDetector(
@@ -91,7 +97,10 @@ export default function BarcodeScannerModal({ isOpen, onOpenChange, onScan }) {
   };
 
   useEffect(() => {
-    if (!isOpen) stopCamera();
+    if (!isOpen) {
+      autoStartedRef.current = false;
+      stopCamera();
+    }
     return stopCamera;
   }, [isOpen]);
 
@@ -175,6 +184,22 @@ export default function BarcodeScannerModal({ isOpen, onOpenChange, onScan }) {
       setMessage("Camera access was not available. Enter the barcode manually instead.");
     }
   };
+
+  useEffect(() => {
+    if (
+      !isOpen ||
+      !autoStart ||
+      autoStartedRef.current ||
+      hasNativeDetector === null ||
+      isScanning ||
+      isStartingCamera
+    ) {
+      return;
+    }
+
+    autoStartedRef.current = true;
+    startCamera();
+  }, [autoStart, hasNativeDetector, isOpen, isScanning, isStartingCamera]);
 
   const scanPhoto = async (event) => {
     const file = event.target.files?.[0];
@@ -273,7 +298,11 @@ export default function BarcodeScannerModal({ isOpen, onOpenChange, onScan }) {
                     )
                   }
                 >
-                  {isScanning ? "Stop camera" : "Start camera"}
+                  {isStartingCamera
+                    ? "Starting camera..."
+                    : isScanning
+                    ? "Stop camera"
+                    : "Start camera"}
                 </Button>
 
                 <Button
