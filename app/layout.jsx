@@ -243,6 +243,7 @@ export default async function RootLayout({ children }) {
   let navigationSummary = {
     householdName: "",
     householdRole: "",
+    effectivePlanId: "free",
     isFamilyPlan: false,
     displayName: "",
   };
@@ -288,6 +289,7 @@ export default async function RootLayout({ children }) {
       navigationSummary = {
         householdName: household?.name || "",
         householdRole: normalizeHouseholdRole(member?.role),
+        effectivePlanId: billing.effectivePlanId,
         isFamilyPlan: billing.effectivePlanId === "family",
         displayName: getPreferredName(currentUser),
       };

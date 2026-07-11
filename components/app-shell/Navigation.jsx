@@ -493,7 +493,6 @@ function HouseholdSharingPanel({
   message,
   inviteEmail,
   inviteRole,
-  removeCandidateId,
   copiedInviteId,
   onClose,
   onSelectTab,
@@ -505,13 +504,12 @@ function HouseholdSharingPanel({
   onRevokeInvite,
   onUpdateMemberRole,
   onRequestRemoveMember,
-  onCancelRemoveMember,
-  onConfirmRemoveMember,
 }) {
   const members = sharing?.members ?? [];
   const invites = sharing?.invites ?? [];
   const pendingInviteCount = invites.filter((invite) => invite.status === "pending").length;
   const isMembersTab = activeTab === "members";
+  const isFamily = sharing?.effectivePlanId === "family";
   const isOwner = sharing?.currentUserRole === "owner";
   const canInvite = Boolean(sharing?.canInvite);
   const title = isMembersTab ? "Household members" : "Household invites";
@@ -683,43 +681,16 @@ function HouseholdSharingPanel({
                                     <SelectItem key={role.id}>{role.label}</SelectItem>
                                   ))}
                                 </Select>
-                                {removeCandidateId === member.userId ? (
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      size="sm"
-                                      variant="light"
-                                      className="rounded-lg px-2"
-                                      onPress={onCancelRemoveMember}
-                                      isDisabled={actionLoading === `remove:${member.userId}`}
-                                    >
-                                      Cancel
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="flat"
-                                      className="rounded-lg border border-rose-200 bg-rose-50 px-2 text-rose-700"
-                                      onPress={() => onConfirmRemoveMember(member)}
-                                      isLoading={actionLoading === `remove:${member.userId}`}
-                                      isDisabled={
-                                        Boolean(actionLoading) &&
-                                        actionLoading !== `remove:${member.userId}`
-                                      }
-                                    >
-                                      Confirm
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <Button
-                                    size="sm"
-                                    variant="flat"
-                                    className="rounded-lg border border-rose-200 bg-rose-50 px-2 text-rose-700"
-                                    onPress={() => onRequestRemoveMember(member)}
-                                    isDisabled={Boolean(actionLoading)}
-                                    startContent={<FaTimesCircle className="h-3.5 w-3.5" />}
-                                  >
-                                    Remove
-                                  </Button>
-                                )}
+                                <Button
+                                  size="sm"
+                                  variant="flat"
+                                  className="rounded-lg border border-rose-200 bg-rose-50 px-2 text-rose-700"
+                                  onPress={() => onRequestRemoveMember(member)}
+                                  isDisabled={Boolean(actionLoading)}
+                                  startContent={<FaTimesCircle className="h-3.5 w-3.5" />}
+                                >
+                                  Remove
+                                </Button>
                               </div>
                             )}
                           </div>
@@ -742,7 +713,16 @@ function HouseholdSharingPanel({
                 </div>
               )}
 
-              {!loading && !error && !isMembersTab && !isOwner && (
+              {!loading && !error && !isMembersTab && !isFamily && isOwner && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  Upgrade to Family to invite household members.{" "}
+                  <Link href="/profile#billing" className="font-semibold underline">
+                    View Family plan
+                  </Link>
+                </div>
+              )}
+
+              {!loading && !error && !isMembersTab && isFamily && !isOwner && (
                 <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-8 text-center">
                   <p className="text-sm font-semibold text-gray-900">
                     Owner access required
@@ -753,7 +733,18 @@ function HouseholdSharingPanel({
                 </div>
               )}
 
-              {!loading && !error && !isMembersTab && isOwner && (
+              {!loading && !error && !isMembersTab && !isFamily && !isOwner && (
+                <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-8 text-center">
+                  <p className="text-sm font-semibold text-gray-900">
+                    Family plan required
+                  </p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Household invites are available on the Family plan.
+                  </p>
+                </div>
+              )}
+
+              {!loading && !error && !isMembersTab && isFamily && isOwner && (
                 <div className="space-y-3">
                   <form
                     onSubmit={onCreateInvite}
@@ -800,7 +791,7 @@ function HouseholdSharingPanel({
                       </div>
                       {!canInvite && (
                         <p className="text-xs text-amber-700">
-                          Upgrade to Family or free up a member slot to send invites.
+                          This household is at the Family member limit.
                         </p>
                       )}
                     </div>
@@ -909,6 +900,7 @@ function PreferencesPanel({
   preferences,
   preferredName,
   saving,
+  canCustomizeAppearance,
   message,
   onClose,
   onThemeChange,
@@ -1032,11 +1024,20 @@ function PreferencesPanel({
                 </div>
 
                 <div className="mt-4 space-y-3">
+                  {!canCustomizeAppearance && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+                      Theme and font customization is included with Plus and Family.{" "}
+                      <Link href="/profile#billing" className="font-semibold underline">
+                        View plans
+                      </Link>
+                    </div>
+                  )}
+
                   <Select
                     label="Color theme"
                     selectedKeys={new Set([preferences.themeId])}
                     onSelectionChange={onThemeChange}
-                    isDisabled={saving}
+                    isDisabled={saving || !canCustomizeAppearance}
                     variant="bordered"
                     radius="lg"
                     classNames={themedSelectClassNames}
@@ -1051,7 +1052,7 @@ function PreferencesPanel({
                     label="Font"
                     selectedKeys={new Set([preferences.fontId])}
                     onSelectionChange={onFontChange}
-                    isDisabled={saving}
+                    isDisabled={saving || !canCustomizeAppearance}
                     variant="bordered"
                     radius="lg"
                     classNames={themedSelectClassNames}
@@ -1608,12 +1609,14 @@ export default function Navigation({
   const [sharingMessage, setSharingMessage] = useState(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("editor");
-  const [removeMemberCandidateId, setRemoveMemberCandidateId] = useState(null);
+  const [removeMemberCandidate, setRemoveMemberCandidate] = useState(null);
   const [copiedInviteId, setCopiedInviteId] = useState(null);
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
   const [preferredName, setPreferredName] = useState(initialPreferredName);
   const [preferenceSaving, setPreferenceSaving] = useState(false);
   const [preferenceMessage, setPreferenceMessage] = useState(null);
+  const canCustomizeAppearance =
+    (navigationSummary?.effectivePlanId || "free") !== "free";
 
   const activeHref = useMemo(() => {
     const desktopItems = desktopSidebarSections.flatMap((section) => section.items);
@@ -1732,6 +1735,16 @@ export default function Navigation({
   };
 
   const updateSidebarPreferences = async (nextPreferences) => {
+    if (!canCustomizeAppearance) {
+      const defaults = saveStoredPreferences(DEFAULT_PREFERENCES);
+      setPreferences(defaults);
+      setPreferenceMessage({
+        type: "error",
+        text: "Appearance customization requires a Plus or Family plan.",
+      });
+      return;
+    }
+
     const normalized = saveStoredPreferences({
       ...preferences,
       ...nextPreferences,
@@ -1808,6 +1821,23 @@ export default function Navigation({
 
   const handleCreateSidebarInvite = async (event) => {
     event.preventDefault();
+
+    if (sharingData?.effectivePlanId !== "family") {
+      setSharingMessage({
+        type: "error",
+        text: "Upgrade to Family before inviting household members.",
+      });
+      return;
+    }
+
+    if (!sharingData?.canInvite) {
+      setSharingMessage({
+        type: "error",
+        text: "This household is at the Family member limit.",
+      });
+      return;
+    }
+
     setSharingActionLoading("invite");
     setSharingMessage(null);
 
@@ -1932,12 +1962,12 @@ export default function Navigation({
   const handleRequestSidebarRemoveMember = (member) => {
     if (!member?.userId) return;
     setSharingMessage(null);
-    setRemoveMemberCandidateId(member.userId);
+    setRemoveMemberCandidate(member);
   };
 
   const handleCancelSidebarRemoveMember = () => {
     if (sharingActionLoading?.startsWith("remove:")) return;
-    setRemoveMemberCandidateId(null);
+    setRemoveMemberCandidate(null);
   };
 
   const handleConfirmSidebarRemoveMember = async (member) => {
@@ -1948,7 +1978,7 @@ export default function Navigation({
 
     const result = await removeHouseholdMemberAction(member.userId);
     setSharingActionLoading("");
-    setRemoveMemberCandidateId(null);
+    setRemoveMemberCandidate(null);
 
     if (result?.error) {
       setSharingMessage({ type: "error", text: result.error });
@@ -2171,7 +2201,6 @@ export default function Navigation({
         message={sharingMessage}
         inviteEmail={inviteEmail}
         inviteRole={inviteRole}
-        removeCandidateId={removeMemberCandidateId}
         copiedInviteId={copiedInviteId}
         onClose={() => setSharingPanel(null)}
         onSelectTab={setSharingTab}
@@ -2183,8 +2212,6 @@ export default function Navigation({
         onRevokeInvite={handleRevokeSidebarInvite}
         onUpdateMemberRole={handleUpdateSidebarMemberRole}
         onRequestRemoveMember={handleRequestSidebarRemoveMember}
-        onCancelRemoveMember={handleCancelSidebarRemoveMember}
-        onConfirmRemoveMember={handleConfirmSidebarRemoveMember}
       />
 
       <PreferencesPanel
@@ -2192,6 +2219,7 @@ export default function Navigation({
         preferences={preferences}
         preferredName={preferredName}
         saving={preferenceSaving}
+        canCustomizeAppearance={canCustomizeAppearance}
         message={preferenceMessage}
         onClose={() => setSharingPanel(null)}
         onThemeChange={handleSidebarThemeChange}
@@ -2410,6 +2438,64 @@ export default function Navigation({
           </div>
         </div>
       )}
+
+      <Modal
+        isOpen={Boolean(removeMemberCandidate)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) handleCancelSidebarRemoveMember();
+        }}
+        placement="center"
+        classNames={{
+          wrapper: "max-md:items-end",
+          base: "max-md:m-0 max-md:w-screen max-md:max-w-none max-md:rounded-b-none max-md:rounded-t-2xl",
+        }}
+      >
+        <ModalContent
+          className={`${modalContentClass} max-md:h-auto max-md:max-h-[80svh] max-md:rounded-b-none max-md:rounded-t-2xl max-md:border max-md:border-gray-200 max-md:bg-white max-md:shadow-2xl`}
+          style={modalContentStyle}
+        >
+          {(onClose) => {
+            const memberLabel =
+              removeMemberCandidate?.displayName ||
+              removeMemberCandidate?.email ||
+              "this member";
+            const removing =
+              sharingActionLoading === `remove:${removeMemberCandidate?.userId}`;
+
+            return (
+              <>
+                <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
+                  Remove member
+                </ModalHeader>
+                <ModalBody className={modalBodyClass}>
+                  <p className="text-sm text-gray-600">
+                    Remove {memberLabel} from this household? They will lose access to this shared inventory.
+                  </p>
+                </ModalBody>
+                <ModalFooter className={modalFooterClass}>
+                  <Button
+                    variant="light"
+                    className="rounded-xl"
+                    onPress={onClose}
+                    isDisabled={removing}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    className="rounded-xl bg-rose-600 text-white"
+                    onPress={() => handleConfirmSidebarRemoveMember(removeMemberCandidate)}
+                    isLoading={removing}
+                    isDisabled={!removeMemberCandidate}
+                    startContent={!removing && <FaTimesCircle className="h-3.5 w-3.5" />}
+                  >
+                    Remove member
+                  </Button>
+                </ModalFooter>
+              </>
+            );
+          }}
+        </ModalContent>
+      </Modal>
 
       {/* Logout confirmation modal */}
       <Modal
