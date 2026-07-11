@@ -64,10 +64,51 @@ async function getAuthedHousehold({ createIfMissing = true } = {}) {
   }
 }
 
-function serializeMember(member) {
+function getUserDisplayName(user) {
+  const metadata = user?.user_metadata ?? {};
+  const name =
+    metadata.preferred_name ||
+    metadata.display_name ||
+    metadata.full_name ||
+    metadata.name ||
+    "";
+
+  return name ? String(name).trim() : "";
+}
+
+async function getMemberDisplayNames(admin, members = []) {
+  const userIds = [
+    ...new Set(
+      (members ?? [])
+        .map((member) => member?.user_id)
+        .filter(Boolean)
+    ),
+  ];
+
+  if (userIds.length === 0) return new Map();
+
+  const results = await Promise.all(
+    userIds.map(async (userId) => {
+      const { data, error } = await admin.auth.admin.getUserById(userId);
+      if (error) {
+        console.warn("Could not load household member display name:", error);
+        return [userId, ""];
+      }
+
+      return [userId, getUserDisplayName(data?.user)];
+    })
+  );
+
+  return new Map(results);
+}
+
+function serializeMember(member, displayNamesByUserId = new Map()) {
+  const displayName = displayNamesByUserId.get(member.user_id) || "";
+
   return {
     userId: member.user_id,
     email: member.email || "Unknown email",
+    displayName: displayName || null,
     role: normalizeHouseholdRole(member.role),
     joinedAt: member.joined_at,
   };
@@ -293,6 +334,7 @@ export async function getHouseholdSharingAction() {
     const billing = await getHouseholdBilling(household);
     const maxMembers = billing.limits.users ?? null;
     const memberCount = members?.length ?? 0;
+    const displayNamesByUserId = await getMemberDisplayNames(admin, members);
     const isOwner = canManageHousehold(member, household, context.user.id);
     const canInvite =
       isOwner &&
@@ -311,7 +353,9 @@ export async function getHouseholdSharingAction() {
         maxMembers,
         memberCount,
         canInvite,
-        members: (members ?? []).map(serializeMember),
+        members: (members ?? []).map((item) =>
+          serializeMember(item, displayNamesByUserId)
+        ),
         invites: (invites ?? []).map((invite) => serializeInvite(invite, appUrl)),
       },
       error: null,
@@ -622,6 +666,10 @@ export async function updateHouseholdMemberRoleAction(memberUserId, role) {
 
     if (error) throw error;
 
+    const displayNamesByUserId = await getMemberDisplayNames(admin, [
+      updatedMember,
+    ]);
+
     revalidatePath("/profile");
     revalidatePath("/");
     revalidatePath("/locations");
@@ -632,7 +680,7 @@ export async function updateHouseholdMemberRoleAction(memberUserId, role) {
     revalidatePath("/shopping-list");
 
     return {
-      data: { member: serializeMember(updatedMember) },
+      data: { member: serializeMember(updatedMember, displayNamesByUserId) },
       error: null,
     };
   } catch (err) {

@@ -7,6 +7,7 @@ import {
   getHouseholdBilling,
   getHouseholdForUser,
 } from "@/utils/households";
+import { getInventoryImageUrls } from "@/utils/inventoryImages";
 
 const DEFAULT_LIMIT = 12;
 const MAX_LIMIT = 50;
@@ -150,6 +151,106 @@ function rowItemId(row) {
 function rowTime(value) {
   const time = new Date(value || "").getTime();
   return Number.isFinite(time) ? time : null;
+}
+
+function activityImagePath(row) {
+  const changes = row?.changes || {};
+  const value = firstValue(
+    { ...row, changes },
+    [
+      "image_path",
+      "imagePath",
+      "changes.image_path.to",
+      "changes.imagePath.to",
+      "changes.image_path.from",
+      "changes.imagePath.from",
+      "changes.image_path",
+      "changes.imagePath",
+      "changes.snapshot.image_path",
+      "changes.snapshot.imagePath",
+      "changes.old.image_path",
+      "changes.old.imagePath",
+      "changes.from_deleted_item.image_path",
+      "changes.from_deleted_item.imagePath",
+    ]
+  );
+
+  if (!value) return null;
+  if (typeof value === "object") {
+    return normalizeText(value.to || value.from || value.path || value.image_path);
+  }
+
+  return normalizeText(value);
+}
+
+async function enrichActivityImages(supabase, items) {
+  if (!items?.length) return items;
+
+  const itemIds = new Set();
+  const shoppingListItemIds = new Set();
+
+  for (const row of items) {
+    if (activityImagePath(row)) continue;
+
+    const entityType = String(row?.entity_type || "").toLowerCase();
+    const entityId = normalizeId(row?.entity_id ?? row?.item_id);
+    if (!entityId) continue;
+
+    if (entityType === "item") itemIds.add(entityId);
+    if (entityType === "shopping_list_item") shoppingListItemIds.add(entityId);
+  }
+
+  const imagePathByRowKey = new Map();
+
+  if (itemIds.size > 0) {
+    const { data, error } = await supabase
+      .from("items")
+      .select("id, image_path")
+      .in("id", Array.from(itemIds));
+
+    if (!error) {
+      for (const item of data ?? []) {
+        if (item?.image_path) imagePathByRowKey.set(`item:${item.id}`, item.image_path);
+      }
+    }
+  }
+
+  if (shoppingListItemIds.size > 0) {
+    const { data, error } = await supabase
+      .from("shopping_list_items")
+      .select("id, image_path")
+      .in("id", Array.from(shoppingListItemIds));
+
+    if (!error) {
+      for (const item of data ?? []) {
+        if (item?.image_path) {
+          imagePathByRowKey.set(`shopping_list_item:${item.id}`, item.image_path);
+        }
+      }
+    }
+  }
+
+  const imagePaths = items
+    .map((row) => {
+      const entityType = String(row?.entity_type || "").toLowerCase();
+      const entityId = normalizeId(row?.entity_id ?? row?.item_id);
+      return activityImagePath(row) || imagePathByRowKey.get(`${entityType}:${entityId}`);
+    })
+    .filter(Boolean);
+  const urlsByPath = await getInventoryImageUrls(imagePaths);
+
+  return items.map((row) => {
+    const entityType = String(row?.entity_type || "").toLowerCase();
+    const entityId = normalizeId(row?.entity_id ?? row?.item_id);
+    const imagePath =
+      activityImagePath(row) || imagePathByRowKey.get(`${entityType}:${entityId}`);
+
+    return {
+      ...row,
+      image_path: row.image_path ?? imagePath ?? null,
+      imageUrl: imagePath ? urlsByPath.get(imagePath) ?? null : null,
+    };
+  });
 }
 
 async function getLegacyMovePaths(movedItems) {
@@ -472,7 +573,8 @@ export async function getRecentActivityAction(filters = {}) {
       supabase,
       rows.slice(0, limit)
     );
-    const items = await enrichActivityActors(movedItems, household?.id);
+    const actorItems = await enrichActivityActors(movedItems, household?.id);
+    const items = await enrichActivityImages(supabase, actorItems);
 
     return {
       data: {

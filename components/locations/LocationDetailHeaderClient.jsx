@@ -171,63 +171,69 @@ export default function LocationDetailHeaderClient({
         </div>
       </header>
 
-      <header className="mb-6 overflow-hidden rounded-2xl border border-stocksense-gray bg-white shadow-sm max-md:hidden">
-        <div className="border-t-4 border-[var(--entity-location-accent)] p-5">
-          <Link
-            href="/locations"
-            className="inline-flex items-center text-sm font-medium text-[var(--stocksense-brand)] hover:underline"
-          >
-            Back to locations
-          </Link>
-          <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div className="flex min-w-0 gap-4">
-              {currentImageUrl ? (
-                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-location-border)] bg-white">
-                  <img src={currentImageUrl} alt="" className="h-full w-full object-cover" />
-                </div>
-              ) : (
-                <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-[var(--entity-location-border)] bg-[var(--entity-location-soft)] text-[var(--entity-location-accent)]">
-                  <FaMapMarkedAlt className="h-6 w-6" />
-                </div>
-              )}
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Location
-                </p>
-                <h1 className="mt-1 truncate text-3xl font-semibold tracking-tight text-gray-950">
-                  {name}
-                </h1>
-                <p className="mt-2 max-w-2xl text-sm text-gray-500">
-                  Manage this location while seeing the hierarchy clearly: storage
-                  areas contain categories, and categories contain items.
-                </p>
-              </div>
-            </div>
+      <header className="mb-6 max-md:hidden">
+        <Link
+          href="/locations"
+          className="inline-flex items-center text-sm font-semibold text-[var(--stocksense-brand)] transition hover:text-[var(--stocksense-brand-dark)]"
+        >
+          Back to locations
+        </Link>
 
-            {canEditInventory && (
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button
-                  variant="flat"
-                  className="rounded-xl border border-amber-200 bg-amber-50 text-amber-700"
-                  onPress={() => {
-                    setEditName(name);
-                    setEditOpen(true);
-                  }}
-                  startContent={<FaEdit />}
-                >
-                  Edit
-                </Button>
-                <Button
-                  variant="flat"
-                  className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
-                  onPress={() => setDeleteOpen(true)}
-                  startContent={<FaTrash />}
-                >
-                  Delete
-                </Button>
+        <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 gap-4">
+            {currentImageUrl ? (
+              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-location-border)] bg-white shadow-sm">
+                <img src={currentImageUrl} alt="" className="h-full w-full object-cover" />
+              </div>
+            ) : (
+              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-[var(--entity-location-border)] bg-[var(--entity-location-soft)] text-[var(--entity-location-accent)] shadow-sm">
+                <FaMapMarkedAlt className="h-6 w-6" />
               </div>
             )}
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--stocksense-brand)]">
+                Location
+              </p>
+              <h1 className="mt-1 truncate text-3xl font-semibold tracking-tight text-gray-950">
+                {name}
+              </h1>
+              <p className="mt-2 text-sm leading-6 text-gray-600">
+                Everything stored in this space.
+              </p>
+              <p className="mt-2 text-sm font-medium text-gray-500">
+                {stats.totalAreas ?? 0} storage areas &bull;{' '}
+                {stats.totalCategories ?? 0} categories &bull;{' '}
+                {stats.totalItems ?? 0} items
+              </p>
+            </div>
           </div>
+
+          {canEditInventory && (
+            <div className="flex flex-wrap gap-2 lg:justify-end">
+              <Button
+                size="sm"
+                variant="flat"
+                className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] shadow-sm"
+                onPress={() => {
+                  setEditName(name);
+                  setEditOpen(true);
+                }}
+                startContent={<FaEdit />}
+              >
+                Edit location
+              </Button>
+              <Button
+                size="sm"
+                variant="flat"
+                color="danger"
+                className="rounded-xl shadow-sm"
+                onPress={() => setDeleteOpen(true)}
+                startContent={<FaTrash />}
+              >
+                Delete location
+              </Button>
+            </div>
+          )}
         </div>
       </header>
 

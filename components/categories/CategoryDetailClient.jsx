@@ -5,6 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Button,
+  DatePicker,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownTrigger,
   Input,
   Modal,
   ModalBody,
@@ -19,9 +24,11 @@ import {
   FaCalendarAlt,
   FaChevronLeft,
   FaEdit,
+  FaEllipsisV,
   FaTags,
   FaTrash,
 } from "react-icons/fa";
+import { parseDate } from "@internationalized/date";
 import {
   deleteCategory,
   deleteItem,
@@ -106,6 +113,15 @@ export default function CategoryDetailClient({
     (sum, item) => sum + Number(item.quantity ?? 0),
     0
   );
+  const itemModalExpirationDateValue = useMemo(() => {
+    if (!itemModal.expirationDate) return null;
+
+    try {
+      return parseDate(itemModal.expirationDate);
+    } catch {
+      return null;
+    }
+  }, [itemModal.expirationDate]);
   const selectedCount = selectedItemIds.size;
   const allItemsSelected = items.length > 0 && selectedCount === items.length;
   const normalizedMoveLocations = useMemo(
@@ -501,7 +517,7 @@ export default function CategoryDetailClient({
   };
 
   return (
-    <main className="page-enter mx-auto max-w-[1500px] space-y-5 p-6 pt-8 md:min-h-[100vh] max-md:px-4 max-md:pb-0 max-md:pt-4">
+    <main className="page-enter mx-auto max-w-[1500px] space-y-5 px-5 py-8 md:min-h-[100vh] lg:px-6 xl:px-8 max-md:px-4 max-md:pb-0 max-md:pt-4">
       <header className="content-enter md:hidden">
         <Link
           href="/categories"
@@ -587,7 +603,7 @@ export default function CategoryDetailClient({
         </div>
       </header>
 
-      <nav className="content-enter flex flex-wrap items-center gap-2 text-sm text-gray-500 max-md:hidden">
+      <nav className="hidden">
         <Link
           href="/categories"
           className="inline-flex items-center gap-1 hover:text-[var(--stocksense-brand)]"
@@ -607,7 +623,7 @@ export default function CategoryDetailClient({
         <span className="text-gray-700">{categoryName}</span>
       </nav>
 
-      <header className="content-enter overflow-hidden rounded-2xl border border-stocksense-gray bg-white shadow-sm max-md:hidden">
+      <header className="hidden">
         <div className="border-t-4 border-[var(--entity-category-accent)] p-4 md:p-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="flex min-w-0 gap-3">
@@ -675,6 +691,160 @@ export default function CategoryDetailClient({
           </div>
         </div>
       </header>
+
+      <section className="content-enter max-md:hidden">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
+          <Link
+            href="/categories"
+            className="inline-flex items-center gap-1 hover:text-[var(--stocksense-brand)]"
+          >
+            <FaChevronLeft className="h-3 w-3" />
+            Categories
+          </Link>
+          {location?.id && (
+            <>
+              <span className="text-gray-300">/</span>
+              <Link
+                href={`/locations/${location.id}`}
+                className="hover:text-[var(--stocksense-brand)]"
+              >
+                {location.name ?? "Location"}
+              </Link>
+            </>
+          )}
+          {area?.id && (
+            <>
+              <span className="text-gray-300">/</span>
+              <Link
+                href={`/areas/${area.id}`}
+                className="hover:text-[var(--stocksense-brand)]"
+              >
+                {area.name}
+              </Link>
+            </>
+          )}
+          <span className="text-gray-300">/</span>
+          <span className="font-medium text-gray-800">{categoryName}</span>
+        </div>
+
+        <header className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex min-w-0 items-start gap-4">
+            {categoryImageUrl ? (
+              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-category-border)] bg-white shadow-sm">
+                <img
+                  src={categoryImageUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)] shadow-sm">
+                <FaTags className="h-6 w-6" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--stocksense-brand)]">
+                Category
+              </p>
+              <h1 className="mt-1 truncate text-2xl font-semibold tracking-tight text-gray-950 md:text-3xl">
+                {categoryName}
+              </h1>
+              <p className="mt-1 flex max-w-2xl flex-wrap items-center gap-1.5 text-sm leading-6 text-gray-600">
+                {location?.id ? (
+                  <Link
+                    href={`/locations/${location.id}`}
+                    className="font-medium hover:text-[var(--stocksense-brand)]"
+                  >
+                    {location.name ?? "Unknown location"}
+                  </Link>
+                ) : (
+                  <span>{location?.name ?? "Unknown location"}</span>
+                )}
+                <span className="text-gray-300">/</span>
+                {area?.id ? (
+                  <Link
+                    href={`/areas/${area.id}`}
+                    className="font-medium hover:text-[var(--stocksense-brand)]"
+                  >
+                    {area.name ?? "Unknown area"}
+                  </Link>
+                ) : (
+                  <span>{area?.name ?? "Unknown area"}</span>
+                )}
+              </p>
+            </div>
+          </div>
+
+          {canEditInventory && (
+            <div className="flex flex-wrap gap-2">
+              <OpenGlobalAddItemButton
+                context={{
+                  locationId: location?.id,
+                  storageAreaId: area?.id,
+                  categoryId: category.id,
+                }}
+                className="min-h-10 rounded-xl bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white"
+              >
+                Add Item
+              </OpenGlobalAddItemButton>
+              <Button
+                variant="flat"
+                className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
+                onPress={() => {
+                  setEditCategoryName(categoryName);
+                  setEditCategoryOpen(true);
+                }}
+                startContent={<FaEdit />}
+              >
+                Edit category
+              </Button>
+              <Button
+                variant="flat"
+                className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
+                onPress={openDeleteCategory}
+                startContent={<FaTrash />}
+              >
+                Delete
+              </Button>
+            </div>
+          )}
+        </header>
+      </section>
+
+      <section className="grid gap-4 sm:grid-cols-2 max-md:hidden">
+        <div className="rounded-2xl border border-white/70 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-500">Items</p>
+              <p className="mt-2 text-3xl font-semibold tracking-tight text-gray-950">
+                {items.length.toLocaleString()}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-gray-500">
+                Stored in this category
+              </p>
+            </div>
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] text-[var(--entity-item-accent)]">
+              <FaBoxOpen className="h-4 w-4" />
+            </span>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-white/70 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-500">Units</p>
+              <p className="mt-2 text-3xl font-semibold tracking-tight text-gray-950">
+                {totalQuantity.toLocaleString()}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-gray-500">
+                Total quantity counted
+              </p>
+            </div>
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+              <FaBoxOpen className="h-4 w-4" />
+            </span>
+          </div>
+        </div>
+      </section>
 
       <section className="md:hidden">
         <div className="flex items-end justify-between gap-3">
@@ -785,14 +955,19 @@ export default function CategoryDetailClient({
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-lg font-semibold leading-6 text-gray-950">
+                  <p
+                    className="truncate text-lg font-semibold leading-6 text-gray-950"
+                    title={item.name}
+                  >
                     {item.name}
                   </p>
                   <div className="mt-2 grid gap-0.5 text-sm leading-5 text-gray-500">
                     <span>Qty: {item.quantity ?? 0}</span>
                     <span>Exp: {formatExpiration(item.expiration_date)}</span>
                     {item.barcode && (
-                      <span className="truncate">Barcode: {item.barcode}</span>
+                      <span className="truncate" title={item.barcode}>
+                        Barcode: {item.barcode}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -856,13 +1031,13 @@ export default function CategoryDetailClient({
       </section>
 
       {canEditInventory && items.length > 0 && (
-        <section className="max-md:hidden rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+        <section className="max-md:hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-gray-950">
+              <p className="text-sm font-semibold text-[var(--stocksense-brand)]">
                 {selectedCount} selected
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-[var(--stocksense-brand)]/70">
                 Select items to move or delete together.
               </p>
             </div>
@@ -905,22 +1080,36 @@ export default function CategoryDetailClient({
         </section>
       )}
 
-      <section className="content-stagger grid grid-cols-1 gap-3 max-md:hidden sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <section className="content-stagger grid auto-rows-fr grid-cols-1 gap-5 max-md:hidden lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {items.map((item) => {
           const isSelected = selectedItemIds.has(String(item.id));
 
           return (
           <article
             key={item.id}
-            className={`flex min-w-0 flex-col gap-3 rounded-2xl border bg-white p-4 shadow-sm ${
+            className={`group flex min-h-[160px] min-w-0 flex-col gap-4 rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${
               isSelected
                 ? "border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]"
-                : "border-stocksense-gray"
+                : "border-white/70 hover:border-[var(--stocksense-brand-border)]"
             }`}
           >
             <div className="flex min-w-0 gap-3">
+              {canEditInventory && selectedCount > 0 && (
+                <label
+                  className="mt-3 flex h-5 w-5 shrink-0 items-center justify-center"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelectItem(item.id)}
+                    aria-label={`Select ${item.name}`}
+                    className="h-4 w-4 rounded border-[var(--stocksense-brand-border)]"
+                  />
+                </label>
+              )}
               {item.imageUrl ? (
-                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
+                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-item-border)] bg-white">
                   <img
                     src={item.imageUrl}
                     alt=""
@@ -928,12 +1117,15 @@ export default function CategoryDetailClient({
                   />
                 </div>
               ) : (
-                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] text-[var(--entity-item-accent)]">
-                  <FaBoxOpen className="h-5 w-5" />
+                <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] text-[var(--entity-item-accent)]">
+                  <FaBoxOpen className="h-6 w-6" />
                 </div>
               )}
-              <div className="min-w-0">
-                <div className="truncate font-semibold text-gray-950">
+              <div className="min-w-0 flex-1">
+                <div
+                  className="truncate text-lg font-semibold leading-6 text-gray-950"
+                  title={item.name}
+                >
                   {item.name}
                 </div>
                 <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
@@ -948,64 +1140,80 @@ export default function CategoryDetailClient({
                   {item.barcode && (
                     <span className="inline-flex min-w-0 items-center gap-1">
                       <FaBarcode className="h-3 w-3" />
-                      <span className="truncate">{item.barcode}</span>
+                      <span className="min-w-0 truncate" title={item.barcode}>
+                        {item.barcode}
+                      </span>
                     </span>
                   )}
                 </div>
               </div>
               {canEditInventory && (
-                <label className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center">
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleSelectItem(item.id)}
-                    aria-label={`Select ${item.name}`}
-                    className="h-5 w-5 rounded border-gray-300"
-                  />
-                </label>
+                <div className="ml-auto flex shrink-0 items-center gap-2">
+                  <Dropdown placement="bottom-end">
+                    <DropdownTrigger>
+                      <Button
+                        isIconOnly
+                        variant="light"
+                        radius="lg"
+                        className="h-9 w-9 min-w-9 shrink-0"
+                      >
+                        <FaEllipsisV className="text-gray-500" />
+                      </Button>
+                    </DropdownTrigger>
+                    <DropdownMenu aria-label={`${item.name} actions`}>
+                      <DropdownItem
+                        key="select"
+                        onPress={() => toggleSelectItem(item.id)}
+                      >
+                        {isSelected
+                          ? "Deselect for bulk action"
+                          : "Select for bulk action"}
+                      </DropdownItem>
+                      <DropdownItem
+                        key="move"
+                        startContent={<FaArrowsAlt className="h-3.5 w-3.5" />}
+                        onPress={() => openMoveItem(item)}
+                      >
+                        Move
+                      </DropdownItem>
+                      <DropdownItem
+                        key="edit"
+                        startContent={<FaEdit className="h-3.5 w-3.5" />}
+                        onPress={() => openEditItem(item)}
+                      >
+                        Edit
+                      </DropdownItem>
+                      <DropdownItem
+                        key="delete"
+                        className="text-danger"
+                        color="danger"
+                        startContent={<FaTrash className="h-3.5 w-3.5" />}
+                        onPress={() => openDeleteItem(item)}
+                      >
+                        Delete
+                      </DropdownItem>
+                    </DropdownMenu>
+                  </Dropdown>
+                </div>
               )}
             </div>
-
-            {canEditInventory && (
-              <div className="mt-auto grid grid-cols-3 gap-2">
-                <Button
-                  size="sm"
-                  variant="flat"
-                  className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
-                  onPress={() => openMoveItem(item)}
-                  startContent={<FaArrowsAlt />}
-                >
-                  Move
-                </Button>
-                <Button
-                  size="sm"
-                  variant="flat"
-                  className="rounded-xl border border-amber-200 bg-amber-50 text-amber-700"
-                  onPress={() => openEditItem(item)}
-                  startContent={<FaEdit />}
-                >
-                  Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="flat"
-                  className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
-                  onPress={() => openDeleteItem(item)}
-                  startContent={<FaTrash />}
-                >
-                  Delete
-                </Button>
-              </div>
-            )}
           </article>
           );
         })}
 
         {items.length === 0 && (
-          <div className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center text-gray-500 sm:col-span-2 lg:col-span-3 xl:col-span-4">
-            No items in this category yet.
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-8 text-center shadow-sm sm:col-span-2 lg:col-span-3 2xl:col-span-4">
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] text-[var(--entity-item-accent)]">
+              <FaBoxOpen className="h-6 w-6" />
+            </div>
+            <h2 className="mt-4 text-lg font-semibold text-gray-950">
+              No items yet
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Add an item to start filling this category.
+            </p>
             {canEditInventory && (
-              <div className="mt-4 flex justify-center">
+              <div className="mt-5 flex justify-center">
                 <OpenGlobalAddItemButton
                   context={{
                     locationId: location?.id,
@@ -1149,19 +1357,20 @@ export default function CategoryDetailClient({
                       }
                       classNames={modalInputClassNames}
                     />
-                    <Input
-                      label="Expiration"
-                      type="date"
-                      value={itemModal.expirationDate}
-                      onValueChange={(value) =>
+                    <DatePicker
+                      label="Expiration date"
+                      labelPlacement="inside"
+                      value={itemModalExpirationDateValue}
+                      onChange={(date) =>
                         setItemModal((prev) => ({
                           ...prev,
-                          expirationDate: value,
+                          expirationDate: date ? date.toString() : "",
                         }))
                       }
                       variant="bordered"
                       radius="lg"
                       classNames={modalInputClassNames}
+                      showMonthAndYearPickers
                     />
                   </div>
                   <Input

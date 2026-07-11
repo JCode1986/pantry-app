@@ -1,10 +1,16 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Input,
   Button,
+  DatePicker,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownTrigger,
   Modal,
   ModalContent,
   ModalHeader,
@@ -13,13 +19,17 @@ import {
   Select,
   SelectItem,
 } from "@heroui/react";
+import { parseDate } from "@internationalized/date";
 import {
   FaBarcode,
   FaBoxOpen,
   FaChevronDown,
   FaChevronLeft,
   FaChevronRight,
+  FaEllipsisV,
+  FaExclamationTriangle,
   FaFilter,
+  FaMapMarkedAlt,
   FaSearch,
   FaShoppingBasket,
   FaTimes,
@@ -181,11 +191,15 @@ export default function ItemsPageClient({
   canEditInventory = true,
   initialExpirationFilter,
   initialExpirationDays,
+  initialStockFilter,
 }) {
   const hasInitialExpirationFilter =
     initialExpirationFilter === EXPIRATION_FILTERS.EXPIRED ||
     initialExpirationFilter === EXPIRATION_FILTERS.SOON ||
     initialExpirationFilter === EXPIRATION_FILTERS.NONE;
+  const hasInitialStockFilter =
+    initialStockFilter === STOCK_FILTERS.IN_STOCK ||
+    initialStockFilter === STOCK_FILTERS.LOW_OR_EMPTY;
   const normalizedInitialExpirationDays = toPositiveInteger(
     initialExpirationDays,
     7
@@ -209,11 +223,13 @@ export default function ItemsPageClient({
   const [expirationFilter, setExpirationFilter] = useState(
     hasInitialExpirationFilter ? initialExpirationFilter : EXPIRATION_FILTERS.ALL
   );
-  const [stockFilter, setStockFilter] = useState(STOCK_FILTERS.ALL);
+  const [stockFilter, setStockFilter] = useState(
+    hasInitialStockFilter ? initialStockFilter : STOCK_FILTERS.ALL
+  );
   const [expDays, setExpDays] = useState(normalizedInitialExpirationDays);
   const [sortBy, setSortBy] = useState(SORT_OPTIONS.NAME_ASC);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(
-    hasInitialExpirationFilter
+    hasInitialExpirationFilter || hasInitialStockFilter
   );
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -274,6 +290,16 @@ export default function ItemsPageClient({
       (barcode || null) !== (activeItem.barcode ?? null)
     );
   }, [activeItem, editBarcode, editExp, editName, editQty]);
+
+  const editExpirationDateValue = useMemo(() => {
+    if (!editExp) return null;
+
+    try {
+      return parseDate(editExp);
+    } catch {
+      return null;
+    }
+  }, [editExp]);
 
   useEffect(() => {
     const handleItemAdded = (event) => {
@@ -663,19 +689,57 @@ export default function ItemsPageClient({
 
   const selectedCount = selectedIds.size;
 
-  const allFilteredSelected = useMemo(() => {
-    if (filteredItems.length === 0) return false;
-    for (const it of filteredItems) {
+  const allVisibleItemsSelected = useMemo(() => {
+    if (paginatedItems.length === 0) return false;
+    for (const it of paginatedItems) {
       if (!selectedIds.has(String(it.id))) return false;
     }
     return true;
-  }, [filteredItems, selectedIds]);
+  }, [paginatedItems, selectedIds]);
 
   const totals = useMemo(() => {
     const total = Math.max(totalItemCount, items?.length ?? 0);
     const expSoon = (items || []).filter((i) => isExpiringSoon(i.expiration_date, expDays)).length;
-    return { total, expSoon };
+    const expired = (items || []).filter((i) => daysUntil(i.expiration_date) < 0).length;
+    const lowStock = (items || []).filter(
+      (i) => toNonNegativeInteger(i.quantity, 0) <= 1
+    ).length;
+    return { total, expSoon, expired, lowStock };
   }, [items, expDays, totalItemCount]);
+  const desktopSummaryCards = [
+    {
+      label: "Items",
+      value: totals.total,
+      description: "Across your home",
+      icon: FaBoxOpen,
+      className:
+        "border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]",
+    },
+    {
+      label: "Expiring Soon",
+      value: totals.expSoon,
+      description: `Within ${expDays} day${expDays === 1 ? "" : "s"}`,
+      icon: FaExclamationTriangle,
+      className:
+        "border-[var(--entity-warning-border)] bg-[var(--entity-warning-soft)] text-[var(--entity-warning-accent)]",
+    },
+    {
+      label: "Low Stock",
+      value: totals.lowStock,
+      description: "One or fewer left",
+      icon: FaShoppingBasket,
+      className:
+        "border-[var(--entity-shopping-border)] bg-[var(--entity-shopping-soft)] text-[var(--entity-shopping-accent)]",
+    },
+    {
+      label: "Locations",
+      value: locationOptions.length,
+      description: "Spaces represented",
+      icon: FaMapMarkedAlt,
+      className:
+        "border-[var(--entity-location-border)] bg-[var(--entity-location-soft)] text-[var(--entity-location-accent)]",
+    },
+  ];
 
   // ---- selection helpers ----
   const toggleSelect = (id) => {
@@ -741,26 +805,25 @@ export default function ItemsPageClient({
     openDrawer(item);
   };
 
-  const selectAllFiltered = () => {
+  const selectAllVisibleItems = () => {
     if (!canEditInventory) return;
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      for (const it of filteredItems) next.add(String(it.id));
+      for (const it of paginatedItems) next.add(String(it.id));
       return next;
     });
   };
 
-  const toggleSelectAllFiltered = () => {
+  const toggleSelectAllVisibleItems = () => {
     if (!canEditInventory) return;
-    if (allFilteredSelected) {
-      // Unselect only the currently filtered items
+    if (allVisibleItemsSelected) {
       setSelectedIds((prev) => {
         const next = new Set(prev);
-        for (const it of filteredItems) next.delete(String(it.id));
+        for (const it of paginatedItems) next.delete(String(it.id));
         return next;
       });
     } else {
-      selectAllFiltered();
+      selectAllVisibleItems();
     }
   };
 
@@ -1180,6 +1243,24 @@ export default function ItemsPageClient({
     });
   };
 
+  const openDeleteForItem = (item) => {
+    if (!canEditInventory || !item?.id) return;
+
+    setDeleteDialog({
+      open: true,
+      isDeleting: false,
+      isAddingToShoppingList: false,
+      mode: "single",
+      payload: {
+        itemId: item.id,
+        name: item.name,
+        locationName: item.location?.name,
+        areaName: item.area?.name,
+        categoryName: item.category?.name,
+      },
+    });
+  };
+
   const openDeleteBulk = () => {
     if (!canEditInventory) return;
     if (selectedIds.size === 0) return;
@@ -1354,14 +1435,14 @@ export default function ItemsPageClient({
             <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
               <button
                 type="button"
-                onClick={toggleSelectAllFiltered}
-                disabled={filteredItems.length === 0}
+                onClick={toggleSelectAllVisibleItems}
+                disabled={paginatedItems.length === 0}
                 className="min-h-11 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 text-sm font-semibold text-[var(--stocksense-brand)] disabled:opacity-50"
               >
-                {allFilteredSelected ? "Deselect all" : "Select all"}
+                {allVisibleItemsSelected ? "Deselect visible" : "Select visible"}
               </button>
               <span className="flex min-h-11 items-center rounded-xl border border-gray-200 bg-gray-50 px-3 text-xs font-medium text-gray-500">
-                {filteredItems.length} matching
+                {paginatedItems.length} visible
               </span>
             </div>
 
@@ -1433,7 +1514,7 @@ export default function ItemsPageClient({
                   onClick={() => applyMobileQuickFilter("expiring")}
                   className={`min-h-10 shrink-0 rounded-full border px-4 text-sm font-semibold transition ${
                     expirationFilter === EXPIRATION_FILTERS.SOON
-                      ? "border-orange-200 bg-orange-50 text-orange-700"
+                      ? "border-[var(--entity-warning-border)] bg-[var(--entity-warning-soft)] text-[var(--entity-warning-accent)]"
                       : "border-gray-200 bg-white text-gray-700"
                   }`}
                 >
@@ -1485,28 +1566,69 @@ export default function ItemsPageClient({
         )}
       </motion.section>
 
-      {/* Header */}
       <motion.div
         variants={pageItemVariants}
-        className="rounded-2xl border border-stocksense-gray bg-white p-4 shadow-sm max-md:hidden md:p-5"
+        className="max-md:hidden"
       >
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--stocksense-brand)]">
+              Items
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-gray-950 md:text-3xl">
+              Your inventory
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-600">
+              {canEditInventory
+                ? "Search, filter, move, and manage everything stored at home."
+                : "Search items across all locations."}
+            </p>
+          </div>
+          <OpenGlobalAddItemButton
+            canEditInventory={canEditInventory}
+            className="min-h-11 rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm"
+          >
+            Add Item
+          </OpenGlobalAddItemButton>
+        </div>
+
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {desktopSummaryCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <div
+                key={card.label}
+                className="rounded-2xl border border-white/70 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">{card.label}</p>
+                    <p className="mt-2 text-3xl font-semibold tracking-tight text-gray-950">
+                      {card.value.toLocaleString()}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-gray-500">
+                      {card.description}
+                    </p>
+                  </div>
+                  <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl border ${card.className}`}>
+                    <Icon className="h-4 w-4" />
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-white/70 bg-white p-4 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl border border-[var(--entity-item-border)] bg-[var(--entity-item-accent)] p-3 text-white shadow-sm">
-              <FaBoxOpen className="h-5 w-5" />
-            </div>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] text-[var(--entity-item-accent)]">
+              <FaFilter className="h-4 w-4" />
+            </span>
             <div>
-              <h1 className="text-xl font-semibold tracking-tight text-stocksense-teal md:text-2xl">
-                Items
-              </h1>
-              <p className="text-sm text-gray-500">
-                {canEditInventory
-                  ? "Search and manage items across all locations."
-                  : "Search items across all locations."}
-              </p>
+              <h2 className="text-sm font-semibold text-gray-950">Find items</h2>
+              <p className="text-xs text-gray-500">Search or narrow the list.</p>
             </div>
           </div>
-        </div>
 
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(220px,280px)_auto] md:items-start">
           <Input
@@ -1718,7 +1840,7 @@ export default function ItemsPageClient({
             <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
               <strong>{totals.total}</strong> {totals.total === 1 ? "Item" : "Items"}
             </span>
-            <span className="px-2.5 py-1 rounded-full text-xs bg-[#FFF7ED] text-[#9A3412] border border-[#FED7AA]">
+            <span className="px-2.5 py-1 rounded-full text-xs border border-[var(--entity-warning-border)] bg-[var(--entity-warning-soft)] text-[var(--entity-warning-accent)]">
               <strong>{totals.expSoon}</strong>{" "}
               expiring soon
             </span>
@@ -1742,26 +1864,14 @@ export default function ItemsPageClient({
             )}
           </div>
 
-          {canEditInventory && (
-            <div className="flex flex-wrap gap-2 items-center">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={allFilteredSelected}
-                  onChange={toggleSelectAllFiltered}
-                  className="w-5 h-5 border border-stocksense-gray rounded cursor-pointer"
-                />
-                Select all visible
-              </label>
-
-              <button
-                onClick={clearSelection}
-                className="rounded-xl border border-stocksense-gray px-3 py-1.5 text-xs hover:bg-gray-50 cursor-pointer"
-                disabled={selectedCount === 0}
-              >
-                Clear selection
-              </button>
-            </div>
+          {canEditInventory && paginatedItems.length > 0 && (
+            <button
+              type="button"
+              onClick={toggleSelectAllVisibleItems}
+              className="inline-flex w-fit items-center justify-center rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 py-1.5 text-sm font-medium text-[var(--stocksense-brand)] transition hover:bg-[var(--stocksense-brand-soft)]"
+            >
+              {allVisibleItemsSelected ? "Deselect visible" : "Select visible"}
+            </button>
           )}
         </div>
 
@@ -1774,30 +1884,47 @@ export default function ItemsPageClient({
             animate={{ opacity: 1, height: "auto", y: 0 }}
             exit={{ opacity: 0, height: 0, y: -6 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="mt-4 overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+            className="mt-5 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
           >
-            <div className="text-sm text-[var(--stocksense-brand)]">
-              Bulk actions for <span className="font-semibold">{selectedCount}</span>{" "}
-              item{selectedCount === 1 ? "" : "s"}
-              {filteredItems.length > 0 && (
-                <span className="text-xs text-[var(--stocksense-brand)]/70">
-                  {" "}
-                  (filtered list: {filteredItems.length})
-                </span>
-              )}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="text-sm text-[var(--stocksense-brand)]">
+                Bulk actions for <span className="font-semibold">{selectedCount}</span>{" "}
+                item{selectedCount === 1 ? "" : "s"}
+                {paginatedItems.length > 0 && (
+                  <span className="text-xs text-[var(--stocksense-brand)]/70">
+                    {" "}
+                    ({paginatedItems.length} visible)
+                  </span>
+                )}
+              </div>
+              <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-[var(--stocksense-brand)]">
+                <input
+                  type="checkbox"
+                  checked={allVisibleItemsSelected}
+                  onChange={toggleSelectAllVisibleItems}
+                  className="h-4 w-4 cursor-pointer rounded border border-[var(--stocksense-brand-border)]"
+                />
+                Select all visible
+              </label>
             </div>
 
             <div className="flex flex-wrap gap-2">
               <button
+                onClick={clearSelection}
+                className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 py-1.5 text-sm font-medium text-[var(--stocksense-brand)] hover:bg-[var(--stocksense-brand-soft)] cursor-pointer"
+              >
+                Clear selection
+              </button>
+              <button
                 onClick={() => openMove("bulk")}
-                className="text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)] bg-white hover:bg-[var(--stocksense-brand-soft)] px-3 py-1.5 rounded-md cursor-pointer"
+                className="text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)] bg-white hover:bg-[var(--stocksense-brand-soft)] px-3 py-1.5 rounded-xl cursor-pointer"
               >
                 Move selected
               </button>
 
               <button
                 onClick={openDeleteBulk}
-                className="text-rose-700 border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-md cursor-pointer"
+                className="text-rose-700 border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-xl cursor-pointer"
               >
                 Delete selected
               </button>
@@ -1805,6 +1932,7 @@ export default function ItemsPageClient({
           </motion.div>
           )}
         </AnimatePresence>}
+        </div>
       </motion.div>
 
       {/* List */}
@@ -1898,13 +2026,18 @@ export default function ItemsPageClient({
 
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-start gap-2">
-                      <h2 className="min-w-0 flex-1 truncate text-base font-semibold leading-5 text-gray-950">
+                      <h2
+                        className="min-w-0 flex-1 truncate text-base font-semibold leading-5 text-gray-950"
+                        title={it.name}
+                      >
                         {it.name}
                       </h2>
                       <FaChevronRight className="mt-1 h-3.5 w-3.5 shrink-0 text-[var(--stocksense-brand)]" />
                     </div>
 
-                    <p className="mt-1 truncate text-sm text-gray-500">{path}</p>
+                    <p className="mt-1 truncate text-sm text-gray-500" title={path}>
+                      {path}
+                    </p>
                     <p className="mt-2 text-sm font-medium text-gray-800">
                       Qty: {quantity}
                     </p>
@@ -1921,7 +2054,7 @@ export default function ItemsPageClient({
                             className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                               expired
                                 ? "border-rose-200 bg-rose-50 text-rose-700"
-                                : "border-orange-200 bg-orange-50 text-orange-700"
+                                : "border-[var(--entity-warning-border)] bg-[var(--entity-warning-soft)] text-[var(--entity-warning-accent)]"
                             }`}
                           >
                             {expired ? "Expired" : "Expiring soon"}
@@ -1974,7 +2107,7 @@ export default function ItemsPageClient({
           </AnimatePresence>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 max-md:hidden sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid auto-rows-fr grid-cols-1 gap-5 max-md:hidden lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         <AnimatePresence initial={false}>
         {paginatedItems.map((it) => {
           const soon = isExpiringSoon(it.expiration_date, expDays);
@@ -1998,50 +2131,60 @@ export default function ItemsPageClient({
                   openDrawer(it);
                 }
               }}
-              className={`relative h-full overflow-hidden rounded-2xl border bg-white p-3.5 pt-4 shadow-sm transition sm:p-4 ${
+              className={`group relative flex h-full min-h-0 overflow-hidden rounded-2xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${
                 selected
                   ? "border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]"
-                  : "border-stocksense-gray hover:bg-gray-50"
+                  : "border-white/70 hover:border-[var(--stocksense-brand-border)]"
               } cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]`}
               whileHover={{ y: -1 }}
             >
               <div className={`absolute inset-x-0 top-0 h-1 ${soon ? "bg-[var(--entity-warning-accent)]" : "bg-[var(--entity-item-accent)]"}`} />
-              <div className="flex h-full items-start gap-2.5">
-                {/* Left: checkbox + info */}
-                <div className="flex items-start gap-2.5 min-w-0">
-                  {canEditInventory && (
+              <div className="flex h-full min-w-0 flex-1 items-start justify-between gap-3">
+                {/* Left: item image and info */}
+                <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                  {canEditInventory && selectedCount > 0 && (
                     <input
                       type="checkbox"
                       checked={selected}
                       onClick={(event) => event.stopPropagation()}
                       onKeyDown={(event) => event.stopPropagation()}
                       onChange={() => toggleSelect(it.id)}
-                      className="mt-0.5 w-5 h-5 cursor-pointer"
+                      aria-label={`Select ${it.name}`}
+                      className="mt-3 h-4 w-4 shrink-0 cursor-pointer rounded border border-[var(--stocksense-brand-border)]"
                     />
                   )}
-
-                  {it.imageUrl && (
-                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
+                  <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] text-[var(--entity-item-accent)]">
+                    {it.imageUrl ? (
                       <img
                         src={it.imageUrl}
                         alt=""
                         className="h-full w-full object-cover"
                       />
-                    </div>
-                  )}
+                    ) : (
+                      <FaBoxOpen className="h-6 w-6" />
+                    )}
+                  </div>
 
-                  <div className="min-w-0 text-left">
+                  <div className="min-w-0 flex-1 text-left">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <div className="truncate text-[15px] font-semibold leading-5 text-stocksense-teal sm:text-base">{it.name}</div>
+                      <div
+                        className="min-w-0 truncate text-lg font-semibold leading-6 text-gray-950"
+                        title={it.name}
+                      >
+                        {it.name}
+                      </div>
 
                       {soon && (
-                        <span className="rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-orange-700">
+                        <span className="shrink-0 rounded-full border border-[var(--entity-warning-border)] bg-[var(--entity-warning-soft)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--entity-warning-accent)]">
                           {du < 0 ? "Expired" : "Soon"}
                         </span>
                       )}
                     </div>
 
-                    <div className="mt-1 text-sm text-gray-500 truncate">
+                    <div
+                      className="mt-1 truncate text-sm text-gray-500"
+                      title={`${it.location?.name || "Unknown location"} / ${it.area?.name || "-"} / ${it.category?.name || "-"}`}
+                    >
                       {it.location?.name || "Unknown location"} • {it.area?.name || "—"} •{" "}
                       {it.category?.name || "—"}
                     </div>
@@ -2052,11 +2195,55 @@ export default function ItemsPageClient({
                     {it.barcode && (
                       <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
                         <FaBarcode className="h-3 w-3" />
-                        <span className="truncate">{it.barcode}</span>
+                        <span className="min-w-0 truncate" title={it.barcode}>
+                          {it.barcode}
+                        </span>
                       </div>
                     )}
                   </div>
                 </div>
+                {canEditInventory && (
+                  <div
+                    className="shrink-0"
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  >
+                    <Dropdown placement="bottom-end">
+                      <DropdownTrigger>
+                        <Button
+                          isIconOnly
+                          variant="light"
+                          radius="lg"
+                          className="h-9 w-9 min-w-9 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+                          aria-label={`${it.name} actions`}
+                        >
+                          <FaEllipsisV className="h-4 w-4" />
+                        </Button>
+                      </DropdownTrigger>
+                      <DropdownMenu aria-label={`${it.name} actions`}>
+                        <DropdownItem
+                          key="select"
+                          onPress={() => toggleSelect(it.id)}
+                        >
+                          {selected
+                            ? "Deselect for bulk action"
+                            : "Select for bulk action"}
+                        </DropdownItem>
+                        <DropdownItem key="view" onPress={() => openDrawer(it)}>
+                          View / Edit
+                        </DropdownItem>
+                        <DropdownItem
+                          key="delete"
+                          className="text-danger"
+                          color="danger"
+                          onPress={() => openDeleteForItem(it)}
+                        >
+                          Delete
+                        </DropdownItem>
+                      </DropdownMenu>
+                    </Dropdown>
+                  </div>
+                )}
               </div>
             </motion.div>
           );
@@ -2291,10 +2478,16 @@ export default function ItemsPageClient({
             <>
               <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-lg font-semibold text-[var(--stocksense-brand)]">
+                  <div
+                    className="truncate text-lg font-semibold text-[var(--stocksense-brand)]"
+                    title={activeItem?.name || "Item"}
+                  >
                     {activeItem?.name || "Item"}
                   </div>
-                  <div className="truncate text-sm text-gray-500">
+                  <div
+                    className="truncate text-sm text-gray-500"
+                    title={`${activeItem?.location?.name || "Unknown location"} / ${activeItem?.area?.name || "-"} / ${activeItem?.category?.name || "-"}`}
+                  >
                     {activeItem?.location?.name || "Unknown location"} • {activeItem?.area?.name || "—"} •{" "}
                     {activeItem?.category?.name || "—"}
                   </div>
@@ -2335,15 +2528,16 @@ export default function ItemsPageClient({
                         classNames={modalInputClassNames}
                       />
 
-                      <div className="space-y-2">
-                        <div className="text-xs font-medium text-gray-600">Expiration date</div>
-                        <input
-                          type="date"
-                          value={editExp || ""}
-                          onChange={(e) => setEditExp(e.target.value)}
-                          className="w-full rounded-xl border border-[var(--stocksense-brand-border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
-                        />
-                      </div>
+                      <DatePicker
+                        label="Expiration date"
+                        labelPlacement="inside"
+                        value={editExpirationDateValue}
+                        onChange={(date) => setEditExp(date ? date.toString() : "")}
+                        variant="bordered"
+                        radius="lg"
+                        classNames={modalInputClassNames}
+                        showMonthAndYearPickers
+                      />
                     </div>
 
                     <div className="space-y-2 max-md:hidden">
@@ -2373,7 +2567,10 @@ export default function ItemsPageClient({
                           <FaBarcode className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
                           <span>Barcode</span>
                         </div>
-                        <div className="mt-1 truncate text-sm font-semibold text-gray-800">
+                        <div
+                          className="mt-1 truncate text-sm font-semibold text-gray-800"
+                          title={activeItem.barcode}
+                        >
                           {activeItem.barcode}
                         </div>
                       </div>
@@ -2478,10 +2675,39 @@ export default function ItemsPageClient({
                     <p className="text-xs font-medium uppercase text-gray-500">
                       Current
                     </p>
-                    <p className="mt-1 text-sm font-semibold text-gray-950">
-                      {activeItem.location?.name || "Unknown location"} &gt;{" "}
-                      {activeItem.area?.name || "Storage area"} &gt;{" "}
-                      {activeItem.category?.name || "Category"}
+                    <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-semibold text-gray-950">
+                      {activeItem.location?.id ? (
+                        <Link
+                          href={`/locations/${activeItem.location.id}`}
+                          className="hover:text-[var(--stocksense-brand)]"
+                        >
+                          {activeItem.location.name || "Unknown location"}
+                        </Link>
+                      ) : (
+                        <span>{activeItem.location?.name || "Unknown location"}</span>
+                      )}
+                      <span className="text-gray-300">/</span>
+                      {activeItem.area?.id ? (
+                        <Link
+                          href={`/areas/${activeItem.area.id}`}
+                          className="hover:text-[var(--stocksense-brand)]"
+                        >
+                          {activeItem.area.name || "Storage area"}
+                        </Link>
+                      ) : (
+                        <span>{activeItem.area?.name || "Storage area"}</span>
+                      )}
+                      <span className="text-gray-300">/</span>
+                      {activeItem.category?.id ? (
+                        <Link
+                          href={`/categories/${activeItem.category.id}`}
+                          className="hover:text-[var(--stocksense-brand)]"
+                        >
+                          {activeItem.category.name || "Category"}
+                        </Link>
+                      ) : (
+                        <span>{activeItem.category?.name || "Category"}</span>
+                      )}
                     </p>
                   </div>
                 ) : null}

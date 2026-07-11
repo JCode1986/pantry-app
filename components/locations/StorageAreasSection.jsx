@@ -1,10 +1,14 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Button,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownTrigger,
   Input,
   Modal,
   ModalBody,
@@ -23,12 +27,15 @@ import {
   updateItem,
   deleteItem,
   updateItemLocation,
+  uploadInventoryImage,
 } from '@/app/actions/server';
 import {
   FaPlus,
   FaEdit,
   FaTrash,
   FaChevronUp,
+  FaEllipsisV,
+  FaImage,
   FaSearch,
   FaArrowsAlt,
   FaBoxOpen,
@@ -104,8 +111,104 @@ const modalInputClassNames = {
 const modalPrimaryButtonClass =
   'bg-[var(--stocksense-brand)] text-white hover:brightness-95';
 
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const IMAGE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+]);
+
 const STORAGE_AREA_SUGGESTIONS = ['Pantry', 'Closet', 'Cabinet', 'Drawer', 'Shelf', 'Box'];
 const CATEGORY_SUGGESTIONS = ['Food', 'Documents', 'Tools', 'Medicine', 'Clothes', 'Electronics'];
+
+function validateImageFile(file) {
+  if (!file) return '';
+  if (!IMAGE_TYPES.has(file.type)) {
+    return 'Choose a JPG, PNG, WebP, or GIF image.';
+  }
+  if (file.size > MAX_IMAGE_SIZE) {
+    return 'Images must be 5 MB or smaller.';
+  }
+  return '';
+}
+
+function CreateImagePicker({
+  label,
+  imagePreview,
+  imageFile,
+  imageMessage,
+  onSelect,
+  onClear,
+}) {
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-3 max-md:bg-white">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+          <FaImage className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+          {label}
+        </div>
+        {imageFile && (
+          <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-[var(--stocksense-brand)]">
+            Ready to upload
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:h-28 sm:w-40">
+          {imagePreview ? (
+            <img
+              src={imagePreview}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="grid h-full w-full place-items-center text-xs text-gray-400">
+              Optional photo
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-1 flex-col gap-2">
+          <div className="flex flex-wrap gap-2">
+            <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 text-sm font-semibold text-[var(--stocksense-brand)]">
+              <FaImage className="h-3.5 w-3.5" />
+              {imageFile ? 'Change photo' : 'Add photo'}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = '';
+                  onSelect(file);
+                }}
+              />
+            </label>
+            {imageFile && (
+              <button
+                type="button"
+                onClick={onClear}
+                className="inline-flex min-h-10 items-center justify-center rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-600"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          <p className="text-xs leading-5 text-gray-500 max-md:hidden">
+            {imageFile
+              ? imageFile.name
+              : 'Choose a photo now, or add one later from edit.'}
+          </p>
+          {imageMessage && (
+            <p className="text-xs text-[var(--stocksense-brand)]">{imageMessage}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function StorageAreasSection({
   locationId,
@@ -123,6 +226,9 @@ export default function StorageAreasSection({
     name: '',
     imageUrl: null,
     image_path: null,
+    imageFile: null,
+    imagePreview: null,
+    imageMessage: '',
     locationName: '',
   });
   const [categoryModal, setCategoryModal] = useState({
@@ -132,6 +238,11 @@ export default function StorageAreasSection({
     categoryId: null,
     areaName: '',
     name: '',
+    imageUrl: null,
+    image_path: null,
+    imageFile: null,
+    imagePreview: null,
+    imageMessage: '',
   });
   const [itemModal, setItemModal] = useState({
     open: false,
@@ -145,6 +256,9 @@ export default function StorageAreasSection({
     expirationDate: '',
     imageUrl: null,
     image_path: null,
+    imageFile: null,
+    imagePreview: null,
+    imageMessage: '',
   });
   const shouldAutoFocus = useDesktopAutoFocus(
     areaModal.open || categoryModal.open || itemModal.open
@@ -275,6 +389,67 @@ export default function StorageAreasSection({
     };
   }, [locationId]);
 
+  useEffect(() => {
+    const previews = [
+      areaModal.imagePreview,
+      categoryModal.imagePreview,
+      itemModal.imagePreview,
+    ];
+
+    return () => {
+      previews.forEach((preview) => {
+        if (preview?.startsWith('blob:')) {
+          URL.revokeObjectURL(preview);
+        }
+      });
+    };
+  }, [
+    areaModal.imagePreview,
+    categoryModal.imagePreview,
+    itemModal.imagePreview,
+  ]);
+
+  const setCreateImageFile = (setModal, file) => {
+    if (!file) return;
+
+    const imageError = validateImageFile(file);
+    if (imageError) {
+      setModal((prev) => ({ ...prev, imageMessage: imageError }));
+      return;
+    }
+
+    setModal((prev) => ({
+      ...prev,
+      imageFile: file,
+      imagePreview: URL.createObjectURL(file),
+      imageMessage: '',
+    }));
+  };
+
+  const clearCreateImageFile = (setModal) => {
+    setModal((prev) => ({
+      ...prev,
+      imageFile: null,
+      imagePreview: null,
+      imageMessage: '',
+    }));
+  };
+
+  const uploadCreatedEntityImage = async (entityType, entityId, imageFile) => {
+    if (!imageFile || !entityId) return null;
+
+    const formData = new FormData();
+    formData.append('image', imageFile);
+    const result = await uploadInventoryImage(entityType, entityId, formData);
+
+    if (result?.error) {
+      console.error(`${entityType} image upload error:`, result.error);
+      return null;
+    }
+
+    return result?.data ?? null;
+  };
+
   const openDeleteDialog = (entityType, payload) => {
     if (!canEditInventory) return;
     setDeleteDialog({
@@ -323,7 +498,7 @@ export default function StorageAreasSection({
 
   useEffect(() => {
     const areaState = {};
-    const catState = {};
+    const categoryState = {};
 
     for (const areaGroup of expansionSignature.split('|')) {
       if (!areaGroup) continue;
@@ -332,12 +507,12 @@ export default function StorageAreasSection({
       if (areaId) areaState[areaId] = true;
 
       for (const categoryId of categoryList.split(',')) {
-        if (categoryId) catState[categoryId] = true;
+        if (categoryId) categoryState[categoryId] = true;
       }
     }
 
     setExpandedAreas(areaState);
-    setExpandedCategories(catState);
+    setExpandedCategories(categoryState);
   }, [expansionSignature]);
 
   const totalAreas = storageAreas?.length || 0;
@@ -367,15 +542,38 @@ export default function StorageAreasSection({
       [id]: !prev[id],
     }));
 
-  const expandAllAreas = () =>
-    setExpandedAreas(Object.fromEntries((storageAreas || []).map((a) => [a.id, true])));
+  const expandAllAreas = () => {
+    setExpandedAreas(
+      Object.fromEntries((storageAreas || []).map((area) => [area.id, true]))
+    );
+    setExpandedCategories(
+      Object.fromEntries(
+        (storageAreas || []).flatMap((area) =>
+          (area.categories || []).map((category) => [category.id, true])
+        )
+      )
+    );
+  };
 
-  const collapseAllAreas = () =>
-    setExpandedAreas(Object.fromEntries((storageAreas || []).map((a) => [a.id, false])));
+  const collapseAllAreas = () => {
+    setExpandedAreas(
+      Object.fromEntries((storageAreas || []).map((area) => [area.id, false]))
+    );
+    setExpandedCategories(
+      Object.fromEntries(
+        (storageAreas || []).flatMap((area) =>
+          (area.categories || []).map((category) => [category.id, false])
+        )
+      )
+    );
+  };
 
   const allAreasExpanded =
     (storageAreas || []).length > 0 &&
-    (storageAreas || []).every((a) => expandedAreas[a.id]);
+    (storageAreas || []).every((area) => expandedAreas[area.id]) &&
+    (storageAreas || []).every((area) =>
+      (area.categories || []).every((category) => expandedCategories[category.id])
+    );
 
   // ---------- Modal helpers ----------
   const closeAreaModal = () =>
@@ -386,6 +584,9 @@ export default function StorageAreasSection({
       name: '',
       imageUrl: null,
       image_path: null,
+      imageFile: null,
+      imagePreview: null,
+      imageMessage: '',
       locationName: '',
     });
 
@@ -397,6 +598,11 @@ export default function StorageAreasSection({
       categoryId: null,
       areaName: '',
       name: '',
+      imageUrl: null,
+      image_path: null,
+      imageFile: null,
+      imagePreview: null,
+      imageMessage: '',
     });
 
   const closeItemModal = () =>
@@ -412,6 +618,9 @@ export default function StorageAreasSection({
       expirationDate: '',
       imageUrl: null,
       image_path: null,
+      imageFile: null,
+      imagePreview: null,
+      imageMessage: '',
     });
 
   // ---------- Storage Area CRUD ----------
@@ -424,6 +633,9 @@ export default function StorageAreasSection({
       name: '',
       imageUrl: null,
       image_path: null,
+      imageFile: null,
+      imagePreview: null,
+      imageMessage: '',
       locationName,
     });
 
@@ -436,6 +648,9 @@ export default function StorageAreasSection({
       name: area.name,
       imageUrl: area.imageUrl ?? null,
       image_path: area.image_path ?? null,
+      imageFile: null,
+      imagePreview: null,
+      imageMessage: '',
       locationName,
     });
 
@@ -482,7 +697,19 @@ export default function StorageAreasSection({
 
     const result = await addStorageArea(locationId, name);
     if (result?.data) {
-      setStorageAreas((prev) => [...prev, { ...result.data, categories: [] }]);
+      const uploadedImage = await uploadCreatedEntityImage(
+        'storage_area',
+        result.data.id,
+        areaModal.imageFile
+      );
+      const createdArea = {
+        ...result.data,
+        image_path: uploadedImage?.imagePath ?? result.data.image_path ?? null,
+        imageUrl: uploadedImage?.imageUrl ?? null,
+        categories: [],
+      };
+
+      setStorageAreas((prev) => [...prev, createdArea]);
       emitInventoryChange({
         entity: 'storage_area',
         action: 'added',
@@ -517,6 +744,11 @@ export default function StorageAreasSection({
       categoryId: null,
       areaName: area.name,
       name: '',
+      imageUrl: null,
+      image_path: null,
+      imageFile: null,
+      imagePreview: null,
+      imageMessage: '',
     });
 
   const openEditCategoryModal = (area, category) =>
@@ -528,7 +760,43 @@ export default function StorageAreasSection({
       categoryId: category.id,
       areaName: area.name,
       name: category.name,
+      imageUrl: category.imageUrl ?? null,
+      image_path: category.image_path ?? null,
+      imageFile: null,
+      imagePreview: null,
+      imageMessage: '',
     });
+
+  const handleCategoryImageChange = ({ imagePath, imageUrl }) => {
+    setCategoryModal((prev) => ({
+      ...prev,
+      image_path: imagePath ?? null,
+      imageUrl: imageUrl ?? null,
+    }));
+    setStorageAreas((prev) =>
+      prev.map((area) =>
+        area.id === categoryModal.areaId
+          ? {
+              ...area,
+              categories: area.categories.map((category) =>
+                category.id === categoryModal.categoryId
+                  ? {
+                      ...category,
+                      image_path: imagePath ?? null,
+                      imageUrl: imageUrl ?? null,
+                    }
+                  : category
+              ),
+            }
+          : area
+      )
+    );
+    emitInventoryChange({
+      entity: 'category',
+      action: imagePath ? 'image_updated' : 'image_removed',
+      id: categoryModal.categoryId,
+    });
+  };
 
   const submitCategoryModal = async () => {
     if (!canEditInventory) return;
@@ -568,15 +836,26 @@ export default function StorageAreasSection({
     }
 
     if (result?.data) {
+      const uploadedImage = await uploadCreatedEntityImage(
+        'category',
+        result.data.id,
+        categoryModal.imageFile
+      );
+      const createdCategory = {
+        ...result.data,
+        image_path: uploadedImage?.imagePath ?? result.data.image_path ?? null,
+        imageUrl: uploadedImage?.imageUrl ?? null,
+        items: [],
+      };
+
       setStorageAreas((prev) =>
         prev.map((a) =>
           a.id === categoryModal.areaId
-            ? { ...a, categories: [...(a.categories || []), result.data] }
+            ? { ...a, categories: [...(a.categories || []), createdCategory] }
             : a
         )
       );
       closeCategoryModal();
-      setExpandedCategories((prev) => ({ ...prev, [result.data.id]: true }));
       emitInventoryChange({
         entity: 'category',
         action: 'added',
@@ -624,6 +903,9 @@ export default function StorageAreasSection({
       expirationDate: '',
       imageUrl: null,
       image_path: null,
+      imageFile: null,
+      imagePreview: null,
+      imageMessage: '',
     });
 
   const openEditItemModal = (area, category, item) =>
@@ -640,6 +922,9 @@ export default function StorageAreasSection({
       expirationDate: item.expiration_date || '',
       imageUrl: item.imageUrl ?? null,
       image_path: item.image_path ?? null,
+      imageFile: null,
+      imagePreview: null,
+      imageMessage: '',
     });
 
   const handleItemImageChange = ({ imagePath, imageUrl }) => {
@@ -744,8 +1029,21 @@ export default function StorageAreasSection({
       return;
     }
 
-    const created = result?.data;
+    let created = result?.data;
     if (!created) return;
+
+    const uploadedImage = await uploadCreatedEntityImage(
+      'item',
+      created.id,
+      itemModal.imageFile
+    );
+    if (uploadedImage) {
+      created = {
+        ...created,
+        image_path: uploadedImage.imagePath ?? created.image_path ?? null,
+        imageUrl: uploadedImage.imageUrl ?? created.imageUrl ?? null,
+      };
+    }
 
     setStorageAreas((prev) =>
       prev.map((area) => ({
@@ -1122,6 +1420,49 @@ export default function StorageAreasSection({
     };
   }, [mobileCategorySheet, storageAreas, normalizedSearch, expSoonEnabled, expDays]);
 
+  const desktopStorageAreas = (storageAreas ?? [])
+    .map((area) => {
+      const areaNameMatches =
+        normalizedSearch && containsQuery(area.name, normalizedSearch);
+      const categories = (area.categories ?? [])
+        .map((category) => {
+          const categoryNameMatches =
+            normalizedSearch && containsQuery(category.name, normalizedSearch);
+          const items = (category.items ?? []).filter((item) => {
+            if (expSoonEnabled && !isExpiringSoon(item.expiration_date, expDays)) {
+              return false;
+            }
+            if (!normalizedSearch || areaNameMatches || categoryNameMatches) {
+              return true;
+            }
+            return containsQuery(item.name, normalizedSearch);
+          });
+          const shouldShowCategory =
+            areaNameMatches || categoryNameMatches || items.length > 0;
+
+          return shouldShowCategory ? { ...category, visibleItems: items } : null;
+        })
+        .filter(Boolean);
+
+      const areaItemCount = (area.categories ?? []).reduce(
+        (sum, category) => sum + (category.items?.length ?? 0),
+        0
+      );
+      const shouldShowArea =
+        !normalizedSearch && !expSoonEnabled
+          ? true
+          : areaNameMatches || categories.length > 0;
+
+      return shouldShowArea
+        ? {
+            ...area,
+            visibleCategories: categories,
+            areaItemCount,
+          }
+        : null;
+    })
+    .filter(Boolean);
+
   // ---------- UI ----------
   return (
     <motion.div
@@ -1147,118 +1488,135 @@ export default function StorageAreasSection({
         </motion.div>
       )}
 
-      {/* Top: Summary & tools */}
-      <motion.div
-        variants={pageItemVariants}
-        className="rounded-2xl border border-stocksense-gray bg-white p-4 shadow-sm max-md:hidden md:p-5"
-      >
-        <div className="flex flex-col gap-4">
+      {/* Desktop overview and tools */}
+      <motion.section variants={pageItemVariants} className="max-md:hidden">
+        <div className="flex items-end justify-between gap-4">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-gray-950 md:text-2xl">
-              Inventory overview
-            </h1>
-            <p className="text-sm text-gray-500">{locationName}</p>
+            <h2 className="text-xl font-semibold tracking-tight text-gray-950">
+              Inside this location
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-gray-600">
+              Browse the storage areas, categories, and items in {locationName}.
+            </p>
           </div>
+        </div>
 
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-            {/* Search */}
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
+          {[
+            {
+              label: 'Storage Areas',
+              value: totalAreas,
+              description: 'Places inside this space',
+              icon: FaWarehouse,
+            },
+            {
+              label: 'Categories',
+              value: totalCategories,
+              description: 'Groups across all areas',
+              icon: FaTags,
+            },
+            {
+              label: 'Items',
+              value: totalItems,
+              description: 'Things stored here',
+              icon: FaBoxOpen,
+            },
+          ].map(({ label, value, description, icon: Icon }) => (
+            <div
+              key={label}
+              className="rounded-2xl border border-white/70 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">{label}</p>
+                  <p className="mt-2 text-3xl font-semibold tracking-tight text-gray-950">
+                    {value.toLocaleString()}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-gray-500">
+                    {description}
+                  </p>
+                </div>
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+                  <Icon className="h-4 w-4" />
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-white/70 bg-white p-4 shadow-sm">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
             <div className="relative min-w-0">
-              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-3.5 w-3.5" />
+              <FaSearch className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
               <input
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search categories or items..."
-                className="h-11 w-full rounded-xl border border-stocksense-gray pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/50"
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={`Search items inside ${locationName}...`}
+                className="h-11 w-full rounded-2xl border border-gray-200 bg-white pl-9 pr-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/60"
               />
             </div>
 
-            {/* Expiring filter */}
-            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
-              <label className="flex items-center gap-2 text-sm text-gray-700">
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="inline-flex h-10 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 text-xs font-semibold text-gray-600">
                 <input
                   type="checkbox"
                   checked={expSoonEnabled}
-                  onChange={() => setExpSoonEnabled((v) => !v)}
-                  className="w-5 h-5 border border-stocksense-gray rounded cursor-pointer"
+                  onChange={() => setExpSoonEnabled((value) => !value)}
+                  className="h-4 w-4 cursor-pointer rounded border border-gray-300"
                 />
-                Expiring in
+                Expiring
               </label>
               <input
                 type="number"
                 min={1}
                 value={expDays}
-                onChange={(e) =>
-                  setExpDays(toPositiveInteger(e.target.value, 7))
+                onChange={(event) =>
+                  setExpDays(toPositiveInteger(event.target.value, 7))
                 }
-                className={`border border-stocksense-gray rounded px-2 py-1 w-16 ${
-                  !expSoonEnabled && 'bg-gray-100 text-gray-400'
-                }`}
+                className="h-10 w-16 rounded-xl border border-gray-200 bg-white px-2 text-sm text-gray-700 disabled:bg-gray-50 disabled:text-gray-400"
                 disabled={!expSoonEnabled}
+                aria-label="Expiring within days"
               />
-              <span className="text-sm">days</span>
+              <span className="text-xs font-medium text-gray-500">days</span>
+
+              {storageAreas.length > 0 && (
+                <button
+                  type="button"
+                  onClick={allAreasExpanded ? collapseAllAreas : expandAllAreas}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-600 shadow-sm transition hover:border-[var(--stocksense-brand-border)] hover:text-[var(--stocksense-brand)]"
+                >
+                  {allAreasExpanded ? 'Collapse all' : 'Expand all'}
+                  <FaChevronUp
+                    className={`h-3.5 w-3.5 transition-transform ${
+                      allAreasExpanded ? '' : 'rotate-180'
+                    }`}
+                  />
+                </button>
+              )}
+
+              {canEditInventory && (
+                <>
+                  <OpenGlobalAddItemButton
+                    canEditInventory={canEditInventory}
+                    context={{ locationId }}
+                    className="h-10 rounded-xl bg-[var(--stocksense-brand)] px-3 text-sm font-semibold text-white shadow-sm"
+                  >
+                    Add Item
+                  </OpenGlobalAddItemButton>
+                  <button
+                    type="button"
+                    onClick={openCreateAreaModal}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 text-sm font-semibold text-[var(--stocksense-brand)] transition hover:brightness-95"
+                  >
+                    <FaPlus className="h-3.5 w-3.5" />
+                    Add Storage Area
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Areas
-            </p>
-            <p className="mt-1 text-2xl font-semibold text-stocksense-teal">
-              {totalAreas}
-            </p>
-          </div>
-          <div className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Categories
-            </p>
-            <p className="mt-1 text-2xl font-semibold text-stocksense-teal">
-              {totalCategories}
-            </p>
-          </div>
-          <div className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Items
-            </p>
-            <p className="mt-1 text-2xl font-semibold text-stocksense-teal">
-              {totalItems}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          {canEditInventory && (
-            <div className="flex flex-wrap gap-2">
-              <OpenGlobalAddItemButton
-                canEditInventory={canEditInventory}
-                context={{
-                  locationId,
-                }}
-              />
-              <button
-                onClick={openCreateAreaModal}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 py-2 text-sm font-medium text-[var(--stocksense-brand)] hover:brightness-95"
-              >
-                <FaPlus /> New storage area
-              </button>
-            </div>
-          )}
-
-          <button
-            onClick={allAreasExpanded ? collapseAllAreas : expandAllAreas}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-stocksense-gray px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer"
-          >
-            {allAreasExpanded ? 'Collapse all' : 'Expand all'}
-            <FaChevronUp
-              className={`${
-                allAreasExpanded ? '' : 'rotate-180'
-              } transition-all duration-150 cursor-pointer`}
-            />
-          </button>
-        </div>
-
-      </motion.div>
+      </motion.section>
 
       {/* Mobile hierarchy */}
       <motion.div variants={pageVariants} className="grid grid-cols-1 gap-3 md:hidden">
@@ -1449,9 +1807,19 @@ export default function StorageAreasSection({
                               className="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white p-3 text-left shadow-sm"
                             >
                               <div className="flex min-w-0 items-center gap-3">
-                                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
-                                  <FaTags className="h-4 w-4" />
-                                </div>
+                                {category.imageUrl ? (
+                                  <div className="h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-[var(--entity-category-border)] bg-white">
+                                    <img
+                                      src={category.imageUrl}
+                                      alt=""
+                                      className="h-full w-full object-cover"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
+                                    <FaTags className="h-4 w-4" />
+                                  </div>
+                                )}
                                 <div className="min-w-0">
                                   <p className="truncate text-sm font-semibold text-gray-900">
                                     {category.name}
@@ -1485,421 +1853,506 @@ export default function StorageAreasSection({
       </motion.div>
 
       {/* Desktop hierarchy */}
-      <motion.div variants={pageVariants} className="hidden grid-cols-1 gap-4 md:grid">
-        {storageAreas.length === 0 && (
+      <motion.div variants={pageVariants} className="hidden grid-cols-1 gap-5 md:grid">
+        {storageAreas.length === 0 ? (
           <motion.div
             variants={pageItemVariants}
-            className="rounded-2xl border border-dashed border-stocksense-gray bg-white p-8 text-center shadow-sm"
+            className="rounded-2xl border border-dashed border-[var(--stocksense-brand-border)] bg-white p-10 text-center shadow-sm"
           >
-            <h2 className="text-lg font-semibold text-gray-950">
-              No storage areas yet
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]">
+              <FaWarehouse className="h-6 w-6" />
+            </div>
+            <h2 className="mt-4 text-xl font-semibold text-gray-950">
+              Nothing stored here yet
             </h2>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-600">
+              Create a shelf, closet, drawer, or bin to start organizing.
+            </p>
             {canEditInventory && (
               <button
+                type="button"
                 onClick={openCreateAreaModal}
-                className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--stocksense-brand)] px-4 py-2 text-sm font-medium text-white hover:brightness-95"
+                className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
               >
-                <FaPlus /> New storage area
+                <FaPlus className="h-3.5 w-3.5" />
+                Add Storage Area
               </button>
             )}
           </motion.div>
-        )}
-        {storageAreas.map((area, aIdx) => (
+        ) : desktopStorageAreas.length === 0 ? (
           <motion.div
-            key={area.id}
-            initial={{ opacity: 0, y: 10, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ type: 'spring', stiffness: 220, damping: 20, delay: aIdx * 0.02 }}
-            className="overflow-hidden rounded-2xl border border-stocksense-gray bg-white shadow-sm"
+            variants={pageItemVariants}
+            className="rounded-2xl border border-white/70 bg-white p-8 text-center shadow-sm"
           >
-            {/* Area header */}
-            <div className="border-t-4 border-[var(--entity-area-accent)] p-4 md:p-5 flex items-start justify-between gap-3">
-              <div className="flex min-w-0 flex-1 items-center gap-3">
-                {area.categories?.length ? (
-                  <button
-                    onClick={() => toggleArea(area.id)}
-                    className="text-[var(--stocksense-brand)] rounded-lg p-1.5 hover:bg-[var(--stocksense-brand-soft)] border border-transparent hover:border-[var(--stocksense-brand-border)]"
-                    aria-label={expandedAreas[area.id] ? 'Collapse area' : 'Expand area'}
-                  >
-                    <FaChevronUp
-                      className={`${
-                        expandedAreas[area.id] ? '' : 'rotate-180'
-                      } transition-all duration-150 cursor-pointer`}
-                    />
-                  </button>
-                ) : null}
-
-                {area.imageUrl ? (
-                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
-                    <img
-                      src={area.imageUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]">
-                    <FaWarehouse className="h-5 w-5" />
-                  </div>
-                )}
-
-                <div className="min-w-0">
-                  <h2 className="text-lg font-semibold text-gray-900 truncate">
-                    {area.name}
-                  </h2>
-                  <p className="text-xs text-gray-500">
-                    {area.categories?.length || 0}{' '}
-                    {area.categories?.length === 1 ? 'category' : 'categories'} in this storage area
-                  </p>
-                </div>
-              </div>
-
-              {canEditInventory && (
-                <div className="flex flex-wrap justify-end gap-2 shrink-0">
-                  <button
-                    onClick={() => openCreateCategoryModal(area)}
-                    className="inline-flex items-center gap-2 rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-2 text-sm font-medium text-[var(--stocksense-brand)] hover:brightness-95"
-                  >
-                    <FaLayerGroup /> New category
-                  </button>
-                  <button
-                    onClick={() => openEditAreaModal(area)}
-                    className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
-                    title="Edit storage area"
-                  >
-                    <FaEdit />
-                  </button>
-                  <button
-                    onClick={() =>
-                      openDeleteDialog('area', {
-                        areaId: area.id,
-                        name: area.name,
-                      })
-                    }
-                    className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
-                    title="Delete storage area"
-                  >
-                    <FaTrash />
-                  </button>
-                </div>
-              )}
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+              <FaSearch className="h-5 w-5" />
             </div>
-
-            {/* Categories list */}
-            <AnimatePresence initial={false}>
-              {expandedAreas[area.id] && (
-                <motion.div
-                  key={`${area.id}-content`}
-                  variants={collapseVariants}
-                  initial="collapsed"
-                  animate="open"
-                  exit="collapsed"
-                  className="overflow-hidden"
-                >
-                  <div className="border-t border-gray-100 bg-gray-50/70 px-3 py-4 md:px-5 space-y-3">
-                    {(area.categories || []).filter((c) =>
-                      filterCategoryVisible(c)
-                    ).length === 0 && (
-                      <div className="rounded-xl border border-dashed border-stocksense-gray bg-gray-50 px-4 py-5 text-center text-sm text-gray-500">
-                        {search || expSoonEnabled
-                          ? 'No matching categories or items.'
-                          : 'No categories yet.'}
+            <h2 className="mt-4 text-lg font-semibold text-gray-950">
+              No matching inventory
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Try another search or adjust the expiration filter.
+            </p>
+          </motion.div>
+        ) : (
+          desktopStorageAreas.map((area, areaIndex) => (
+            <motion.article
+              key={area.id}
+              initial={{ opacity: 0, y: 10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{
+                type: 'spring',
+                stiffness: 220,
+                damping: 20,
+                delay: areaIndex * 0.02,
+              }}
+              className="overflow-hidden rounded-2xl border border-white/70 bg-white shadow-sm transition hover:shadow-md"
+            >
+              <div className="border-t-4 border-[var(--entity-area-accent)] p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-start gap-4">
+                    <button
+                      type="button"
+                      onClick={() => toggleArea(area.id)}
+                      className="mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-transparent text-[var(--stocksense-brand)] transition hover:border-[var(--stocksense-brand-border)] hover:bg-[var(--stocksense-brand-soft)]"
+                      aria-expanded={Boolean(expandedAreas[area.id])}
+                      aria-label={`${expandedAreas[area.id] ? 'Collapse' : 'Expand'} ${area.name}`}
+                    >
+                      <FaChevronUp
+                        className={`h-4 w-4 transition-transform ${
+                          expandedAreas[area.id] ? '' : 'rotate-180'
+                        }`}
+                      />
+                    </button>
+                    {area.imageUrl ? (
+                      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-area-border)] bg-white">
+                        <img
+                          src={area.imageUrl}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]">
+                        <FaWarehouse className="h-5 w-5" />
                       </div>
                     )}
-                    {(area.categories || [])
-                      .filter((c) => filterCategoryVisible(c))
-                      .map((category, cIdx) => {
-                        const items = (category.items || []).filter(filterItem);
-                        const selMap = selectedByCategory[category.id] || {};
-                        const selectedCount = Object.values(selMap).filter(Boolean).length;
-                        const allSelected =
-                          items.length > 0 && selectedCount === items.length;
 
-                        return (
-                          <motion.div
-                            key={category.id}
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.22, delay: cIdx * 0.02 }}
-                            className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <span className="rounded-full border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--entity-area-accent)]">
+                          Storage area
+                        </span>
+                        <h2 className="truncate text-xl font-semibold tracking-tight text-gray-950">
+                          {area.name}
+                        </h2>
+                      </div>
+                      <p className="mt-1 text-sm font-medium text-gray-500">
+                        {(area.categories ?? []).length}{' '}
+                        {(area.categories ?? []).length === 1
+                          ? 'category'
+                          : 'categories'}{' '}
+                        &bull; {area.areaItemCount}{' '}
+                        {area.areaItemCount === 1 ? 'item' : 'items'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {canEditInventory && (
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openCreateCategoryModal(area)}
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 text-sm font-semibold text-[var(--stocksense-brand)] transition hover:brightness-95"
+                      >
+                        <FaLayerGroup className="h-3.5 w-3.5" />
+                        Add Category
+                      </button>
+                      <Dropdown placement="bottom-end">
+                        <DropdownTrigger>
+                          <Button
+                            isIconOnly
+                            variant="light"
+                            radius="lg"
+                            className="h-10 w-10 min-w-10 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+                            aria-label={`${area.name} actions`}
                           >
-                            {/* Category header */}
-                            <div className="p-3 sm:p-4 flex items-start justify-between gap-3">
-                              <div className="flex min-w-0 flex-1 items-center gap-2">
-                                {items.length ? (
-                                  <button
-                                    onClick={() => toggleCategory(category.id)}
-                                    className="text-[var(--stocksense-brand)] rounded-lg p-1 hover:bg-[var(--stocksense-brand-soft)] border border-transparent hover:border-[var(--stocksense-brand-border)]"
-                                    aria-label={
-                                      expandedCategories[category.id]
-                                        ? 'Collapse category'
-                                        : 'Expand category'
-                                    }
-                                  >
-                                    <FaChevronUp
-                                      className={`${
-                                        expandedCategories[category.id]
-                                          ? ''
-                                          : 'rotate-180'
-                                      } transition-all duration-150 cursor-pointer`}
-                                    />
-                                  </button>
-                                ) : null}
+                            <FaEllipsisV className="h-4 w-4" />
+                          </Button>
+                        </DropdownTrigger>
+                        <DropdownMenu aria-label={`${area.name} actions`}>
+                          <DropdownItem
+                            key="edit"
+                            onPress={() => openEditAreaModal(area)}
+                          >
+                            Edit
+                          </DropdownItem>
+                          <DropdownItem
+                            key="delete"
+                            className="text-danger"
+                            color="danger"
+                            onPress={() =>
+                              openDeleteDialog('area', {
+                                areaId: area.id,
+                                name: area.name,
+                              })
+                            }
+                          >
+                            Delete
+                          </DropdownItem>
+                        </DropdownMenu>
+                      </Dropdown>
+                    </div>
+                  )}
+                </div>
 
-                                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
+                <AnimatePresence initial={false}>
+                  {expandedAreas[area.id] && (
+                    <motion.div
+                      key={`${area.id}-desktop-content`}
+                      variants={collapseVariants}
+                      initial="collapsed"
+                      animate="open"
+                      exit="collapsed"
+                      className="overflow-hidden"
+                    >
+                      <div className="mt-5 space-y-4">
+                        {area.visibleCategories.length === 0 ? (
+                          <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/70 p-5 text-center text-sm text-gray-500">
+                            No categories yet.
+                          </div>
+                        ) : (
+                          area.visibleCategories.map((category, categoryIndex) => {
+                      const items = category.visibleItems ?? [];
+                      const selectedMap = selectedByCategory[category.id] || {};
+                      const selectedCount = Object.values(selectedMap).filter(Boolean).length;
+                      const allSelected =
+                        items.length > 0 && selectedCount === items.length;
+
+                      return (
+                        <motion.section
+                          key={category.id}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.22, delay: categoryIndex * 0.02 }}
+                          className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => toggleCategory(category.id)}
+                                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-transparent text-[var(--stocksense-brand)] transition hover:border-[var(--stocksense-brand-border)] hover:bg-[var(--stocksense-brand-soft)]"
+                                aria-expanded={Boolean(expandedCategories[category.id])}
+                                aria-label={`${expandedCategories[category.id] ? 'Collapse' : 'Expand'} ${category.name}`}
+                              >
+                                <FaChevronUp
+                                  className={`h-3.5 w-3.5 transition-transform ${
+                                    expandedCategories[category.id] ? '' : 'rotate-180'
+                                  }`}
+                                />
+                              </button>
+                              {category.imageUrl ? (
+                                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-[var(--entity-category-border)] bg-white">
+                                  <img
+                                    src={category.imageUrl}
+                                    alt=""
+                                    className="h-full w-full object-cover"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
                                   <FaTags className="h-4 w-4" />
                                 </div>
-
-                                <div className="min-w-0">
-                                  <h3 className="font-semibold text-gray-900 truncate">
+                              )}
+                              <div className="min-w-0">
+                                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                  <span className="rounded-full border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--entity-category-accent)]">
+                                    Category
+                                  </span>
+                                  <h3 className="truncate text-base font-semibold text-gray-950">
                                     {category.name}
                                   </h3>
-                                  <p className="text-xs text-gray-500">
-                                    {items.length}{' '}
-                                    {items.length === 1 ? 'item' : 'items'} in this category
-                                  </p>
                                 </div>
+                                <p className="text-xs font-medium text-gray-500">
+                                  {(category.items ?? []).length}{' '}
+                                  {(category.items ?? []).length === 1 ? 'item' : 'items'}
+                                </p>
                               </div>
-
-                              {canEditInventory && (
-                                <div className="flex flex-wrap justify-end gap-2 shrink-0">
-                                  <button
-                                    onClick={() => openCreateItemModal(area, category)}
-                                    className="inline-flex items-center gap-2 rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-2 text-sm font-medium text-[var(--stocksense-brand)] hover:brightness-95"
-                                  >
-                                    <FaBoxOpen /> Add item
-                                  </button>
-                                  <button
-                                    onClick={() => openEditCategoryModal(area, category)}
-                                    className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
-                                    title="Edit category"
-                                  >
-                                    <FaEdit />
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      openDeleteDialog('category', {
-                                        categoryId: category.id,
-                                        storageAreaId: area.id,
-                                        name: category.name,
-                                        areaName: area.name,
-                                      })
-                                    }
-                                    className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
-                                    title="Delete category"
-                                  >
-                                    <FaTrash />
-                                  </button>
-                                </div>
-                              )}
                             </div>
 
-                            {/* Items list (collapsible) */}
-                            <AnimatePresence initial={false}>
-                              {expandedCategories[category.id] && (
-                                <motion.div
-                                  key={`${category.id}-items`}
-                                  variants={collapseVariants}
-                                  initial="collapsed"
-                                  animate="open"
-                                  exit="collapsed"
-                                  className="overflow-hidden sm:pl-8"
+                            {canEditInventory && (
+                              <div className="flex shrink-0 items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openCreateItemModal(area, category)}
+                                  className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[var(--stocksense-brand)] px-3 text-xs font-semibold text-white shadow-sm transition hover:brightness-95"
                                 >
-                                  {canEditInventory && items.length > 0 && (
-                                    <div className="px-3 sm:px-4 flex flex-wrap items-center text-sm mb-2 gap-2">
-                                      <h3 className="font-semibold text-sm uppercase tracking-wide text-gray-500 truncate">
-                                        Items
-                                      </h3>
-                                      <label className="flex items-center gap-2 cursor-pointer">
+                                  <FaBoxOpen className="h-3.5 w-3.5" />
+                                  Add Item
+                                </button>
+                                <Dropdown placement="bottom-end">
+                                  <DropdownTrigger>
+                                    <Button
+                                      isIconOnly
+                                      variant="light"
+                                      radius="lg"
+                                      className="h-9 w-9 min-w-9 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+                                      aria-label={`${category.name} actions`}
+                                    >
+                                      <FaEllipsisV className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownTrigger>
+                                  <DropdownMenu aria-label={`${category.name} actions`}>
+                                    <DropdownItem
+                                      key="select-all"
+                                      onPress={() => {
+                                        if (items.length === 0) return;
+                                        if (allSelected) {
+                                          clearSelectInCategory(category.id);
+                                        } else {
+                                          selectAllInCategory({ ...category, items });
+                                        }
+                                      }}
+                                    >
+                                      {items.length === 0
+                                        ? 'No items to select'
+                                        : allSelected
+                                        ? 'Clear selection'
+                                        : 'Select all items'}
+                                    </DropdownItem>
+                                    <DropdownItem
+                                      key="edit"
+                                      onPress={() => openEditCategoryModal(area, category)}
+                                    >
+                                      Edit
+                                    </DropdownItem>
+                                    <DropdownItem
+                                      key="delete"
+                                      className="text-danger"
+                                      color="danger"
+                                      onPress={() =>
+                                        openDeleteDialog('category', {
+                                          categoryId: category.id,
+                                          storageAreaId: area.id,
+                                          name: category.name,
+                                          areaName: area.name,
+                                        })
+                                      }
+                                    >
+                                      Delete
+                                    </DropdownItem>
+                                  </DropdownMenu>
+                                </Dropdown>
+                              </div>
+                            )}
+                          </div>
+
+                          <AnimatePresence initial={false}>
+                            {expandedCategories[category.id] && (
+                              <motion.div
+                                key={`${category.id}-desktop-items`}
+                                variants={collapseVariants}
+                                initial="collapsed"
+                                animate="open"
+                                exit="collapsed"
+                                className="overflow-hidden"
+                              >
+                                {canEditInventory && selectedCount > 0 && (
+                                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-2">
+                                    <p className="text-xs font-semibold text-[var(--stocksense-brand)]">
+                                      {selectedCount} selected
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => openMoveModal(area.id, category.id)}
+                                        className="inline-flex h-8 items-center rounded-lg bg-white px-3 text-xs font-semibold text-[var(--stocksense-brand)] shadow-sm"
+                                      >
+                                        Move selected
+                                      </button>
+                                      <Button
+                                        size="sm"
+                                        color="danger"
+                                        variant="flat"
+                                        className="h-8 rounded-lg px-3 text-xs font-semibold"
+                                        onPress={() => {
+                                          const ids = Object.keys(selectedMap).filter(
+                                            (key) => selectedMap[key]
+                                          );
+                                          if (!ids.length) return;
+
+                                          openDeleteDialog('bulk-items', {
+                                            itemIds: ids,
+                                            categoryId: category.id,
+                                            storageAreaId: area.id,
+                                            categoryName: category.name,
+                                            areaName: area.name,
+                                            count: ids.length,
+                                          });
+                                        }}
+                                      >
+                                        Delete selected
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="mt-3 space-y-2">
+                                  {items.length === 0 ? (
+                                    <div className="rounded-xl border border-dashed border-gray-200 bg-white px-4 py-4 text-sm text-gray-500">
+                                      {search || expSoonEnabled
+                                        ? 'No matching items in this category.'
+                                        : 'No items in this category yet.'}
+                                    </div>
+                                  ) : (
+                                    items.map((item, itemIndex) => {
+                                const soon = isExpiringSoon(
+                                  item.expiration_date,
+                                  expDays
+                                );
+                                const selected = Boolean(
+                                  selectedByCategory[category.id]?.[item.id]
+                                );
+
+                                return (
+                                  <motion.div
+                                    key={item.id}
+                                    initial={{ opacity: 0, y: 6 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{
+                                      duration: 0.18,
+                                      delay: itemIndex * 0.015,
+                                    }}
+                                    className={`flex items-center justify-between gap-3 rounded-2xl border bg-white px-3 py-3 shadow-sm transition hover:border-[var(--stocksense-brand-border)] hover:shadow-md ${
+                                      selected
+                                        ? 'border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]'
+                                        : 'border-white/70'
+                                    }`}
+                                  >
+                                    <div className="flex min-w-0 items-center gap-3">
+                                      {canEditInventory && (
                                         <input
                                           type="checkbox"
-                                          className="cursor-pointer"
-                                          checked={allSelected}
-                                          onChange={(e) => {
-                                            if (e.target.checked)
-                                              selectAllInCategory({ ...category, items });
-                                            else clearSelectInCategory(category.id);
-                                          }}
+                                          checked={selected}
+                                          onChange={() =>
+                                            toggleSelectItem(category.id, item.id)
+                                          }
+                                          className="h-4 w-4 shrink-0 cursor-pointer rounded border border-gray-300"
+                                          aria-label={`Select ${item.name}`}
                                         />
-                                        Select all
-                                      </label>
+                                      )}
+                                      {item.imageUrl ? (
+                                        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-white">
+                                          <img
+                                            src={item.imageUrl}
+                                            alt=""
+                                            className="h-full w-full object-cover"
+                                          />
+                                        </div>
+                                      ) : (
+                                        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] text-[var(--entity-item-accent)]">
+                                          <FaBoxOpen className="h-4 w-4" />
+                                        </div>
+                                      )}
+                                      <div className="min-w-0">
+                                        <div className="flex min-w-0 items-center gap-2">
+                                          <p className="truncate text-sm font-semibold text-gray-950">
+                                            {item.name}
+                                          </p>
+                                          {soon && (
+                                            <span className="shrink-0 rounded-full border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--stocksense-brand)]">
+                                              {daysUntil(item.expiration_date) < 0
+                                                ? 'Expired'
+                                                : 'Soon'}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium text-gray-500">
+                                          <span>Qty: {item.quantity}</span>
+                                          {item.expiration_date && (
+                                            <span>Expires {item.expiration_date}</span>
+                                          )}
+                                          {item.barcode && (
+                                            <span className="inline-flex min-w-0 items-center gap-1">
+                                              <FaBarcode className="h-3 w-3" />
+                                              <span className="truncate">{item.barcode}</span>
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
 
-                                      {Object.values(
-                                        selectedByCategory[category.id] || {}
-                                      ).some(Boolean) && (
-                                        <>
-                                          <button
-                                            onClick={() =>
-                                              openMoveModal(area.id, category.id)
-                                            }
-                                            className="text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] hover:brightness-95 px-3 py-1.5 rounded-md cursor-pointer"
+                                    {canEditInventory && (
+                                      <Dropdown placement="bottom-end">
+                                        <DropdownTrigger>
+                                          <Button
+                                            isIconOnly
+                                            variant="light"
+                                            radius="lg"
+                                            className="h-9 w-9 min-w-9 shrink-0 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+                                            aria-label={`${item.name} actions`}
                                           >
-                                            Move selected items
-                                          </button>
-                                          <button
-                                            onClick={() => {
-                                              const selectedMap = selectedByCategory[category.id] || {};
-                                              const ids = Object.keys(selectedMap).filter((k) => selectedMap[k]);
-                                              if (!ids.length) return;
-
-                                              openDeleteDialog('bulk-items', {
-                                                itemIds: ids,
+                                            <FaEllipsisV className="h-4 w-4" />
+                                          </Button>
+                                        </DropdownTrigger>
+                                        <DropdownMenu aria-label={`${item.name} actions`}>
+                                          <DropdownItem
+                                            key="move"
+                                            onPress={() =>
+                                              openMoveModal(area.id, category.id, item.id)
+                                            }
+                                          >
+                                            Move
+                                          </DropdownItem>
+                                          <DropdownItem
+                                            key="edit"
+                                            onPress={() =>
+                                              openEditItemModal(area, category, item)
+                                            }
+                                          >
+                                            Edit
+                                          </DropdownItem>
+                                          <DropdownItem
+                                            key="delete"
+                                            className="text-danger"
+                                            color="danger"
+                                            onPress={() =>
+                                              openDeleteDialog('item', {
+                                                itemId: item.id,
+                                                itemName: item.name,
                                                 categoryId: category.id,
                                                 storageAreaId: area.id,
                                                 categoryName: category.name,
                                                 areaName: area.name,
-                                                count: ids.length,
-                                              });
-                                            }}
-                                            className="text-rose-700 border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-md cursor-pointer"
+                                              })
+                                            }
                                           >
-                                            Delete selected items (
-                                            {Object.values(selectedByCategory[category.id] || {}).filter(Boolean).length}
-                                            )
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
+                                            Delete
+                                          </DropdownItem>
+                                        </DropdownMenu>
+                                      </Dropdown>
+                                    )}
+                                  </motion.div>
+                                );
+                                    })
                                   )}
-
-                                  <div
-                                    className={`${
-                                      items.length && 'pb-4 '
-                                    } px-3 sm:px-4 space-y-2`}
-                                  >
-                                    {items.map((item, iIdx) => {
-                                      const soon = isExpiringSoon(
-                                        item.expiration_date,
-                                        expDays
-                                      );
-                                      const selected = !!(
-                                        selectedByCategory[category.id]?.[item.id]
-                                      );
-
-                                      return (
-                                        <motion.div
-                                          key={item.id}
-                                          initial={{ opacity: 0, y: 6 }}
-                                          animate={{ opacity: 1, y: 0 }}
-                                          transition={{
-                                            duration: 0.18,
-                                            delay: iIdx * 0.015,
-                                          }}
-                                          className={`flex flex-col gap-3 rounded-xl border border-gray-100 bg-gray-50/70 px-3 py-2.5 transition hover:border-[var(--stocksense-brand-border)] hover:bg-white sm:flex-row sm:items-center sm:justify-between ${
-                                            selected ? 'ring-2 ring-rose-200' : ''
-                                          }`}
-                                        >
-                                          <>
-                                            <div className="flex items-start gap-3 min-w-0">
-                                              {canEditInventory && (
-                                                <input
-                                                  type="checkbox"
-                                                  checked={selected}
-                                                  onChange={() =>
-                                                    toggleSelectItem(
-                                                      category.id,
-                                                      item.id
-                                                    )
-                                                  }
-                                                  className="mt-1"
-                                                />
-                                              )}
-                                              {item.imageUrl ? (
-                                                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
-                                                  <img
-                                                    src={item.imageUrl}
-                                                    alt=""
-                                                    className="h-full w-full object-cover"
-                                                  />
-                                                </div>
-                                              ) : (
-                                                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] text-[var(--entity-item-accent)]">
-                                                  <FaBoxOpen className="h-4 w-4" />
-                                                </div>
-                                              )}
-                                              <div className="min-w-0">
-                                                <p className="font-semibold text-gray-900 truncate">
-                                                  {item.name}
-                                                  {soon && (
-                                                    <span className="ml-2 text-[10px] uppercase tracking-wide bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
-                                                      {daysUntil(item.expiration_date) < 0
-                                                        ? 'Expired'
-                                                        : 'Soon'}
-                                                    </span>
-                                                  )}
-                                                </p>
-                                                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-gray-500">
-                                                  <span>Qty: {item.quantity}</span>
-                                                  <span>Exp: {item.expiration_date || '-'}</span>
-                                                  {item.barcode && (
-                                                    <span className="inline-flex min-w-0 items-center gap-1 text-xs">
-                                                      <FaBarcode className="h-3 w-3" />
-                                                      <span className="truncate">{item.barcode}</span>
-                                                    </span>
-                                                  )}
-                                                </div>
-                                              </div>
-                                            </div>
-                                            {canEditInventory && (
-                                              <div className="flex items-center gap-2 self-end shrink-0 sm:self-auto">
-                                                <button
-                                                  onClick={() =>
-                                                    openMoveModal(
-                                                      area.id,
-                                                      category.id,
-                                                      item.id
-                                                    )
-                                                  }
-                                                  className="text-[var(--stocksense-brand)] cursor-pointer rounded-lg p-2 hover:bg-[var(--stocksense-brand-soft)]"
-                                                  title="Move item to another category"
-                                                >
-                                                  <FaArrowsAlt />
-                                                </button>
-
-                                                <button
-                                                  onClick={() =>
-                                                    openEditItemModal(area, category, item)
-                                                  }
-                                                  className="text-amber-600 cursor-pointer rounded-lg p-2 hover:bg-amber-50"
-                                                  title="Edit item"
-                                                >
-                                                  <FaEdit />
-                                                </button>
-                                                <button
-                                                  onClick={() =>
-                                                    openDeleteDialog('item', {
-                                                      itemId: item.id,
-                                                      itemName: item.name,
-                                                      categoryId: category.id,
-                                                      storageAreaId: area.id,
-                                                      categoryName: category.name,
-                                                      areaName: area.name,
-                                                    })
-                                                  }
-                                                  className="text-rose-600 cursor-pointer rounded-lg p-2 hover:bg-rose-50"
-                                                  title="Delete item"
-                                                >
-                                                  <FaTrash />
-                                                </button>
-                                              </div>
-                                            )}
-                                          </>
-                                        </motion.div>
-                                      );
-                                    })}
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </motion.div>
-                        );
-                      })}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        ))}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </motion.section>
+                      );
+                          })
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </motion.article>
+          ))
+        )}
       </motion.div>
 
       <Modal
@@ -2139,6 +2592,16 @@ export default function StorageAreasSection({
                 onSelect={(name) => setAreaModal((prev) => ({ ...prev, name }))}
               />
             )}
+            {areaModal.mode === 'create' && (
+              <CreateImagePicker
+                label="Storage area photo optional"
+                imagePreview={areaModal.imagePreview}
+                imageFile={areaModal.imageFile}
+                imageMessage={areaModal.imageMessage}
+                onSelect={(file) => setCreateImageFile(setAreaModal, file)}
+                onClear={() => clearCreateImageFile(setAreaModal)}
+              />
+            )}
             {areaModal.mode === 'edit' && (
               <EntityImageManager
                 entityType="storage_area"
@@ -2240,6 +2703,25 @@ export default function StorageAreasSection({
                 onSelect={(name) =>
                   setCategoryModal((prev) => ({ ...prev, name }))
                 }
+              />
+            )}
+            {categoryModal.mode === 'create' && (
+              <CreateImagePicker
+                label="Category photo optional"
+                imagePreview={categoryModal.imagePreview}
+                imageFile={categoryModal.imageFile}
+                imageMessage={categoryModal.imageMessage}
+                onSelect={(file) => setCreateImageFile(setCategoryModal, file)}
+                onClear={() => clearCreateImageFile(setCategoryModal)}
+              />
+            )}
+            {categoryModal.mode === 'edit' && (
+              <EntityImageManager
+                entityType="category"
+                entityId={categoryModal.categoryId}
+                imageUrl={categoryModal.imageUrl}
+                label="Category photo"
+                onChange={handleCategoryImageChange}
               />
             )}
             {categoryModal.mode === 'edit' && (
@@ -2357,6 +2839,16 @@ export default function StorageAreasSection({
                 imageUrl={itemModal.imageUrl}
                 label="Item photo"
                 onChange={handleItemImageChange}
+              />
+            )}
+            {itemModal.mode === 'create' && (
+              <CreateImagePicker
+                label="Item photo optional"
+                imagePreview={itemModal.imagePreview}
+                imageFile={itemModal.imageFile}
+                imageMessage={itemModal.imageMessage}
+                onSelect={(file) => setCreateImageFile(setItemModal, file)}
+                onClear={() => clearCreateImageFile(setItemModal)}
               />
             )}
             {itemModal.mode === 'edit' && (

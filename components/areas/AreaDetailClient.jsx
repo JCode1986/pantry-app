@@ -23,6 +23,7 @@ import {
 import {
   FaBoxOpen,
   FaChevronLeft,
+  FaChevronRight,
   FaEdit,
   FaEllipsisV,
   FaPlus,
@@ -59,14 +60,6 @@ import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
 import { emitInventoryChange } from "@/utils/clientEvents";
 
 const CATEGORY_SUGGESTIONS = ["Food", "Documents", "Tools", "Medicine", "Clothes", "Electronics"];
-
-function StatPill({ label, value }) {
-  return (
-    <span className="px-2.5 py-1 rounded-full text-xs bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] border border-[var(--stocksense-brand-border)]">
-      <strong>{value}</strong> {label}
-    </span>
-  );
-}
 
 const pageVariants = {
   hidden: { opacity: 0 },
@@ -476,7 +469,7 @@ export default function AreaDetailClient({
       </motion.header>
 
       {/* Header */}
-      <motion.div variants={pageItemVariants} className="flex flex-col gap-3 max-md:hidden">
+      <motion.div variants={pageItemVariants} className="hidden">
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <Link href="/areas" className="inline-flex items-center gap-2 hover:text-[var(--stocksense-brand)]">
             <FaChevronLeft className="h-3.5 w-3.5" />
@@ -492,7 +485,7 @@ export default function AreaDetailClient({
           <div>
             <div className="flex items-center gap-3">
               {areaImageUrl && (
-                <div className="h-14 w-14 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
+                <div className="h-14 w-14 overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
                   <img
                     src={areaImageUrl}
                     alt=""
@@ -510,15 +503,9 @@ export default function AreaDetailClient({
               Click a category to view items.
             </p>
 
-            <div className="mt-3 flex flex-wrap gap-2">
-              <StatPill
-                label={totals.categories === 1 ? "Category" : "Categories"}
-                value={totals.categories}
-              />
-              <StatPill
-                label={totals.items === 1 ? "Item" : "Items"}
-                value={totals.items}
-              />
+            <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-500">
+              <span>{totals.categories} categories</span>
+              <span>{totals.items} items</span>
             </div>
           </div>
 
@@ -565,6 +552,164 @@ export default function AreaDetailClient({
           </div>
         </div>
       </motion.div>
+
+      <motion.section variants={pageItemVariants} className="max-md:hidden">
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <Link
+            href="/areas"
+            className="inline-flex items-center gap-2 hover:text-[var(--stocksense-brand)]"
+          >
+            <FaChevronLeft className="h-3.5 w-3.5" />
+            Storage areas
+          </Link>
+          <span className="text-gray-300">/</span>
+          {area?.location?.id ? (
+            <Link
+              href={`/locations/${area.location.id}`}
+              className="text-gray-600 hover:text-[var(--stocksense-brand)]"
+            >
+              {area.location.name || "Location"}
+            </Link>
+          ) : (
+            <span className="text-gray-600">
+              {area?.location?.name || "Location"}
+            </span>
+          )}
+          <span className="text-gray-300">/</span>
+          <span className="font-medium text-gray-800">{areaName || "Area"}</span>
+        </div>
+
+        <header className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex min-w-0 items-start gap-4">
+            {areaImageUrl ? (
+              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-area-border)] bg-white shadow-sm">
+                <img src={areaImageUrl} alt="" className="h-full w-full object-cover" />
+              </div>
+            ) : (
+              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)] shadow-sm">
+                <FaWarehouse className="h-6 w-6" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--stocksense-brand)]">
+                Storage Area
+              </p>
+              <h1 className="mt-1 truncate text-2xl font-semibold tracking-tight text-gray-950 md:text-3xl">
+                {areaName}
+              </h1>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-600">
+                Everything organized in{" "}
+                <span className="font-medium">{area?.location?.name}</span>.
+              </p>
+            </div>
+          </div>
+
+          {canEditInventory && (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="flat"
+                className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
+                onPress={() => {
+                  setEditAreaName(areaName);
+                  setEditAreaOpen(true);
+                }}
+                startContent={<FaEdit />}
+              >
+                Edit area
+              </Button>
+              <Button
+                variant="flat"
+                className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
+                onPress={() => setDeleteAreaOpen(true)}
+                startContent={<FaTrash />}
+              >
+                Delete
+              </Button>
+            </div>
+          )}
+        </header>
+      </motion.section>
+
+      <motion.section
+        variants={pageItemVariants}
+        className="grid gap-4 sm:grid-cols-2 max-md:hidden"
+      >
+        <div className="rounded-2xl border border-white/70 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-500">Categories</p>
+              <p className="mt-2 text-3xl font-semibold tracking-tight text-gray-950">
+                {totals.categories.toLocaleString()}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-gray-500">
+                Groups inside this space
+              </p>
+            </div>
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
+              <FaTags className="h-4 w-4" />
+            </span>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-white/70 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-500">Items</p>
+              <p className="mt-2 text-3xl font-semibold tracking-tight text-gray-950">
+                {totals.items.toLocaleString()}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-gray-500">
+                Stored in this area
+              </p>
+            </div>
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] text-[var(--entity-item-accent)]">
+              <FaBoxOpen className="h-4 w-4" />
+            </span>
+          </div>
+        </div>
+      </motion.section>
+
+      <motion.section
+        variants={pageItemVariants}
+        className="rounded-2xl border border-white/70 bg-white p-4 shadow-sm max-md:hidden"
+      >
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
+              <FaSearch className="h-4 w-4" />
+            </span>
+            <div>
+              <h2 className="text-sm font-semibold text-gray-950">
+                Find categories
+              </h2>
+              <p className="text-xs text-gray-500">
+                Search or add a category in this storage area.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Input
+              value={search}
+              onValueChange={setSearch}
+              placeholder="Search categories"
+              startContent={<FaSearch className="text-gray-400" />}
+              className="sm:w-[320px]"
+              radius="lg"
+              variant="bordered"
+              classNames={{
+                inputWrapper:
+                  "border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]",
+              }}
+            />
+            <OpenGlobalAddItemButton
+              canEditInventory={canEditInventory}
+              context={{
+                locationId: area?.location?.id,
+                storageAreaId: area?.id,
+              }}
+            />
+          </div>
+        </div>
+      </motion.section>
 
       <motion.section variants={pageItemVariants} className="md:hidden">
         <div className="flex items-end justify-between gap-3">
@@ -670,43 +815,56 @@ export default function AreaDetailClient({
       </section>
 
       {/* Add Category */}
-      {canEditInventory && <motion.div variants={pageItemVariants} className="max-md:hidden">
-        <Card className="border border-stocksense-gray shadow-sm">
-        <CardBody className="p-4">
-          <div className="flex flex-col md:flex-row gap-2 md:items-center">
-            <Input
-              value={newCategory}
-              onValueChange={setNewCategory}
-              placeholder={`Add a category in ${areaName} (e.g., Fruits, Snacks)`}
-              radius="lg"
-              variant="bordered"
-              className="w-full"
-              isDisabled={isSaving}
-            />
-            <Button
-              className="rounded-xl bg-[var(--stocksense-brand)] text-white"
-              onPress={handleAddCategory}
-              isDisabled={isSaving || !newCategory.trim()}
-              startContent={<FaPlus />}
-            >
-              Add Category
-            </Button>
-          </div>
+      {canEditInventory && (
+        <motion.div variants={pageItemVariants} className="max-md:hidden">
+          <Card className="rounded-2xl border border-white/70 bg-white shadow-sm">
+            <CardBody className="p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold text-gray-950">
+                    Create category
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    Add a new group inside {areaName}.
+                  </p>
+                </div>
+                <Input
+                  value={newCategory}
+                  onValueChange={setNewCategory}
+                  placeholder={`Add a category in ${areaName} (e.g., Fruits, Snacks)`}
+                  radius="lg"
+                  variant="bordered"
+                  className="w-full lg:max-w-xl"
+                  isDisabled={isSaving}
+                  classNames={{
+                    inputWrapper:
+                      "border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]",
+                  }}
+                />
+                <Button
+                  className="rounded-xl bg-[var(--stocksense-brand)] text-white"
+                  onPress={handleAddCategory}
+                  isDisabled={isSaving || !newCategory.trim()}
+                  startContent={<FaPlus />}
+                >
+                  Add Category
+                </Button>
+              </div>
 
-          {/* saving hint */}
-          {isSaving && (
-            <div className="mt-3">
-              <Skeleton className="rounded-lg">
-                <div className="h-3 w-44" />
-              </Skeleton>
-            </div>
-          )}
-        </CardBody>
-        </Card>
-      </motion.div>}
+              {isSaving && (
+                <div className="mt-3">
+                  <Skeleton className="rounded-lg">
+                    <div className="h-3 w-44" />
+                  </Skeleton>
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Categories Grid */}
-      <div className="grid grid-cols-1 gap-4 max-md:hidden sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid auto-rows-fr grid-cols-1 gap-5 max-md:hidden lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         <AnimatePresence>
           {filtered.map((cat, idx) => (
             <motion.div
@@ -716,14 +874,13 @@ export default function AreaDetailClient({
               exit={{ opacity: 0, y: 10 }}
               transition={{ duration: 0.2, delay: idx * 0.02 }}
             >
-              <Card className="group relative overflow-hidden border border-stocksense-gray shadow-sm transition hover:bg-gray-50 hover:shadow-md">
-                <div className="absolute inset-x-0 top-0 h-1 bg-[var(--entity-category-accent)]" />
-                <CardBody className="p-3.5 pt-4 sm:p-4">
+              <Card className="group relative h-full overflow-hidden rounded-2xl border border-white/70 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--stocksense-brand-border)] hover:shadow-lg">
+                <CardBody className="flex h-full flex-col gap-4 p-5">
                   <div className="flex items-start justify-between gap-2">
                     <Link href={`/categories/${cat.id}`} className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex min-w-0 items-center gap-3">
                         {cat.imageUrl ? (
-                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-gray-50">
+                          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-category-border)] bg-white">
                             <img
                               src={cat.imageUrl}
                               alt=""
@@ -731,15 +888,18 @@ export default function AreaDetailClient({
                             />
                           </div>
                         ) : (
-                          <div className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-2 text-[var(--stocksense-brand)]">
-                            <FaTag />
+                          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
+                            <FaTag className="h-5 w-5" />
                           </div>
                         )}
-                        <div className="min-w-0">
-                          <h3 className="truncate text-[15px] font-semibold leading-5 text-gray-950 group-hover:underline sm:text-base">
+                        <div className="min-w-0 flex-1">
+                          <h3
+                            className="truncate text-lg font-semibold leading-6 text-gray-950"
+                            title={cat.name}
+                          >
                             {cat.name}
                           </h3>
-                          <p className="text-xs text-gray-500">
+                          <p className="mt-1 text-sm text-gray-500">
                             {cat.itemsCount} {cat.itemsCount === 1 ? "item" : "items"}
                           </p>
                         </div>
@@ -749,7 +909,13 @@ export default function AreaDetailClient({
                     {canEditInventory && (
                       <Dropdown placement="bottom-end">
                         <DropdownTrigger>
-                          <Button isIconOnly variant="light" radius="lg" isDisabled={isSaving}>
+                          <Button
+                            isIconOnly
+                            variant="light"
+                            radius="lg"
+                            isDisabled={isSaving}
+                            className="h-9 w-9 min-w-9 shrink-0"
+                          >
                             <FaEllipsisV className="text-gray-500" />
                           </Button>
                         </DropdownTrigger>
@@ -782,12 +948,13 @@ export default function AreaDetailClient({
                     )}
                   </div>
 
-                  <div className="mt-3">
+                  <div className="mt-auto">
                     <Link
                       href={`/categories/${cat.id}`}
-                      className="inline-flex h-9 items-center gap-2 rounded-xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] px-2.5 text-xs text-[var(--entity-category-accent)] hover:brightness-95"
+                      className="inline-flex h-9 items-center gap-2 rounded-xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] px-3 text-sm font-semibold text-[var(--entity-category-accent)] hover:brightness-95"
                     >
-                      View items →
+                      View items
+                      <FaChevronRight className="h-3 w-3" />
                     </Link>
                   </div>
                 </CardBody>
@@ -797,23 +964,19 @@ export default function AreaDetailClient({
         </AnimatePresence>
 
         {filtered.length === 0 && (
-          <Card className="border border-dashed border-stocksense-gray">
-            <CardBody className="p-8 text-center">
-              <p className="text-sm text-gray-600 font-medium">No categories found</p>
-              <p className="text-xs text-gray-500 mt-1">
+          <Card className="rounded-2xl border border-dashed border-gray-200 bg-white shadow-sm lg:col-span-2 xl:col-span-3 2xl:col-span-4">
+            <CardBody className="px-5 py-8 text-center">
+              <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
+                <FaTag className="h-6 w-6" />
+              </div>
+              <p className="mt-4 text-lg font-semibold text-gray-950">
+                No categories found
+              </p>
+              <p className="mt-1 text-sm text-gray-500">
                 {canEditInventory
                   ? "Try a different search, or add a new category above."
                   : "Try a different search."}
               </p>
-              <div className="mt-4 flex justify-center">
-                <OpenGlobalAddItemButton
-                  canEditInventory={canEditInventory}
-                  context={{
-                    locationId: area?.location?.id,
-                    storageAreaId: area?.id,
-                  }}
-                />
-              </div>
             </CardBody>
           </Card>
         )}

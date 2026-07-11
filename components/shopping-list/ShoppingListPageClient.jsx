@@ -4,6 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Button,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownTrigger,
   Modal,
   ModalBody,
   ModalContent,
@@ -14,7 +18,7 @@ import {
 } from "@heroui/react";
 import {
   FaCheck,
-  FaEdit,
+  FaEllipsisV,
   FaExchangeAlt,
   FaImage,
   FaPlus,
@@ -174,6 +178,7 @@ export default function ShoppingListPageClient({
   }, [filter, items]);
 
   const selectedCount = selectedIds.size;
+  const selectionMode = selectedCount > 0;
   const isBulkBusy = Boolean(bulkAction);
   const safeMoveLocations = moveLocations ?? [];
 
@@ -231,6 +236,37 @@ export default function ShoppingListPageClient({
       { all: 0, needed: 0, purchased: 0, dismissed: 0 }
     );
   }, [items]);
+  const desktopSummaryCards = [
+    {
+      label: "Needed",
+      value: counts.needed ?? 0,
+      description: "Ready to restock",
+      icon: FaShoppingBasket,
+      className: "border-amber-200 bg-amber-50 text-amber-700",
+    },
+    {
+      label: "Purchased",
+      value: counts.purchased ?? 0,
+      description: "Recently checked off",
+      icon: FaCheck,
+      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    },
+    {
+      label: "Dismissed",
+      value: counts.dismissed ?? 0,
+      description: "Set aside for now",
+      icon: FaUndo,
+      className: "border-gray-200 bg-gray-50 text-gray-600",
+    },
+    {
+      label: "Total",
+      value: counts.all ?? 0,
+      description: "Shopping list items",
+      icon: FaShoppingBasket,
+      className:
+        "border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]",
+    },
+  ];
 
   function handleAdded(item) {
     if (!canEditInventory) return;
@@ -819,20 +855,18 @@ export default function ShoppingListPageClient({
         )}
       </motion.section>
 
-      <section className="rounded-2xl border border-stocksense-gray bg-white p-4 shadow-sm max-md:hidden md:p-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl border border-[var(--entity-shopping-border)] bg-[var(--entity-shopping-accent)] p-3 text-white shadow-sm">
-              <FaShoppingBasket className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-gray-950 md:text-2xl">
-                Shopping List
-              </h1>
-              <p className="text-sm text-gray-500">
-                Keep track of what needs to be restocked.
-              </p>
-            </div>
+      <section className="max-md:hidden">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--stocksense-brand)]">
+              Shopping List
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-gray-950 md:text-3xl">
+              Restock list
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-600">
+              Keep track of what your home needs next.
+            </p>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -870,31 +904,6 @@ export default function ShoppingListPageClient({
           </div>
         </div>
 
-        {canEditInventory && (
-          <div className="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4 max-md:hidden sm:flex-row sm:items-center sm:justify-between">
-            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={allVisibleSelected}
-                onChange={toggleSelectAllVisible}
-                disabled={visibleItems.length === 0 || isBulkBusy}
-                className="h-5 w-5 cursor-pointer rounded border border-stocksense-gray"
-              />
-              Select all visible
-            </label>
-
-            <Button
-              size="sm"
-              variant="flat"
-              className="w-fit rounded-xl"
-              isDisabled={selectedCount === 0 || isBulkBusy}
-              onPress={clearSelection}
-            >
-              Clear selection
-            </Button>
-          </div>
-        )}
-
         {canEditInventory && <AnimatePresence initial={false}>
           {selectedCount > 0 ? (
             <motion.div
@@ -903,16 +912,37 @@ export default function ShoppingListPageClient({
               animate={{ opacity: 1, height: "auto", y: 0 }}
               exit={{ opacity: 0, height: 0, y: -6 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className="mt-4 overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3 max-md:hidden"
+              className="mt-5 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3 max-md:hidden"
             >
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <p className="text-sm text-gray-700">
-                  Bulk actions for{" "}
-                  <span className="font-semibold">{selectedCount}</span>{" "}
-                  item{selectedCount === 1 ? "" : "s"}
-                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className="text-sm text-[var(--stocksense-brand)]">
+                    Bulk actions for{" "}
+                    <span className="font-semibold">{selectedCount}</span>{" "}
+                    item{selectedCount === 1 ? "" : "s"}
+                  </p>
+                  <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-[var(--stocksense-brand)]">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleSelectAllVisible}
+                      disabled={visibleItems.length === 0 || isBulkBusy}
+                      className="h-4 w-4 cursor-pointer rounded border border-[var(--stocksense-brand-border)]"
+                    />
+                    Select all visible
+                  </label>
+                </div>
 
                 <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
+                    isDisabled={isBulkBusy}
+                    onPress={clearSelection}
+                  >
+                    Clear selection
+                  </Button>
                   <Button
                     size="sm"
                     className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
@@ -983,7 +1013,34 @@ export default function ShoppingListPageClient({
         ) : null}
       </section>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 max-md:hidden">
+        {desktopSummaryCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <div
+              key={card.label}
+              className="rounded-2xl border border-white/70 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">{card.label}</p>
+                  <p className="mt-2 text-3xl font-semibold tracking-tight text-gray-950">
+                    {card.value.toLocaleString()}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-gray-500">
+                    {card.description}
+                  </p>
+                </div>
+                <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl border ${card.className}`}>
+                  <Icon className="h-4 w-4" />
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </section>
+
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4 md:gap-5">
         <AnimatePresence initial={false}>
           {visibleItems.map((item) => {
             const isSelected = selectedIds.has(String(item.id));
@@ -1004,10 +1061,10 @@ export default function ShoppingListPageClient({
                 onPointerCancel={clearMobileLongPressTimer}
                 onContextMenu={(event) => event.preventDefault()}
                 onClick={() => handleMobileItemPress(item)}
-                className={`relative h-full overflow-hidden rounded-2xl border bg-white p-3.5 shadow-sm transition sm:p-4 ${
+                className={`relative h-full overflow-hidden rounded-2xl border bg-white p-3.5 shadow-sm transition sm:p-4 md:border-white/70 md:p-5 md:hover:-translate-y-0.5 md:hover:shadow-lg ${
                   isSelected
                     ? "border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]/40"
-                    : "border-stocksense-gray hover:bg-gray-50"
+                    : "border-stocksense-gray hover:bg-gray-50 md:hover:border-[var(--stocksense-brand-border)]"
                 }`}
               >
                 <div className={`absolute inset-x-0 top-0 h-1 ${statusAccentClass(item.status)}`} />
@@ -1035,7 +1092,7 @@ export default function ShoppingListPageClient({
                       </motion.div>
                     )}
 
-                    {canEditInventory && (
+                    {canEditInventory && selectionMode && (
                       <input
                         type="checkbox"
                         checked={isSelected}
@@ -1046,7 +1103,7 @@ export default function ShoppingListPageClient({
                       />
                     )}
 
-                    <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 text-[var(--stocksense-brand)]">
+                    <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl border border-[var(--entity-shopping-border)] bg-[var(--entity-shopping-soft)] text-[var(--entity-shopping-accent)] md:h-20 md:w-20">
                       {item.imageUrl ? (
                         <img
                           src={item.imageUrl}
@@ -1061,7 +1118,10 @@ export default function ShoppingListPageClient({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2.5">
                         <div className="min-w-0 flex-1">
-                          <h2 className="truncate text-[15px] font-semibold leading-5 text-gray-900 sm:text-base">
+                          <h2
+                            className="truncate text-[15px] font-semibold leading-5 text-gray-900 sm:text-base md:text-lg md:leading-6"
+                            title={item.name}
+                          >
                             {item.name}
                           </h2>
                           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -1078,13 +1138,105 @@ export default function ShoppingListPageClient({
                           </div>
                         </div>
 
-                        <div className="shrink-0 rounded-xl border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-center">
-                          <div className="text-[10px] font-semibold uppercase text-gray-400">
-                            Qty
+                        <div className="flex shrink-0 items-start gap-1.5">
+                          <div className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-2.5 py-1.5 text-center">
+                            <div className="text-[10px] font-semibold uppercase text-gray-400">
+                              Qty
+                            </div>
+                            <div className="text-base font-semibold leading-5 text-[var(--stocksense-brand)]">
+                              {item.quantity ?? 0}
+                            </div>
                           </div>
-                          <div className="text-base font-semibold leading-5 text-gray-950 md:text-stocksense-teal">
-                            {item.quantity ?? 0}
-                          </div>
+
+                          {canEditInventory && (
+                            <div
+                              className="max-md:hidden"
+                              onClick={(event) => event.stopPropagation()}
+                              onKeyDown={(event) => event.stopPropagation()}
+                            >
+                              <Dropdown placement="bottom-end">
+                                <DropdownTrigger>
+                                  <Button
+                                    isIconOnly
+                                    variant="light"
+                                    radius="lg"
+                                    className="h-9 w-9 min-w-9 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+                                    aria-label={`${item.name} actions`}
+                                    isDisabled={isDisabled}
+                                  >
+                                    <FaEllipsisV className="h-4 w-4" />
+                                  </Button>
+                                </DropdownTrigger>
+                                <DropdownMenu aria-label={`${item.name} actions`}>
+                                  <DropdownItem
+                                    key="select"
+                                    onPress={() => toggleSelect(item.id)}
+                                  >
+                                    {isSelected
+                                      ? "Deselect for bulk action"
+                                      : "Select for bulk action"}
+                                  </DropdownItem>
+                                  {item.status === "needed" ? (
+                                    <DropdownItem
+                                      key="purchased"
+                                      onPress={() => updateItemStatus(item, "purchased")}
+                                    >
+                                      Mark purchased
+                                    </DropdownItem>
+                                  ) : (
+                                    <DropdownItem
+                                      key="needed"
+                                      onPress={() => updateItemStatus(item, "needed")}
+                                    >
+                                      Need again
+                                    </DropdownItem>
+                                  )}
+                                  {item.status !== "dismissed" ? (
+                                    <DropdownItem
+                                      key="dismiss"
+                                      onPress={() => updateItemStatus(item, "dismissed")}
+                                    >
+                                      Dismiss
+                                    </DropdownItem>
+                                  ) : (
+                                    <DropdownItem
+                                      key="restore"
+                                      onPress={() => updateItemStatus(item, "needed")}
+                                    >
+                                      Restore
+                                    </DropdownItem>
+                                  )}
+                                  <DropdownItem
+                                    key="move"
+                                    isDisabled={safeMoveLocations.length === 0}
+                                    onPress={() => openMoveDialog(item)}
+                                  >
+                                    Move to inventory
+                                  </DropdownItem>
+                                  <DropdownItem
+                                    key="edit"
+                                    onPress={() => {
+                                      setMessage(null);
+                                      setEditingItem(item);
+                                    }}
+                                  >
+                                    Edit
+                                  </DropdownItem>
+                                  <DropdownItem
+                                    key="delete"
+                                    className="text-danger"
+                                    color="danger"
+                                    onPress={() => {
+                                      setMessage(null);
+                                      setDeleteCandidate(item);
+                                    }}
+                                  >
+                                    Delete
+                                  </DropdownItem>
+                                </DropdownMenu>
+                              </Dropdown>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -1096,94 +1248,6 @@ export default function ShoppingListPageClient({
                     </div>
                   </div>
 
-                  {canEditInventory && (
-                  <div className="grid grid-cols-[minmax(82px,1.25fr)_minmax(58px,1fr)_36px_36px_36px] gap-1.5 max-md:hidden">
-                    {item.status === "needed" ? (
-                      <Button
-                        size="sm"
-                        className="h-9 min-w-0 rounded-xl bg-emerald-600 px-1.5 text-[11px] text-white sm:px-2 sm:text-xs"
-                        isLoading={isPending}
-                        isDisabled={isBulkBusy}
-                        onPress={() => updateItemStatus(item, "purchased")}
-                      >
-                        Purchased
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        className="h-9 min-w-0 rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-1.5 text-[11px] text-[var(--stocksense-brand)] sm:px-2 sm:text-xs"
-                        isLoading={isPending}
-                        isDisabled={isBulkBusy}
-                        onPress={() => updateItemStatus(item, "needed")}
-                      >
-                        Need again
-                      </Button>
-                    )}
-                    {item.status !== "dismissed" ? (
-                      <Button
-                        size="sm"
-                        variant="flat"
-                        className="h-9 min-w-0 rounded-xl px-1.5 text-[11px] sm:px-2 sm:text-xs"
-                        isDisabled={isDisabled}
-                        onPress={() => updateItemStatus(item, "dismissed")}
-                      >
-                        Dismiss
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="flat"
-                        className="h-9 min-w-0 rounded-xl px-1.5 text-[11px] sm:px-2 sm:text-xs"
-                        isDisabled={isDisabled}
-                        onPress={() => updateItemStatus(item, "needed")}
-                      >
-                        Restore
-                      </Button>
-                    )}
-                    <Button
-                      isIconOnly
-                      size="sm"
-                      variant="flat"
-                      className="h-9 w-9 min-w-9 rounded-xl text-[var(--stocksense-brand)]"
-                      isDisabled={isDisabled || safeMoveLocations.length === 0}
-                      aria-label={`Move ${item.name} to inventory`}
-                      title="Move to inventory"
-                      onPress={() => openMoveDialog(item)}
-                    >
-                      <FaExchangeAlt />
-                    </Button>
-                    <Button
-                      isIconOnly
-                      size="sm"
-                      className="h-9 w-9 min-w-9 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
-                      isDisabled={isDisabled}
-                      aria-label={`Edit ${item.name}`}
-                      title="Edit"
-                      onPress={() => {
-                        setMessage(null);
-                        setEditingItem(item);
-                      }}
-                    >
-                      <FaEdit />
-                    </Button>
-                    <Button
-                      isIconOnly
-                      size="sm"
-                      variant="flat"
-                      color="danger"
-                      className="h-9 w-9 min-w-9 rounded-xl"
-                      isDisabled={isDisabled}
-                      aria-label={`Delete ${item.name}`}
-                      title="Delete"
-                      onPress={() => {
-                        setMessage(null);
-                        setDeleteCandidate(item);
-                      }}
-                    >
-                      <FaTrash />
-                    </Button>
-                  </div>
-                  )}
                 </div>
               </motion.article>
             );

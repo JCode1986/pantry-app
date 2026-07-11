@@ -1,11 +1,15 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Input,
   Button,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownTrigger,
   Modal,
   ModalContent,
   ModalHeader,
@@ -13,8 +17,12 @@ import {
   ModalFooter,
 } from "@heroui/react";
 import {
+  FaBoxOpen,
   FaChevronRight,
+  FaEllipsisV,
+  FaMapMarkedAlt,
   FaSearch,
+  FaTags,
   FaTrash,
   FaWarehouse,
 } from "react-icons/fa";
@@ -162,9 +170,47 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
   }, [areas, search]);
 
   const selectedCount = selectedIds.size;
+  const selectionMode = selectedCount > 0;
   const allVisibleSelected =
     filtered.length > 0 &&
     filtered.every((area) => selectedIds.has(String(area.id)));
+  const totalCategories = areas.reduce(
+    (sum, area) => sum + (area.categoriesCount ?? 0),
+    0
+  );
+  const totalItems = areas.reduce(
+    (sum, area) => sum + (area.itemsCount ?? 0),
+    0
+  );
+  const totalLocations = new Set(
+    areas.map((area) => area.location?.id ?? area.location?.name).filter(Boolean)
+  ).size;
+  const summaryCards = [
+    {
+      label: "Storage Areas",
+      value: areas.length,
+      description: "Shelves, closets, bins",
+      icon: FaWarehouse,
+    },
+    {
+      label: "Locations",
+      value: totalLocations,
+      description: "Spaces with storage",
+      icon: FaMapMarkedAlt,
+    },
+    {
+      label: "Categories",
+      value: totalCategories,
+      description: "Groups inside areas",
+      icon: FaTags,
+    },
+    {
+      label: "Items",
+      value: totalItems,
+      description: "Tracked household items",
+      icon: FaBoxOpen,
+    },
+  ];
 
   const toggleSelect = (id) => {
     if (!canEditInventory) return;
@@ -455,100 +501,135 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
         )}
       </motion.section>
 
-      {/* Header */}
-      <motion.div
-        variants={pageItemVariants}
-        className="rounded-2xl border border-stocksense-gray bg-white p-4 shadow-sm max-md:hidden md:p-5"
-      >
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl border border-[var(--entity-area-border)] bg-[var(--entity-area-accent)] p-3 text-white shadow-sm">
-              <FaWarehouse className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-gray-950 md:text-2xl">
-                Storage Areas
-              </h1>
-              <p className="text-sm text-gray-500">
-                View storage areas across all locations. Click one to manage it.
-              </p>
-            </div>
+      <motion.section variants={pageItemVariants} className="max-md:hidden">
+        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--stocksense-brand)]">
+              Storage Areas
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-gray-950 md:text-3xl">
+              Your storage
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-600">
+              Browse the shelves, closets, drawers, and bins that organize your home.
+            </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Input
               value={search}
               onValueChange={setSearch}
-              placeholder="Search areas, locations, categories…"
+              placeholder="Search storage areas"
+              radius="lg"
+              variant="bordered"
+              className="w-full sm:w-80"
               startContent={<FaSearch className="text-gray-400" />}
               classNames={{
-                inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
+                inputWrapper:
+                  "min-h-11 border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]",
+                input: "text-sm text-gray-900 placeholder:text-gray-400",
               }}
             />
+            {canEditInventory && (
+              <OpenGlobalAddItemButton
+                canEditInventory={canEditInventory}
+                className="min-h-11 rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm"
+              >
+                Add Item
+              </OpenGlobalAddItemButton>
+            )}
           </div>
-        </div>
-
-        {canEditInventory && (
-          <div className="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={allVisibleSelected}
-                onChange={toggleSelectAllVisible}
-                disabled={filtered.length === 0 || deleteDialog.isDeleting}
-                className="h-5 w-5 cursor-pointer rounded border border-stocksense-gray"
-              />
-              Select all visible
-            </label>
-
-            <Button
-              size="sm"
-              variant="flat"
-              className="w-fit rounded-xl"
-              isDisabled={selectedCount === 0 || deleteDialog.isDeleting}
-              onPress={clearSelection}
-            >
-              Clear selection
-            </Button>
-          </div>
-        )}
+        </header>
 
         {canEditInventory && <AnimatePresence initial={false}>
-          {selectedCount > 0 ? (
+          {selectionMode ? (
             <motion.div
               layout
               initial={{ opacity: 0, height: 0, y: -6 }}
               animate={{ opacity: 1, height: "auto", y: 0 }}
               exit={{ opacity: 0, height: 0, y: -6 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className="mt-4 overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3"
+              className="mt-5 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3"
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-gray-700">
-                  Bulk actions for <span className="font-semibold">{selectedCount}</span>{" "}
-                  storage area{selectedCount === 1 ? "" : "s"}
-                </p>
-                <Button
-                  size="sm"
-                  color="danger"
-                  variant="flat"
-                  className="w-fit rounded-xl"
-                  isDisabled={deleteDialog.isDeleting}
-                  onPress={openBulkDelete}
-                  startContent={<FaTrash />}
-                >
-                  Delete selected
-                </Button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className="text-sm text-[var(--stocksense-brand)]">
+                    Bulk actions for <span className="font-semibold">{selectedCount}</span>{" "}
+                    storage area{selectedCount === 1 ? "" : "s"}
+                  </p>
+                  <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-[var(--stocksense-brand)]">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleSelectAllVisible}
+                      disabled={filtered.length === 0 || deleteDialog.isDeleting}
+                      className="h-4 w-4 cursor-pointer rounded border border-[var(--stocksense-brand-border)]"
+                    />
+                    Select all visible
+                  </label>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
+                    isDisabled={deleteDialog.isDeleting}
+                    onPress={clearSelection}
+                  >
+                    Clear selection
+                  </Button>
+                  <Button
+                    size="sm"
+                    color="danger"
+                    variant="flat"
+                    className="rounded-xl"
+                    isDisabled={deleteDialog.isDeleting}
+                    onPress={openBulkDelete}
+                    startContent={<FaTrash />}
+                  >
+                    Delete selected
+                  </Button>
+                </div>
               </div>
             </motion.div>
           ) : null}
         </AnimatePresence>}
-      </motion.div>
+      </motion.section>
+
+      <motion.section
+        variants={pageItemVariants}
+        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 max-md:hidden"
+      >
+        {summaryCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <div
+              key={card.label}
+              className="rounded-2xl border border-white/70 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">{card.label}</p>
+                  <p className="mt-2 text-3xl font-semibold tracking-tight text-gray-950">
+                    {card.value.toLocaleString()}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-gray-500">
+                    {card.description}
+                  </p>
+                </div>
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+                  <Icon className="h-4 w-4" />
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </motion.section>
 
       {/* List */}
       <motion.div
         variants={pageSectionVariants}
-        className="grid grid-cols-1 gap-4 max-md:hidden sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        className="grid grid-cols-1 gap-5 max-md:hidden lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
       >
         <AnimatePresence initial={false}>
           {filtered.map((a) => (
@@ -565,51 +646,158 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
             }}
             role="button"
             tabIndex={0}
-            className="relative flex flex-col justify-between overflow-hidden rounded-2xl border border-stocksense-gray bg-white p-3.5 pt-4 text-left shadow-sm transition hover:bg-gray-50 cursor-pointer sm:p-4"
+            className={`group relative flex min-h-[260px] flex-col justify-between overflow-hidden rounded-2xl border bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg cursor-pointer ${
+              selectedIds.has(String(a.id))
+                ? "border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]"
+                : "border-white/70 hover:border-[var(--stocksense-brand-border)]"
+            }`}
             whileHover={{ y: -1 }}
             whileTap={{ scale: 0.99 }}
           >
-            <div className="absolute inset-x-0 top-0 h-1 bg-[var(--entity-area-accent)]" />
-            <div className="flex h-full flex-col justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-2.5">
-                {canEditInventory && (
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(String(a.id))}
+            <div className="flex h-full flex-col gap-5">
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  {canEditInventory && selectionMode && (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(String(a.id))}
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                      onChange={() => toggleSelect(a.id)}
+                      aria-label={`Select ${a.name}`}
+                      className="mt-3 h-4 w-4 shrink-0 cursor-pointer rounded border border-[var(--stocksense-brand-border)]"
+                    />
+                  )}
+                  {a.imageUrl ? (
+                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-area-border)] bg-white">
+                      <img
+                        src={a.imageUrl}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]">
+                      <FaWarehouse className="h-5 w-5" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div
+                      className="truncate text-lg font-semibold leading-6 text-gray-950"
+                      title={a.name}
+                    >
+                      {a.name}
+                    </div>
+                    <div
+                      className="mt-1 truncate text-sm text-gray-500"
+                      title={a.location?.name || "Unknown location"}
+                    >
+                      {a.location?.name || "Unknown location"}
+                    </div>
+                  </div>
+                </div>
+                {canEditInventory ? (
+                  <div
+                    className="shrink-0"
                     onClick={(event) => event.stopPropagation()}
                     onKeyDown={(event) => event.stopPropagation()}
-                    onChange={() => toggleSelect(a.id)}
-                    aria-label={`Select ${a.name}`}
-                    className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border border-stocksense-gray"
-                  />
-                )}
-                {a.imageUrl ? (
-                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
-                    <img
-                      src={a.imageUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
+                  >
+                    <Dropdown placement="bottom-end">
+                      <DropdownTrigger>
+                        <Button
+                          isIconOnly
+                          variant="light"
+                          radius="lg"
+                          className="h-9 w-9 min-w-9 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+                          aria-label={`${a.name} actions`}
+                        >
+                          <FaEllipsisV className="h-4 w-4" />
+                        </Button>
+                      </DropdownTrigger>
+                      <DropdownMenu aria-label={`${a.name} actions`}>
+                        <DropdownItem
+                          key="select"
+                          onPress={() => toggleSelect(a.id)}
+                        >
+                          {selectedIds.has(String(a.id))
+                            ? "Deselect for bulk action"
+                            : "Select for bulk action"}
+                        </DropdownItem>
+                        <DropdownItem key="view" onPress={() => openDrawer(a)}>
+                          View / Edit
+                        </DropdownItem>
+                        <DropdownItem
+                          key="delete"
+                          className="text-danger"
+                          color="danger"
+                          onPress={() => openDeleteForArea(a)}
+                        >
+                          Delete
+                        </DropdownItem>
+                      </DropdownMenu>
+                    </Dropdown>
                   </div>
                 ) : (
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]">
-                    <FaWarehouse className="h-4 w-4" />
-                  </div>
+                  <FaChevronRight className="mt-1 h-4 w-4 shrink-0 text-[var(--stocksense-brand)] opacity-60 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
                 )}
-                <div className="min-w-0">
-                  <div className="truncate text-[15px] font-semibold leading-5 text-gray-950 sm:text-base">{a.name}</div>
-                  <div className="mt-1 text-sm text-gray-500 truncate">{a.location?.name}</div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  Categories
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(a.categories ?? []).slice(0, 3).map((category) => (
+                    <span
+                      key={category.id}
+                      className="rounded-full border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] px-3 py-1 text-xs font-medium text-[var(--entity-area-accent)]"
+                    >
+                      {category.name}
+                    </span>
+                  ))}
+                  {(a.categories ?? []).length > 3 && (
+                    <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-500">
+                      +{(a.categories ?? []).length - 3} more
+                    </span>
+                  )}
+                  {(a.categories ?? []).length === 0 && (
+                    <span className="text-sm text-gray-500">
+                      No categories yet.
+                    </span>
+                  )}
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-1.5">
-                <span className="rounded-xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] px-2.5 py-1 text-center text-xs text-[var(--entity-area-accent)]">
-                  {a.categoriesCount} {a.categoriesCount === 1 ? "category" : "categories"}
-                </span>
-                <span className="rounded-xl border border-gray-200 bg-gray-50 px-2.5 py-1 text-center text-xs text-gray-600 md:border-[var(--stocksense-brand-border)] md:bg-[var(--stocksense-brand-soft)] md:text-[var(--stocksense-brand)]">
-                  {a.itemsCount} {a.itemsCount === 1 ? "item" : "items"}
-                </span>
+              <div className="mt-auto grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] p-3">
+                  <p className="text-2xl font-semibold tracking-tight text-[var(--entity-area-accent)]">
+                    {(a.categoriesCount ?? 0).toLocaleString()}
+                  </p>
+                  <p className="mt-0.5 text-xs text-[var(--entity-area-accent)]">
+                    {(a.categoriesCount ?? 0) === 1 ? "category" : "categories"}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3">
+                  <p className="text-2xl font-semibold tracking-tight text-[var(--stocksense-brand)]">
+                    {(a.itemsCount ?? 0).toLocaleString()}
+                  </p>
+                  <p className="mt-0.5 text-xs text-[var(--stocksense-brand)]">
+                    {(a.itemsCount ?? 0) === 1 ? "item" : "items"}
+                  </p>
+                </div>
               </div>
+
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  router.push(`/areas/${a.id}`);
+                }}
+                className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-[var(--stocksense-brand)]"
+              >
+                View storage area
+                <FaChevronRight className="h-3 w-3" />
+              </button>
             </div>
           </motion.article>
           ))}
@@ -658,10 +846,18 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
             <>
               <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-lg font-semibold text-[var(--stocksense-brand)]">
+                  <div
+                    className="truncate text-lg font-semibold text-[var(--stocksense-brand)]"
+                    title={activeArea?.name || "Storage Area"}
+                  >
                     {activeArea?.name || "Storage Area"}
                   </div>
-                  <div className="truncate text-sm text-gray-500">{activeArea?.location?.name}</div>
+                  <div
+                    className="truncate text-sm text-gray-500"
+                    title={activeArea?.location?.name || ""}
+                  >
+                    {activeArea?.location?.name}
+                  </div>
                 </div>
                 {canEditInventory && (
                   <Button
@@ -743,9 +939,17 @@ export default function AreasPageClient({ initialAreas, canEditInventory = true 
                         key={c.id}
                         className="rounded-xl border border-stocksense-gray bg-white p-3 flex items-start justify-between gap-3"
                       >
-                        <div className="min-w-0">
-                          <div className="truncate font-medium text-gray-950">{c.name}</div>
-                          <div className="text-sm text-gray-500 truncate">
+                        <div className="min-w-0 flex-1">
+                          <div
+                            className="truncate font-medium text-gray-950"
+                            title={c.name}
+                          >
+                            {c.name}
+                          </div>
+                          <div
+                            className="truncate text-sm text-gray-500"
+                            title={`${c.itemsCount} ${c.itemsCount === 1 ? "item" : "items"}`}
+                          >
                             {c.itemsCount} {c.itemsCount === 1 ? "item" : "items"}
                           </div>
                         </div>
