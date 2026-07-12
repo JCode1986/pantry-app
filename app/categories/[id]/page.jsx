@@ -4,6 +4,7 @@ import CategoryDetailClient from "@/components/categories/CategoryDetailClient";
 import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
 import { getCanEditInventoryForUser } from "@/utils/households";
 import { getInventoryImageUrls } from "@/utils/inventoryImages";
+import { getItemsPageAction } from "@/app/actions/server";
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
@@ -116,14 +117,15 @@ export default async function CategoryDetailPage({ params }) {
     notFound();
   }
 
-  const imageUrlsByPath = await getInventoryImageUrls([
-    category.image_path,
-    ...(category.items ?? []).map((item) => item.image_path),
+  const [imageUrlsByPath, itemsResult] = await Promise.all([
+    getInventoryImageUrls([category.image_path]),
+    getItemsPageAction({
+      offset: 0,
+      limit: 24,
+      filters: { categoryId: id },
+    }),
   ]);
-  const items = (category.items ?? []).map((item) => ({
-      ...item,
-      imageUrl: imageUrlsByPath.get(item.image_path) ?? null,
-    }));
+  const items = itemsResult.data.items ?? [];
   const area = category.storage_area;
   const location = area?.location;
 
@@ -196,6 +198,7 @@ export default async function CategoryDetailPage({ params }) {
       area={area ? { id: area.id, name: area.name } : null}
       location={location ? { id: location.id, name: location.name } : null}
       initialItems={items}
+      initialTotalItems={itemsResult.data.totalCount}
       moveLocations={moveLocations}
       canEditInventory={canEditInventory}
     />

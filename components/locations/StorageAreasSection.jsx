@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Button,
+  DatePicker,
   Dropdown,
   DropdownItem,
   DropdownMenu,
@@ -15,6 +16,8 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
+  Select,
+  SelectItem,
 } from '@heroui/react';
 import {
   addStorageArea,
@@ -26,6 +29,7 @@ import {
   addItem,
   updateItem,
   deleteItem,
+  getLocationStorageAreasPageAction,
   updateItemLocation,
   uploadInventoryImage,
 } from '@/app/actions/server';
@@ -43,6 +47,7 @@ import {
   FaWarehouse,
   FaTags,
   FaBarcode,
+  FaExclamationTriangle,
 } from 'react-icons/fa';
 import ConfirmDeleteModal from '@/components/modals/ConfirmDeleteModal';
 import MoveItemsModal from '@/components/items/MoveItemsModal';
@@ -51,7 +56,9 @@ import { emitInventoryChange, emitItemAdded } from '@/utils/clientEvents';
 import EntityImageManager from '@/components/inventory/EntityImageManager';
 import MobileSuggestionChips from '@/components/modals/MobileSuggestionChips';
 import MobileSheetCloseButton from '@/components/modals/MobileSheetCloseButton';
+import { themedSelectClassNames } from '@/components/modals/modalTheme';
 import QuantityStepperInput from '@/components/modals/QuantityStepperInput';
+import PaginationControls from '@/components/ui/PaginationControls';
 import useDesktopAutoFocus from '@/components/modals/useDesktopAutoFocus';
 import {
   daysUntil,
@@ -60,6 +67,7 @@ import {
   toPositiveInteger,
 } from '@/utils/pantry/date';
 import { containsQuery } from '@/utils/pantry/search';
+import { parseDate } from '@internationalized/date';
 
 const collapseVariants = {
   collapsed: { height: 0, opacity: 0, transition: { duration: 0.2 } },
@@ -121,6 +129,13 @@ const IMAGE_TYPES = new Set([
 
 const STORAGE_AREA_SUGGESTIONS = ['Pantry', 'Closet', 'Cabinet', 'Drawer', 'Shelf', 'Box'];
 const CATEGORY_SUGGESTIONS = ['Food', 'Documents', 'Tools', 'Medicine', 'Clothes', 'Electronics'];
+const LOCATION_DETAIL_PAGE_SIZE = 12;
+const SORT_OPTIONS = [
+  ['name_asc', 'A-Z'],
+  ['name_desc', 'Z-A'],
+  ['newest', 'Newest'],
+  ['oldest', 'Oldest'],
+];
 
 function validateImageFile(file) {
   if (!file) return '';
@@ -213,12 +228,18 @@ function CreateImagePicker({
 export default function StorageAreasSection({
   locationId,
   initialStorageAreas,
+  initialTotalStorageAreas = initialStorageAreas?.length ?? 0,
   locationName,
   // optional: pass all locations if you want true cross-location moves
   allLocations,
   canEditInventory = true,
 }) {
   const [storageAreas, setStorageAreas] = useState(initialStorageAreas ?? []);
+  const [totalStorageAreaCount, setTotalStorageAreaCount] = useState(initialTotalStorageAreas);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState('name_asc');
+  const [isLoadingStorageAreas, setIsLoadingStorageAreas] = useState(false);
+  const [storageAreasError, setStorageAreasError] = useState('');
   const [areaModal, setAreaModal] = useState({
     open: false,
     mode: 'create',
@@ -263,6 +284,14 @@ export default function StorageAreasSection({
   const shouldAutoFocus = useDesktopAutoFocus(
     areaModal.open || categoryModal.open || itemModal.open
   );
+  const itemModalExpirationDateValue = useMemo(() => {
+    if (!itemModal.expirationDate) return null;
+    try {
+      return parseDate(itemModal.expirationDate);
+    } catch {
+      return null;
+    }
+  }, [itemModal.expirationDate]);
   const [limitNotice, setLimitNotice] = useState(null);
 
   const [expandedAreas, setExpandedAreas] = useState({});
@@ -276,6 +305,61 @@ export default function StorageAreasSection({
   const [search, setSearch] = useState('');
   const [expSoonEnabled, setExpSoonEnabled] = useState(false);
   const [expDays, setExpDays] = useState(7);
+  const serverSearch = search.trim().toLowerCase();
+
+  const loadStorageAreaPage = useCallback(
+    async (page) => {
+      const safePage = Math.max(1, page);
+      setIsLoadingStorageAreas(true);
+      setStorageAreasError('');
+
+      try {
+        const result = await getLocationStorageAreasPageAction({
+          locationId,
+          offset: (safePage - 1) * LOCATION_DETAIL_PAGE_SIZE,
+          limit: LOCATION_DETAIL_PAGE_SIZE,
+          filters: { search: serverSearch, sortBy },
+        });
+
+        if (result?.error) {
+          setStorageAreasError(result.error);
+          return;
+        }
+
+        const nextAreas = result?.data?.items ?? [];
+        const nextTotal = result?.data?.totalCount ?? 0;
+        setStorageAreas(nextAreas);
+        setTotalStorageAreaCount(nextTotal);
+
+        const nextTotalPages = Math.max(
+          1,
+          Math.ceil(nextTotal / LOCATION_DETAIL_PAGE_SIZE)
+        );
+        if (safePage > nextTotalPages) setCurrentPage(nextTotalPages);
+      } catch (error) {
+        setStorageAreasError(error?.message || 'Could not load storage areas.');
+      } finally {
+        setIsLoadingStorageAreas(false);
+      }
+    },
+    [locationId, serverSearch, sortBy]
+  );
+
+  const initialStorageLoadSkippedRef = useRef(false);
+
+  useEffect(() => {
+    if (!initialStorageLoadSkippedRef.current) {
+      initialStorageLoadSkippedRef.current = true;
+      return;
+    }
+
+    void loadStorageAreaPage(currentPage);
+  }, [currentPage, loadStorageAreaPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedByCategory({});
+  }, [serverSearch, sortBy]);
 
   // Move items modal state
   const [moveModal, setMoveModal] = useState({
@@ -515,7 +599,7 @@ export default function StorageAreasSection({
     setExpandedCategories(categoryState);
   }, [expansionSignature]);
 
-  const totalAreas = storageAreas?.length || 0;
+  const totalAreas = totalStorageAreaCount;
   const totalCategories = useMemo(
     () => (storageAreas || []).reduce((sum, a) => sum + (a.categories?.length || 0), 0),
     [storageAreas]
@@ -528,6 +612,46 @@ export default function StorageAreasSection({
     }
     return n;
   }, [storageAreas]);
+
+  const expiringSoonCount = useMemo(() => {
+    let n = 0;
+    for (const area of storageAreas ?? []) {
+      for (const category of area.categories || []) {
+        for (const item of category.items || []) {
+          if (isExpiringSoon(item.expiration_date, expDays)) n += 1;
+        }
+      }
+    }
+    return n;
+  }, [storageAreas, expDays]);
+
+  const desktopSummaryCards = [
+    {
+      label: 'Storage Areas',
+      value: totalAreas,
+      description: 'Places inside this space',
+      icon: FaWarehouse,
+    },
+    {
+      label: 'Categories',
+      value: totalCategories,
+      description: 'Groups across all areas',
+      icon: FaTags,
+    },
+    {
+      label: 'Items',
+      value: totalItems,
+      description: 'Things stored here',
+      icon: FaBoxOpen,
+    },
+    {
+      label: 'Expiring Soon',
+      value: expiringSoonCount,
+      description: 'Items expiring soon',
+      icon: FaExclamationTriangle,
+      isWarning: true,
+    },
+  ];
 
   // ---------- Expand/Collapse helpers ----------
   const toggleArea = (id) =>
@@ -1218,17 +1342,6 @@ export default function StorageAreasSection({
     }));
   };
 
-  const selectAllInCategory = (category) => {
-    if (!canEditInventory) return;
-    const all = Object.fromEntries((category.items || []).map((i) => [i.id, true]));
-    setSelectedByCategory((prev) => ({ ...prev, [category.id]: all }));
-  };
-
-  const clearSelectInCategory = (categoryId) => {
-    if (!canEditInventory) return;
-    setSelectedByCategory((prev) => ({ ...prev, [categoryId]: {} }));
-  };
-
   // ---------- Move items logic ----------
 
   const openMoveModal = (areaId, categoryId, singleItemId = null) => {
@@ -1422,6 +1535,19 @@ export default function StorageAreasSection({
 
   // ---------- Filtering ----------
   const normalizedSearch = search.trim().toLowerCase();
+  const totalPages = Math.max(
+    1,
+    Math.ceil(totalStorageAreaCount / LOCATION_DETAIL_PAGE_SIZE)
+  );
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startItem =
+    totalStorageAreaCount === 0
+      ? 0
+      : (safeCurrentPage - 1) * LOCATION_DETAIL_PAGE_SIZE + 1;
+  const endItem = Math.min(
+    (safeCurrentPage - 1) * LOCATION_DETAIL_PAGE_SIZE + storageAreas.length,
+    totalStorageAreaCount
+  );
   const filterItem = (item) => {
     const nameOk =
       !normalizedSearch || containsQuery(item.name, normalizedSearch);
@@ -1458,6 +1584,7 @@ export default function StorageAreasSection({
 
   const desktopStorageAreas = (storageAreas ?? [])
     .map((area) => {
+      const filtersActive = Boolean(normalizedSearch || expSoonEnabled);
       const areaNameMatches =
         normalizedSearch && containsQuery(area.name, normalizedSearch);
       const categories = (area.categories ?? [])
@@ -1474,7 +1601,7 @@ export default function StorageAreasSection({
             return containsQuery(item.name, normalizedSearch);
           });
           const shouldShowCategory =
-            areaNameMatches || categoryNameMatches || items.length > 0;
+            !filtersActive || areaNameMatches || categoryNameMatches || items.length > 0;
 
           return shouldShowCategory ? { ...category, visibleItems: items } : null;
         })
@@ -1485,7 +1612,7 @@ export default function StorageAreasSection({
         0
       );
       const shouldShowArea =
-        !normalizedSearch && !expSoonEnabled
+        !filtersActive
           ? true
           : areaNameMatches || categories.length > 0;
 
@@ -1523,74 +1650,58 @@ export default function StorageAreasSection({
           )}
         </motion.div>
       )}
+      {storageAreasError ? (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          {storageAreasError}
+        </div>
+      ) : null}
 
       {/* Desktop overview and tools */}
       <motion.section variants={pageItemVariants} className="max-md:hidden">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight text-gray-950">
-              Inside this location
-            </h2>
-            <p className="mt-1 text-sm leading-6 text-gray-600">
-              Browse the storage areas, categories, and items in {locationName}.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
-          {[
-            {
-              label: 'Storage Areas',
-              value: totalAreas,
-              description: 'Places inside this space',
-              icon: FaWarehouse,
-            },
-            {
-              label: 'Categories',
-              value: totalCategories,
-              description: 'Groups across all areas',
-              icon: FaTags,
-            },
-            {
-              label: 'Items',
-              value: totalItems,
-              description: 'Things stored here',
-              icon: FaBoxOpen,
-            },
-          ].map(({ label, value, description, icon: Icon }) => (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {desktopSummaryCards.map(({ label, value, description, icon: Icon, isWarning }) => (
             <div
               key={label}
-              className="rounded-2xl border border-white/70 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              className="flex items-center gap-4 rounded-[1.35rem] border border-white/70 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--stocksense-brand-border)] hover:shadow-md"
             >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">{label}</p>
-                  <p className="mt-2 text-3xl font-semibold tracking-tight text-gray-950">
-                    {value.toLocaleString()}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-gray-500">
-                    {description}
-                  </p>
-                </div>
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
-                  <Icon className="h-4 w-4" />
-                </span>
+              <div
+                className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl border ${
+                  isWarning
+                    ? 'border-[var(--entity-warning-border)] bg-[var(--entity-warning-soft)] text-[var(--entity-warning-accent)]'
+                    : 'border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]'
+                }`}
+              >
+                <Icon className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-gray-950">{label}</h2>
+                <p className="text-3xl font-semibold tracking-tight text-gray-950">
+                  {value.toLocaleString()}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-gray-500">
+                  {description}
+                </p>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="mt-5 rounded-2xl border border-white/70 bg-white p-4 shadow-sm">
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
-            <div className="relative min-w-0">
-              <FaSearch className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={`Search items inside ${locationName}...`}
-                className="h-11 w-full rounded-2xl border border-gray-200 bg-white pl-9 pr-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]/60"
-              />
-            </div>
+        <div className="mt-5 rounded-[1.5rem] border border-white/70 bg-white p-4 shadow-sm">
+          <div className="grid max-w-6xl gap-3">
+            <Input
+              value={search}
+              onValueChange={setSearch}
+              placeholder={`Search items inside ${locationName}...`}
+              radius="lg"
+              variant="bordered"
+              className="w-full max-w-md"
+              startContent={<FaSearch className="h-4 w-4 text-gray-400" />}
+              classNames={{
+                inputWrapper:
+                  'min-h-10 border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]',
+                input: 'text-sm text-gray-900 placeholder:text-gray-400',
+              }}
+            />
 
             <div className="flex flex-wrap items-center gap-2">
               <label className="inline-flex h-10 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 text-xs font-semibold text-gray-600">
@@ -1600,7 +1711,7 @@ export default function StorageAreasSection({
                   onChange={() => setExpSoonEnabled((value) => !value)}
                   className="h-4 w-4 cursor-pointer rounded border border-gray-300"
                 />
-                Expiring
+                  Expiring
               </label>
               <input
                 type="number"
@@ -1614,6 +1725,21 @@ export default function StorageAreasSection({
                 aria-label="Expiring within days"
               />
               <span className="text-xs font-medium text-gray-500">days</span>
+              <Select
+                aria-label="Sort storage areas"
+                selectedKeys={new Set([sortBy])}
+                onSelectionChange={(keys) =>
+                  setSortBy(String(Array.from(keys)[0] || 'name_asc'))
+                }
+                variant="bordered"
+                radius="lg"
+                className="w-36"
+                classNames={themedSelectClassNames}
+              >
+                {SORT_OPTIONS.map(([value, label]) => (
+                  <SelectItem key={value}>{label}</SelectItem>
+                ))}
+              </Select>
 
               {storageAreas.length > 0 && (
                 <button
@@ -1631,23 +1757,14 @@ export default function StorageAreasSection({
               )}
 
               {canEditInventory && (
-                <>
-                  <OpenGlobalAddItemButton
-                    canEditInventory={canEditInventory}
-                    context={{ locationId }}
-                    className="h-10 rounded-xl bg-[var(--stocksense-brand)] px-3 text-sm font-semibold text-white shadow-sm"
-                  >
-                    Add Item
-                  </OpenGlobalAddItemButton>
-                  <button
-                    type="button"
-                    onClick={openCreateAreaModal}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 text-sm font-semibold text-[var(--stocksense-brand)] transition hover:brightness-95"
-                  >
-                    <FaPlus className="h-3.5 w-3.5" />
-                    Add Storage Area
-                  </button>
-                </>
+                <button
+                  type="button"
+                  onClick={openCreateAreaModal}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--stocksense-brand)] px-3 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+                >
+                  <FaPlus className="h-3.5 w-3.5" />
+                  Add Storage Area
+                </button>
               )}
             </div>
           </div>
@@ -1674,6 +1791,21 @@ export default function StorageAreasSection({
             </button>
           )}
         </motion.div>
+
+        <Select
+          aria-label="Sort storage areas"
+          selectedKeys={new Set([sortBy])}
+          onSelectionChange={(keys) =>
+            setSortBy(String(Array.from(keys)[0] || 'name_asc'))
+          }
+          variant="bordered"
+          radius="lg"
+          classNames={themedSelectClassNames}
+        >
+          {SORT_OPTIONS.map(([value, label]) => (
+            <SelectItem key={value}>{label}</SelectItem>
+          ))}
+        </Select>
 
         {storageAreas.length === 0 && (
           <motion.div
@@ -1709,7 +1841,7 @@ export default function StorageAreasSection({
           </motion.div>
         )}
 
-        {storageAreas.map((area, aIdx) => {
+        {storageAreas.map((area) => {
           const areaNameMatches =
             normalizedSearch && containsQuery(area.name, normalizedSearch);
           const visibleCategories = areaNameMatches
@@ -1886,14 +2018,49 @@ export default function StorageAreasSection({
             </motion.article>
           );
         })}
+        <PaginationControls
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
+          startItem={startItem}
+          endItem={endItem}
+          totalItems={totalStorageAreaCount}
+          isLoading={isLoadingStorageAreas}
+          onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+          onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+        />
       </motion.div>
 
       {/* Desktop hierarchy */}
-      <motion.div variants={pageVariants} className="hidden grid-cols-1 gap-5 md:grid">
+      <motion.div variants={pageVariants} className="hidden space-y-5 md:block">
+        <div className="rounded-[1.75rem] border border-white/70 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight text-gray-950">
+                Location map
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-gray-600">
+                Storage areas, categories, and items inside {locationName}.
+              </p>
+            </div>
+            <div className="lg:min-w-[24rem]">
+              <PaginationControls
+                currentPage={safeCurrentPage}
+                totalPages={totalPages}
+                startItem={startItem}
+                endItem={endItem}
+                totalItems={totalStorageAreaCount}
+                isLoading={isLoadingStorageAreas}
+                onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              />
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-4">
         {storageAreas.length === 0 ? (
           <motion.div
             variants={pageItemVariants}
-            className="rounded-2xl border border-dashed border-[var(--stocksense-brand-border)] bg-white p-10 text-center shadow-sm"
+            className="rounded-2xl border border-dashed border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/35 p-10 text-center"
           >
             <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]">
               <FaWarehouse className="h-6 w-6" />
@@ -1902,7 +2069,7 @@ export default function StorageAreasSection({
               Nothing stored here yet
             </h2>
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-600">
-              Create a shelf, closet, drawer, or bin to start organizing.
+              Create a shelf, closet, drawer, cabinet, or bin to start organizing this space.
             </p>
             {canEditInventory && (
               <button
@@ -1918,7 +2085,7 @@ export default function StorageAreasSection({
         ) : desktopStorageAreas.length === 0 ? (
           <motion.div
             variants={pageItemVariants}
-            className="rounded-2xl border border-white/70 bg-white p-8 text-center shadow-sm"
+            className="rounded-2xl border border-white/70 bg-gray-50/60 p-8 text-center"
           >
             <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
               <FaSearch className="h-5 w-5" />
@@ -1942,7 +2109,7 @@ export default function StorageAreasSection({
                 damping: 20,
                 delay: areaIndex * 0.02,
               }}
-              className="overflow-hidden rounded-2xl border border-white/70 bg-white shadow-sm transition hover:shadow-md"
+              className="overflow-hidden rounded-2xl border border-gray-100 bg-gray-50/50 shadow-sm transition hover:border-[var(--stocksense-brand-border)] hover:shadow-md"
             >
               <div className="border-t-4 border-[var(--entity-area-accent)] p-5">
                 <div className="flex items-start justify-between gap-4">
@@ -2021,7 +2188,7 @@ export default function StorageAreasSection({
                             key="edit"
                             onPress={() => openEditAreaModal(area)}
                           >
-                            Edit
+                            Edit Storage Area
                           </DropdownItem>
                           <DropdownItem
                             key="delete"
@@ -2034,7 +2201,7 @@ export default function StorageAreasSection({
                               })
                             }
                           >
-                            Delete
+                            Delete Storage Area
                           </DropdownItem>
                         </DropdownMenu>
                       </Dropdown>
@@ -2054,16 +2221,29 @@ export default function StorageAreasSection({
                     >
                       <div className="mt-5 space-y-4">
                         {area.visibleCategories.length === 0 ? (
-                          <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/70 p-5 text-center text-sm text-gray-500">
-                            No categories yet.
+                          <div className="rounded-2xl border border-dashed border-[var(--stocksense-brand-border)] bg-white p-6 text-center">
+                            <h3 className="text-base font-semibold text-gray-950">
+                              No categories yet
+                            </h3>
+                            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-600">
+                              Create a category to group the items inside this storage area.
+                            </p>
+                            {canEditInventory ? (
+                              <button
+                                type="button"
+                                onClick={() => openCreateCategoryModal(area)}
+                                className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+                              >
+                                <FaLayerGroup className="h-3.5 w-3.5" />
+                                Add Category
+                              </button>
+                            ) : null}
                           </div>
                         ) : (
                           area.visibleCategories.map((category, categoryIndex) => {
                       const items = category.visibleItems ?? [];
                       const selectedMap = selectedByCategory[category.id] || {};
                       const selectedCount = Object.values(selectedMap).filter(Boolean).length;
-                      const allSelected =
-                        items.length > 0 && selectedCount === items.length;
 
                       return (
                         <motion.section
@@ -2071,7 +2251,7 @@ export default function StorageAreasSection({
                           initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.22, delay: categoryIndex * 0.02 }}
-                          className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4"
+                          className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex min-w-0 items-center gap-3">
@@ -2141,27 +2321,10 @@ export default function StorageAreasSection({
                                   </DropdownTrigger>
                                   <DropdownMenu aria-label={`${category.name} actions`}>
                                     <DropdownItem
-                                      key="select-all"
-                                      onPress={() => {
-                                        if (items.length === 0) return;
-                                        if (allSelected) {
-                                          clearSelectInCategory(category.id);
-                                        } else {
-                                          selectAllInCategory({ ...category, items });
-                                        }
-                                      }}
-                                    >
-                                      {items.length === 0
-                                        ? 'No items to select'
-                                        : allSelected
-                                        ? 'Clear selection'
-                                        : 'Select all items'}
-                                    </DropdownItem>
-                                    <DropdownItem
                                       key="edit"
                                       onPress={() => openEditCategoryModal(area, category)}
                                     >
-                                      Edit
+                                      Edit Category
                                     </DropdownItem>
                                     <DropdownItem
                                       key="delete"
@@ -2176,7 +2339,7 @@ export default function StorageAreasSection({
                                         })
                                       }
                                     >
-                                      Delete
+                                      Delete Category
                                     </DropdownItem>
                                   </DropdownMenu>
                                 </Dropdown>
@@ -2236,17 +2399,38 @@ export default function StorageAreasSection({
 
                                 <div className="mt-3 space-y-2">
                                   {items.length === 0 ? (
-                                    <div className="rounded-xl border border-dashed border-gray-200 bg-white px-4 py-4 text-sm text-gray-500">
-                                      {search || expSoonEnabled
-                                        ? 'No matching items in this category.'
-                                        : 'No items in this category yet.'}
+                                    <div className="rounded-2xl border border-dashed border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/25 px-5 py-6 text-center">
+                                      <h4 className="text-sm font-semibold text-gray-950">
+                                        {search || expSoonEnabled
+                                          ? 'No matching items'
+                                          : 'No items yet'}
+                                      </h4>
+                                      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-600">
+                                        {search || expSoonEnabled
+                                          ? 'Try another search or adjust the expiration filter.'
+                                          : 'Add the first item to this category.'}
+                                      </p>
+                                      {canEditInventory && !search && !expSoonEnabled ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => openCreateItemModal(area, category)}
+                                          className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+                                        >
+                                          <FaBoxOpen className="h-3.5 w-3.5" />
+                                          Add Item
+                                        </button>
+                                      ) : null}
                                     </div>
                                   ) : (
                                     items.map((item, itemIndex) => {
-                                const soon = isExpiringSoon(
+                                const expirationDays = daysUntil(item.expiration_date);
+                                const expired = expirationDays < 0;
+                                const soon = !expired && isExpiringSoon(
                                   item.expiration_date,
                                   expDays
                                 );
+                                const quantity = toNonNegativeInteger(item.quantity, 0);
+                                const lowStock = quantity <= 1;
                                 const selected = Boolean(
                                   selectedByCategory[category.id]?.[item.id]
                                 );
@@ -2292,20 +2476,27 @@ export default function StorageAreasSection({
                                         </div>
                                       )}
                                       <div className="min-w-0">
-                                        <div className="flex min-w-0 items-center gap-2">
+                                        <div className="flex min-w-0 flex-wrap items-center gap-2">
                                           <p className="truncate text-sm font-semibold text-gray-950">
                                             {item.name}
                                           </p>
-                                          {soon && (
-                                            <span className="shrink-0 rounded-full border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--stocksense-brand)]">
-                                              {daysUntil(item.expiration_date) < 0
-                                                ? 'Expired'
-                                                : 'Soon'}
+                                          {(expired || soon || lowStock) && (
+                                            <span className="flex flex-wrap gap-1.5">
+                                              {(expired || soon) && (
+                                                <span className="shrink-0 rounded-full border border-[var(--entity-warning-border)] bg-[var(--entity-warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--entity-warning-accent)]">
+                                                  {expired ? 'Expired' : 'Expiring soon'}
+                                                </span>
+                                              )}
+                                              {lowStock && (
+                                                <span className="shrink-0 rounded-full border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--entity-item-accent)]">
+                                                  Low stock
+                                                </span>
+                                              )}
                                             </span>
                                           )}
                                         </div>
                                         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium text-gray-500">
-                                          <span>Qty: {item.quantity}</span>
+                                          <span>Qty: {quantity}</span>
                                           {item.expiration_date && (
                                             <span>Expires {item.expiration_date}</span>
                                           )}
@@ -2334,12 +2525,12 @@ export default function StorageAreasSection({
                                         </DropdownTrigger>
                                         <DropdownMenu aria-label={`${item.name} actions`}>
                                           <DropdownItem
-                                            key="move"
+                                            key="view"
                                             onPress={() =>
-                                              openMoveModal(area.id, category.id, item.id)
+                                              openEditItemModal(area, category, item)
                                             }
                                           >
-                                            Move
+                                            View Item
                                           </DropdownItem>
                                           <DropdownItem
                                             key="edit"
@@ -2347,7 +2538,15 @@ export default function StorageAreasSection({
                                               openEditItemModal(area, category, item)
                                             }
                                           >
-                                            Edit
+                                            Edit Item
+                                          </DropdownItem>
+                                          <DropdownItem
+                                            key="move"
+                                            onPress={() =>
+                                              openMoveModal(area.id, category.id, item.id)
+                                            }
+                                          >
+                                            Move Item
                                           </DropdownItem>
                                           <DropdownItem
                                             key="delete"
@@ -2364,7 +2563,7 @@ export default function StorageAreasSection({
                                               })
                                             }
                                           >
-                                            Delete
+                                            Delete Item
                                           </DropdownItem>
                                         </DropdownMenu>
                                       </Dropdown>
@@ -2389,6 +2588,64 @@ export default function StorageAreasSection({
             </motion.article>
           ))
         )}
+          </div>
+
+          {canEditInventory && storageAreas.length > 0 ? (
+            <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-dashed border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/35 px-5 py-4">
+              <div className="flex min-w-0 items-center gap-4">
+                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]">
+                  <FaPlus className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold text-gray-950">
+                    Add another storage area
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Create a new place inside {locationName}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={openCreateAreaModal}
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+              >
+                <FaPlus className="h-3.5 w-3.5" />
+                Add Storage Area
+              </button>
+            </div>
+          ) : null}
+
+          <div className="mt-5">
+            <PaginationControls
+              currentPage={safeCurrentPage}
+              totalPages={totalPages}
+              startItem={startItem}
+              endItem={endItem}
+              totalItems={totalStorageAreaCount}
+              isLoading={isLoadingStorageAreas}
+              onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+            />
+          </div>
+        </div>
+
+        <div className="rounded-[1.5rem] border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/70 px-6 py-6">
+          <div className="flex items-center gap-5">
+            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]">
+              <FaWarehouse className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-gray-950">
+                Tip: Build this location one area at a time
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-gray-600">
+                Start with the main shelves, drawers, closets, or bins, then add
+                categories and items as you go.
+              </p>
+            </div>
+          </div>
+        </div>
       </motion.div>
 
       <Modal
@@ -2856,16 +3113,20 @@ export default function StorageAreasSection({
                 min={0}
                 classNames={modalInputClassNames}
               />
-              <Input
-                type="date"
+              <DatePicker
                 label="Expiration date"
-                value={itemModal.expirationDate}
-                onValueChange={(expirationDate) =>
-                  setItemModal((prev) => ({ ...prev, expirationDate }))
+                labelPlacement="inside"
+                value={itemModalExpirationDateValue}
+                onChange={(date) =>
+                  setItemModal((prev) => ({
+                    ...prev,
+                    expirationDate: date ? date.toString() : '',
+                  }))
                 }
                 variant="bordered"
                 radius="lg"
                 classNames={modalInputClassNames}
+                showMonthAndYearPickers
               />
             </div>
             {itemModal.mode === 'edit' && (

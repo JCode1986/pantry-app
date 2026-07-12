@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Button,
+  DatePicker,
   Input,
   Modal,
   ModalBody,
@@ -15,6 +16,7 @@ import {
   Select,
   SelectItem,
 } from "@heroui/react";
+import { parseDate } from "@internationalized/date";
 import {
   FaBarcode,
   FaCamera,
@@ -360,6 +362,14 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
       manual: "order-30",
     };
   }, [addMethod]);
+  const formExpirationDateValue = useMemo(() => {
+    if (!form.expirationDate) return null;
+    try {
+      return parseDate(form.expirationDate);
+    } catch {
+      return null;
+    }
+  }, [form.expirationDate]);
 
   const savePreferredAddMethod = useCallback((method) => {
     if (!ADD_METHODS.some((item) => item.id === method)) return;
@@ -1578,15 +1588,18 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                           isDisabled={isSaving}
                           classNames={modalInputClassNames}
                         />
-                        <Input
+                        <DatePicker
                           label="Expiration"
-                          type="date"
-                          value={form.expirationDate}
-                          onValueChange={(value) => updateForm("expirationDate", value)}
+                          labelPlacement="inside"
+                          value={formExpirationDateValue}
+                          onChange={(date) =>
+                            updateForm("expirationDate", date ? date.toString() : "")
+                          }
                           isDisabled={isSaving}
                           variant="bordered"
                           radius="lg"
                           classNames={modalInputClassNames}
+                          showMonthAndYearPickers
                         />
                       </div>
 

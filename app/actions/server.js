@@ -53,7 +53,7 @@ function revalidateEntityPaths(entityType, extraPaths = []) {
 }
 
 function normalizeSearchTerm(value) {
-  return normalizeName(value).replace(/[%,_]/g, '').slice(0, 80);
+  return normalizeName(value).replace(/[%,_()]/g, '').slice(0, 80);
 }
 
 function normalizeBarcode(value) {
@@ -1425,12 +1425,761 @@ export async function getInventoryHierarchy() {
   };
 }
 
-const ITEMS_PAGE_SIZE_DEFAULT = 100;
+const ITEMS_PAGE_SIZE_DEFAULT = 25;
 const ITEMS_PAGE_SIZE_MAX = 200;
+const ITEM_LIST_FILTERS = {
+  ALL: 'all',
+  EXPIRED: 'expired',
+  SOON: 'soon',
+  NONE: 'none',
+  IN_STOCK: 'in_stock',
+  LOW_OR_EMPTY: 'low_or_empty',
+};
+const ITEM_SORT_OPTIONS = {
+  NAME_ASC: 'name_asc',
+  NAME_DESC: 'name_desc',
+  EXPIRATION_ASC: 'expiration_asc',
+  QUANTITY_ASC: 'quantity_asc',
+  NEWEST: 'newest',
+  OLDEST: 'oldest',
+};
+const ITEM_EXPIRATION_FILTER_VALUES = new Set([
+  ITEM_LIST_FILTERS.ALL,
+  ITEM_LIST_FILTERS.EXPIRED,
+  ITEM_LIST_FILTERS.SOON,
+  ITEM_LIST_FILTERS.NONE,
+]);
+const ITEM_STOCK_FILTER_VALUES = new Set([
+  ITEM_LIST_FILTERS.ALL,
+  ITEM_LIST_FILTERS.IN_STOCK,
+  ITEM_LIST_FILTERS.LOW_OR_EMPTY,
+]);
+const ITEM_SORT_VALUES = new Set(Object.values(ITEM_SORT_OPTIONS));
 
 function normalizeRange(value, fallback) {
   const parsed = Number.parseInt(String(value), 10);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function normalizeFilterId(value) {
+  const next = typeof value === 'string' ? value.trim() : '';
+  return /^[A-Za-z0-9_-]{1,120}$/.test(next) ? next : '';
+}
+
+function normalizeItemListFilters(filters = {}) {
+  const expirationFilter = ITEM_EXPIRATION_FILTER_VALUES.has(filters.expirationFilter)
+    ? filters.expirationFilter
+    : ITEM_LIST_FILTERS.ALL;
+  const stockFilter = ITEM_STOCK_FILTER_VALUES.has(filters.stockFilter)
+    ? filters.stockFilter
+    : ITEM_LIST_FILTERS.ALL;
+  const sortBy = ITEM_SORT_VALUES.has(filters.sortBy)
+    ? filters.sortBy
+    : ITEM_SORT_OPTIONS.NAME_ASC;
+
+  return {
+    search: normalizeSearchTerm(filters.search),
+    locationId: normalizeFilterId(filters.locationId),
+    areaId: normalizeFilterId(filters.areaId),
+    categoryId: normalizeFilterId(filters.categoryId),
+    expirationFilter,
+    expirationDays: Math.max(1, normalizeRange(filters.expirationDays, 7)),
+    stockFilter,
+    sortBy,
+  };
+}
+
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function toDateString(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function uniqueIds(rows = [], key = 'id') {
+  return [...new Set((rows ?? []).map((row) => row?.[key]).filter(Boolean).map(String))];
+}
+
+async function getCategoryIdsForAreaIds(supabase, areaIds = []) {
+  if (!areaIds.length) return { ids: [], error: null };
+
+  const { data, error } = await supabase
+    .from('storage_categories')
+    .select('id')
+    .in('storage_area_id', areaIds);
+
+  return { ids: uniqueIds(data), error };
+}
+
+async function getAreaIdsForLocationIds(supabase, locationIds = []) {
+  if (!locationIds.length) return { ids: [], error: null };
+
+  const { data, error } = await supabase
+    .from('storage_areas')
+    .select('id')
+    .in('location_id', locationIds);
+
+  return { ids: uniqueIds(data), error };
+}
+
+async function getCategoryIdsForItemFilters(supabase, filters) {
+  if (filters.categoryId) {
+    return { ids: [filters.categoryId], shouldRestrict: true, error: null };
+  }
+
+  if (filters.areaId) {
+    const result = await getCategoryIdsForAreaIds(supabase, [filters.areaId]);
+    return { ...result, shouldRestrict: true };
+  }
+
+  if (filters.locationId) {
+    const areas = await getAreaIdsForLocationIds(supabase, [filters.locationId]);
+    if (areas.error) return { ids: [], shouldRestrict: true, error: areas.error };
+
+    const categories = await getCategoryIdsForAreaIds(supabase, areas.ids);
+    return { ...categories, shouldRestrict: true };
+  }
+
+  return { ids: [], shouldRestrict: false, error: null };
+}
+
+async function getCategoryIdsForItemPathSearch(supabase, term) {
+  if (!term) return { ids: [], error: null };
+
+  const { data: matchingCategories, error: categoryError } = await supabase
+    .from('storage_categories')
+    .select('id')
+    .ilike('name', `%${term}%`);
+  if (categoryError) return { ids: [], error: categoryError };
+
+  const { data: matchingAreas, error: areaError } = await supabase
+    .from('storage_areas')
+    .select('id')
+    .ilike('name', `%${term}%`);
+  if (areaError) return { ids: [], error: areaError };
+
+  const { data: matchingLocations, error: locationError } = await supabase
+    .from('locations')
+    .select('id')
+    .ilike('name', `%${term}%`);
+  if (locationError) return { ids: [], error: locationError };
+
+  const locationAreaIds = matchingLocations?.length
+    ? await getAreaIdsForLocationIds(supabase, uniqueIds(matchingLocations))
+    : { ids: [], error: null };
+  if (locationAreaIds.error) return { ids: [], error: locationAreaIds.error };
+
+  const areaIds = [
+    ...new Set([...uniqueIds(matchingAreas), ...locationAreaIds.ids]),
+  ];
+  const areaCategoryIds = areaIds.length
+    ? await getCategoryIdsForAreaIds(supabase, areaIds)
+    : { ids: [], error: null };
+  if (areaCategoryIds.error) return { ids: [], error: areaCategoryIds.error };
+
+  return {
+    ids: [...new Set([...uniqueIds(matchingCategories), ...areaCategoryIds.ids])],
+    error: null,
+  };
+}
+
+function applyItemSort(query, sortBy) {
+  if (sortBy === ITEM_SORT_OPTIONS.NAME_DESC) {
+    return query.order('name', { ascending: false });
+  }
+
+  if (sortBy === ITEM_SORT_OPTIONS.EXPIRATION_ASC) {
+    return query
+      .order('expiration_date', { ascending: true, nullsFirst: false })
+      .order('name', { ascending: true });
+  }
+
+  if (sortBy === ITEM_SORT_OPTIONS.QUANTITY_ASC) {
+    return query
+      .order('quantity', { ascending: true })
+      .order('name', { ascending: true });
+  }
+
+  if (sortBy === ITEM_SORT_OPTIONS.NEWEST) {
+    return query.order('created_at', { ascending: false }).order('name', { ascending: true });
+  }
+
+  if (sortBy === ITEM_SORT_OPTIONS.OLDEST) {
+    return query.order('created_at', { ascending: true }).order('name', { ascending: true });
+  }
+
+  return query.order('name', { ascending: true });
+}
+
+const HIERARCHY_PAGE_SIZE_DEFAULT = 24;
+const HIERARCHY_PAGE_SIZE_MAX = 100;
+const HIERARCHY_SORT_OPTIONS = {
+  NAME_ASC: 'name_asc',
+  NAME_DESC: 'name_desc',
+  NEWEST: 'newest',
+  OLDEST: 'oldest',
+};
+const HIERARCHY_SORT_VALUES = new Set(Object.values(HIERARCHY_SORT_OPTIONS));
+
+function emptyPageData() {
+  return { items: [], totalCount: 0, nextOffset: null, hasMore: false };
+}
+
+function normalizeHierarchyFilters(filters = {}) {
+  const sortBy = HIERARCHY_SORT_VALUES.has(filters.sortBy)
+    ? filters.sortBy
+    : HIERARCHY_SORT_OPTIONS.NAME_ASC;
+
+  return {
+    search: normalizeSearchTerm(filters.search),
+    locationId: normalizeFilterId(filters.locationId),
+    areaId: normalizeFilterId(filters.areaId),
+    sortBy,
+  };
+}
+
+function applyHierarchySort(query, sortBy, dateColumn = 'created_at') {
+  if (sortBy === HIERARCHY_SORT_OPTIONS.NAME_DESC) {
+    return query.order('name', { ascending: false });
+  }
+
+  if (sortBy === HIERARCHY_SORT_OPTIONS.NEWEST) {
+    return query.order(dateColumn, { ascending: false });
+  }
+
+  if (sortBy === HIERARCHY_SORT_OPTIONS.OLDEST) {
+    return query.order(dateColumn, { ascending: true });
+  }
+
+  return query.order('name', { ascending: true });
+}
+
+function pageMetadata(offset, limit, count, rowCount) {
+  const totalCount = count ?? rowCount;
+  const nextOffset = offset + rowCount;
+  return {
+    totalCount,
+    nextOffset: nextOffset < totalCount ? nextOffset : null,
+    hasMore: nextOffset < totalCount,
+  };
+}
+
+async function fetchStorageAreasForLocations(supabase, locationIds = []) {
+  if (!locationIds.length) return { data: [], error: null };
+
+  return supabase
+    .from('storage_areas')
+    .select(
+      `
+      id,
+      name,
+      image_path,
+      created_at,
+      location_id,
+      storage_categories:storage_categories!fk_storage_area (
+        id,
+        name,
+        image_path,
+        items:items!fk_items_category (
+          id,
+          name,
+          quantity,
+          expiration_date,
+          category_id,
+          barcode,
+          image_path,
+          created_at
+        )
+      )
+    `
+    )
+    .in('location_id', locationIds);
+}
+
+function normalizeStorageAreaRows(storageAreasRaw = [], imageUrlsByPath = new Map()) {
+  return (storageAreasRaw ?? []).map((area) => ({
+    id: area.id,
+    name: area.name,
+    image_path: area.image_path ?? null,
+    imageUrl: imageUrlsByPath.get(area.image_path) ?? null,
+    categories: (area.storage_categories ?? []).map((category) => ({
+      id: category.id,
+      name: category.name,
+      image_path: category.image_path ?? null,
+      imageUrl: imageUrlsByPath.get(category.image_path) ?? null,
+      items: (category.items ?? []).map((item) => ({
+        ...item,
+        imageUrl: imageUrlsByPath.get(item.image_path) ?? null,
+      })),
+    })),
+  }));
+}
+
+export async function getLocationsPageAction({
+  offset = 0,
+  limit = HIERARCHY_PAGE_SIZE_DEFAULT,
+  filters = {},
+} = {}) {
+  const safeOffset = normalizeRange(offset, 0);
+  const safeLimit = Math.min(
+    HIERARCHY_PAGE_SIZE_MAX,
+    Math.max(1, normalizeRange(limit, HIERARCHY_PAGE_SIZE_DEFAULT))
+  );
+  const normalizedFilters = normalizeHierarchyFilters(filters);
+  const supabase = await createClient();
+
+  let query = supabase
+    .from('locations')
+    .select('id, name, image_path, created_at', { count: 'exact' });
+
+  if (normalizedFilters.search) {
+    query = query.ilike('name', `%${normalizedFilters.search}%`);
+  }
+
+  query = applyHierarchySort(query, normalizedFilters.sortBy, 'created_at').range(
+    safeOffset,
+    safeOffset + safeLimit - 1
+  );
+
+  const { data: locationsRaw, error, count } = await query;
+  if (error) {
+    console.error('getLocationsPageAction error:', error);
+    return { data: emptyPageData(), error: error.message };
+  }
+
+  const locationIds = uniqueIds(locationsRaw);
+  const { data: areasRaw, error: areasError } = await fetchStorageAreasForLocations(
+    supabase,
+    locationIds
+  );
+  if (areasError) {
+    console.error('getLocationsPageAction areas error:', areasError);
+    return { data: emptyPageData(), error: areasError.message };
+  }
+
+  const imagePaths = [
+    ...(locationsRaw ?? []).map((location) => location.image_path),
+    ...(areasRaw ?? []).flatMap((area) =>
+      (area.storage_categories ?? []).flatMap((category) =>
+        (category.items ?? []).map((item) => item.image_path)
+      )
+    ),
+  ];
+  const imageUrlsByPath = await getInventoryImageUrls(imagePaths);
+  const areasByLocation = new Map();
+
+  for (const area of areasRaw ?? []) {
+    const key = String(area.location_id);
+    if (!areasByLocation.has(key)) areasByLocation.set(key, []);
+    areasByLocation.get(key).push(area);
+  }
+
+  const items = (locationsRaw ?? []).map((location) => {
+    const areas = areasByLocation.get(String(location.id)) ?? [];
+    const categoriesCount = areas.reduce(
+      (sum, area) => sum + (area.storage_categories?.length ?? 0),
+      0
+    );
+    const itemsCount = areas.reduce(
+      (sum, area) =>
+        sum +
+        (area.storage_categories ?? []).reduce(
+          (categorySum, category) => categorySum + (category.items?.length ?? 0),
+          0
+        ),
+      0
+    );
+    const storageAreas = areas.map((area) => ({
+      id: area.id,
+      name: area.name,
+      itemsCount: (area.storage_categories ?? []).reduce(
+        (sum, category) => sum + (category.items?.length ?? 0),
+        0
+      ),
+    }));
+    const recentItems = areas
+      .flatMap((area) =>
+        (area.storage_categories ?? []).flatMap((category) =>
+          (category.items ?? []).map((item) => ({
+            id: item.id,
+            name: item.name,
+            image_path: item.image_path ?? null,
+            imageUrl: imageUrlsByPath.get(item.image_path) ?? null,
+            created_at: item.created_at,
+            storagePath: [location.name, area.name, category.name]
+              .filter(Boolean)
+              .join(' > '),
+          }))
+        )
+      )
+      .sort((a, b) => new Date(b.created_at ?? 0) - new Date(a.created_at ?? 0))
+      .slice(0, 3);
+
+    return {
+      id: location.id,
+      name: location.name,
+      image_path: location.image_path ?? null,
+      imageUrl: imageUrlsByPath.get(location.image_path) ?? null,
+      created_at: location.created_at,
+      areasCount: areas.length,
+      categoriesCount,
+      itemsCount,
+      storageAreas,
+      recentItems,
+    };
+  });
+
+  return {
+    data: {
+      items,
+      ...pageMetadata(safeOffset, safeLimit, count, items.length),
+    },
+    error: null,
+  };
+}
+
+export async function getLocationStorageAreasPageAction({
+  locationId,
+  offset = 0,
+  limit = HIERARCHY_PAGE_SIZE_DEFAULT,
+  filters = {},
+} = {}) {
+  const safeLocationId = normalizeFilterId(locationId);
+  if (!safeLocationId) {
+    return { data: emptyPageData(), error: 'Location is required.' };
+  }
+
+  const safeOffset = normalizeRange(offset, 0);
+  const safeLimit = Math.min(
+    HIERARCHY_PAGE_SIZE_MAX,
+    Math.max(1, normalizeRange(limit, HIERARCHY_PAGE_SIZE_DEFAULT))
+  );
+  const normalizedFilters = normalizeHierarchyFilters(filters);
+  const supabase = await createClient();
+
+  let query = supabase
+    .from('storage_areas')
+    .select('id, name, location_id, image_path, created_at', { count: 'exact' })
+    .eq('location_id', safeLocationId);
+
+  if (normalizedFilters.search) {
+    query = query.ilike('name', `%${normalizedFilters.search}%`);
+  }
+
+  query = applyHierarchySort(query, normalizedFilters.sortBy, 'created_at').range(
+    safeOffset,
+    safeOffset + safeLimit - 1
+  );
+
+  const { data: areaPageRows, error, count } = await query;
+  if (error) {
+    console.error('getLocationStorageAreasPageAction error:', error);
+    return { data: emptyPageData(), error: error.message };
+  }
+
+  const areaIds = uniqueIds(areaPageRows);
+  const { data: areasRaw, error: areasError } = areaIds.length
+    ? await supabase
+        .from('storage_areas')
+        .select(
+          `
+          id,
+          name,
+          image_path,
+          created_at,
+          location_id,
+          storage_categories:storage_categories!fk_storage_area (
+            id,
+            name,
+            image_path,
+            items:items!fk_items_category (
+              id,
+              name,
+              quantity,
+              expiration_date,
+              category_id,
+              barcode,
+              image_path,
+              created_at
+            )
+          )
+        `
+        )
+        .in('id', areaIds)
+    : { data: [], error: null };
+  if (areasError) {
+    console.error('getLocationStorageAreasPageAction nested error:', areasError);
+    return { data: emptyPageData(), error: areasError.message };
+  }
+
+  const areaMap = new Map((areasRaw ?? []).map((area) => [String(area.id), area]));
+  const sortedAreas = (areaPageRows ?? [])
+    .map((area) => areaMap.get(String(area.id)))
+    .filter(Boolean);
+  const imageUrlsByPath = await getInventoryImageUrls(
+    sortedAreas.flatMap((area) => [
+      area.image_path,
+      ...(area.storage_categories ?? []).flatMap((category) => [
+        category.image_path,
+        ...(category.items ?? []).map((item) => item.image_path),
+      ]),
+    ])
+  );
+
+  const items = normalizeStorageAreaRows(sortedAreas, imageUrlsByPath);
+
+  return {
+    data: {
+      items,
+      ...pageMetadata(safeOffset, safeLimit, count, items.length),
+    },
+    error: null,
+  };
+}
+
+export async function getStorageAreasPageAction({
+  offset = 0,
+  limit = HIERARCHY_PAGE_SIZE_DEFAULT,
+  filters = {},
+} = {}) {
+  const safeOffset = normalizeRange(offset, 0);
+  const safeLimit = Math.min(
+    HIERARCHY_PAGE_SIZE_MAX,
+    Math.max(1, normalizeRange(limit, HIERARCHY_PAGE_SIZE_DEFAULT))
+  );
+  const normalizedFilters = normalizeHierarchyFilters(filters);
+  const supabase = await createClient();
+
+  let query = supabase
+    .from('storage_areas')
+    .select(
+      `
+      id,
+      name,
+      image_path,
+      location_id,
+      created_at,
+      storage_categories:storage_categories!fk_storage_area (
+        id,
+        name,
+        items:items!fk_items_category ( id )
+      )
+    `,
+      { count: 'exact' }
+    );
+
+  if (normalizedFilters.locationId) {
+    query = query.eq('location_id', normalizedFilters.locationId);
+  }
+  if (normalizedFilters.search) {
+    query = query.ilike('name', `%${normalizedFilters.search}%`);
+  }
+
+  query = applyHierarchySort(query, normalizedFilters.sortBy, 'created_at').range(
+    safeOffset,
+    safeOffset + safeLimit - 1
+  );
+
+  const { data: areasRaw, error, count } = await query;
+  if (error) {
+    console.error('getStorageAreasPageAction error:', error);
+    return { data: emptyPageData(), error: error.message };
+  }
+
+  const locationIds = uniqueIds(areasRaw, 'location_id');
+  const { data: locationsRaw, error: locationsError } = locationIds.length
+    ? await supabase.from('locations').select('id, name').in('id', locationIds)
+    : { data: [], error: null };
+  if (locationsError) {
+    console.error('getStorageAreasPageAction locations error:', locationsError);
+    return { data: emptyPageData(), error: locationsError.message };
+  }
+
+  const imageUrlsByPath = await getInventoryImageUrls(
+    (areasRaw ?? []).map((area) => area.image_path)
+  );
+  const locationMap = new Map((locationsRaw ?? []).map((location) => [String(location.id), location]));
+  const items = (areasRaw ?? []).map((area) => {
+    const categories = area.storage_categories ?? [];
+    const location = area.location_id ? locationMap.get(String(area.location_id)) : null;
+
+    return {
+      id: area.id,
+      name: area.name,
+      image_path: area.image_path ?? null,
+      imageUrl: imageUrlsByPath.get(area.image_path) ?? null,
+      location: location
+        ? { id: location.id, name: location.name }
+        : { id: null, name: 'Unknown location' },
+      categories: categories.map((category) => ({
+        id: category.id,
+        name: category.name,
+        itemsCount: (category.items ?? []).length,
+      })),
+      categoriesCount: categories.length,
+      itemsCount: categories.reduce((sum, category) => sum + (category.items ?? []).length, 0),
+    };
+  });
+
+  return {
+    data: {
+      items,
+      ...pageMetadata(safeOffset, safeLimit, count, items.length),
+    },
+    error: null,
+  };
+}
+
+export async function getAreaCategoriesPageAction({
+  areaId,
+  offset = 0,
+  limit = HIERARCHY_PAGE_SIZE_DEFAULT,
+  filters = {},
+} = {}) {
+  const safeAreaId = normalizeFilterId(areaId);
+  if (!safeAreaId) {
+    return { data: emptyPageData(), error: 'Storage area is required.' };
+  }
+
+  return getCategoriesPageAction({
+    offset,
+    limit,
+    filters: { ...filters, areaId: safeAreaId },
+  });
+}
+
+export async function getCategoriesPageAction({
+  offset = 0,
+  limit = HIERARCHY_PAGE_SIZE_DEFAULT,
+  filters = {},
+} = {}) {
+  const safeOffset = normalizeRange(offset, 0);
+  const safeLimit = Math.min(
+    HIERARCHY_PAGE_SIZE_MAX,
+    Math.max(1, normalizeRange(limit, HIERARCHY_PAGE_SIZE_DEFAULT))
+  );
+  const normalizedFilters = normalizeHierarchyFilters(filters);
+  const supabase = await createClient();
+
+  let areaIds = [];
+  if (normalizedFilters.locationId) {
+    const areas = await getAreaIdsForLocationIds(supabase, [normalizedFilters.locationId]);
+    if (areas.error) {
+      console.error('getCategoriesPageAction location areas error:', areas.error);
+      return { data: emptyPageData(), error: areas.error.message };
+    }
+    areaIds = areas.ids;
+    if (areaIds.length === 0) {
+      return { data: emptyPageData(), error: null };
+    }
+  }
+
+  let query = supabase
+    .from('storage_categories')
+    .select(
+      `
+      id,
+      name,
+      image_path,
+      inserted_at,
+      storage_area_id,
+      items:items!fk_items_category (
+        id,
+        name,
+        quantity,
+        expiration_date
+      )
+    `,
+      { count: 'exact' }
+    );
+
+  if (normalizedFilters.areaId) {
+    query = query.eq('storage_area_id', normalizedFilters.areaId);
+  } else if (areaIds.length) {
+    query = query.in('storage_area_id', areaIds);
+  }
+  if (normalizedFilters.search) {
+    query = query.ilike('name', `%${normalizedFilters.search}%`);
+  }
+
+  query = applyHierarchySort(query, normalizedFilters.sortBy, 'inserted_at').range(
+    safeOffset,
+    safeOffset + safeLimit - 1
+  );
+
+  const { data: categoriesRaw, error, count } = await query;
+  if (error) {
+    console.error('getCategoriesPageAction error:', error);
+    return { data: emptyPageData(), error: error.message };
+  }
+
+  const pageAreaIds = uniqueIds(categoriesRaw, 'storage_area_id');
+  const { data: areasRaw, error: areasError } = pageAreaIds.length
+    ? await supabase
+        .from('storage_areas')
+        .select('id, name, location_id')
+        .in('id', pageAreaIds)
+    : { data: [], error: null };
+  if (areasError) {
+    console.error('getCategoriesPageAction areas error:', areasError);
+    return { data: emptyPageData(), error: areasError.message };
+  }
+
+  const locationIds = uniqueIds(areasRaw, 'location_id');
+  const { data: locationsRaw, error: locationsError } = locationIds.length
+    ? await supabase.from('locations').select('id, name').in('id', locationIds)
+    : { data: [], error: null };
+  if (locationsError) {
+    console.error('getCategoriesPageAction locations error:', locationsError);
+    return { data: emptyPageData(), error: locationsError.message };
+  }
+
+  const imageUrlsByPath = await getInventoryImageUrls(
+    (categoriesRaw ?? []).map((category) => category.image_path)
+  );
+  const areaMap = new Map((areasRaw ?? []).map((area) => [String(area.id), area]));
+  const locationMap = new Map((locationsRaw ?? []).map((location) => [String(location.id), location]));
+  const items = (categoriesRaw ?? []).map((category) => {
+    const area = category.storage_area_id
+      ? areaMap.get(String(category.storage_area_id))
+      : null;
+    const location = area?.location_id
+      ? locationMap.get(String(area.location_id))
+      : null;
+
+    return {
+      id: category.id,
+      name: category.name,
+      image_path: category.image_path ?? null,
+      imageUrl: imageUrlsByPath.get(category.image_path) ?? null,
+      insertedAt: category.inserted_at,
+      storageArea: {
+        id: area?.id ?? null,
+        name: area?.name ?? 'Unknown area',
+      },
+      location: {
+        id: location?.id ?? null,
+        name: location?.name ?? 'Unknown location',
+      },
+      items: category.items ?? [],
+      itemsCount: (category.items ?? []).length,
+    };
+  });
+
+  return {
+    data: {
+      items,
+      ...pageMetadata(safeOffset, safeLimit, count, items.length),
+    },
+    error: null,
+  };
 }
 
 async function normalizeItemsForList({
@@ -1487,21 +2236,96 @@ async function normalizeItemsForList({
   });
 }
 
-export async function getItemsPageAction({ offset = 0, limit = ITEMS_PAGE_SIZE_DEFAULT } = {}) {
+export async function getItemsPageAction({
+  offset = 0,
+  limit = ITEMS_PAGE_SIZE_DEFAULT,
+  filters = {},
+} = {}) {
   const safeOffset = normalizeRange(offset, 0);
   const safeLimit = Math.min(
     ITEMS_PAGE_SIZE_MAX,
     Math.max(1, normalizeRange(limit, ITEMS_PAGE_SIZE_DEFAULT))
   );
+  const normalizedFilters = normalizeItemListFilters(filters);
   const supabase = await createClient();
 
-  const { data: itemsRaw, error: itemsError, count } = await supabase
+  const categoryFilter = await getCategoryIdsForItemFilters(supabase, normalizedFilters);
+  if (categoryFilter.error) {
+    console.error('getItemsPageAction category filter error:', categoryFilter.error);
+    return {
+      data: { items: [], totalCount: 0, nextOffset: null, hasMore: false },
+      error: categoryFilter.error.message,
+    };
+  }
+
+  if (categoryFilter.shouldRestrict && categoryFilter.ids.length === 0) {
+    return {
+      data: { items: [], totalCount: 0, nextOffset: null, hasMore: false },
+      error: null,
+    };
+  }
+
+  const searchPathCategories = await getCategoryIdsForItemPathSearch(
+    supabase,
+    normalizedFilters.search
+  );
+  if (searchPathCategories.error) {
+    console.error('getItemsPageAction search path error:', searchPathCategories.error);
+    return {
+      data: { items: [], totalCount: 0, nextOffset: null, hasMore: false },
+      error: searchPathCategories.error.message,
+    };
+  }
+
+  let query = supabase
     .from('items')
     .select('id, name, quantity, expiration_date, category_id, image_path, barcode', {
       count: 'exact',
-    })
-    .order('name', { ascending: true })
-    .range(safeOffset, safeOffset + safeLimit - 1);
+    });
+
+  if (categoryFilter.shouldRestrict) {
+    query = query.in('category_id', categoryFilter.ids);
+  }
+
+  if (normalizedFilters.search) {
+    const searchOrParts = [
+      `name.ilike.%${normalizedFilters.search}%`,
+      `barcode.ilike.%${normalizedFilters.search}%`,
+    ];
+
+    if (searchPathCategories.ids.length > 0) {
+      searchOrParts.push(`category_id.in.(${searchPathCategories.ids.join(',')})`);
+    }
+
+    query = query.or(searchOrParts.join(','));
+  }
+
+  const today = toDateString(new Date());
+  const cutoff = toDateString(addDays(new Date(), normalizedFilters.expirationDays));
+
+  if (normalizedFilters.expirationFilter === ITEM_LIST_FILTERS.EXPIRED) {
+    query = query.not('expiration_date', 'is', null).lt('expiration_date', today);
+  } else if (normalizedFilters.expirationFilter === ITEM_LIST_FILTERS.SOON) {
+    query = query
+      .not('expiration_date', 'is', null)
+      .gte('expiration_date', today)
+      .lte('expiration_date', cutoff);
+  } else if (normalizedFilters.expirationFilter === ITEM_LIST_FILTERS.NONE) {
+    query = query.is('expiration_date', null);
+  }
+
+  if (normalizedFilters.stockFilter === ITEM_LIST_FILTERS.IN_STOCK) {
+    query = query.gt('quantity', 0);
+  } else if (normalizedFilters.stockFilter === ITEM_LIST_FILTERS.LOW_OR_EMPTY) {
+    query = query.lte('quantity', 1);
+  }
+
+  query = applyItemSort(query, normalizedFilters.sortBy).range(
+    safeOffset,
+    safeOffset + safeLimit - 1
+  );
+
+  const { data: itemsRaw, error: itemsError, count } = await query;
 
   if (itemsError) {
     console.error('getItemsPageAction items error:', itemsError);

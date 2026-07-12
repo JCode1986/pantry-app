@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Button,
@@ -14,10 +14,13 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
+  Select,
+  SelectItem,
 } from '@heroui/react';
 import {
   addLocation,
   deleteLocation,
+  getLocationsPageAction,
   updateLocationName,
   uploadInventoryImage,
 } from '@/app/actions/server';
@@ -44,6 +47,8 @@ import EntityImageManager from '@/components/inventory/EntityImageManager';
 import MobileSuggestionChips from '@/components/modals/MobileSuggestionChips';
 import MobileSheetCloseButton from '@/components/modals/MobileSheetCloseButton';
 import useDesktopAutoFocus from '@/components/modals/useDesktopAutoFocus';
+import PaginationControls from '@/components/ui/PaginationControls';
+import { themedSelectClassNames } from '@/components/modals/modalTheme';
 
 const modalContentStyle = {
   fontFamily: 'var(--stocksense-font-family)',
@@ -83,6 +88,27 @@ const IMAGE_TYPES = new Set([
 ]);
 
 const LOCATION_SUGGESTIONS = ['Home', 'Apartment', 'Garage', 'Storage Unit', 'Office'];
+const LOCATIONS_PAGE_SIZE = 24;
+const SORT_OPTIONS = [
+  ['name_asc', 'A-Z'],
+  ['name_desc', 'Z-A'],
+  ['newest', 'Newest'],
+  ['oldest', 'Oldest'],
+];
+
+function getSortTimestamp(entry) {
+  const time = new Date(entry?.created_at ?? entry?.createdAt ?? 0).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function sortLocationsForDisplay(items, sortBy) {
+  return [...(items ?? [])].sort((a, b) => {
+    if (sortBy === 'name_desc') return b.name.localeCompare(a.name);
+    if (sortBy === 'newest') return getSortTimestamp(b) - getSortTimestamp(a);
+    if (sortBy === 'oldest') return getSortTimestamp(a) - getSortTimestamp(b);
+    return a.name.localeCompare(b.name);
+  });
+}
 
 function validateImageFile(file) {
   if (!file) return '';
@@ -95,14 +121,24 @@ function validateImageFile(file) {
   return '';
 }
 
-export default function LocationsSection({ locations, canEditInventory = true }) {
+export default function LocationsSection({
+  locations,
+  totalLocations = locations?.length ?? 0,
+  canEditInventory = true,
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mobileLocationsSectionRef = useRef(null);
   const locationImageInputRef = useRef(null);
   const locationCameraInputRef = useRef(null);
   const [allLocations, setAllLocations] = useState(locations);
+  const [totalLocationCount, setTotalLocationCount] = useState(totalLocations);
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('name_asc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoadingLocations, setIsLoadingLocations] = useState(false);
+  const [locationsError, setLocationsError] = useState('');
+  const [refreshNonce, setRefreshNonce] = useState(0);
   const [locationModal, setLocationModal] = useState({
     open: false,
     mode: 'create',
@@ -129,6 +165,57 @@ export default function LocationsSection({ locations, canEditInventory = true })
     count: 0,
   });
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const normalizedSearch = search.trim().toLowerCase();
+
+  const loadLocationsPage = useCallback(
+    async (page) => {
+      const safePage = Math.max(1, page);
+      setIsLoadingLocations(true);
+      setLocationsError('');
+
+      try {
+        const result = await getLocationsPageAction({
+          offset: (safePage - 1) * LOCATIONS_PAGE_SIZE,
+          limit: LOCATIONS_PAGE_SIZE,
+          filters: { search: normalizedSearch, sortBy },
+        });
+
+        if (result?.error) {
+          setLocationsError(result.error);
+          return;
+        }
+
+        const nextLocations = result?.data?.items ?? [];
+        const nextTotal = result?.data?.totalCount ?? 0;
+        setAllLocations(nextLocations);
+        setTotalLocationCount(nextTotal);
+
+        const nextTotalPages = Math.max(1, Math.ceil(nextTotal / LOCATIONS_PAGE_SIZE));
+        if (safePage > nextTotalPages) setCurrentPage(nextTotalPages);
+      } catch (error) {
+        setLocationsError(error?.message || 'Could not load locations.');
+      } finally {
+        setIsLoadingLocations(false);
+      }
+    },
+    [normalizedSearch, sortBy]
+  );
+
+  const initialLoadSkippedRef = useRef(false);
+
+  useEffect(() => {
+    if (!initialLoadSkippedRef.current) {
+      initialLoadSkippedRef.current = true;
+      return;
+    }
+
+    void loadLocationsPage(currentPage);
+  }, [currentPage, loadLocationsPage, refreshNonce]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedIds(new Set());
+  }, [normalizedSearch, sortBy]);
 
   useEffect(() => {
     const handleItemAdded = (event) => {
@@ -141,7 +228,7 @@ export default function LocationsSection({ locations, canEditInventory = true })
         );
 
         if (!locationExists) {
-          return [
+          return sortLocationsForDisplay([
             ...(prev ?? []),
             {
               id: item.locationId,
@@ -176,7 +263,7 @@ export default function LocationsSection({ locations, canEditInventory = true })
                   ]
                 : [],
             },
-          ].sort((a, b) => a.name.localeCompare(b.name));
+          ], sortBy);
         }
 
         return (prev ?? []).map((location) =>
@@ -199,7 +286,7 @@ export default function LocationsSection({ locations, canEditInventory = true })
     return () => {
       window.removeEventListener('stocksense:item-added', handleItemAdded);
     };
-  }, []);
+  }, [sortBy]);
 
   useEffect(() => {
     const preview = locationModal.imagePreview;
@@ -237,36 +324,33 @@ export default function LocationsSection({ locations, canEditInventory = true })
     (sum, location) => sum + (location.itemsCount ?? 0),
     0
   );
-  const normalizedSearch = search.trim().toLowerCase();
-  const filteredLocations = useMemo(() => {
-    if (!normalizedSearch) return allLocations;
-
-    return allLocations.filter((location) => {
-      const searchable = [
-        location.name,
-        ...(location.storageAreas ?? []).map((area) => area.name),
-        ...(location.recentItems ?? []).flatMap((item) => [
-          item.name,
-          item.storagePath,
-        ]),
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-
-      return searchable.includes(normalizedSearch);
-    });
-  }, [allLocations, normalizedSearch]);
+  const filteredLocations = allLocations ?? [];
   const selectedCount = selectedIds.size;
   const selectionMode = selectedCount > 0;
+  const showDesktopAddLocationTile = canEditInventory && !normalizedSearch;
+  const desktopLocationCardCount =
+    filteredLocations.length + (showDesktopAddLocationTile ? 1 : 0);
+  const desktopLocationGridClass =
+    desktopLocationCardCount <= 3
+      ? 'grid max-w-[1180px] grid-cols-1 items-stretch gap-5 lg:grid-cols-2'
+      : 'grid max-w-[1360px] grid-cols-1 items-stretch gap-5 lg:grid-cols-2 xl:grid-cols-3';
   const allVisibleSelected =
     filteredLocations.length > 0 &&
     filteredLocations.every((location) => selectedIds.has(String(location.id)));
+  const totalPages = Math.max(1, Math.ceil(totalLocationCount / LOCATIONS_PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startItem =
+    totalLocationCount === 0 ? 0 : (safeCurrentPage - 1) * LOCATIONS_PAGE_SIZE + 1;
+  const endItem = Math.min(
+    (safeCurrentPage - 1) * LOCATIONS_PAGE_SIZE + filteredLocations.length,
+    totalLocationCount
+  );
+  const refreshLocations = () => setRefreshNonce((current) => current + 1);
 
   const summaryCards = [
     {
       label: 'Locations',
-      value: allLocations.length,
+      value: totalLocationCount,
       description: 'Spaces in your home',
       icon: FaMapMarkedAlt,
     },
@@ -293,17 +377,6 @@ export default function LocationsSection({ locations, canEditInventory = true })
   const formatCount = (count, singular, plural = `${singular}s`) => {
     const value = count ?? 0;
     return `${value} ${value === 1 ? singular : plural}`;
-  };
-
-  const toggleSelect = (id) => {
-    if (!canEditInventory) return;
-    const key = String(id);
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
   };
 
   const clearSelection = () => setSelectedIds(new Set());
@@ -458,6 +531,7 @@ export default function LocationsSection({ locations, canEditInventory = true })
           id: locationModal.locationId,
         });
         closeLocationModal();
+        refreshLocations();
         return;
       }
 
@@ -476,7 +550,9 @@ export default function LocationsSection({ locations, canEditInventory = true })
         _optimistic: true,
       };
 
-      setAllLocations((prev) => [optimisticLocation, ...prev]);
+      setAllLocations((prev) =>
+        sortLocationsForDisplay([optimisticLocation, ...prev], sortBy)
+      );
 
       const result = await addLocation(name);
       if (result?.error) {
@@ -536,8 +612,11 @@ export default function LocationsSection({ locations, canEditInventory = true })
       }
 
       setAllLocations((prev) =>
-        prev.map((loc) =>
-          loc.id === optimisticLocationId ? createdLocation : loc
+        sortLocationsForDisplay(
+          prev.map((loc) =>
+            loc.id === optimisticLocationId ? createdLocation : loc
+          ),
+          sortBy
         )
       );
       emitInventoryChange({
@@ -546,6 +625,9 @@ export default function LocationsSection({ locations, canEditInventory = true })
         id: newLoc.id,
       });
       closeLocationModal();
+      setTotalLocationCount((current) => current + 1);
+      setCurrentPage(1);
+      refreshLocations();
       if (imageUploadWarning) {
         setMessage(imageUploadWarning);
       }
@@ -614,6 +696,9 @@ export default function LocationsSection({ locations, canEditInventory = true })
           action: 'deleted',
           ids: deleteDialog.locationIds,
         });
+        setTotalLocationCount((current) =>
+          Math.max(0, current - deleteDialog.locationIds.length)
+        );
       } else {
         await deleteLocation(deleteDialog.locationId);
         setAllLocations((prev) =>
@@ -629,7 +714,9 @@ export default function LocationsSection({ locations, canEditInventory = true })
           action: 'deleted',
           id: deleteDialog.locationId,
         });
+        setTotalLocationCount((current) => Math.max(0, current - 1));
       }
+      refreshLocations();
     } finally {
       setDeleteDialog({
         open: false,
@@ -648,7 +735,7 @@ export default function LocationsSection({ locations, canEditInventory = true })
       variants={listVariants}
       initial="hidden"
       animate="show"
-      className="page-enter mx-auto max-w-[1500px] px-5 py-8 md:min-h-[96.3vh] lg:px-6 xl:px-8 max-md:px-4 max-md:pb-0 max-md:pt-4"
+      className="page-enter mx-auto max-w-[1560px] px-5 py-8 md:min-h-[96.3vh] lg:px-6 xl:px-8 max-md:px-4 max-md:pb-0 max-md:pt-4"
     >
       <motion.section
         variants={pageItemVariants}
@@ -678,24 +765,21 @@ export default function LocationsSection({ locations, canEditInventory = true })
         </div>
       </motion.section>
 
-      <motion.section
-        variants={pageItemVariants}
-        className="max-md:hidden"
-      >
-        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <motion.section variants={pageItemVariants} className="max-md:hidden">
+        <header className="flex flex-col gap-4 py-2">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--stocksense-brand)]">
-              Locations
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--stocksense-brand)]">
+              LOCATIONS
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-gray-950 md:text-3xl">
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-gray-950">
               Your spaces
             </h1>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-600">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
               Manage every room, shelf, and place your items live.
             </p>
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex w-full max-w-3xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <Input
               value={search}
               onValueChange={setSearch}
@@ -706,15 +790,30 @@ export default function LocationsSection({ locations, canEditInventory = true })
               startContent={<FaSearch className="h-4 w-4 text-gray-400" />}
               classNames={{
                 inputWrapper:
-                  'min-h-11 border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]',
+                  'min-h-10 border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]',
                 input: 'text-sm text-gray-900 placeholder:text-gray-400',
               }}
             />
+            <Select
+              aria-label="Sort locations"
+              selectedKeys={new Set([sortBy])}
+              onSelectionChange={(keys) =>
+                setSortBy(String(Array.from(keys)[0] || 'name_asc'))
+              }
+              variant="bordered"
+              radius="lg"
+              className="w-full sm:w-40"
+              classNames={themedSelectClassNames}
+            >
+              {SORT_OPTIONS.map(([value, label]) => (
+                <SelectItem key={value}>{label}</SelectItem>
+              ))}
+            </Select>
             {canEditInventory && (
               <Button
                 onPress={openCreateLocationModal}
                 radius="lg"
-                className="min-h-11 bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm max-md:w-full"
+                className="min-h-10 w-full whitespace-nowrap bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm sm:w-auto"
                 startContent={<FaPlus />}
               >
                 Add Location
@@ -780,30 +879,28 @@ export default function LocationsSection({ locations, canEditInventory = true })
 
       <motion.section
         variants={pageItemVariants}
-        className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4 max-md:hidden"
+        className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4 max-md:hidden"
       >
         {summaryCards.map((card) => {
           const Icon = card.icon;
           return (
             <div
               key={card.label}
-              className="rounded-2xl border border-white/70 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              className="flex items-center gap-4 rounded-[1.35rem] border border-white/70 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--stocksense-brand-border)] hover:shadow-md"
             >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">
-                    {card.label}
-                  </p>
-                  <p className="mt-2 text-3xl font-semibold tracking-tight text-gray-950">
-                    {card.value.toLocaleString()}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-gray-500">
-                    {card.description}
-                  </p>
-                </div>
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
-                  <Icon className="h-4 w-4" />
-                </span>
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+                <Icon className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-gray-950">
+                  {card.label}
+                </h2>
+                <p className="text-3xl font-semibold tracking-tight text-gray-950">
+                  {card.value.toLocaleString()}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-gray-500">
+                  {card.description}
+                </p>
               </div>
             </div>
           );
@@ -827,6 +924,12 @@ export default function LocationsSection({ locations, canEditInventory = true })
         </motion.div>
       )}
 
+      {locationsError ? (
+        <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          {locationsError}
+        </div>
+      ) : null}
+
       <motion.section
         ref={mobileLocationsSectionRef}
         variants={pageItemVariants}
@@ -835,6 +938,35 @@ export default function LocationsSection({ locations, canEditInventory = true })
         <h2 className="mb-2 text-base font-semibold text-gray-950">
           Your locations
         </h2>
+        <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+          <Input
+            value={search}
+            onValueChange={setSearch}
+            placeholder="Search locations"
+            radius="lg"
+            variant="bordered"
+            startContent={<FaSearch className="h-4 w-4 text-gray-400" />}
+            classNames={{
+              inputWrapper: 'min-h-11 border-gray-200 bg-white shadow-sm',
+              input: 'text-sm text-gray-900 placeholder:text-gray-400',
+            }}
+          />
+          <Select
+            aria-label="Sort locations"
+            selectedKeys={new Set([sortBy])}
+            onSelectionChange={(keys) =>
+              setSortBy(String(Array.from(keys)[0] || 'name_asc'))
+            }
+            variant="bordered"
+            radius="lg"
+            className="w-32"
+            classNames={themedSelectClassNames}
+          >
+            {SORT_OPTIONS.map(([value, label]) => (
+              <SelectItem key={value}>{label}</SelectItem>
+            ))}
+          </Select>
+        </div>
         {allLocations.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-7 text-center shadow-sm">
             <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[var(--entity-location-border)] bg-[var(--entity-location-soft)] text-[var(--entity-location-accent)]">
@@ -941,264 +1073,325 @@ export default function LocationsSection({ locations, canEditInventory = true })
             ))}
           </ul>
         )}
+        <div className="mt-4">
+          <PaginationControls
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            startItem={startItem}
+            endItem={endItem}
+            totalItems={totalLocationCount}
+            isLoading={isLoadingLocations}
+            onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+            onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+          />
+        </div>
       </motion.section>
 
-      <motion.section variants={pageItemVariants} className="mt-6 max-md:hidden">
-        <AnimatePresence initial={false}>
-          <motion.ul
-            variants={listVariants}
-            initial="hidden"
-            animate="show"
-            className="grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
-          >
-            {allLocations.length === 0 ? (
-              <li className="col-span-full rounded-2xl border border-dashed border-[var(--stocksense-brand-border)] bg-white p-10 text-center shadow-sm">
-                <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
-                  <FaMapMarkedAlt className="h-6 w-6" />
-                </div>
-                <h2 className="mt-4 text-xl font-semibold text-gray-950">
-                  No spaces yet
-                </h2>
-                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-600">
-                  Create your first location like a kitchen, garage, or closet.
-                </p>
-                {canEditInventory && (
-                  <Button
-                    onPress={openCreateLocationModal}
-                    radius="lg"
-                    className="mt-6 bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm"
-                    startContent={<FaPlus />}
-                  >
-                    Create Location
-                  </Button>
-                )}
-              </li>
-            ) : filteredLocations.length === 0 ? (
-              <li className="col-span-full rounded-2xl border border-white/70 bg-white p-8 text-center shadow-sm">
-                <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
-                  <FaSearch className="h-5 w-5" />
-                </div>
-                <h2 className="mt-4 text-lg font-semibold text-gray-950">
-                  No spaces match
-                </h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  Try another search or create a new location.
-                </p>
-              </li>
-            ) : (
-              filteredLocations.map((loc) => {
-                const visibleAreas = (loc.storageAreas ?? []).slice(0, 3);
-                const moreAreas = Math.max(
-                  (loc.storageAreas?.length ?? loc.areasCount ?? 0) -
-                    visibleAreas.length,
-                  0
-                );
-                const recentItems = (loc.recentItems ?? []).slice(0, 3);
-                const isSelected = selectedIds.has(String(loc.id));
+      <motion.section variants={pageItemVariants} className="mt-5 max-md:hidden">
+        {filteredLocations.length > 0 ? (
+          <div className="mb-4">
+            <PaginationControls
+              currentPage={safeCurrentPage}
+              totalPages={totalPages}
+              startItem={startItem}
+              endItem={endItem}
+              totalItems={totalLocationCount}
+              isLoading={isLoadingLocations}
+              onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+            />
+          </div>
+        ) : null}
 
-                return (
-                  <motion.li
-                    key={loc.id}
-                    variants={itemVariants}
-                    className="group relative flex min-h-[390px] flex-col overflow-hidden rounded-2xl border border-white/70 bg-white p-5 text-gray-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--stocksense-brand-border)] hover:shadow-md"
-                  >
-                    <div className="absolute inset-x-0 top-0 h-1 bg-[var(--stocksense-brand)]" />
+        {filteredLocations.length === 0 ? (
+          <div className="rounded-[1.75rem] border border-dashed border-[var(--stocksense-brand-border)] bg-white px-6 py-12 text-center shadow-sm">
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+              {normalizedSearch ? (
+                <FaSearch className="h-6 w-6" />
+              ) : (
+                <FaMapMarkedAlt className="h-7 w-7" />
+              )}
+            </div>
+            <h2 className="mt-5 text-2xl font-semibold tracking-tight text-gray-950">
+              {normalizedSearch ? 'No spaces match' : 'No spaces yet'}
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-600">
+              {normalizedSearch
+                ? 'Try a different search or clear your filters.'
+                : 'Create your first location like a kitchen, garage, closet, or office.'}
+            </p>
+            {canEditInventory && !normalizedSearch ? (
+              <Button
+                onPress={openCreateLocationModal}
+                radius="lg"
+                className="mt-7 bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm"
+                startContent={<FaPlus />}
+              >
+                Add Location
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <>
+            <AnimatePresence initial={false}>
+              <motion.ul
+                variants={listVariants}
+                initial="hidden"
+                animate="show"
+                className={desktopLocationGridClass}
+              >
+                {filteredLocations.map((loc) => {
+                  const visibleAreas = (loc.storageAreas ?? []).slice(0, 3);
+                  const totalAreaCount = loc.areasCount ?? loc.storageAreas?.length ?? 0;
+                  const moreAreas = Math.max(totalAreaCount - visibleAreas.length, 0);
+                  const recentItems = (loc.recentItems ?? []).slice(0, 2);
 
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 flex-1 items-start gap-3">
-                        {canEditInventory && selectionMode && (
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleSelect(loc.id)}
-                            className="mt-3 h-4 w-4 shrink-0 cursor-pointer rounded border border-[var(--stocksense-brand-border)]"
-                            aria-label={`Select ${loc.name}`}
-                          />
-                        )}
-                        {loc.imageUrl ? (
-                          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-location-border)] bg-white">
-                            <img
-                              src={loc.imageUrl}
-                              alt=""
-                              className="h-full w-full object-cover"
-                            />
+                  return (
+                    <motion.li
+                      key={loc.id}
+                      variants={itemVariants}
+                      className="group relative flex h-full min-h-[25.5rem] flex-col overflow-hidden rounded-[1.5rem] border border-white/70 bg-white p-6 text-gray-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--stocksense-brand-border)] hover:shadow-lg"
+                    >
+                      <div className="absolute inset-x-0 top-0 h-1 bg-[var(--stocksense-brand)]" />
+
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 flex-1 items-start gap-3">
+                          {loc.imageUrl ? (
+                            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white">
+                              <img
+                                src={loc.imageUrl}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+                              <FaMapMarkedAlt className="h-5 w-5" />
+                            </div>
+                          )}
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <h2
+                                className="min-w-0 truncate text-xl font-semibold leading-7 text-gray-950"
+                                title={loc.name}
+                              >
+                                {loc.name}
+                              </h2>
+                              {loc._optimistic && (
+                                <span className="shrink-0 rounded-full bg-[var(--stocksense-brand-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--stocksense-brand)]">
+                                  Saving
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-sm font-medium text-gray-500">
+                              {formatCount(loc.itemsCount, 'item')}
+                            </p>
+                          </div>
+                        </div>
+
+                        {canEditInventory && !loc._optimistic ? (
+                          <Dropdown placement="bottom-end">
+                            <DropdownTrigger>
+                              <Button
+                                isIconOnly
+                                variant="light"
+                                radius="lg"
+                                className="h-9 w-9 min-w-9 shrink-0 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+                                aria-label={`${loc.name} actions`}
+                              >
+                                <FaEllipsisV className="h-4 w-4" />
+                              </Button>
+                            </DropdownTrigger>
+                            <DropdownMenu aria-label={`${loc.name} actions`}>
+                              <DropdownItem
+                                key="edit"
+                                startContent={<FaEdit className="h-3.5 w-3.5" />}
+                                onPress={() => openEditLocationModal(loc)}
+                              >
+                                Edit Location
+                              </DropdownItem>
+                              <DropdownItem
+                                key="delete"
+                                className="text-danger"
+                                color="danger"
+                                startContent={<FaTrash className="h-3.5 w-3.5" />}
+                                onPress={() => openDeleteDialog(loc)}
+                              >
+                                Delete Location
+                              </DropdownItem>
+                            </DropdownMenu>
+                          </Dropdown>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-6 rounded-2xl border border-gray-100 bg-gray-50/60 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">
+                            STORAGE AREAS
+                          </h3>
+                          <span className="rounded-full border border-[var(--stocksense-brand-border)] bg-white px-2.5 py-1 text-xs font-semibold text-[var(--stocksense-brand)]">
+                            {totalAreaCount.toLocaleString()}
+                          </span>
+                        </div>
+
+                        {visibleAreas.length > 0 ? (
+                          <div className="mt-3 space-y-2">
+                            {visibleAreas.map((area) => (
+                              <div
+                                key={area.id}
+                                className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 text-sm shadow-[0_1px_0_rgb(15_23_42_/_0.03)]"
+                              >
+                                <span
+                                  className="min-w-0 truncate font-medium text-gray-800"
+                                  title={area.name}
+                                >
+                                  {area.name}
+                                </span>
+                                <span className="shrink-0 text-xs text-gray-500">
+                                  {formatCount(area.itemsCount, 'item')}
+                                </span>
+                              </div>
+                            ))}
+                            {moreAreas > 0 ? (
+                              <p className="px-1 text-xs font-semibold text-[var(--stocksense-brand)]">
+                                +{moreAreas} more
+                              </p>
+                            ) : null}
                           </div>
                         ) : (
-                          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-[var(--entity-location-border)] bg-[var(--entity-location-soft)] text-[var(--entity-location-accent)]">
-                            <FaMapMarkedAlt className="h-5 w-5" />
-                          </div>
-                        )}
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <h2
-                              className="min-w-0 truncate text-lg font-semibold leading-6 text-gray-950"
-                              title={loc.name}
-                            >
-                              {loc.name}
-                            </h2>
-                            {loc._optimistic && (
-                              <span className="shrink-0 rounded-full bg-[var(--stocksense-brand-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--stocksense-brand)]">
-                                Saving
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-1 text-sm font-medium text-gray-500">
-                            {formatCount(loc.itemsCount, 'item')}
+                          <p className="mt-3 text-sm text-gray-500">
+                            No storage areas yet.
                           </p>
-                        </div>
+                        )}
                       </div>
 
-                      {canEditInventory && !loc._optimistic && (
-                        <Dropdown placement="bottom-end">
-                          <DropdownTrigger>
-                            <Button
-                              isIconOnly
-                              variant="light"
-                              radius="lg"
-                              className="h-9 w-9 min-w-9 shrink-0 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-                              aria-label={`${loc.name} actions`}
-                            >
-                              <FaEllipsisV className="h-4 w-4" />
-                            </Button>
-                          </DropdownTrigger>
-                          <DropdownMenu aria-label={`${loc.name} actions`}>
-                            <DropdownItem
-                              key="select"
-                              onPress={() => toggleSelect(loc.id)}
-                            >
-                              {isSelected ? 'Deselect location' : 'Select location'}
-                            </DropdownItem>
-                            <DropdownItem
-                              key="edit"
-                              onPress={() => openEditLocationModal(loc)}
-                            >
-                              Edit Location
-                            </DropdownItem>
-                            <DropdownItem
-                              key="delete"
-                              className="text-danger"
-                              color="danger"
-                              onPress={() => openDeleteDialog(loc)}
-                            >
-                              Delete Location
-                            </DropdownItem>
-                          </DropdownMenu>
-                        </Dropdown>
-                      )}
-                    </div>
-
-                    <div className="mt-5 rounded-2xl border border-gray-100 bg-gray-50/60 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                          Storage Areas
+                      <div className="mt-6">
+                        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">
+                          RECENTLY ADDED
                         </h3>
-                        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--stocksense-brand)]">
-                          {formatCount(loc.areasCount, 'area')}
-                        </span>
+
+                        {recentItems.length > 0 ? (
+                          <div className="mt-3 space-y-3">
+                            {recentItems.map((item) => (
+                              <div
+                                key={item.id}
+                                className="flex min-w-0 items-center gap-3"
+                              >
+                                {item.imageUrl ? (
+                                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-white">
+                                    <img
+                                      src={item.imageUrl}
+                                      alt=""
+                                      className="h-full w-full object-cover"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+                                    <FaBoxOpen className="h-4 w-4" />
+                                  </div>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <p
+                                    className="truncate text-sm font-semibold text-gray-950"
+                                    title={item.name}
+                                  >
+                                    {item.name}
+                                  </p>
+                                  <p
+                                    className="truncate text-xs text-gray-500"
+                                    title={item.storagePath || loc.name}
+                                  >
+                                    {item.storagePath || loc.name}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-3 text-sm text-gray-500">
+                            No recent items yet.
+                          </p>
+                        )}
                       </div>
 
-                      {visibleAreas.length > 0 ? (
-                        <div className="mt-3 space-y-2">
-                          {visibleAreas.map((area) => (
-                            <div
-                              key={area.id}
-                              className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 text-sm"
-                            >
-                              <span
-                                className="min-w-0 truncate font-medium text-gray-800"
-                                title={area.name}
-                              >
-                                {area.name}
-                              </span>
-                              <span className="shrink-0 text-xs text-gray-500">
-                                {formatCount(area.itemsCount, 'item')}
-                              </span>
-                            </div>
-                          ))}
-                          {moreAreas > 0 && (
-                            <p className="px-1 text-xs font-semibold text-[var(--stocksense-brand)]">
-                              +{moreAreas} more
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="mt-3 text-sm text-gray-500">
-                          No storage areas yet.
-                        </p>
-                      )}
-                    </div>
+                      <div className="mt-auto border-t border-gray-100 pt-5">
+                        {loc._optimistic ? (
+                          <span className="inline-flex h-11 w-full items-center justify-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-sm font-semibold text-[var(--stocksense-brand)]">
+                            Saving location
+                          </span>
+                        ) : (
+                          <Link
+                            href={`/locations/${loc.id}`}
+                            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
+                          >
+                            View Location
+                            <FaChevronRight className="h-3.5 w-3.5" />
+                          </Link>
+                        )}
+                      </div>
+                    </motion.li>
+                  );
+                })}
 
-                    <div className="mt-5 flex-1">
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        Recently Added
-                      </h3>
-
-                      {recentItems.length > 0 ? (
-                        <div className="mt-3 space-y-3">
-                          {recentItems.map((item) => (
-                            <div
-                              key={item.id}
-                              className="flex min-w-0 items-center gap-3"
-                            >
-                              {item.imageUrl ? (
-                                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-white">
-                                  <img
-                                    src={item.imageUrl}
-                                    alt=""
-                                    className="h-full w-full object-cover"
-                                  />
-                                </div>
-                              ) : (
-                                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
-                                  <FaBoxOpen className="h-4 w-4" />
-                                </div>
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <p
-                                  className="truncate text-sm font-semibold text-gray-950"
-                                  title={item.name}
-                                >
-                                  {item.name}
-                                </p>
-                                <p
-                                  className="truncate text-xs text-gray-500"
-                                  title={item.storagePath || loc.name}
-                                >
-                                  {item.storagePath || loc.name}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="mt-3 text-sm text-gray-500">
-                          No recent items yet.
-                        </p>
-                      )}
+                {showDesktopAddLocationTile ? (
+                  <motion.li
+                    variants={itemVariants}
+                    className="group flex h-full min-h-[25.5rem] flex-col items-center justify-center rounded-[1.5rem] border border-dashed border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/35 p-8 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--stocksense-brand)] hover:shadow-md"
+                  >
+                    <div className="grid h-20 w-20 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] transition group-hover:bg-[var(--stocksense-brand-soft)]">
+                      <FaPlus className="h-6 w-6" />
                     </div>
-
-                    <div className="mt-5 border-t border-gray-100 pt-4">
-                      {loc._optimistic ? (
-                        <span className="inline-flex h-11 w-full items-center justify-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-sm font-semibold text-[var(--stocksense-brand)]">
-                          Saving location
-                        </span>
-                      ) : (
-                        <Link
-                          href={`/locations/${loc.id}`}
-                          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white shadow-sm transition hover:brightness-95"
-                        >
-                          View Location
-                          <FaChevronRight className="h-3.5 w-3.5" />
-                        </Link>
-                      )}
-                    </div>
+                    <h2 className="mt-6 text-xl font-semibold text-gray-950">
+                      Add your next space
+                    </h2>
+                    <p className="mt-3 max-w-sm text-sm leading-6 text-gray-600">
+                      Create a new location like a room, closet, or garage.
+                    </p>
+                    <Button
+                      onPress={openCreateLocationModal}
+                      radius="lg"
+                      className="mt-6 bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm"
+                      startContent={<FaPlus />}
+                    >
+                      Add Location
+                    </Button>
                   </motion.li>
-                );
-              })
-            )}
-          </motion.ul>
-        </AnimatePresence>
+                ) : null}
+              </motion.ul>
+            </AnimatePresence>
+
+            <div className="mt-5 max-w-[1360px] rounded-[1.5rem] border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/70 px-6 py-6">
+              <div className="flex items-center gap-5">
+                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]">
+                  <FaMapMarkedAlt className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-base font-semibold text-gray-950">
+                    Tip: Start with your main spaces
+                  </h2>
+                  <p className="mt-1 text-sm leading-6 text-gray-600">
+                    Add your key rooms or areas first, then build out storage areas
+                    and categories inside each one.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 max-w-[1360px]">
+              <PaginationControls
+                currentPage={safeCurrentPage}
+                totalPages={totalPages}
+                startItem={startItem}
+                endItem={endItem}
+                totalItems={totalLocationCount}
+                isLoading={isLoadingLocations}
+                onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              />
+            </div>
+          </>
+        )}
       </motion.section>
       {canEditInventory && <Modal
         isOpen={locationModal.open}
