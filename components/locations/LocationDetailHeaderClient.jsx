@@ -3,8 +3,23 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
-import { FaBoxOpen, FaEdit, FaMapMarkedAlt, FaTags, FaTrash, FaWarehouse } from "react-icons/fa";
+import {
+  Button,
+  Input,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+} from "@heroui/react";
+import {
+  FaBoxOpen,
+  FaEdit,
+  FaMapMarkedAlt,
+  FaTags,
+  FaTrash,
+  FaWarehouse,
+} from "react-icons/fa";
 import { deleteLocation, updateLocationName } from "@/app/actions/server";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import EntityImageManager from "@/components/inventory/EntityImageManager";
@@ -34,6 +49,10 @@ export default function LocationDetailHeaderClient({
   const [isSaving, setIsSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const formatCount = (count, singular, plural = `${singular}s`) => {
+    const value = count ?? 0;
+    return `${value} ${value === 1 ? singular : plural}`;
+  };
   const mobileStats = [
     {
       label: "Storage areas",
@@ -171,7 +190,7 @@ export default function LocationDetailHeaderClient({
         </div>
       </header>
 
-      <header className="mb-6 max-md:hidden">
+      <header className="mb-5 max-md:hidden">
         <Link
           href="/locations"
           className="inline-flex items-center text-sm font-semibold text-[var(--stocksense-brand)] transition hover:text-[var(--stocksense-brand-dark)]"
@@ -179,7 +198,7 @@ export default function LocationDetailHeaderClient({
           Back to locations
         </Link>
 
-        <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="mt-4 flex items-start justify-between gap-4">
           <div className="flex min-w-0 gap-4">
             {currentImageUrl ? (
               <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-location-border)] bg-white shadow-sm">
@@ -191,8 +210,8 @@ export default function LocationDetailHeaderClient({
               </div>
             )}
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--stocksense-brand)]">
-                Location
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--stocksense-brand)]">
+                LOCATION
               </p>
               <h1 className="mt-1 truncate text-3xl font-semibold tracking-tight text-gray-950">
                 {name}
@@ -201,15 +220,15 @@ export default function LocationDetailHeaderClient({
                 Everything stored in this space.
               </p>
               <p className="mt-2 text-sm font-medium text-gray-500">
-                {stats.totalAreas ?? 0} storage areas &bull;{' '}
-                {stats.totalCategories ?? 0} categories &bull;{' '}
-                {stats.totalItems ?? 0} items
+                {formatCount(stats.totalAreas, "storage area")} &bull;{" "}
+                {formatCount(stats.totalCategories, "category", "categories")} &bull;{" "}
+                {formatCount(stats.totalItems, "item")}
               </p>
             </div>
           </div>
 
           {canEditInventory && (
-            <div className="flex flex-wrap gap-2 lg:justify-end">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
               <Button
                 size="sm"
                 variant="flat"
@@ -220,17 +239,17 @@ export default function LocationDetailHeaderClient({
                 }}
                 startContent={<FaEdit />}
               >
-                Edit location
+                Edit
               </Button>
               <Button
                 size="sm"
                 variant="flat"
                 color="danger"
-                className="rounded-xl shadow-sm"
+                className="rounded-xl"
                 onPress={() => setDeleteOpen(true)}
                 startContent={<FaTrash />}
               >
-                Delete location
+                Delete
               </Button>
             </div>
           )}

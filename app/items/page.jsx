@@ -22,7 +22,15 @@ export default async function Page({ searchParams }) {
   } = await supabase.auth.getUser();
   const canEditInventory = await getCanEditInventoryForUser(user);
   const [itemsResult, hierarchyResult] = await Promise.all([
-    getItemsPageAction({ offset: 0, limit: 100 }),
+    getItemsPageAction({
+      offset: 0,
+      limit: 25,
+      filters: {
+        expirationFilter: params?.expiration,
+        expirationDays: params?.days,
+        stockFilter: params?.stock,
+      },
+    }),
     getInventoryHierarchy(),
   ]);
 
@@ -49,7 +57,6 @@ export default async function Page({ searchParams }) {
       <ItemsPageClient
         initialItems={itemsResult?.data?.items ?? []}
         initialTotalItems={itemsResult?.data?.totalCount ?? 0}
-        initialNextItemsOffset={itemsResult?.data?.nextOffset ?? null}
         moveLocations={moveLocations}
         canEditInventory={canEditInventory}
         initialExpirationFilter={params?.expiration}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -66,7 +66,6 @@ import {
   toNonNegativeInteger,
   toPositiveInteger,
 } from "@/utils/pantry/date";
-import { containsQuery } from "@/utils/pantry/search";
 
 const pageSectionVariants = {
   hidden: { opacity: 0 },
@@ -100,7 +99,6 @@ const mobileDefaultPanelMotion = {
 };
 
 const ITEMS_PER_PAGE = 25;
-const ITEMS_LOAD_CHUNK_SIZE = 100;
 const ALL_FILTER_KEY = "all";
 const NEW_LOCATION_VALUE = "__new_location__";
 const NEW_AREA_VALUE = "__new_area__";
@@ -192,7 +190,6 @@ function PaginationControls({
 export default function ItemsPageClient({
   initialItems,
   initialTotalItems,
-  initialNextItemsOffset,
   moveLocations,
   canEditInventory = true,
   initialExpirationFilter,
@@ -214,12 +211,11 @@ export default function ItemsPageClient({
   const [totalItemCount, setTotalItemCount] = useState(
     initialTotalItems ?? initialItems?.length ?? 0
   );
-  const [nextItemsOffset, setNextItemsOffset] = useState(
-    initialNextItemsOffset ?? null
-  );
   const [isLoadingMoreItems, setIsLoadingMoreItems] = useState(
-    initialNextItemsOffset !== null && initialNextItemsOffset !== undefined
+    false
   );
+  const [itemsError, setItemsError] = useState(null);
+  const [itemsRefreshNonce, setItemsRefreshNonce] = useState(0);
 
   // filters
   const [search, setSearch] = useState("");
@@ -332,60 +328,9 @@ export default function ItemsPageClient({
       const item = event.detail?.item;
       if (!item?.id) return;
 
-      const loc =
-        localMoveLocations.find((l) => String(l.id) === String(item.locationId)) ||
-        null;
-      const area =
-        (loc?.storage_areas || []).find(
-          (a) => String(a.id) === String(item.storageAreaId)
-        ) || null;
-      const cat =
-        (area?.categories || []).find(
-          (c) => String(c.id) === String(item.categoryId)
-        ) || null;
-
-      const normalizedItem = {
-        id: item.id,
-        name: item.name,
-        quantity: item.quantity ?? 0,
-        expiration_date: item.expiration_date ?? null,
-        barcode: item.barcode ?? null,
-        category_id: item.category_id ?? item.categoryId ?? null,
-        image_path: item.image_path ?? null,
-        imageUrl: item.imageUrl ?? null,
-        location:
-          loc || item.locationId || item.locationName
-            ? {
-                id: loc?.id ?? item.locationId ?? null,
-                name: loc?.name ?? item.locationName ?? "Unknown location",
-              }
-            : null,
-        area:
-          area || item.storageAreaId || item.storageAreaName
-            ? {
-                id: area?.id ?? item.storageAreaId ?? null,
-                name: area?.name ?? item.storageAreaName ?? "Unknown area",
-              }
-            : null,
-        category:
-          cat || item.categoryId || item.categoryName
-            ? {
-                id: cat?.id ?? item.categoryId ?? null,
-                name: cat?.name ?? item.categoryName ?? "Unknown category",
-              }
-            : null,
-      };
-
-      setItems((prev) => {
-        if (prev.some((existing) => String(existing.id) === String(item.id))) {
-          return prev;
-        }
-
-        return [...prev, normalizedItem].sort((a, b) =>
-          a.name.localeCompare(b.name)
-        );
-      });
       setTotalItemCount((current) => current + 1);
+      setCurrentPage(1);
+      setItemsRefreshNonce((current) => current + 1);
     };
 
     window.addEventListener("stocksense:item-added", handleItemAdded);
@@ -393,60 +338,7 @@ export default function ItemsPageClient({
     return () => {
       window.removeEventListener("stocksense:item-added", handleItemAdded);
     };
-  }, [localMoveLocations]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadRemainingItems = async () => {
-      let offset = initialNextItemsOffset;
-      if (offset === null || offset === undefined) {
-        setIsLoadingMoreItems(false);
-        return;
-      }
-
-      setIsLoadingMoreItems(true);
-
-      while (!cancelled && offset !== null && offset !== undefined) {
-        const result = await getItemsPageAction({
-          offset,
-          limit: ITEMS_LOAD_CHUNK_SIZE,
-        });
-
-        if (cancelled) return;
-
-        if (result?.error) {
-          console.error("Could not load more items:", result.error);
-          break;
-        }
-
-        const nextItems = result?.data?.items ?? [];
-        setTotalItemCount(result?.data?.totalCount ?? nextItems.length);
-        setItems((current) => {
-          const existingIds = new Set(current.map((item) => String(item.id)));
-          const merged = [
-            ...current,
-            ...nextItems.filter((item) => !existingIds.has(String(item.id))),
-          ];
-
-          return merged.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-        });
-
-        offset = result?.data?.nextOffset ?? null;
-        setNextItemsOffset(offset);
-
-        if (nextItems.length === 0) break;
-      }
-
-      if (!cancelled) setIsLoadingMoreItems(false);
-    };
-
-    loadRemainingItems();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [initialNextItemsOffset]);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -610,95 +502,82 @@ export default function ItemsPageClient({
     stockFilter,
   ]);
 
-  const filteredItems = useMemo(() => {
-    const nextItems = (items || []).filter((it) => {
-      const nameOk = !normalizedSearch || containsQuery(it.name, normalizedSearch);
-      const barcodeOk = !normalizedSearch || containsQuery(it.barcode, normalizedSearch);
+  const itemRequestFilters = useMemo(
+    () => ({
+      search: normalizedSearch,
+      locationId: locationFilter === ALL_FILTER_KEY ? null : locationFilter,
+      areaId: areaFilter === ALL_FILTER_KEY ? null : areaFilter,
+      categoryId: categoryFilter === ALL_FILTER_KEY ? null : categoryFilter,
+      expirationFilter,
+      expirationDays: expDays,
+      stockFilter,
+      sortBy,
+    }),
+    [
+      areaFilter,
+      categoryFilter,
+      expDays,
+      expirationFilter,
+      locationFilter,
+      normalizedSearch,
+      sortBy,
+      stockFilter,
+    ]
+  );
 
-      const path = `${it.location?.name || ""} ${it.area?.name || ""} ${it.category?.name || ""}`;
-      const pathOk = !normalizedSearch || containsQuery(path, normalizedSearch);
+  const loadItemsPage = useCallback(
+    async (page) => {
+      const safePage = Math.max(1, page);
+      setIsLoadingMoreItems(true);
+      setItemsError(null);
 
-      const itemLocationId = it.location?.id ? String(it.location.id) : "";
-      const itemAreaId = it.area?.id ? String(it.area.id) : "";
-      const itemCategoryId = it.category?.id ?? it.category_id;
-      const itemCategoryKey = itemCategoryId ? String(itemCategoryId) : "";
+      try {
+        const result = await getItemsPageAction({
+          offset: (safePage - 1) * ITEMS_PER_PAGE,
+          limit: ITEMS_PER_PAGE,
+          filters: itemRequestFilters,
+        });
 
-      const locationOk =
-        locationFilter === ALL_FILTER_KEY || itemLocationId === locationFilter;
-      const areaOk = areaFilter === ALL_FILTER_KEY || itemAreaId === areaFilter;
-      const categoryOk =
-        categoryFilter === ALL_FILTER_KEY || itemCategoryKey === categoryFilter;
+        if (result?.error) {
+          setItemsError(result.error);
+          return;
+        }
 
-      const expirationDays = daysUntil(it.expiration_date);
-      let expirationOk = true;
-      if (expirationFilter === EXPIRATION_FILTERS.EXPIRED) {
-        expirationOk = expirationDays < 0;
-      } else if (expirationFilter === EXPIRATION_FILTERS.SOON) {
-        expirationOk = expirationDays >= 0 && expirationDays <= expDays;
-      } else if (expirationFilter === EXPIRATION_FILTERS.NONE) {
-        expirationOk = !it.expiration_date;
+        const nextItems = result?.data?.items ?? [];
+        const nextTotal = result?.data?.totalCount ?? 0;
+        setItems(nextItems);
+        setTotalItemCount(nextTotal);
+        const nextTotalPages = Math.max(1, Math.ceil(nextTotal / ITEMS_PER_PAGE));
+        if (safePage > nextTotalPages) {
+          setCurrentPage(nextTotalPages);
+        }
+      } catch (error) {
+        setItemsError(error?.message || "Could not load items.");
+      } finally {
+        setIsLoadingMoreItems(false);
       }
+    },
+    [itemRequestFilters]
+  );
 
-      const quantity = toNonNegativeInteger(it.quantity, 0);
-      let stockOk = true;
-      if (stockFilter === STOCK_FILTERS.IN_STOCK) {
-        stockOk = quantity > 0;
-      } else if (stockFilter === STOCK_FILTERS.LOW_OR_EMPTY) {
-        stockOk = quantity <= 1;
-      }
+  const initialLoadSkippedRef = useRef(false);
 
-      return (
-        (nameOk || barcodeOk || pathOk) &&
-        locationOk &&
-        areaOk &&
-        categoryOk &&
-        expirationOk &&
-        stockOk
-      );
-    });
+  useEffect(() => {
+    if (!initialLoadSkippedRef.current) {
+      initialLoadSkippedRef.current = true;
+      return;
+    }
 
-    return [...nextItems].sort((a, b) => {
-      if (sortBy === SORT_OPTIONS.NAME_DESC) {
-        return (b.name || "").localeCompare(a.name || "");
-      }
+    void loadItemsPage(currentPage);
+  }, [currentPage, itemsRefreshNonce, loadItemsPage]);
 
-      if (sortBy === SORT_OPTIONS.EXPIRATION_ASC) {
-        const aDays = daysUntil(a.expiration_date);
-        const bDays = daysUntil(b.expiration_date);
-        if (aDays !== bDays) return aDays - bDays;
-        return (a.name || "").localeCompare(b.name || "");
-      }
-
-      if (sortBy === SORT_OPTIONS.QUANTITY_ASC) {
-        const aQuantity = toNonNegativeInteger(a.quantity, 0);
-        const bQuantity = toNonNegativeInteger(b.quantity, 0);
-        if (aQuantity !== bQuantity) return aQuantity - bQuantity;
-        return (a.name || "").localeCompare(b.name || "");
-      }
-
-      return (a.name || "").localeCompare(b.name || "");
-    });
-  }, [
-    areaFilter,
-    categoryFilter,
-    expDays,
-    expirationFilter,
-    items,
-    locationFilter,
-    normalizedSearch,
-    sortBy,
-    stockFilter,
-  ]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE));
+  const filteredItems = items || [];
+  const totalPages = Math.max(1, Math.ceil(totalItemCount / ITEMS_PER_PAGE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const pageStartIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedItems = filteredItems.slice(
-    pageStartIndex,
-    pageStartIndex + ITEMS_PER_PAGE
-  );
-  const startItem = filteredItems.length === 0 ? 0 : pageStartIndex + 1;
-  const endItem = Math.min(pageStartIndex + paginatedItems.length, filteredItems.length);
+  const paginatedItems = filteredItems;
+  const startItem = totalItemCount === 0 ? 0 : pageStartIndex + 1;
+  const endItem = Math.min(pageStartIndex + paginatedItems.length, totalItemCount);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -709,12 +588,18 @@ export default function ItemsPageClient({
     expirationFilter,
     locationFilter,
     normalizedSearch,
+    sortBy,
     stockFilter,
   ]);
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, totalPages));
   }, [totalPages]);
+
+  useEffect(() => {
+    clearSelection();
+    setMobileSelectionMode(false);
+  }, [currentPage, itemRequestFilters]);
 
   const selectedCount = selectedIds.size;
 
@@ -747,7 +632,7 @@ export default function ItemsPageClient({
     {
       label: "Expiring Soon",
       value: totals.expSoon,
-      description: `Within ${expDays} day${expDays === 1 ? "" : "s"}`,
+      description: `On this page, within ${expDays} day${expDays === 1 ? "" : "s"}`,
       icon: FaExclamationTriangle,
       className:
         "border-[var(--entity-warning-border)] bg-[var(--entity-warning-soft)] text-[var(--entity-warning-accent)]",
@@ -755,7 +640,7 @@ export default function ItemsPageClient({
     {
       label: "Low Stock",
       value: totals.lowStock,
-      description: "One or fewer left",
+      description: "On this page",
       icon: FaShoppingBasket,
       className:
         "border-[var(--entity-shopping-border)] bg-[var(--entity-shopping-soft)] text-[var(--entity-shopping-accent)]",
@@ -783,6 +668,9 @@ export default function ItemsPageClient({
   };
 
   const clearSelection = () => setSelectedIds(new Set());
+  const refreshCurrentItems = () => {
+    setItemsRefreshNonce((current) => current + 1);
+  };
 
   const enterMobileSelection = (id) => {
     if (!canEditInventory) return;
@@ -998,6 +886,7 @@ export default function ItemsPageClient({
       action: "updated",
       id: activeItem.id,
     });
+    refreshCurrentItems();
     closeDrawer();
   };
 
@@ -1239,6 +1128,7 @@ export default function ItemsPageClient({
       action: "moved",
       id: activeItem.id,
     });
+    refreshCurrentItems();
     closeDrawer();
   };
 
@@ -1292,6 +1182,7 @@ export default function ItemsPageClient({
       action: "moved",
       ids,
     });
+    refreshCurrentItems();
   };
 
   const moveItemsToShoppingList = async (ids, actionKey) => {
@@ -1349,6 +1240,7 @@ export default function ItemsPageClient({
           .filter(Boolean),
         deletedItemIds: Array.from(movedIds),
       });
+      refreshCurrentItems();
     } catch (error) {
       console.error("Move to shopping list error:", error);
       alert("There was a problem moving one or more items to the shopping list.");
@@ -1459,6 +1351,7 @@ export default function ItemsPageClient({
           next.delete(String(deleteDialog.payload.itemId));
           return next;
         });
+        refreshCurrentItems();
         return;
       }
 
@@ -1488,6 +1381,7 @@ export default function ItemsPageClient({
         if (drawerOpen && activeItemId && deletedSet.has(String(activeItemId))) {
           closeDrawer();
         }
+        refreshCurrentItems();
       }
     } catch (e) {
       console.error("Delete error:", e);
@@ -1529,6 +1423,7 @@ export default function ItemsPageClient({
         next.delete(String(deleteDialog.payload.itemId));
         return next;
       });
+      refreshCurrentItems();
     } catch (e) {
       console.error("Delete and add to shopping list error:", e);
       closeDelete();
@@ -1622,7 +1517,7 @@ export default function ItemsPageClient({
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  {canEditInventory && filteredItems.length > 0 && (
+                  {canEditInventory && paginatedItems.length > 0 && (
                     <button
                       type="button"
                       onClick={() => enterMobileSelection()}
@@ -1713,12 +1608,12 @@ export default function ItemsPageClient({
         variants={pageItemVariants}
         className="max-md:hidden"
       >
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-4">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--stocksense-brand)]">
               Items
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-gray-950 md:text-3xl">
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-gray-950">
               Your inventory
             </h1>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-600">
@@ -1729,7 +1624,7 @@ export default function ItemsPageClient({
           </div>
           <OpenGlobalAddItemButton
             canEditInventory={canEditInventory}
-            className="min-h-11 rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm"
+            className="min-h-11 w-full max-w-40 rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm sm:w-auto"
           >
             Add Item
           </OpenGlobalAddItemButton>
@@ -1780,7 +1675,7 @@ export default function ItemsPageClient({
             placeholder="Search items, locations, areas, categories..."
             startContent={<FaSearch className="text-gray-400" />}
             classNames={{
-              inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
+              inputWrapper: "rounded-xl border border-stocksense-gray shadow-none max-w-[500px] h-[56px]",
             }}
           />
 
@@ -1990,7 +1885,7 @@ export default function ItemsPageClient({
 
             {isLoadingMoreItems && (
               <span className="px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-600 border border-gray-200">
-                Loading {items.length} of {totalItemCount || "more"}
+                Loading items
               </span>
             )}
 
@@ -2002,7 +1897,7 @@ export default function ItemsPageClient({
 
             {filtersAreActive && (
               <span className="px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-700 border border-gray-200">
-                <strong>{filteredItems.length}</strong> matching
+                <strong>{totalItemCount}</strong> matching
               </span>
             )}
           </div>
@@ -2080,13 +1975,19 @@ export default function ItemsPageClient({
 
       {/* List */}
       <motion.div variants={pageSectionVariants} className="space-y-4">
+        {itemsError ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {itemsError}
+          </div>
+        ) : null}
+
         <div className="max-md:hidden">
           <PaginationControls
             currentPage={safeCurrentPage}
             totalPages={totalPages}
             startItem={startItem}
             endItem={endItem}
-            totalItems={filteredItems.length}
+            totalItems={totalItemCount}
             onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
             onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
           />
@@ -2215,7 +2116,7 @@ export default function ItemsPageClient({
               );
             })}
 
-            {filteredItems.length === 0 && (
+            {totalItemCount === 0 && (
               <motion.div
                 key="mobile-empty"
                 variants={pageItemVariants}
@@ -2228,14 +2129,14 @@ export default function ItemsPageClient({
                   <FaBoxOpen className="h-6 w-6" />
                 </div>
                 <h2 className="mt-4 text-lg font-semibold text-gray-950">
-                  {items.length === 0 ? "No items yet" : "No matching items"}
+                  {filtersAreActive ? "No matching items" : "No items yet"}
                 </h2>
                 <p className="mt-1 text-sm text-gray-500">
-                  {items.length === 0
-                    ? "Start adding things you want to keep track of."
-                    : "Try changing your search or filters."}
+                  {filtersAreActive
+                    ? "Try changing your search or filters."
+                    : "Start adding things you want to keep track of."}
                 </p>
-                {items.length === 0 ? (
+                {!filtersAreActive ? (
                   <div className="mt-5">
                     <OpenGlobalAddItemButton
                       canEditInventory={canEditInventory}
@@ -2250,7 +2151,7 @@ export default function ItemsPageClient({
           </AnimatePresence>
         </div>
 
-        <div className="grid auto-rows-fr grid-cols-1 gap-5 max-md:hidden lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:gap-5 max-md:hidden lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         <AnimatePresence initial={false}>
         {paginatedItems.map((it) => {
           const soon = isExpiringSoon(it.expiration_date, expDays);
@@ -2274,7 +2175,7 @@ export default function ItemsPageClient({
                   openDrawer(it);
                 }
               }}
-              className={`group relative flex h-full min-h-0 overflow-hidden rounded-2xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${
+              className={`group relative flex overflow-hidden rounded-2xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${
                 selected
                   ? "border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]"
                   : "border-white/70 hover:border-[var(--stocksense-brand-border)]"
@@ -2282,7 +2183,7 @@ export default function ItemsPageClient({
               whileHover={{ y: -1 }}
             >
               <div className={`absolute inset-x-0 top-0 h-1 ${soon ? "bg-[var(--entity-warning-accent)]" : "bg-[var(--entity-item-accent)]"}`} />
-              <div className="flex h-full min-w-0 flex-1 items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
                 {/* Left: item image and info */}
                 <div className="flex min-w-0 flex-1 items-start gap-2.5">
                   {canEditInventory && selectedCount > 0 && (
@@ -2392,7 +2293,7 @@ export default function ItemsPageClient({
           );
         })}
 
-        {filteredItems.length === 0 && (
+        {totalItemCount === 0 && (
           <motion.div
             key="empty"
             variants={pageItemVariants}
@@ -2401,22 +2302,28 @@ export default function ItemsPageClient({
             exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
             className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center sm:col-span-2 lg:col-span-3 xl:col-span-4"
           >
-            <p className="text-gray-500">No items match your search.</p>
-            <div className="mt-4 flex justify-center">
-              <OpenGlobalAddItemButton canEditInventory={canEditInventory} />
-            </div>
+            <p className="text-gray-500">
+              {filtersAreActive
+                ? "No items match your search or filters."
+                : "No items yet."}
+            </p>
+            {!filtersAreActive ? (
+              <div className="mt-4 flex justify-center">
+                <OpenGlobalAddItemButton canEditInventory={canEditInventory} />
+              </div>
+            ) : null}
           </motion.div>
         )}
         </AnimatePresence>
         </div>
 
-        {filteredItems.length > ITEMS_PER_PAGE && (
+        {totalItemCount > ITEMS_PER_PAGE && (
           <PaginationControls
             currentPage={safeCurrentPage}
             totalPages={totalPages}
             startItem={startItem}
             endItem={endItem}
-            totalItems={filteredItems.length}
+            totalItems={totalItemCount}
             onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
             onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
           />

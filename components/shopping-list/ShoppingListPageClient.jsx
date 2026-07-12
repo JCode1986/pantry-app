@@ -1033,12 +1033,12 @@ export default function ShoppingListPageClient({
       </motion.section>
 
       <section className="max-md:hidden">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-4">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--stocksense-brand)]">
               Shopping List
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-gray-950 md:text-3xl">
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-gray-950">
               Restock list
             </h1>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-600">
@@ -1046,7 +1046,7 @@ export default function ShoppingListPageClient({
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex w-full max-w-4xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <div className="flex flex-wrap gap-2">
               {FILTERS.map((option) => (
                 <button

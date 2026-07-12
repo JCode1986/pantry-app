@@ -4,6 +4,7 @@ import AreaDetailClient from "@/components/areas/AreaDetailClient";
 import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
 import { getCanEditInventoryForUser } from "@/utils/households";
 import { getInventoryImageUrls } from "@/utils/inventoryImages";
+import { getAreaCategoriesPageAction } from "@/app/actions/server";
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
@@ -58,64 +59,14 @@ export default async function Page({ params }) {
     notFound();
   }
 
-  // 2) Fetch categories under this area + item counts (minimal)
-  // IMPORTANT: If you get "more than one relationship" errors, you may need explicit FK names.
-  let { data: categoriesRaw, error: categoriesError } = await supabase
-    .from("storage_categories")
-    .select(
-      `
-      id,
-      name,
-      image_path,
-      storage_area_id,
-      items:items!fk_items_category ( id )
-    `
-    )
-    .eq("storage_area_id", id)
-    .order("name", { ascending: true });
-
-  const categoryImageColumnMissing =
-    categoriesError?.code === "42703" &&
-    categoriesError?.message?.includes("image_path");
-
-  if (categoryImageColumnMissing) {
-    const fallback = await supabase
-      .from("storage_categories")
-      .select(
-        `
-        id,
-        name,
-        storage_area_id,
-        items:items!fk_items_category ( id )
-      `
-      )
-      .eq("storage_area_id", id)
-      .order("name", { ascending: true });
-
-    categoriesRaw = fallback.data;
-    categoriesError = fallback.error;
-  }
-
-  if (categoriesError) {
-    console.error("Categories fetch error:", categoriesError?.message || categoriesError);
-  }
-
-  const imageUrlsByPath = await getInventoryImageUrls([
-    area.image_path,
-    ...(categoriesRaw ?? []).map((category) => category.image_path),
+  const [categoriesResult, imageUrlsByPath] = await Promise.all([
+    getAreaCategoriesPageAction({ areaId: id, offset: 0, limit: 24 }),
+    getInventoryImageUrls([area.image_path]),
   ]);
-  const categories = (categoriesRaw ?? []).map((c) => ({
-      id: c.id,
-      name: c.name,
-      image_path: c.image_path ?? null,
-      imageUrl: categoryImageColumnMissing
-        ? null
-        : imageUrlsByPath.get(c.image_path) ?? null,
-      itemsCount: (c.items ?? []).length,
-    }));
+  const categories = categoriesResult.data.items ?? [];
 
   const totals = {
-    categories: categories.length,
+    categories: categoriesResult.data.totalCount ?? categories.length,
     items: categories.reduce((sum, c) => sum + (c.itemsCount || 0), 0),
   };
 
@@ -133,6 +84,7 @@ export default async function Page({ params }) {
         imageUrl: imageUrlsByPath.get(area.image_path) ?? null,
       }}
         initialCategories={categories}
+        initialTotalCategories={categoriesResult.data.totalCount}
         totals={totals}
         canEditInventory={canEditInventory}
       />

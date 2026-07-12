@@ -2,23 +2,22 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Card,
-  CardBody,
   Button,
   Input,
   Dropdown,
   DropdownTrigger,
   DropdownMenu,
   DropdownItem,
-  Skeleton,
   Modal,
   ModalContent,
   ModalHeader,
   ModalBody,
   ModalFooter,
+  Select,
+  SelectItem,
 } from "@heroui/react";
 import {
   FaBoxOpen,
@@ -37,6 +36,7 @@ import {
 import {
   addCategory,
   deleteStorageArea,
+  getAreaCategoriesPageAction,
   updateCategoryName,
   deleteCategory,
   updateStorageArea,
@@ -54,12 +54,52 @@ import {
   modalHeaderClass,
   modalInputClassNames,
   mobileSheetModalClassNames,
+  themedSelectClassNames,
 } from "@/components/modals/modalTheme";
-import { containsQuery } from "@/utils/pantry/search";
 import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
 import { emitInventoryChange } from "@/utils/clientEvents";
+import PaginationControls from "@/components/ui/PaginationControls";
+import { daysUntil, isExpiringSoon, toNonNegativeInteger } from "@/utils/pantry/date";
 
 const CATEGORY_SUGGESTIONS = ["Food", "Documents", "Tools", "Medicine", "Clothes", "Electronics"];
+const AREA_DETAIL_PAGE_SIZE = 24;
+const SORT_OPTIONS = [
+  ["name_asc", "A-Z"],
+  ["name_desc", "Z-A"],
+  ["newest", "Newest"],
+  ["oldest", "Oldest"],
+];
+
+function getSortTimestamp(entry) {
+  const time = new Date(
+    entry?.insertedAt ?? entry?.inserted_at ?? entry?.created_at ?? entry?.createdAt ?? 0
+  ).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function sortCategoriesForDisplay(items, sortBy) {
+  return [...(items ?? [])].sort((a, b) => {
+    if (sortBy === "name_desc") return b.name.localeCompare(a.name);
+    if (sortBy === "newest") return getSortTimestamp(b) - getSortTimestamp(a);
+    if (sortBy === "oldest") return getSortTimestamp(a) - getSortTimestamp(b);
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function formatCount(count, singular, plural = `${singular}s`) {
+  const value = count ?? 0;
+  return `${value.toLocaleString()} ${value === 1 ? singular : plural}`;
+}
+
+function formatExpiration(value) {
+  if (!value) return "";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
 
 const pageVariants = {
   hidden: { opacity: 0 },
@@ -75,17 +115,29 @@ const pageItemVariants = {
   },
 };
 
+const collapseVariants = {
+  collapsed: { height: 0, opacity: 0, transition: { duration: 0.2 } },
+  open: { height: "auto", opacity: 1, transition: { duration: 0.25 } },
+};
+
 export default function AreaDetailClient({
   area,
   initialCategories,
+  initialTotalCategories = initialCategories?.length ?? 0,
   canEditInventory = true,
 }) {
   const router = useRouter();
   const [areaName, setAreaName] = useState(area?.name ?? "");
   const [areaImageUrl, setAreaImageUrl] = useState(area?.imageUrl ?? null);
   const [categories, setCategories] = useState(initialCategories ?? []);
+  const [totalCategoryCount, setTotalCategoryCount] = useState(initialTotalCategories);
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("name_asc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+  const [categoriesError, setCategoriesError] = useState("");
   const [newCategory, setNewCategory] = useState("");
+  const [collapsedCategoryIds, setCollapsedCategoryIds] = useState(() => new Set());
   const [mobileAddOpen, setMobileAddOpen] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
@@ -111,18 +163,76 @@ export default function AreaDetailClient({
     busy: false,
   });
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return categories;
-    return categories.filter((c) => containsQuery(c.name, q));
-  }, [categories, search]);
+  const normalizedSearch = search.trim().toLowerCase();
+  const loadCategoryPage = useCallback(
+    async (page) => {
+      const safePage = Math.max(1, page);
+      setIsLoadingCategories(true);
+      setCategoriesError("");
+
+      try {
+        const result = await getAreaCategoriesPageAction({
+          areaId: area?.id,
+          offset: (safePage - 1) * AREA_DETAIL_PAGE_SIZE,
+          limit: AREA_DETAIL_PAGE_SIZE,
+          filters: { search: normalizedSearch, sortBy },
+        });
+
+        if (result?.error) {
+          setCategoriesError(result.error);
+          return;
+        }
+
+        const nextCategories = result?.data?.items ?? [];
+        const nextTotal = result?.data?.totalCount ?? 0;
+        setCategories(nextCategories);
+        setTotalCategoryCount(nextTotal);
+
+        const nextTotalPages = Math.max(1, Math.ceil(nextTotal / AREA_DETAIL_PAGE_SIZE));
+        if (safePage > nextTotalPages) setCurrentPage(nextTotalPages);
+      } catch (error) {
+        setCategoriesError(error?.message || "Could not load categories.");
+      } finally {
+        setIsLoadingCategories(false);
+      }
+    },
+    [area?.id, normalizedSearch, sortBy]
+  );
+
+  const initialLoadSkippedRef = useRef(false);
+
+  useEffect(() => {
+    if (!initialLoadSkippedRef.current) {
+      initialLoadSkippedRef.current = true;
+      return;
+    }
+
+    void loadCategoryPage(currentPage);
+  }, [currentPage, loadCategoryPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [normalizedSearch, sortBy]);
+
+  const filtered = categories ?? [];
+  const totalPages = Math.max(1, Math.ceil(totalCategoryCount / AREA_DETAIL_PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startItem =
+    totalCategoryCount === 0
+      ? 0
+      : (safeCurrentPage - 1) * AREA_DETAIL_PAGE_SIZE + 1;
+  const endItem = Math.min(
+    (safeCurrentPage - 1) * AREA_DETAIL_PAGE_SIZE + filtered.length,
+    totalCategoryCount
+  );
+  const hasActiveSearch = Boolean(normalizedSearch);
 
   const totals = useMemo(() => {
     return {
-      categories: categories.length,
+      categories: totalCategoryCount,
       items: categories.reduce((sum, c) => sum + (c.itemsCount || 0), 0),
     };
-  }, [categories]);
+  }, [categories, totalCategoryCount]);
 
   useEffect(() => {
     const handleItemAdded = (event) => {
@@ -131,30 +241,61 @@ export default function AreaDetailClient({
         return;
       }
 
+      if (item.createdCategory) {
+        setTotalCategoryCount((current) => current + 1);
+      }
+
+      const nextItem = {
+        id: item.id,
+        name: item.name ?? item.itemName ?? "Item",
+        quantity: item.quantity ?? 0,
+        expiration_date: item.expiration_date ?? item.expirationDate ?? null,
+        barcode: item.barcode ?? null,
+        image_path: item.image_path ?? null,
+        imageUrl: item.imageUrl ?? null,
+      };
+
       setCategories((prev) => {
         const categoryExists = prev.some(
           (category) => String(category.id) === String(item.categoryId)
         );
 
         if (!categoryExists) {
-          return [
+          return sortCategoriesForDisplay([
             ...prev,
             {
               id: item.categoryId,
               name: item.categoryName ?? "Category",
               itemsCount: 1,
+              items: [nextItem],
             },
-          ].sort((a, b) => a.name.localeCompare(b.name));
+          ], sortBy);
         }
 
         return prev.map((category) =>
           String(category.id) === String(item.categoryId)
-            ? {
-                ...category,
-                itemsCount: (category.itemsCount ?? 0) + 1,
-              }
+            ? (() => {
+                const existingItems = category.items ?? [];
+                const itemAlreadyVisible = existingItems.some(
+                  (visibleItem) => String(visibleItem.id) === String(item.id)
+                );
+
+                return {
+                  ...category,
+                  itemsCount: itemAlreadyVisible
+                    ? category.itemsCount ?? existingItems.length
+                    : (category.itemsCount ?? existingItems.length) + 1,
+                  items: itemAlreadyVisible ? existingItems : [...existingItems, nextItem],
+                };
+              })()
             : category
         );
+      });
+      setCollapsedCategoryIds((prev) => {
+        if (!prev.has(String(item.categoryId))) return prev;
+        const next = new Set(prev);
+        next.delete(String(item.categoryId));
+        return next;
       });
     };
 
@@ -163,7 +304,7 @@ export default function AreaDetailClient({
     return () => {
       window.removeEventListener("stocksense:item-added", handleItemAdded);
     };
-  }, [area?.id]);
+  }, [area?.id, sortBy]);
 
   // ---------------- Actions ----------------
 
@@ -244,8 +385,9 @@ export default function AreaDetailClient({
     };
 
     setCategories((prev) =>
-      [...prev, optimistic].sort((a, b) => a.name.localeCompare(b.name))
+      sortCategoriesForDisplay([...prev, optimistic], sortBy)
     );
+    setTotalCategoryCount((current) => current + 1);
     setNewCategory("");
 
     try {
@@ -259,8 +401,8 @@ export default function AreaDetailClient({
       if (!created?.id) throw new Error("Category create failed: no id returned");
 
       setCategories((prev) =>
-        prev
-          .map((c) =>
+        sortCategoriesForDisplay(
+          prev.map((c) =>
             c.id === tempId
               ? {
                   id: created.id,
@@ -270,8 +412,9 @@ export default function AreaDetailClient({
                   itemsCount: 0,
                 }
               : c
-          )
-          .sort((a, b) => a.name.localeCompare(b.name))
+          ),
+          sortBy
+        )
       );
       emitInventoryChange({
         entity: "category",
@@ -284,6 +427,7 @@ export default function AreaDetailClient({
 
       // rollback optimistic
       setCategories((prev) => prev.filter((c) => c.id !== tempId));
+      setTotalCategoryCount((current) => Math.max(0, current - 1));
       alert("Failed to add category. Please try again.");
       setNewCategory(name);
     } finally {
@@ -303,9 +447,10 @@ export default function AreaDetailClient({
 
     // optimistic rename
     setCategories((prev) =>
-      prev
-        .map((c) => (c.id === id ? { ...c, name } : c))
-        .sort((a, b) => a.name.localeCompare(b.name))
+      sortCategoriesForDisplay(
+        prev.map((c) => (c.id === id ? { ...c, name } : c)),
+        sortBy
+      )
     );
 
     try {
@@ -323,15 +468,32 @@ export default function AreaDetailClient({
 
       // rollback
       setCategories((prev) =>
-        prev
-          .map((c) => (c.id === id ? { ...c, name: prevName || c.name } : c))
-          .sort((a, b) => a.name.localeCompare(b.name))
+        sortCategoriesForDisplay(
+          prev.map((c) => (c.id === id ? { ...c, name: prevName || c.name } : c)),
+          sortBy
+        )
       );
 
       alert("Failed to rename category. Please try again.");
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const toggleCategoryCollapsed = (categoryId) => {
+    const key = String(categoryId);
+    setCollapsedCategoryIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const focusDesktopAddCategory = () => {
+    const input = document.getElementById("area-detail-new-category");
+    input?.scrollIntoView({ behavior: "smooth", block: "center" });
+    input?.focus({ preventScroll: true });
   };
 
   const handleCategoryImageChange = ({ imageUrl }) => {
@@ -364,6 +526,7 @@ export default function AreaDetailClient({
     // optimistic remove
     const snapshot = categories;
     setCategories((prev) => prev.filter((c) => c.id !== id));
+    setTotalCategoryCount((current) => Math.max(0, current - 1));
 
     try {
       const result = await deleteCategory(id);
@@ -380,6 +543,7 @@ export default function AreaDetailClient({
 
       // rollback
       setCategories(snapshot);
+      setTotalCategoryCount((current) => current + 1);
       setDeleteModal((p) => ({ ...p, busy: false }));
 
       alert("Failed to delete category. Please try again.");
@@ -481,7 +645,7 @@ export default function AreaDetailClient({
           <span className="font-medium text-gray-800">{areaName || "Area"}</span>
         </div>
 
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+        <div className="flex flex-col gap-3">
           <div>
             <div className="flex items-center gap-3">
               {areaImageUrl && (
@@ -493,7 +657,7 @@ export default function AreaDetailClient({
                   />
                 </div>
               )}
-              <h1 className="text-2xl font-semibold tracking-tight text-gray-950 md:text-3xl">
+              <h1 className="text-3xl font-semibold tracking-tight text-gray-950">
                 {areaName}
               </h1>
             </div>
@@ -509,13 +673,13 @@ export default function AreaDetailClient({
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <div className="flex w-full max-w-3xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <Input
               value={search}
               onValueChange={setSearch}
-              placeholder="Search categories…"
+              placeholder="Search categories..."
               startContent={<FaSearch className="text-gray-400" />}
-              className="sm:w-[320px]"
+              className="w-full sm:w-80"
               radius="lg"
               variant="bordered"
             />
@@ -554,15 +718,14 @@ export default function AreaDetailClient({
       </motion.div>
 
       <motion.section variants={pageItemVariants} className="max-md:hidden">
-        <div className="flex items-center gap-2 text-sm text-gray-500">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
           <Link
             href="/areas"
             className="inline-flex items-center gap-2 hover:text-[var(--stocksense-brand)]"
           >
-            <FaChevronLeft className="h-3.5 w-3.5" />
-            Storage areas
+            Storage Areas
           </Link>
-          <span className="text-gray-300">/</span>
+          <FaChevronRight className="h-3 w-3 text-gray-300" />
           {area?.location?.id ? (
             <Link
               href={`/locations/${area.location.id}`}
@@ -575,37 +738,40 @@ export default function AreaDetailClient({
               {area?.location?.name || "Location"}
             </span>
           )}
-          <span className="text-gray-300">/</span>
-          <span className="font-medium text-gray-800">{areaName || "Area"}</span>
+          <FaChevronRight className="h-3 w-3 text-gray-300" />
+          <span className="font-medium text-gray-800">{areaName || "Storage Area"}</span>
         </div>
 
-        <header className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <header className="mt-4 flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-4">
             {areaImageUrl ? (
-              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-area-border)] bg-white shadow-sm">
+              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white shadow-sm">
                 <img src={areaImageUrl} alt="" className="h-full w-full object-cover" />
               </div>
             ) : (
-              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)] shadow-sm">
+              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] shadow-sm">
                 <FaWarehouse className="h-6 w-6" />
               </div>
             )}
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--stocksense-brand)]">
-                Storage Area
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--stocksense-brand)]">
+                STORAGE AREA
               </p>
-              <h1 className="mt-1 truncate text-2xl font-semibold tracking-tight text-gray-950 md:text-3xl">
+              <h1 className="mt-2 truncate text-3xl font-semibold tracking-tight text-gray-950">
                 {areaName}
               </h1>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-600">
-                Everything organized in{" "}
-                <span className="font-medium">{area?.location?.name}</span>.
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-600">
+                Everything organized in this space.
+              </p>
+              <p className="mt-2 text-sm font-medium text-gray-500">
+                {formatCount(totals.categories, "category", "categories")} &bull;{" "}
+                {formatCount(totals.items, "item")}
               </p>
             </div>
           </div>
 
           {canEditInventory && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
               <Button
                 variant="flat"
                 className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
@@ -615,11 +781,12 @@ export default function AreaDetailClient({
                 }}
                 startContent={<FaEdit />}
               >
-                Edit area
+                Edit
               </Button>
               <Button
                 variant="flat"
-                className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
+                color="danger"
+                className="rounded-xl"
                 onPress={() => setDeleteAreaOpen(true)}
                 startContent={<FaTrash />}
               >
@@ -634,79 +801,91 @@ export default function AreaDetailClient({
         variants={pageItemVariants}
         className="grid gap-4 sm:grid-cols-2 max-md:hidden"
       >
-        <div className="rounded-2xl border border-white/70 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Categories</p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight text-gray-950">
-                {totals.categories.toLocaleString()}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-gray-500">
-                Groups inside this space
-              </p>
-            </div>
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
-              <FaTags className="h-4 w-4" />
-            </span>
+        <div className="flex items-center gap-4 rounded-[1.35rem] border border-white/70 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--stocksense-brand-border)] hover:shadow-md">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+            <FaTags className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-gray-950">Categories</h2>
+            <p className="text-3xl font-semibold tracking-tight text-gray-950">
+              {totals.categories.toLocaleString()}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-gray-500">
+              Groups inside this storage area
+            </p>
           </div>
         </div>
-        <div className="rounded-2xl border border-white/70 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Items</p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight text-gray-950">
-                {totals.items.toLocaleString()}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-gray-500">
-                Stored in this area
-              </p>
-            </div>
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] text-[var(--entity-item-accent)]">
-              <FaBoxOpen className="h-4 w-4" />
-            </span>
+        <div className="flex items-center gap-4 rounded-[1.35rem] border border-white/70 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--stocksense-brand-border)] hover:shadow-md">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+            <FaBoxOpen className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-gray-950">Items</h2>
+            <p className="text-3xl font-semibold tracking-tight text-gray-950">
+              {totals.items.toLocaleString()}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-gray-500">
+              Stored in this area
+            </p>
           </div>
         </div>
       </motion.section>
 
       <motion.section
         variants={pageItemVariants}
-        className="rounded-2xl border border-white/70 bg-white p-4 shadow-sm max-md:hidden"
+        className="rounded-[1.5rem] border border-white/70 bg-white p-4 shadow-sm max-md:hidden"
       >
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
-              <FaSearch className="h-4 w-4" />
-            </span>
-            <div>
-              <h2 className="text-sm font-semibold text-gray-950">
-                Find categories
-              </h2>
-              <p className="text-xs text-gray-500">
-                Search or add a category in this storage area.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Input
-              value={search}
-              onValueChange={setSearch}
-              placeholder="Search categories"
-              startContent={<FaSearch className="text-gray-400" />}
-              className="sm:w-[320px]"
-              radius="lg"
+        <div className="flex flex-col gap-3">
+          <Input
+            value={search}
+            onValueChange={setSearch}
+            placeholder="Search categories or items..."
+            startContent={<FaSearch className="h-4 w-4 text-gray-400" />}
+            className="w-full max-w-md"
+            radius="lg"
+            variant="bordered"
+            classNames={{
+              inputWrapper:
+                "min-h-10 border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]",
+              input: "text-sm text-gray-900 placeholder:text-gray-400",
+            }}
+          />
+          <div className="flex w-full max-w-3xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <Select
+              aria-label="Sort categories"
+              selectedKeys={new Set([sortBy])}
+              onSelectionChange={(keys) =>
+                setSortBy(String(Array.from(keys)[0] || "name_asc"))
+              }
               variant="bordered"
-              classNames={{
-                inputWrapper:
-                  "border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]",
-              }}
-            />
+              radius="lg"
+              className="w-full sm:w-40"
+              classNames={themedSelectClassNames}
+            >
+              {SORT_OPTIONS.map(([value, label]) => (
+                <SelectItem key={value}>{label}</SelectItem>
+              ))}
+            </Select>
+            {canEditInventory && (
+              <Button
+                variant="flat"
+                className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
+                onPress={focusDesktopAddCategory}
+                startContent={<FaPlus />}
+              >
+                Add Category
+              </Button>
+            )}
             <OpenGlobalAddItemButton
               canEditInventory={canEditInventory}
               context={{
                 locationId: area?.location?.id,
                 storageAreaId: area?.id,
               }}
-            />
+              className="rounded-xl bg-[var(--stocksense-brand)] text-white shadow-sm"
+            >
+              Add Item
+            </OpenGlobalAddItemButton>
           </div>
         </div>
       </motion.section>
@@ -731,9 +910,40 @@ export default function AreaDetailClient({
             </button>
           )}
         </div>
+        <Select
+          aria-label="Sort categories"
+          selectedKeys={new Set([sortBy])}
+          onSelectionChange={(keys) =>
+            setSortBy(String(Array.from(keys)[0] || "name_asc"))
+          }
+          variant="bordered"
+          radius="lg"
+          className="mt-3"
+          classNames={themedSelectClassNames}
+        >
+          {SORT_OPTIONS.map(([value, label]) => (
+            <SelectItem key={value}>{label}</SelectItem>
+          ))}
+        </Select>
       </motion.section>
 
+      {categoriesError ? (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          {categoriesError}
+        </div>
+      ) : null}
+
       <section className="grid gap-3 md:hidden">
+        <PaginationControls
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
+          startItem={startItem}
+          endItem={endItem}
+          totalItems={totalCategoryCount}
+          isLoading={isLoadingCategories}
+          onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+          onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+        />
         {filtered.map((cat) => (
           <article
             key={cat.id}
@@ -812,29 +1022,59 @@ export default function AreaDetailClient({
             </p>
           </div>
         )}
+        <PaginationControls
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
+          startItem={startItem}
+          endItem={endItem}
+          totalItems={totalCategoryCount}
+          isLoading={isLoadingCategories}
+          onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+          onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+        />
       </section>
 
-      {/* Add Category */}
-      {canEditInventory && (
-        <motion.div variants={pageItemVariants} className="max-md:hidden">
-          <Card className="rounded-2xl border border-white/70 bg-white shadow-sm">
-            <CardBody className="p-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0">
-                  <h2 className="text-sm font-semibold text-gray-950">
-                    Create category
-                  </h2>
-                  <p className="text-xs text-gray-500">
-                    Add a new group inside {areaName}.
-                  </p>
-                </div>
+      <motion.section variants={pageItemVariants} className="space-y-5 max-md:hidden">
+        {filtered.length > 0 ? (
+          <PaginationControls
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            startItem={startItem}
+            endItem={endItem}
+            totalItems={totalCategoryCount}
+            isLoading={isLoadingCategories}
+            onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+            onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+          />
+        ) : null}
+
+        {filtered.length === 0 ? (
+          <div className="rounded-[1.75rem] border border-dashed border-[var(--stocksense-brand-border)] bg-white px-6 py-12 text-center shadow-sm">
+            <div className="mx-auto grid h-20 w-20 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+              {hasActiveSearch ? (
+                <FaSearch className="h-7 w-7" />
+              ) : (
+                <FaTags className="h-8 w-8" />
+              )}
+            </div>
+            <h2 className="mt-6 text-2xl font-semibold tracking-tight text-gray-950">
+              {hasActiveSearch ? "No categories found" : "No categories yet"}
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-600">
+              {hasActiveSearch
+                ? "Try a different search term."
+                : "Create categories to organize the items stored here."}
+            </p>
+            {canEditInventory && !hasActiveSearch ? (
+              <div className="mx-auto mt-7 flex max-w-xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-center">
                 <Input
+                  id="area-detail-new-category"
                   value={newCategory}
                   onValueChange={setNewCategory}
-                  placeholder={`Add a category in ${areaName} (e.g., Fruits, Snacks)`}
+                  placeholder="Category name"
                   radius="lg"
                   variant="bordered"
-                  className="w-full lg:max-w-xl"
+                  className="sm:max-w-xs"
                   isDisabled={isSaving}
                   classNames={{
                     inputWrapper:
@@ -842,145 +1082,362 @@ export default function AreaDetailClient({
                   }}
                 />
                 <Button
-                  className="rounded-xl bg-[var(--stocksense-brand)] text-white"
+                  className="rounded-xl bg-[var(--stocksense-brand)] px-5 text-white shadow-sm"
                   onPress={handleAddCategory}
                   isDisabled={isSaving || !newCategory.trim()}
-                  startContent={<FaPlus />}
+                  isLoading={isSaving}
+                  startContent={!isSaving ? <FaPlus /> : null}
                 >
                   Add Category
                 </Button>
               </div>
+            ) : null}
+          </div>
+        ) : (
+          <AnimatePresence initial={false}>
+            {filtered.map((cat, idx) => {
+              const items = cat.items ?? [];
+              const collapsed = collapsedCategoryIds.has(String(cat.id));
 
-              {isSaving && (
-                <div className="mt-3">
-                  <Skeleton className="rounded-lg">
-                    <div className="h-3 w-44" />
-                  </Skeleton>
-                </div>
-              )}
-            </CardBody>
-          </Card>
-        </motion.div>
-      )}
-
-      {/* Categories Grid */}
-      <div className="grid auto-rows-fr grid-cols-1 gap-5 max-md:hidden lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        <AnimatePresence>
-          {filtered.map((cat, idx) => (
-            <motion.div
-              key={cat.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ duration: 0.2, delay: idx * 0.02 }}
-            >
-              <Card className="group relative h-full overflow-hidden rounded-2xl border border-white/70 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--stocksense-brand-border)] hover:shadow-lg">
-                <CardBody className="flex h-full flex-col gap-4 p-5">
-                  <div className="flex items-start justify-between gap-2">
-                    <Link href={`/categories/${cat.id}`} className="min-w-0 flex-1">
-                      <div className="flex min-w-0 items-center gap-3">
+              return (
+                <motion.article
+                  key={cat.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  transition={{ duration: 0.2, delay: idx * 0.02 }}
+                  className="group overflow-hidden rounded-[1.5rem] border border-white/70 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--stocksense-brand-border)] hover:shadow-lg"
+                >
+                  <div className="border-b border-gray-100 px-5 py-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <button
+                        type="button"
+                        onClick={() => toggleCategoryCollapsed(cat.id)}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                        aria-expanded={!collapsed}
+                      >
+                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+                          {collapsed ? (
+                            <FaChevronRight className="h-3.5 w-3.5" />
+                          ) : (
+                            <FaChevronRight className="h-3.5 w-3.5 rotate-90 transition" />
+                          )}
+                        </span>
                         {cat.imageUrl ? (
-                          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-category-border)] bg-white">
+                          <span className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white">
                             <img
                               src={cat.imageUrl}
                               alt=""
                               className="h-full w-full object-cover"
                             />
-                          </div>
+                          </span>
                         ) : (
-                          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
-                            <FaTag className="h-5 w-5" />
-                          </div>
+                          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+                            <FaTag className="h-4 w-4" />
+                          </span>
                         )}
-                        <div className="min-w-0 flex-1">
-                          <h3
-                            className="truncate text-lg font-semibold leading-6 text-gray-950"
-                            title={cat.name}
-                          >
+                        <span className="min-w-0">
+                          <span className="block truncate text-xl font-semibold leading-7 text-gray-950">
                             {cat.name}
+                          </span>
+                          <span className="mt-1 block text-sm font-medium text-gray-500">
+                            {formatCount(cat.itemsCount ?? items.length, "item")}
+                          </span>
+                        </span>
+                      </button>
+
+                      <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                        {canEditInventory && (
+                          <OpenGlobalAddItemButton
+                            canEditInventory={canEditInventory}
+                            context={{
+                              locationId: area?.location?.id,
+                              storageAreaId: area?.id,
+                              categoryId: cat.id,
+                            }}
+                            className="min-h-10 rounded-xl bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white shadow-sm"
+                          >
+                            Add Item
+                          </OpenGlobalAddItemButton>
+                        )}
+                        <Dropdown placement="bottom-end">
+                          <DropdownTrigger>
+                            <Button
+                              isIconOnly
+                              variant="light"
+                              radius="lg"
+                              isDisabled={isSaving}
+                              className="h-10 w-10 min-w-10 shrink-0 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+                              aria-label={`${cat.name} actions`}
+                            >
+                              <FaEllipsisV className="h-4 w-4" />
+                            </Button>
+                          </DropdownTrigger>
+                          <DropdownMenu aria-label={`${cat.name} actions`}>
+                            <DropdownItem
+                              key="view"
+                              onPress={() => router.push(`/categories/${cat.id}`)}
+                            >
+                              View Items
+                            </DropdownItem>
+                            {canEditInventory ? (
+                              <DropdownItem
+                                key="edit"
+                                onPress={() =>
+                                  setRenameModal({
+                                    open: true,
+                                    id: cat.id,
+                                    name: cat.name,
+                                    imageUrl: cat.imageUrl ?? null,
+                                  })
+                                }
+                              >
+                                Edit Category
+                              </DropdownItem>
+                            ) : null}
+                            {canEditInventory ? (
+                              <DropdownItem
+                                key="delete"
+                                className="text-danger"
+                                color="danger"
+                                onPress={() =>
+                                  setDeleteModal({
+                                    open: true,
+                                    id: cat.id,
+                                    name: cat.name,
+                                    busy: false,
+                                  })
+                                }
+                              >
+                                Delete Category
+                              </DropdownItem>
+                            ) : null}
+                          </DropdownMenu>
+                        </Dropdown>
+                      </div>
+                    </div>
+                  </div>
+
+                  <AnimatePresence initial={false}>
+                    {!collapsed && (
+                      <motion.div
+                        variants={collapseVariants}
+                        initial="collapsed"
+                        animate="open"
+                        exit="collapsed"
+                        className="overflow-hidden"
+                      >
+                    <div className="bg-gray-50/60 px-5 py-4">
+                      {items.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-[var(--stocksense-brand-border)] bg-white px-5 py-8 text-center">
+                          <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+                            <FaBoxOpen className="h-5 w-5" />
+                          </div>
+                          <h3 className="mt-4 text-base font-semibold text-gray-950">
+                            No items yet
                           </h3>
                           <p className="mt-1 text-sm text-gray-500">
-                            {cat.itemsCount} {cat.itemsCount === 1 ? "item" : "items"}
+                            Add your first item to this category.
                           </p>
+                          {canEditInventory ? (
+                            <OpenGlobalAddItemButton
+                              canEditInventory={canEditInventory}
+                              context={{
+                                locationId: area?.location?.id,
+                                storageAreaId: area?.id,
+                                categoryId: cat.id,
+                              }}
+                              className="mt-5 min-h-10 rounded-xl bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white shadow-sm"
+                            >
+                              Add Item
+                            </OpenGlobalAddItemButton>
+                          ) : null}
                         </div>
-                      </div>
-                    </Link>
+                      ) : (
+                        <div className="space-y-2">
+                          {items.map((item) => {
+                            const expirationDays = daysUntil(item.expiration_date);
+                            const expired = expirationDays < 0;
+                            const soon =
+                              !expired &&
+                              item.expiration_date &&
+                              isExpiringSoon(item.expiration_date, 7);
+                            const quantity = toNonNegativeInteger(item.quantity, 0);
+                            const lowStock = quantity <= 1;
 
-                    {canEditInventory && (
-                      <Dropdown placement="bottom-end">
-                        <DropdownTrigger>
-                          <Button
-                            isIconOnly
-                            variant="light"
-                            radius="lg"
-                            isDisabled={isSaving}
-                            className="h-9 w-9 min-w-9 shrink-0"
-                          >
-                            <FaEllipsisV className="text-gray-500" />
-                          </Button>
-                        </DropdownTrigger>
-                        <DropdownMenu aria-label="Category actions">
-                          <DropdownItem
-                            key="edit"
-                            onPress={() =>
-                              setRenameModal({
-                                open: true,
-                                id: cat.id,
-                                name: cat.name,
-                                imageUrl: cat.imageUrl ?? null,
-                              })
-                            }
-                          >
-                            Edit
-                          </DropdownItem>
-                          <DropdownItem
-                            key="delete"
-                            className="text-danger"
-                            color="danger"
-                            onPress={() =>
-                              setDeleteModal({ open: true, id: cat.id, name: cat.name, busy: false })
-                            }
-                          >
-                            Delete
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
+                            return (
+                              <div
+                                key={item.id}
+                                className="flex flex-col gap-3 rounded-2xl border border-white bg-white px-4 py-3 shadow-sm transition hover:border-[var(--stocksense-brand-border)] hover:bg-[var(--stocksense-brand-soft)]/25 md:flex-row md:items-center md:justify-between"
+                              >
+                                <div className="flex min-w-0 items-center gap-3">
+                                  {item.imageUrl ? (
+                                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-white">
+                                      <img
+                                        src={item.imageUrl}
+                                        alt=""
+                                        className="h-full w-full object-cover"
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+                                      <FaBoxOpen className="h-4 w-4" />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                      <p
+                                        className="truncate text-sm font-semibold text-gray-950"
+                                        title={item.name}
+                                      >
+                                        {item.name}
+                                      </p>
+                                      {(expired || soon || lowStock) && (
+                                        <span className="flex flex-wrap gap-1.5">
+                                          {(expired || soon) && (
+                                            <span className="shrink-0 rounded-full border border-[var(--entity-warning-border)] bg-[var(--entity-warning-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--entity-warning-accent)]">
+                                              {expired ? "Expired" : "Expiring Soon"}
+                                            </span>
+                                          )}
+                                          {lowStock && (
+                                            <span className="shrink-0 rounded-full border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--entity-item-accent)]">
+                                              Low Stock
+                                            </span>
+                                          )}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="mt-1 truncate text-xs text-gray-500">
+                                      {[area?.location?.name, areaName, cat.name]
+                                        .filter(Boolean)
+                                        .join(" > ")}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="flex shrink-0 flex-wrap items-center gap-3 text-xs font-medium text-gray-500">
+                                  <span>Qty {quantity}</span>
+                                  {item.expiration_date ? (
+                                    <span>Expires {formatExpiration(item.expiration_date)}</span>
+                                  ) : (
+                                    <span>No expiration</span>
+                                  )}
+                                  <Dropdown placement="bottom-end">
+                                    <DropdownTrigger>
+                                      <Button
+                                        isIconOnly
+                                        variant="light"
+                                        radius="lg"
+                                        className="h-9 w-9 min-w-9 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+                                        aria-label={`${item.name} actions`}
+                                      >
+                                        <FaEllipsisV className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownTrigger>
+                                    <DropdownMenu aria-label={`${item.name} actions`}>
+                                      <DropdownItem
+                                        key="view"
+                                        onPress={() => router.push(`/categories/${cat.id}`)}
+                                      >
+                                        View in Category
+                                      </DropdownItem>
+                                    </DropdownMenu>
+                                  </Dropdown>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                      </motion.div>
                     )}
-                  </div>
-
-                  <div className="mt-auto">
-                    <Link
-                      href={`/categories/${cat.id}`}
-                      className="inline-flex h-9 items-center gap-2 rounded-xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] px-3 text-sm font-semibold text-[var(--entity-category-accent)] hover:brightness-95"
-                    >
-                      View items
-                      <FaChevronRight className="h-3 w-3" />
-                    </Link>
-                  </div>
-                </CardBody>
-              </Card>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-
-        {filtered.length === 0 && (
-          <Card className="rounded-2xl border border-dashed border-gray-200 bg-white shadow-sm lg:col-span-2 xl:col-span-3 2xl:col-span-4">
-            <CardBody className="px-5 py-8 text-center">
-              <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
-                <FaTag className="h-6 w-6" />
-              </div>
-              <p className="mt-4 text-lg font-semibold text-gray-950">
-                No categories found
-              </p>
-              <p className="mt-1 text-sm text-gray-500">
-                {canEditInventory
-                  ? "Try a different search, or add a new category above."
-                  : "Try a different search."}
-              </p>
-            </CardBody>
-          </Card>
+                  </AnimatePresence>
+                </motion.article>
+              );
+            })}
+          </AnimatePresence>
         )}
-      </div>
+
+        {canEditInventory && filtered.length > 0 ? (
+          <div className="rounded-[1.5rem] border border-dashed border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/35 p-6 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex min-w-0 items-center gap-4">
+                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]">
+                  <FaPlus className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-lg font-semibold text-gray-950">
+                    Add another category
+                  </h2>
+                  <p className="mt-1 text-sm leading-6 text-gray-600">
+                    Create a new group inside this storage area.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Input
+                  id="area-detail-new-category"
+                  value={newCategory}
+                  onValueChange={setNewCategory}
+                  placeholder="Category name"
+                  radius="lg"
+                  variant="bordered"
+                  className="w-full sm:w-72"
+                  isDisabled={isSaving}
+                  classNames={{
+                    inputWrapper:
+                      "border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]",
+                  }}
+                />
+                <Button
+                  className="rounded-xl bg-[var(--stocksense-brand)] px-5 text-white shadow-sm"
+                  onPress={handleAddCategory}
+                  isDisabled={isSaving || !newCategory.trim()}
+                  isLoading={isSaving}
+                  startContent={!isSaving ? <FaPlus /> : null}
+                >
+                  Add Category
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="rounded-[1.5rem] border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/70 px-6 py-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-start gap-5">
+              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]">
+                <FaTags className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold text-gray-950">
+                  Tip: Keep categories helpful
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-gray-600">
+                  Use categories that make sense for how you naturally organize this storage area.
+                </p>
+                <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--stocksense-brand)]">
+                  Breakfast &bull; Cleaning &bull; Baking &bull; Tools &bull; Shelf 1 &bull; Pet Supplies &bull; Left Drawer
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {filtered.length > 0 ? (
+          <PaginationControls
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            startItem={startItem}
+            endItem={endItem}
+            totalItems={totalCategoryCount}
+            isLoading={isLoadingCategories}
+            onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+            onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+          />
+        ) : null}
+      </motion.section>
 
       {canEditInventory && (
         <Modal

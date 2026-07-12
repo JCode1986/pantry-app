@@ -2,7 +2,7 @@ import AreasPageClient from "@/components/areas/AreasPageClient";
 import { createClient } from "@/utils/supabase/server";
 import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
 import { getCanEditInventoryForUser } from "@/utils/households";
-import { addInventoryImageUrls } from "@/utils/inventoryImages";
+import { getStorageAreasPageAction } from "@/app/actions/server";
 
 export const metadata = createPageMetadata({
   title: "Areas",
@@ -18,88 +18,17 @@ export default async function Page() {
   } = await supabase.auth.getUser();
   const canEditInventory = await getCanEditInventoryForUser(user);
 
-  const { data: areasRaw, error: areasError } = await supabase
-    .from("storage_areas")
-    .select(`
-      id,
-      name,
-      image_path,
-      location_id,
-      storage_categories:storage_categories!fk_storage_area (
-        id,
-        name,
-        items:items!fk_items_category ( id )
-      )
-    `)
-    .order("name", { ascending: true });
-
-  if (areasError) {
-    console.error("Areas fetch error (message):", areasError?.message);
-    console.error("Areas fetch error (details):", areasError?.details);
-    console.error("Areas fetch error (hint):", areasError?.hint);
-    console.error("Areas fetch error (code):", areasError?.code);
-    console.error(
-      "Areas fetch error (full):",
-      JSON.stringify(areasError, null, 2)
-    );
-  }
-
-  // Fetch referenced locations in one request
-  const locationIds = [
-    ...new Set((areasRaw ?? []).map((a) => a.location_id).filter(Boolean)),
-  ];
-
-  const { data: locationsRaw, error: locationsError } = locationIds.length
-    ? await supabase.from("locations").select("id, name").in("id", locationIds)
-    : { data: [], error: null };
-
-  if (locationsError) {
-    console.error("Locations fetch error (message):", locationsError?.message);
-    console.error("Locations fetch error (details):", locationsError?.details);
-    console.error("Locations fetch error (hint):", locationsError?.hint);
-    console.error("Locations fetch error (code):", locationsError?.code);
-    console.error(
-      "Locations fetch error (full):",
-      JSON.stringify(locationsError, null, 2)
-    );
-  }
-
-  const locationMap = new Map(
-    (locationsRaw ?? []).map((l) => [String(l.id), l])
-  );
-
-  // Normalize for the client component
-  const areas = await addInventoryImageUrls((areasRaw ?? []).map((a) => {
-    const categories = a.storage_categories ?? [];
-    const categoriesCount = categories.length;
-    const itemsCount = categories.reduce(
-      (sum, c) => sum + ((c.items ?? []).length),
-      0
-    );
-
-    const loc = a.location_id ? locationMap.get(String(a.location_id)) : null;
-
-    return {
-      id: a.id,
-      name: a.name,
-      image_path: a.image_path ?? null,
-      location: loc
-        ? { id: loc.id, name: loc.name }
-        : { id: null, name: "Unknown location" },
-      categories: categories.map((c) => ({
-        id: c.id,
-        name: c.name,
-        itemsCount: (c.items ?? []).length,
-      })),
-      categoriesCount,
-      itemsCount,
-    };
-  }));
+  const [areasResult, { data: filterLocations = [] }] = await Promise.all([
+    getStorageAreasPageAction({ offset: 0, limit: 24 }),
+    supabase.from("locations").select("id, name").order("name", { ascending: true }),
+  ]);
 
   return (
-    <main className="page-enter mx-auto max-w-[1500px] px-5 py-8 md:min-h-[100vh] lg:px-6 xl:px-8 max-md:px-4 max-md:pb-0 max-md:pt-4">
+    <main className="page-enter mx-auto max-w-[1560px] px-5 py-8 md:min-h-[100vh] lg:px-6 xl:px-8 max-md:px-4 max-md:pb-0 max-md:pt-4">
       <AreasPageClient
-        initialAreas={areas}
+        initialAreas={areasResult.data.items}
+        initialTotalAreas={areasResult.data.totalCount}
+        filterLocations={filterLocations}
         canEditInventory={canEditInventory}
       />
     </main>
