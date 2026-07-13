@@ -57,7 +57,10 @@ import {
   getThemeById,
   saveStoredPreferences,
 } from "@/utils/appPreferences";
-import { updateUserPreferencesAction } from "@/app/actions/preferences";
+import {
+  updatePreferredNameAction,
+  updateUserPreferencesAction,
+} from "@/app/actions/preferences";
 import { themedSelectClassNames } from "@/components/modals/modalTheme";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 
@@ -329,6 +332,51 @@ function MobileInfoRow({ label, value }) {
         {value}
       </span>
     </div>
+  );
+}
+
+function DisplayNameForm({
+  value,
+  onValueChange,
+  onSubmit,
+  isSaving,
+  message,
+  className = "",
+}) {
+  return (
+    <form onSubmit={onSubmit} className={`space-y-3 ${className}`}>
+      <Input
+        label="Display name"
+        value={value}
+        onValueChange={onValueChange}
+        autoComplete="name"
+        placeholder="Add a display name"
+        classNames={{
+          inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
+        }}
+      />
+      <Button
+        type="submit"
+        className="h-11 w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
+        isLoading={isSaving}
+        isDisabled={isSaving}
+        startContent={<FaIdBadge className="h-3.5 w-3.5" />}
+      >
+        Save display name
+      </Button>
+      {message && (
+        <div
+          className={`rounded-xl border px-3 py-2 text-sm ${
+            message.type === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-rose-200 bg-rose-50 text-rose-700"
+          }`}
+          role={message.type === "success" ? "status" : "alert"}
+        >
+          {message.text}
+        </div>
+      )}
+    </form>
   );
 }
 
@@ -862,6 +910,9 @@ export default function ProfileClient({
   const [removeMemberCandidate, setRemoveMemberCandidate] = useState(null);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [preferredName, setPreferredName] = useState(user?.displayName ?? "");
+  const [savingPreferredName, setSavingPreferredName] = useState(false);
+  const [preferredNameMessage, setPreferredNameMessage] = useState(null);
   const [mobileBillingOpen, setMobileBillingOpen] = useState(false);
   const mobileBillingScrollTimerRef = useRef(null);
 
@@ -888,11 +939,20 @@ export default function ProfileClient({
       ? `${sharingMemberCount} members`
       : `${sharingMemberCount}/${sharingMaxMembers} members`;
   const accountStatus = user.emailConfirmed ? "Active" : "Email pending";
+  const displayNameLabel = preferredName.trim() || "No display name set";
 
   const initials = useMemo(() => {
+    const nameParts = preferredName.trim().split(/\s+/).filter(Boolean);
+    const nameInitials =
+      nameParts.length > 1
+        ? `${nameParts[0][0] ?? ""}${nameParts[nameParts.length - 1][0] ?? ""}`
+        : nameParts[0]?.slice(0, 2);
+
+    if (nameInitials) return nameInitials.toUpperCase();
+
     const email = user?.email || "";
     return email.slice(0, 2).toUpperCase() || "WK";
-  }, [user?.email]);
+  }, [preferredName, user?.email]);
 
   useEffect(() => {
     setPreferences(saveStoredPreferences(initialPreferences));
@@ -905,6 +965,10 @@ export default function ProfileClient({
   useEffect(() => {
     setRequiresPasswordSetup(Boolean(user?.requiresPasswordSetup));
   }, [user?.requiresPasswordSetup]);
+
+  useEffect(() => {
+    setPreferredName(user?.displayName ?? "");
+  }, [user?.displayName]);
 
   useEffect(() => {
     setSharing(initialSharing);
@@ -1003,6 +1067,40 @@ export default function ProfileClient({
     await navigator.clipboard.writeText(user.id);
     setCopiedUserId(true);
     window.setTimeout(() => setCopiedUserId(false), 1800);
+  };
+
+  const handlePreferredNameSubmit = async (event) => {
+    event.preventDefault();
+    setSavingPreferredName(true);
+    setPreferredNameMessage(null);
+
+    try {
+      const result = await updatePreferredNameAction(preferredName);
+      const savedName = result?.data?.name ?? preferredName.trim();
+
+      if (result?.error) {
+        setPreferredNameMessage({
+          type: "error",
+          text: result.error,
+        });
+        return;
+      }
+
+      setPreferredName(savedName);
+      setPreferredNameMessage({
+        type: "success",
+        text: savedName
+          ? "Display name saved."
+          : "Display name cleared.",
+      });
+    } catch (err) {
+      setPreferredNameMessage({
+        type: "error",
+        text: err?.message || "Could not save display name.",
+      });
+    } finally {
+      setSavingPreferredName(false);
+    }
   };
 
   const updatePreferences = async (nextPreferences) => {
@@ -1302,8 +1400,13 @@ export default function ProfileClient({
             </div>
             <div className="min-w-0 flex-1">
               <p className="break-words text-base font-semibold text-gray-950">
-                {user.email}
+                {preferredName.trim() || user.email}
               </p>
+              {preferredName.trim() ? (
+                <p className="mt-0.5 break-words text-sm text-gray-500">
+                  {user.email}
+                </p>
+              ) : null}
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
                   <p className="text-xs text-gray-500">Current plan</p>
@@ -1320,6 +1423,14 @@ export default function ProfileClient({
               </div>
             </div>
           </div>
+          <DisplayNameForm
+            value={preferredName}
+            onValueChange={setPreferredName}
+            onSubmit={handlePreferredNameSubmit}
+            isSaving={savingPreferredName}
+            message={preferredNameMessage}
+            className="mt-4 border-t border-gray-100 pt-4"
+          />
         </MobileProfileCard>
 
         {requiresPasswordSetup && <PasswordSetupNotice />}
@@ -1690,6 +1801,7 @@ export default function ProfileClient({
           summary={user.email}
         >
           <div className="rounded-xl border border-gray-200 bg-gray-50 px-3">
+            <MobileInfoRow label="Display name" value={displayNameLabel} />
             <MobileInfoRow label="Email" value={user.email} />
             <MobileInfoRow
               label="Email status"
@@ -1973,17 +2085,32 @@ export default function ProfileClient({
               </div>
             </div>
 
-            <div className="mt-5 space-y-3">
-              <DetailRow icon={FaEnvelope} label="Email" value={user.email} />
-              <DetailRow
-                icon={FaCheckCircle}
-                label="Email status"
-                value={user.emailConfirmed ? "Confirmed" : "Not confirmed"}
+            <div className="mt-5 space-y-5">
+              <DisplayNameForm
+                value={preferredName}
+                onValueChange={setPreferredName}
+                onSubmit={handlePreferredNameSubmit}
+                isSaving={savingPreferredName}
+                message={preferredNameMessage}
               />
-              <DetailRow icon={FaShieldAlt} label="Provider" value={user.provider} />
-              <DetailRow icon={FaIdBadge} label="Role" value={user.role} />
-              <DetailRow icon={FaUserCircle} label="Created" value={user.createdAtLabel} />
-              <DetailRow icon={FaClock} label="Last sign in" value={user.lastSignInLabel} />
+
+              <div className="space-y-3">
+                <DetailRow
+                  icon={FaIdBadge}
+                  label="Display name"
+                  value={displayNameLabel}
+                />
+                <DetailRow icon={FaEnvelope} label="Email" value={user.email} />
+                <DetailRow
+                  icon={FaCheckCircle}
+                  label="Email status"
+                  value={user.emailConfirmed ? "Confirmed" : "Not confirmed"}
+                />
+                <DetailRow icon={FaShieldAlt} label="Provider" value={user.provider} />
+                <DetailRow icon={FaIdBadge} label="Role" value={user.role} />
+                <DetailRow icon={FaUserCircle} label="Created" value={user.createdAtLabel} />
+                <DetailRow icon={FaClock} label="Last sign in" value={user.lastSignInLabel} />
+              </div>
             </div>
 
             {user.id && (

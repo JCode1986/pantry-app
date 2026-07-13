@@ -1863,6 +1863,7 @@ export async function getLocationStorageAreasPageAction({
   );
   const normalizedFilters = normalizeHierarchyFilters(filters);
   const supabase = await createClient();
+  const matchedAreaIds = new Set();
 
   let query = supabase
     .from('storage_areas')
@@ -1870,7 +1871,80 @@ export async function getLocationStorageAreasPageAction({
     .eq('location_id', safeLocationId);
 
   if (normalizedFilters.search) {
-    query = query.ilike('name', `%${normalizedFilters.search}%`);
+    const searchNeedle = normalizedFilters.search.toLowerCase();
+    const { data: locationAreas, error: locationAreasError } = await supabase
+      .from('storage_areas')
+      .select('id, name')
+      .eq('location_id', safeLocationId);
+
+    if (locationAreasError) {
+      console.error('getLocationStorageAreasPageAction area search error:', locationAreasError);
+      return { data: emptyPageData(), error: locationAreasError.message };
+    }
+
+    for (const area of locationAreas ?? []) {
+      if (String(area.name ?? '').toLowerCase().includes(searchNeedle)) {
+        matchedAreaIds.add(String(area.id));
+      }
+    }
+
+    const locationAreaIds = uniqueIds(locationAreas);
+    if (locationAreaIds.length) {
+      const { data: locationCategories, error: locationCategoriesError } = await supabase
+        .from('storage_categories')
+        .select('id, name, storage_area_id')
+        .in('storage_area_id', locationAreaIds);
+
+      if (locationCategoriesError) {
+        console.error(
+          'getLocationStorageAreasPageAction category search error:',
+          locationCategoriesError
+        );
+        return { data: emptyPageData(), error: locationCategoriesError.message };
+      }
+
+      const categoryAreaById = new Map();
+      for (const category of locationCategories ?? []) {
+        categoryAreaById.set(String(category.id), String(category.storage_area_id));
+        if (String(category.name ?? '').toLowerCase().includes(searchNeedle)) {
+          matchedAreaIds.add(String(category.storage_area_id));
+        }
+      }
+
+      const locationCategoryIds = uniqueIds(locationCategories);
+      if (locationCategoryIds.length) {
+        const { data: itemMatches, error: itemMatchesError } = await supabase
+          .from('items')
+          .select('category_id')
+          .in('category_id', locationCategoryIds)
+          .ilike('name', `%${normalizedFilters.search}%`);
+
+        if (itemMatchesError) {
+          console.error(
+            'getLocationStorageAreasPageAction item search error:',
+            itemMatchesError
+          );
+          return { data: emptyPageData(), error: itemMatchesError.message };
+        }
+
+        for (const item of itemMatches ?? []) {
+          const areaId = categoryAreaById.get(String(item.category_id));
+          if (areaId) matchedAreaIds.add(areaId);
+        }
+      }
+    }
+
+    if (matchedAreaIds.size === 0) {
+      return {
+        data: {
+          items: [],
+          ...pageMetadata(safeOffset, safeLimit, 0, 0),
+        },
+        error: null,
+      };
+    }
+
+    query = query.in('id', Array.from(matchedAreaIds));
   }
 
   query = applyHierarchySort(query, normalizedFilters.sortBy, 'created_at').range(

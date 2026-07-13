@@ -458,6 +458,13 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
                       >
                         Add &quot;{trimmedQuery}&quot;
                       </Button>
+                      <Button
+                        className="mt-2 min-h-11 rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
+                        variant="bordered"
+                        onPress={() => setQuery("")}
+                      >
+                        Clear search
+                      </Button>
                     </div>
                   </motion.div>
                 )}

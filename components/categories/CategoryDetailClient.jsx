@@ -63,6 +63,7 @@ import {
 import { emitInventoryChange, ITEM_ADDED_EVENT } from "@/utils/clientEvents";
 import { daysUntil, isExpiringSoon, toNonNegativeInteger } from "@/utils/pantry/date";
 import PaginationControls from "@/components/ui/PaginationControls";
+import SearchResultsLoadingState from "@/components/ui/SearchResultsLoadingState";
 
 function formatExpiration(value) {
   if (!value) return "None";
@@ -184,6 +185,7 @@ export default function CategoryDetailClient({
   const selectedCount = selectedItemIds.size;
   const allItemsSelected = items.length > 0 && selectedCount === items.length;
   const normalizedSearch = search.trim().toLowerCase();
+  const itemsLoadRequestIdRef = useRef(0);
   const requestExpirationFilter = [
     EXPIRATION_FILTERS.EXPIRED,
     EXPIRATION_FILTERS.SOON,
@@ -200,6 +202,8 @@ export default function CategoryDetailClient({
   const loadItemsPage = useCallback(
     async (page) => {
       const safePage = Math.max(1, page);
+      const requestId = itemsLoadRequestIdRef.current + 1;
+      itemsLoadRequestIdRef.current = requestId;
       setIsLoadingItems(true);
       setItemsError("");
 
@@ -218,9 +222,13 @@ export default function CategoryDetailClient({
         });
 
         if (result?.error) {
-          setItemsError(result.error);
+          if (requestId === itemsLoadRequestIdRef.current) {
+            setItemsError(result.error);
+          }
           return;
         }
+
+        if (requestId !== itemsLoadRequestIdRef.current) return;
 
         const nextItems = result?.data?.items ?? [];
         const nextTotal = result?.data?.totalCount ?? 0;
@@ -233,9 +241,13 @@ export default function CategoryDetailClient({
         );
         if (safePage > nextTotalPages) setCurrentPage(nextTotalPages);
       } catch (error) {
-        setItemsError(error?.message || "Could not load items.");
+        if (requestId === itemsLoadRequestIdRef.current) {
+          setItemsError(error?.message || "Could not load items.");
+        }
       } finally {
-        setIsLoadingItems(false);
+        if (requestId === itemsLoadRequestIdRef.current) {
+          setIsLoadingItems(false);
+        }
       }
     },
     [category?.id, normalizedSearch, requestExpirationFilter, requestStockFilter, sortBy]
@@ -266,6 +278,8 @@ export default function CategoryDetailClient({
     (safeCurrentPage - 1) * CATEGORY_ITEMS_PAGE_SIZE + items.length,
     totalItemCount
   );
+  const showSearchRestoreLoader =
+    isLoadingItems && !normalizedSearch && items.length === 0;
   const representedLocationCount = location?.id ? 1 : 0;
   const representedStorageAreaCount = area?.id ? 1 : 0;
   const expiringSoonCount = items.filter((item) => {
@@ -494,6 +508,23 @@ export default function CategoryDetailClient({
   const clearSelection = () => {
     setSelectedItemIds(new Set());
   };
+
+  const clearSearch = () => {
+    setIsLoadingItems(true);
+    setSearch("");
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = useCallback(
+    (value) => {
+      if (normalizedSearch && !value.trim() && items.length === 0) {
+        setIsLoadingItems(true);
+      }
+      setSearch(value);
+      setCurrentPage(1);
+    },
+    [items.length, normalizedSearch]
+  );
 
   const openMoveItems = (itemIds) => {
     if (!canEditInventory || itemIds.length === 0) return;
@@ -1008,7 +1039,7 @@ export default function CategoryDetailClient({
         <div className="flex flex-col gap-3">
           <Input
             value={search}
-            onValueChange={setSearch}
+            onValueChange={handleSearchChange}
             placeholder={`Search items in ${categoryName}...`}
             startContent={<FaSearch className="h-4 w-4 text-gray-400" />}
             radius="lg"
@@ -1088,15 +1119,19 @@ export default function CategoryDetailClient({
         </div>
 
         <div className="mt-3 grid gap-2">
-          <div className="relative">
-            <FaSearch className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search items"
-              className="min-h-11 w-full rounded-xl border border-gray-200 bg-white pl-9 pr-3 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-[var(--stocksense-brand)]"
-            />
-          </div>
+          <Input
+            value={search}
+            onValueChange={handleSearchChange}
+            placeholder="Search items"
+            radius="lg"
+            variant="bordered"
+            startContent={<FaSearch className="h-4 w-4 text-gray-400" />}
+            classNames={{
+              inputWrapper:
+                "min-h-11 border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]",
+              input: "text-sm text-gray-900 placeholder:text-gray-400",
+            }}
+          />
           <Select
             aria-label="Sort items"
             selectedKeys={new Set([sortBy])}
@@ -1113,24 +1148,23 @@ export default function CategoryDetailClient({
           </Select>
         </div>
 
-        {canEditInventory && items.length > 0 && (
-          <div className="mt-3 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+        {canEditInventory && selectedCount > 0 && (
+          <div className="sticky top-[4.75rem] z-30 mt-3 rounded-2xl border border-gray-200 bg-white p-3 shadow-lg">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-950">
+                <p className="text-xl font-semibold tracking-tight text-gray-950">
                   {selectedCount} selected
                 </p>
                 <p className="text-xs text-gray-500">
-                  Select items to move or delete together.
+                  Tap cards to adjust selection.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={clearSelection}
-                disabled={selectedCount === 0}
-                className="min-h-10 shrink-0 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 disabled:opacity-50"
+                className="min-h-10 shrink-0 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700"
               >
-                Clear
+                Cancel
               </button>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2">
@@ -1181,24 +1215,29 @@ export default function CategoryDetailClient({
             return (
             <article
               key={item.id}
+              role={selectedCount > 0 ? "button" : undefined}
+              tabIndex={selectedCount > 0 ? 0 : undefined}
+              onClick={selectedCount > 0 ? () => toggleSelectItem(item.id) : undefined}
+              onKeyDown={
+                selectedCount > 0
+                  ? (event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      toggleSelectItem(item.id);
+                    }
+                  : undefined
+              }
               className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${
                 isSelected
                   ? "border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]"
                   : "border-gray-200"
+              } ${
+                selectedCount > 0
+                  ? "cursor-pointer transition active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]"
+                  : ""
               }`}
             >
               <div className="flex min-w-0 gap-3 p-4">
-                {canEditInventory && (
-                  <label className="mt-5 flex h-6 w-6 shrink-0 items-center justify-center">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleSelectItem(item.id)}
-                      aria-label={`Select ${item.name}`}
-                      className="h-5 w-5 rounded border-gray-300"
-                    />
-                  </label>
-                )}
                 {item.imageUrl ? (
                   <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-item-border)] bg-white">
                     <ImageWithLoader
@@ -1229,50 +1268,102 @@ export default function CategoryDetailClient({
                     )}
                   </div>
                 </div>
+                {canEditInventory && (
+                  <div
+                    className="shrink-0"
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  >
+                    <Dropdown placement="bottom-end">
+                      <DropdownTrigger>
+                        <Button
+                          isIconOnly
+                          variant="light"
+                          radius="lg"
+                          className="h-9 w-9 min-w-9 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+                          aria-label={`${item.name} actions`}
+                        >
+                          <FaEllipsisV className="h-4 w-4" />
+                        </Button>
+                      </DropdownTrigger>
+                      <DropdownMenu aria-label={`${item.name} actions`}>
+                        <DropdownItem key="select" onPress={() => toggleSelectItem(item.id)}>
+                          {isSelected
+                            ? "Deselect for bulk action"
+                            : "Select for bulk action"}
+                        </DropdownItem>
+                        <DropdownItem
+                          key="edit"
+                          onPress={() => openEditItem(item)}
+                        >
+                          Edit Item
+                        </DropdownItem>
+                        <DropdownItem
+                          key="move"
+                          startContent={<FaArrowsAlt className="h-3.5 w-3.5" />}
+                          onPress={() => openMoveItem(item)}
+                        >
+                          Move Item
+                        </DropdownItem>
+                        <DropdownItem
+                          key="delete"
+                          className="text-danger"
+                          color="danger"
+                          startContent={<FaTrash className="h-3.5 w-3.5" />}
+                          onPress={() => openDeleteItem(item)}
+                        >
+                          Delete Item
+                        </DropdownItem>
+                      </DropdownMenu>
+                    </Dropdown>
+                  </div>
+                )}
               </div>
-
-              {canEditInventory && (
-                <div className="grid grid-cols-3 gap-2 border-t border-gray-200 bg-gray-50 p-3">
-                  <button
-                    type="button"
-                    onClick={() => openMoveItem(item)}
-                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-sm font-semibold text-[var(--stocksense-brand)]"
-                  >
-                    <FaArrowsAlt className="h-3.5 w-3.5" />
-                    Move
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openEditItem(item)}
-                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 text-sm font-semibold text-amber-700"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openDeleteItem(item)}
-                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 text-sm font-semibold text-rose-700"
-                  >
-                    Delete
-                  </button>
-                </div>
-              )}
             </article>
             );
           })}
 
           {items.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-7 text-center shadow-sm">
-              <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] text-[var(--entity-item-accent)]">
-                <FaBoxOpen className="h-6 w-6" />
+            showSearchRestoreLoader ? (
+              <SearchResultsLoadingState
+                label="Loading items"
+                detail="Restoring all items in this category."
+              />
+            ) : (
+            <div className={`rounded-2xl bg-white px-5 py-7 text-center shadow-sm ${
+              normalizedSearch
+                ? "border border-[var(--stocksense-brand-border)]"
+                : "border border-dashed border-gray-200"
+            }`}>
+              <div className={`mx-auto grid h-14 w-14 place-items-center rounded-2xl border ${
+                normalizedSearch
+                  ? "border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
+                  : "border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] text-[var(--entity-item-accent)]"
+              }`}>
+                {normalizedSearch ? (
+                  <FaSearch className="h-5 w-5" />
+                ) : (
+                  <FaBoxOpen className="h-6 w-6" />
+                )}
               </div>
               <h2 className="mt-4 text-lg font-semibold text-gray-950">
-                No items yet
+                {normalizedSearch ? "No matching items" : "No items yet"}
               </h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Add an item to start filling this category.
+              <p className="mx-auto mt-1 max-w-xs text-sm leading-5 text-gray-500">
+                {normalizedSearch
+                  ? `Nothing matched "${search.trim()}". Clear the search or try another item name.`
+                  : "Add an item to start filling this category."}
               </p>
-              {canEditInventory && (
+              {normalizedSearch ? (
+                <Button
+                  onPress={clearSearch}
+                  radius="lg"
+                  variant="bordered"
+                  className="mt-5 w-full border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] font-semibold text-[var(--stocksense-brand)]"
+                >
+                  Clear search
+                </Button>
+              ) : canEditInventory ? (
                 <div className="mt-5 flex justify-center">
                   <OpenGlobalAddItemButton
                     context={{
@@ -1282,8 +1373,9 @@ export default function CategoryDetailClient({
                     }}
                   />
                 </div>
-              )}
+              ) : null}
             </div>
+            )
           )}
         </div>
         <div className="mt-3">
@@ -1388,18 +1480,39 @@ export default function CategoryDetailClient({
             </div>
           ) : null}
 
-          {items.length === 0 ? (
+          {showSearchRestoreLoader ? (
+            <SearchResultsLoadingState
+              label="Loading items"
+              detail="Restoring all items in this category."
+              className="mt-4 px-6 py-12"
+            />
+          ) : items.length === 0 ? (
             <div className="mt-4 rounded-[1.75rem] border border-dashed border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/25 px-6 py-12 text-center">
               <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]">
-                <FaBoxOpen className="h-7 w-7" />
+                {normalizedSearch ? (
+                  <FaSearch className="h-6 w-6" />
+                ) : (
+                  <FaBoxOpen className="h-7 w-7" />
+                )}
               </div>
               <h2 className="mt-5 text-2xl font-semibold tracking-tight text-gray-950">
-                No items in this category yet
+                {normalizedSearch ? "No matching items" : "No items in this category yet"}
               </h2>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-600">
-                Add the first item and keep everything in this group easy to find.
+                {normalizedSearch
+                  ? `Nothing matched "${search.trim()}". Clear the search to see items again.`
+                  : "Add the first item and keep everything in this group easy to find."}
               </p>
-              {canEditInventory ? (
+              {normalizedSearch ? (
+                <Button
+                  onPress={clearSearch}
+                  radius="lg"
+                  variant="bordered"
+                  className="mt-7 border-[var(--stocksense-brand-border)] bg-white px-5 text-sm font-semibold text-[var(--stocksense-brand)] shadow-sm"
+                >
+                  Clear search
+                </Button>
+              ) : canEditInventory ? (
                 <OpenGlobalAddItemButton
                   context={{
                     locationId: location?.id,
@@ -1443,15 +1556,6 @@ export default function CategoryDetailClient({
                     }`}
                   >
                     <div className="flex min-w-0 items-center gap-3">
-                      {canEditInventory ? (
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleSelectItem(item.id)}
-                          aria-label={`Select ${item.name}`}
-                          className="h-4 w-4 shrink-0 cursor-pointer rounded border border-gray-300"
-                        />
-                      ) : null}
                       {item.imageUrl ? (
                         <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-[var(--entity-item-border)] bg-white">
                           <ImageWithLoader

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { getSession } from "@/lib/sessionOptions";
 import { getVerifiedSession } from "@/lib/verifiedSession";
@@ -21,6 +22,53 @@ import { getCanonicalAppUrl } from "@/utils/urlSecurity";
 
 function actionError(message) {
   return { data: null, error: message };
+}
+
+function isLocalAppOrigin(origin) {
+  try {
+    const hostname = new URL(origin).hostname;
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  } catch {
+    return false;
+  }
+}
+
+function getRequestOrigin(headersList) {
+  const forwardedHost = headersList.get("x-forwarded-host");
+  const host = forwardedHost || headersList.get("host");
+  if (!host) return null;
+
+  const forwardedProto = headersList.get("x-forwarded-proto");
+  const proto =
+    forwardedProto ||
+    (host.startsWith("localhost") || host.startsWith("127.0.0.1")
+      ? "http"
+      : "https");
+
+  try {
+    return new URL(`${proto}://${host}`).origin;
+  } catch {
+    return null;
+  }
+}
+
+async function getHouseholdAppUrl() {
+  const configuredUrl = getCanonicalAppUrl();
+
+  if (!isLocalAppOrigin(configuredUrl)) {
+    return configuredUrl;
+  }
+
+  try {
+    const requestOrigin = getRequestOrigin(await headers());
+    if (requestOrigin && !isLocalAppOrigin(requestOrigin)) {
+      return requestOrigin;
+    }
+  } catch {
+    // Keep the configured local URL for local development and non-request contexts.
+  }
+
+  return configuredUrl;
 }
 
 async function getAuthedUser() {
@@ -311,7 +359,7 @@ export async function getHouseholdSharingAction() {
 
   try {
     const admin = createAdminClient();
-    const appUrl = getCanonicalAppUrl();
+    const appUrl = await getHouseholdAppUrl();
     const { household, member } = context;
     const [{ data: members, error: membersError }, { data: invites, error: invitesError }] =
       await Promise.all([
@@ -432,7 +480,7 @@ export async function createHouseholdInviteAction(email, role = HOUSEHOLD_ROLES.
     if (inviteError) throw inviteError;
 
     revalidatePath("/profile");
-    const appUrl = getCanonicalAppUrl();
+    const appUrl = await getHouseholdAppUrl();
     const emailResult = await sendInviteEmail({
       admin,
       email: normalizedEmail,
@@ -542,7 +590,7 @@ export async function resendHouseholdInviteAction(inviteId) {
 
     if (updateError) throw updateError;
 
-    const appUrl = getCanonicalAppUrl();
+    const appUrl = await getHouseholdAppUrl();
     const emailResult = await sendInviteEmail({
       admin,
       email: invite.email,

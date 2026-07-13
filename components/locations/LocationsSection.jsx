@@ -49,6 +49,7 @@ import MobileSuggestionChips from '@/components/modals/MobileSuggestionChips';
 import MobileSheetCloseButton from '@/components/modals/MobileSheetCloseButton';
 import useDesktopAutoFocus from '@/components/modals/useDesktopAutoFocus';
 import PaginationControls from '@/components/ui/PaginationControls';
+import SearchResultsLoadingState from '@/components/ui/SearchResultsLoadingState';
 import { themedSelectClassNames } from '@/components/modals/modalTheme';
 
 const modalContentStyle = {
@@ -326,6 +327,8 @@ export default function LocationsSection({
     0
   );
   const filteredLocations = allLocations ?? [];
+  const showSearchRestoreLoader =
+    isLoadingLocations && !normalizedSearch && filteredLocations.length === 0;
   const selectedCount = selectedIds.size;
   const selectionMode = selectedCount > 0;
   const showDesktopAddLocationTile = canEditInventory && !normalizedSearch;
@@ -380,7 +383,37 @@ export default function LocationsSection({
     return `${value} ${value === 1 ? singular : plural}`;
   };
 
+  const clearSearch = () => {
+    setIsLoadingLocations(true);
+    setSearch('');
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = useCallback(
+    (value) => {
+      if (normalizedSearch && !value.trim() && allLocations.length === 0) {
+        setIsLoadingLocations(true);
+      }
+      setSearch(value);
+      setCurrentPage(1);
+    },
+    [allLocations.length, normalizedSearch]
+  );
+
   const clearSelection = () => setSelectedIds(new Set());
+
+  const toggleSelect = (locationId) => {
+    if (!canEditInventory) return;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const key = String(locationId);
+
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+
+      return next;
+    });
+  };
 
   const toggleSelectAllVisible = () => {
     if (!canEditInventory) return;
@@ -783,7 +816,7 @@ export default function LocationsSection({
           <div className="flex w-full max-w-3xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <Input
               value={search}
-              onValueChange={setSearch}
+              onValueChange={handleSearchChange}
               placeholder="Search locations"
               radius="lg"
               variant="bordered"
@@ -839,16 +872,14 @@ export default function LocationsSection({
                     Bulk actions for <span className="font-semibold">{selectedCount}</span>{' '}
                     location{selectedCount === 1 ? '' : 's'}
                   </p>
-                  <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-[var(--stocksense-brand)]">
-                    <input
-                      type="checkbox"
-                      checked={allVisibleSelected}
-                      onChange={toggleSelectAllVisible}
-                      disabled={filteredLocations.length === 0 || deleteDialog.isDeleting}
-                      className="h-4 w-4 cursor-pointer rounded border border-[var(--stocksense-brand-border)]"
-                    />
-                    Select all visible
-                  </label>
+                  <button
+                    type="button"
+                    onClick={toggleSelectAllVisible}
+                    disabled={filteredLocations.length === 0 || deleteDialog.isDeleting}
+                    className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 py-1.5 text-sm font-medium text-[var(--stocksense-brand)] hover:bg-[var(--stocksense-brand-soft)] disabled:opacity-50"
+                  >
+                    {allVisibleSelected ? 'Deselect visible' : 'Select visible'}
+                  </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button
@@ -942,7 +973,7 @@ export default function LocationsSection({
         <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
           <Input
             value={search}
-            onValueChange={setSearch}
+            onValueChange={handleSearchChange}
             placeholder="Search locations"
             radius="lg"
             variant="bordered"
@@ -968,18 +999,99 @@ export default function LocationsSection({
             ))}
           </Select>
         </div>
-        {allLocations.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-7 text-center shadow-sm">
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[var(--entity-location-border)] bg-[var(--entity-location-soft)] text-[var(--entity-location-accent)]">
-              <FaMapMarkedAlt className="h-6 w-6" />
+        {canEditInventory && selectionMode && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.985 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="sticky top-[4.75rem] z-30 mb-3 rounded-2xl border border-gray-200 bg-white p-3 shadow-lg"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-xl font-semibold tracking-tight text-gray-950">
+                  {selectedCount} selected
+                </h2>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  Tap cards to adjust selection.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="min-h-10 shrink-0 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <button
+                type="button"
+                onClick={toggleSelectAllVisible}
+                disabled={filteredLocations.length === 0 || deleteDialog.isDeleting}
+                className="min-h-11 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 text-sm font-semibold text-[var(--stocksense-brand)] disabled:opacity-50"
+              >
+                {allVisibleSelected ? 'Deselect visible' : 'Select visible'}
+              </button>
+              <span className="flex min-h-11 items-center rounded-xl border border-gray-200 bg-gray-50 px-3 text-xs font-medium text-gray-500">
+                {filteredLocations.length} visible
+              </span>
+            </div>
+
+            <Button
+              className="mt-2 min-h-11 w-full rounded-xl bg-rose-600 text-sm font-semibold text-white"
+              onPress={openBulkDeleteDialog}
+              isDisabled={selectedCount === 0 || deleteDialog.isDeleting}
+            >
+              Delete
+            </Button>
+          </motion.div>
+        )}
+        {showSearchRestoreLoader ? (
+          <SearchResultsLoadingState
+            label="Loading locations"
+            detail="Restoring all locations."
+          />
+        ) : allLocations.length === 0 ? (
+          <div
+            className={`rounded-2xl bg-white px-5 py-7 text-center shadow-sm ${
+              normalizedSearch
+                ? 'border border-[var(--stocksense-brand-border)]'
+                : 'border border-dashed border-gray-200'
+            }`}
+          >
+            <div
+              className={`mx-auto grid h-14 w-14 place-items-center rounded-2xl border ${
+                normalizedSearch
+                  ? 'border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]'
+                  : 'border-[var(--entity-location-border)] bg-[var(--entity-location-soft)] text-[var(--entity-location-accent)]'
+              }`}
+            >
+              {normalizedSearch ? (
+                <FaSearch className="h-5 w-5" />
+              ) : (
+                <FaMapMarkedAlt className="h-6 w-6" />
+              )}
             </div>
             <h2 className="mt-4 text-lg font-semibold text-gray-950">
-              No locations yet
+              {normalizedSearch ? 'No matching locations' : 'No locations yet'}
             </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Create your first place to start organizing your items.
+            <p className="mx-auto mt-1 max-w-xs text-sm leading-5 text-gray-500">
+              {normalizedSearch
+                ? `Nothing matched "${search.trim()}". Clear the search or try a different location name.`
+                : 'Create your first place to start organizing your items.'}
             </p>
-            {canEditInventory && (
+            {normalizedSearch ? (
+              <Button
+                onPress={clearSearch}
+                radius="lg"
+                variant="bordered"
+                className="mt-5 w-full border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] font-semibold text-[var(--stocksense-brand)]"
+              >
+                Clear search
+              </Button>
+            ) : canEditInventory ? (
               <Button
                 onPress={openCreateLocationModal}
                 radius="lg"
@@ -988,7 +1100,7 @@ export default function LocationsSection({
               >
                 Add location
               </Button>
-            )}
+            ) : null}
           </div>
         ) : (
           <ul className="grid gap-3">
@@ -1001,15 +1113,38 @@ export default function LocationsSection({
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.22, ease: 'easeOut' }}
               >
-                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                  <button
-                    type="button"
+                <div
+                  className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${
+                    selectedIds.has(String(loc.id))
+                      ? 'border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]'
+                      : 'border-gray-200'
+                  }`}
+                >
+                  <div
+                    role="button"
+                    tabIndex={loc._optimistic ? -1 : 0}
                     onClick={() => {
                       if (loc._optimistic) return;
+                      if (selectionMode) {
+                        toggleSelect(loc.id);
+                        return;
+                      }
                       router.push(`/locations/${loc.id}`);
                     }}
-                    disabled={Boolean(loc._optimistic)}
-                    className="flex min-h-[112px] w-full items-center gap-4 p-4 text-left opacity-100 transition active:scale-[0.99] disabled:cursor-wait"
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return;
+                      event.preventDefault();
+                      if (loc._optimistic) return;
+                      if (selectionMode) {
+                        toggleSelect(loc.id);
+                        return;
+                      }
+                      router.push(`/locations/${loc.id}`);
+                    }}
+                    aria-disabled={Boolean(loc._optimistic)}
+                    className={`flex min-h-[112px] w-full items-center gap-4 p-4 text-left opacity-100 transition active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)] ${
+                      loc._optimistic ? 'cursor-wait' : 'cursor-pointer'
+                    }`}
                   >
                     {loc.imageUrl ? (
                       <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-location-border)] bg-white">
@@ -1046,29 +1181,56 @@ export default function LocationsSection({
                       </div>
                     </div>
 
-                    <FaChevronRight className="h-4 w-4 shrink-0 text-[var(--stocksense-brand)]" />
-                  </button>
-
-                  {canEditInventory && !loc._optimistic && (
-                    <div className="grid grid-cols-2 gap-2 border-t border-gray-200 bg-gray-50 p-3">
-                      <button
-                        type="button"
-                        onClick={() => openEditLocationModal(loc)}
-                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 text-sm font-semibold text-amber-700"
+                    {canEditInventory && !loc._optimistic ? (
+                      <span
+                        className="shrink-0"
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
                       >
-                        <FaEdit className="h-3.5 w-3.5" />
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openDeleteDialog(loc)}
-                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 text-sm font-semibold text-rose-700"
-                      >
-                        <FaTrash className="h-3.5 w-3.5" />
-                        Delete
-                      </button>
-                    </div>
-                  )}
+                        <Dropdown placement="bottom-end">
+                          <DropdownTrigger>
+                            <Button
+                              isIconOnly
+                              variant="light"
+                              radius="lg"
+                              className="h-9 w-9 min-w-9 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+                              aria-label={`${loc.name} actions`}
+                            >
+                              <FaEllipsisV className="h-4 w-4" />
+                            </Button>
+                          </DropdownTrigger>
+                          <DropdownMenu aria-label={`${loc.name} actions`}>
+                            <DropdownItem
+                              key="select"
+                              onPress={() => toggleSelect(loc.id)}
+                            >
+                              {selectedIds.has(String(loc.id))
+                                ? 'Deselect for bulk action'
+                                : 'Select for bulk action'}
+                            </DropdownItem>
+                            <DropdownItem
+                              key="edit"
+                              startContent={<FaEdit className="h-3.5 w-3.5" />}
+                              onPress={() => openEditLocationModal(loc)}
+                            >
+                              Edit Location
+                            </DropdownItem>
+                            <DropdownItem
+                              key="delete"
+                              className="text-danger"
+                              color="danger"
+                              startContent={<FaTrash className="h-3.5 w-3.5" />}
+                              onPress={() => openDeleteDialog(loc)}
+                            >
+                              Delete Location
+                            </DropdownItem>
+                          </DropdownMenu>
+                        </Dropdown>
+                      </span>
+                    ) : (
+                      <FaChevronRight className="h-4 w-4 shrink-0 text-[var(--stocksense-brand)]" />
+                    )}
+                  </div>
                 </div>
               </motion.li>
             ))}
@@ -1104,8 +1266,20 @@ export default function LocationsSection({
           </div>
         ) : null}
 
-        {filteredLocations.length === 0 ? (
-          <div className="rounded-[1.75rem] border border-dashed border-[var(--stocksense-brand-border)] bg-white px-6 py-12 text-center shadow-sm">
+        {showSearchRestoreLoader ? (
+          <SearchResultsLoadingState
+            label="Loading locations"
+            detail="Restoring all locations."
+            className="px-6 py-12"
+          />
+        ) : filteredLocations.length === 0 ? (
+          <div
+            className={`rounded-[1.75rem] bg-white px-6 py-12 text-center shadow-sm ${
+              normalizedSearch
+                ? 'border border-[var(--stocksense-brand-border)]'
+                : 'border border-dashed border-[var(--stocksense-brand-border)]'
+            }`}
+          >
             <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
               {normalizedSearch ? (
                 <FaSearch className="h-6 w-6" />
@@ -1114,14 +1288,23 @@ export default function LocationsSection({
               )}
             </div>
             <h2 className="mt-5 text-2xl font-semibold tracking-tight text-gray-950">
-              {normalizedSearch ? 'No spaces match' : 'No spaces yet'}
+              {normalizedSearch ? 'No matching locations' : 'No spaces yet'}
             </h2>
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-600">
               {normalizedSearch
-                ? 'Try a different search or clear your filters.'
+                ? `Nothing matched "${search.trim()}". Clear the search to see all locations again.`
                 : 'Create your first location like a kitchen, garage, closet, or office.'}
             </p>
-            {canEditInventory && !normalizedSearch ? (
+            {normalizedSearch ? (
+              <Button
+                onPress={clearSearch}
+                radius="lg"
+                variant="bordered"
+                className="mt-7 border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-5 text-sm font-semibold text-[var(--stocksense-brand)] shadow-sm"
+              >
+                Clear search
+              </Button>
+            ) : canEditInventory ? (
               <Button
                 onPress={openCreateLocationModal}
                 radius="lg"
@@ -1151,7 +1334,11 @@ export default function LocationsSection({
                     <motion.li
                       key={loc.id}
                       variants={itemVariants}
-                      className="group relative flex h-full min-h-[25.5rem] flex-col overflow-hidden rounded-[1.5rem] border border-white/70 bg-white p-6 text-gray-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--stocksense-brand-border)] hover:shadow-lg"
+                      className={`group relative flex h-full min-h-[25.5rem] flex-col overflow-hidden rounded-[1.5rem] border bg-white p-6 text-gray-700 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--stocksense-brand-border)] hover:shadow-lg ${
+                        selectedIds.has(String(loc.id))
+                          ? 'border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]'
+                          : 'border-white/70'
+                      }`}
                     >
                       <div className="absolute inset-x-0 top-0 h-1 bg-[var(--stocksense-brand)]" />
 
@@ -1205,6 +1392,14 @@ export default function LocationsSection({
                               </Button>
                             </DropdownTrigger>
                             <DropdownMenu aria-label={`${loc.name} actions`}>
+                              <DropdownItem
+                                key="select"
+                                onPress={() => toggleSelect(loc.id)}
+                              >
+                                {selectedIds.has(String(loc.id))
+                                  ? 'Deselect for bulk action'
+                                  : 'Select for bulk action'}
+                              </DropdownItem>
                               <DropdownItem
                                 key="edit"
                                 startContent={<FaEdit className="h-3.5 w-3.5" />}
