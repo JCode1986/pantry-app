@@ -42,7 +42,6 @@ import {
   FaCamera,
   FaImage,
   FaSearch,
-  FaArrowsAlt,
   FaBoxOpen,
   FaLayerGroup,
   FaWarehouse,
@@ -52,7 +51,6 @@ import {
 } from 'react-icons/fa';
 import ConfirmDeleteModal from '@/components/modals/ConfirmDeleteModal';
 import MoveItemsModal from '@/components/items/MoveItemsModal';
-import OpenGlobalAddItemButton from '@/components/ui/OpenGlobalAddItemButton';
 import { emitInventoryChange, emitItemAdded } from '@/utils/clientEvents';
 import EntityImageManager from '@/components/inventory/EntityImageManager';
 import ImageWithLoader from '@/components/ui/ImageWithLoader';
@@ -61,6 +59,7 @@ import MobileSheetCloseButton from '@/components/modals/MobileSheetCloseButton';
 import { themedSelectClassNames } from '@/components/modals/modalTheme';
 import QuantityStepperInput from '@/components/modals/QuantityStepperInput';
 import PaginationControls from '@/components/ui/PaginationControls';
+import SearchResultsLoadingState from '@/components/ui/SearchResultsLoadingState';
 import useDesktopAutoFocus from '@/components/modals/useDesktopAutoFocus';
 import {
   daysUntil,
@@ -322,11 +321,14 @@ export default function StorageAreasSection({
   const [search, setSearch] = useState('');
   const [expSoonEnabled, setExpSoonEnabled] = useState(false);
   const [expDays, setExpDays] = useState(7);
-  const serverSearch = search.trim().toLowerCase();
+  const normalizedSearch = search.trim().toLowerCase();
+  const storageLoadRequestIdRef = useRef(0);
 
   const loadStorageAreaPage = useCallback(
     async (page) => {
       const safePage = Math.max(1, page);
+      const requestId = storageLoadRequestIdRef.current + 1;
+      storageLoadRequestIdRef.current = requestId;
       setIsLoadingStorageAreas(true);
       setStorageAreasError('');
 
@@ -335,13 +337,17 @@ export default function StorageAreasSection({
           locationId,
           offset: (safePage - 1) * LOCATION_DETAIL_PAGE_SIZE,
           limit: LOCATION_DETAIL_PAGE_SIZE,
-          filters: { search: serverSearch, sortBy },
+          filters: { search: normalizedSearch, sortBy },
         });
 
         if (result?.error) {
-          setStorageAreasError(result.error);
+          if (requestId === storageLoadRequestIdRef.current) {
+            setStorageAreasError(result.error);
+          }
           return;
         }
+
+        if (requestId !== storageLoadRequestIdRef.current) return;
 
         const nextAreas = result?.data?.items ?? [];
         const nextTotal = result?.data?.totalCount ?? 0;
@@ -354,12 +360,16 @@ export default function StorageAreasSection({
         );
         if (safePage > nextTotalPages) setCurrentPage(nextTotalPages);
       } catch (error) {
-        setStorageAreasError(error?.message || 'Could not load storage areas.');
+        if (requestId === storageLoadRequestIdRef.current) {
+          setStorageAreasError(error?.message || 'Could not load storage areas.');
+        }
       } finally {
-        setIsLoadingStorageAreas(false);
+        if (requestId === storageLoadRequestIdRef.current) {
+          setIsLoadingStorageAreas(false);
+        }
       }
     },
-    [locationId, serverSearch, sortBy]
+    [locationId, normalizedSearch, sortBy]
   );
 
   const initialStorageLoadSkippedRef = useRef(false);
@@ -376,7 +386,26 @@ export default function StorageAreasSection({
   useEffect(() => {
     setCurrentPage(1);
     setSelectedByCategory({});
-  }, [serverSearch, sortBy]);
+  }, [normalizedSearch, sortBy]);
+
+  const handleSearchChange = useCallback(
+    (value) => {
+      if (normalizedSearch && !value.trim() && storageAreas.length === 0) {
+        setIsLoadingStorageAreas(true);
+      }
+      setSearch(value);
+      setSelectedByCategory({});
+      setCurrentPage(1);
+    },
+    [normalizedSearch, storageAreas.length]
+  );
+
+  const clearSearch = () => {
+    setIsLoadingStorageAreas(true);
+    setSearch('');
+    setSelectedByCategory({});
+    setCurrentPage(1);
+  };
 
   // Move items modal state
   const [moveModal, setMoveModal] = useState({
@@ -1350,13 +1379,48 @@ export default function StorageAreasSection({
 
   const toggleSelectItem = (categoryId, itemId) => {
     if (!canEditInventory) return;
-    setSelectedByCategory((prev) => ({
-      ...prev,
-      [categoryId]: {
-        ...(prev[categoryId] || {}),
-        [itemId]: !prev[categoryId]?.[itemId],
-      },
-    }));
+    const categoryKey = String(categoryId);
+    const itemKey = String(itemId);
+
+    setSelectedByCategory((prev) => {
+      const selected = Boolean(prev[categoryKey]?.[itemKey]);
+      const nextCategorySelection = { ...(prev[categoryKey] || {}) };
+
+      if (selected) {
+        delete nextCategorySelection[itemKey];
+      } else {
+        nextCategorySelection[itemKey] = true;
+      }
+
+      return Object.keys(nextCategorySelection).length
+        ? { [categoryKey]: nextCategorySelection }
+        : {};
+    });
+  };
+
+  const selectVisibleItemsInCategory = (categoryId, items) => {
+    if (!canEditInventory) return;
+    const itemIds = (items ?? []).map((item) => String(item.id));
+    if (itemIds.length === 0) return;
+
+    setSelectedByCategory((prev) => {
+      const categoryKey = String(categoryId);
+      const current = prev[categoryKey] || {};
+      const allSelected = itemIds.every((itemId) => current[itemId]);
+
+      if (allSelected) return {};
+
+      return {
+        [categoryKey]: itemIds.reduce((next, itemId) => {
+          next[itemId] = true;
+          return next;
+        }, {}),
+      };
+    });
+  };
+
+  const clearSelectedItems = () => {
+    setSelectedByCategory({});
   };
 
   // ---------- Move items logic ----------
@@ -1551,7 +1615,6 @@ export default function StorageAreasSection({
 
 
   // ---------- Filtering ----------
-  const normalizedSearch = search.trim().toLowerCase();
   const totalPages = Math.max(
     1,
     Math.ceil(totalStorageAreaCount / LOCATION_DETAIL_PAGE_SIZE)
@@ -1565,21 +1628,7 @@ export default function StorageAreasSection({
     (safeCurrentPage - 1) * LOCATION_DETAIL_PAGE_SIZE + storageAreas.length,
     totalStorageAreaCount
   );
-  const filterItem = (item) => {
-    const nameOk =
-      !normalizedSearch || containsQuery(item.name, normalizedSearch);
-    const expOk =
-      !expSoonEnabled || isExpiringSoon(item.expiration_date, expDays);
-    return nameOk && expOk;
-  };
-
-  const filterCategoryVisible = (category) => {
-    const nameMatch =
-      !normalizedSearch || containsQuery(category.name, normalizedSearch);
-    if (nameMatch) return true;
-    return (category.items || []).some(filterItem);
-  };
-
+  const hierarchyFiltersActive = Boolean(normalizedSearch || expSoonEnabled);
   const activeMobileCategory = useMemo(() => {
     if (!mobileCategorySheet) return null;
 
@@ -1592,56 +1641,112 @@ export default function StorageAreasSection({
 
     if (!area || !category) return null;
 
+    const areaNameMatches =
+      normalizedSearch && containsQuery(area.name, normalizedSearch);
+    const categoryNameMatches =
+      normalizedSearch && containsQuery(category.name, normalizedSearch);
+
+    const items = (category.items ?? []).filter((item) => {
+      if (expSoonEnabled && !isExpiringSoon(item.expiration_date, expDays)) {
+        return false;
+      }
+      if (!normalizedSearch || areaNameMatches || categoryNameMatches) {
+        return true;
+      }
+      return containsQuery(item.name, normalizedSearch);
+    });
+
     return {
       area,
       category,
-      items: (category.items ?? []).filter(filterItem),
+      items,
     };
   }, [mobileCategorySheet, storageAreas, normalizedSearch, expSoonEnabled, expDays]);
 
-  const desktopStorageAreas = (storageAreas ?? [])
-    .map((area) => {
-      const filtersActive = Boolean(normalizedSearch || expSoonEnabled);
-      const areaNameMatches =
-        normalizedSearch && containsQuery(area.name, normalizedSearch);
-      const categories = (area.categories ?? [])
-        .map((category) => {
-          const categoryNameMatches =
-            normalizedSearch && containsQuery(category.name, normalizedSearch);
-          const items = (category.items ?? []).filter((item) => {
-            if (expSoonEnabled && !isExpiringSoon(item.expiration_date, expDays)) {
-              return false;
-            }
-            if (!normalizedSearch || areaNameMatches || categoryNameMatches) {
-              return true;
-            }
-            return containsQuery(item.name, normalizedSearch);
-          });
-          const shouldShowCategory =
-            !filtersActive || areaNameMatches || categoryNameMatches || items.length > 0;
+  const visibleStorageAreas = useMemo(
+    () =>
+      (storageAreas ?? [])
+        .map((area) => {
+          const filtersActive = Boolean(normalizedSearch || expSoonEnabled);
+          const areaNameMatches =
+            normalizedSearch && containsQuery(area.name, normalizedSearch);
+          const categories = (area.categories ?? [])
+            .map((category) => {
+              const categoryNameMatches =
+                normalizedSearch && containsQuery(category.name, normalizedSearch);
+              const items = (category.items ?? []).filter((item) => {
+                if (expSoonEnabled && !isExpiringSoon(item.expiration_date, expDays)) {
+                  return false;
+                }
+                if (!normalizedSearch || areaNameMatches || categoryNameMatches) {
+                  return true;
+                }
+                return containsQuery(item.name, normalizedSearch);
+              });
+              const shouldShowCategory =
+                !filtersActive || areaNameMatches || categoryNameMatches || items.length > 0;
 
-          return shouldShowCategory ? { ...category, visibleItems: items } : null;
+              return shouldShowCategory ? { ...category, visibleItems: items } : null;
+            })
+            .filter(Boolean);
+
+          const areaItemCount = (area.categories ?? []).reduce(
+            (sum, category) => sum + (category.items?.length ?? 0),
+            0
+          );
+          const shouldShowArea =
+            !filtersActive
+              ? true
+              : areaNameMatches || categories.length > 0;
+
+          return shouldShowArea
+            ? {
+                ...area,
+                visibleCategories: categories,
+                areaItemCount,
+              }
+            : null;
         })
-        .filter(Boolean);
+        .filter(Boolean),
+    [storageAreas, normalizedSearch, expSoonEnabled, expDays]
+  );
+  const showSearchRestoreLoader =
+    isLoadingStorageAreas &&
+    !hierarchyFiltersActive &&
+    storageAreas.length === 0 &&
+    visibleStorageAreas.length === 0;
 
-      const areaItemCount = (area.categories ?? []).reduce(
-        (sum, category) => sum + (category.items?.length ?? 0),
-        0
-      );
-      const shouldShowArea =
-        !filtersActive
-          ? true
-          : areaNameMatches || categories.length > 0;
+  const selectedBulkContext = useMemo(() => {
+    for (const area of visibleStorageAreas ?? []) {
+      for (const category of area.visibleCategories ?? []) {
+        const selectedMap = selectedByCategory[String(category.id)] || {};
+        const itemIds = Object.keys(selectedMap).filter((itemId) => selectedMap[itemId]);
+        if (itemIds.length === 0) continue;
 
-      return shouldShowArea
-        ? {
-            ...area,
-            visibleCategories: categories,
-            areaItemCount,
-          }
-        : null;
-    })
-    .filter(Boolean);
+        const visibleItems = category.visibleItems ?? [];
+
+        return {
+          area,
+          category,
+          itemIds,
+          visibleItems,
+          allVisibleSelected:
+            visibleItems.length > 0 &&
+            visibleItems.every((item) => selectedMap[String(item.id)]),
+        };
+      }
+    }
+
+    return null;
+  }, [visibleStorageAreas, selectedByCategory]);
+
+  const activeMobileSelectionContext =
+    activeMobileCategory &&
+    selectedBulkContext &&
+    String(activeMobileCategory.category.id) ===
+      String(selectedBulkContext.category.id)
+      ? selectedBulkContext
+      : null;
 
   // ---------- UI ----------
   return (
@@ -1649,7 +1754,7 @@ export default function StorageAreasSection({
       variants={pageVariants}
       initial="hidden"
       animate="show"
-      className="space-y-6 transition-all duration-150"
+      className="space-y-6 pb-28 transition-all duration-150"
     >
       {limitNotice && (
         <motion.div
@@ -1672,6 +1777,91 @@ export default function StorageAreasSection({
           {storageAreasError}
         </div>
       ) : null}
+
+      {canEditInventory && (
+        <AnimatePresence initial={false}>
+          {selectedBulkContext ? (
+            <motion.div
+              key="location-category-bulk-actions"
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.98 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              className="pointer-events-none fixed inset-x-0 bottom-6 z-[70] px-4 max-md:hidden"
+            >
+              <div className="pointer-events-auto mx-auto max-w-2xl rounded-2xl border border-[var(--stocksense-brand-border)] bg-white p-3 shadow-2xl shadow-slate-900/20">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-gray-950">
+                      {selectedBulkContext.itemIds.length} selected in{' '}
+                      {selectedBulkContext.category.name}
+                    </p>
+                    <p className="truncate text-xs text-gray-500">
+                      {selectedBulkContext.area.name} | {locationName}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
+                      onPress={() =>
+                        selectVisibleItemsInCategory(
+                          selectedBulkContext.category.id,
+                          selectedBulkContext.visibleItems
+                        )
+                      }
+                      isDisabled={selectedBulkContext.visibleItems.length === 0}
+                    >
+                      {selectedBulkContext.allVisibleSelected
+                        ? 'Deselect visible'
+                        : 'Select visible'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      className="rounded-xl border border-gray-200 bg-white text-gray-700"
+                      onPress={clearSelectedItems}
+                    >
+                      Clear
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="rounded-xl bg-[var(--stocksense-brand)] text-white"
+                      onPress={() =>
+                        openMoveModal(
+                          selectedBulkContext.area.id,
+                          selectedBulkContext.category.id
+                        )
+                      }
+                    >
+                      Move
+                    </Button>
+                    <Button
+                      size="sm"
+                      color="danger"
+                      variant="flat"
+                      className="rounded-xl"
+                      onPress={() =>
+                        openDeleteDialog('bulk-items', {
+                          itemIds: selectedBulkContext.itemIds,
+                          categoryId: selectedBulkContext.category.id,
+                          storageAreaId: selectedBulkContext.area.id,
+                          categoryName: selectedBulkContext.category.name,
+                          areaName: selectedBulkContext.area.name,
+                          count: selectedBulkContext.itemIds.length,
+                        })
+                      }
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      )}
 
       {/* Desktop overview and tools */}
       <motion.section variants={pageItemVariants} className="max-md:hidden">
@@ -1707,8 +1897,8 @@ export default function StorageAreasSection({
           <div className="grid max-w-6xl gap-3">
             <Input
               value={search}
-              onValueChange={setSearch}
-              placeholder={`Search items inside ${locationName}...`}
+              onValueChange={handleSearchChange}
+              placeholder={`Search areas, categories, or items in ${locationName}...`}
               radius="lg"
               variant="bordered"
               className="w-full max-w-md"
@@ -1789,8 +1979,18 @@ export default function StorageAreasSection({
       </motion.section>
 
       {/* Mobile hierarchy */}
-      <motion.div variants={pageVariants} className="grid grid-cols-1 gap-3 md:hidden">
-        <motion.div variants={pageItemVariants} className="flex items-end justify-between gap-3">
+      <motion.div
+        variants={pageVariants}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 gap-3 md:hidden"
+      >
+        <motion.div
+          variants={pageItemVariants}
+          initial="hidden"
+          animate="show"
+          className="flex items-end justify-between gap-3"
+        >
           <div>
             <h2 className="text-base font-semibold text-gray-950">
               Storage areas
@@ -1809,6 +2009,20 @@ export default function StorageAreasSection({
           )}
         </motion.div>
 
+        <Input
+          value={search}
+          onValueChange={handleSearchChange}
+          placeholder={`Search ${locationName}`}
+          radius="lg"
+          variant="bordered"
+          startContent={<FaSearch className="h-4 w-4 text-gray-400" />}
+          classNames={{
+            inputWrapper:
+              'min-h-11 border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]',
+            input: 'text-sm text-gray-900 placeholder:text-gray-400',
+          }}
+        />
+
         <Select
           aria-label="Sort storage areas"
           selectedKeys={new Set([sortBy])}
@@ -1824,9 +2038,17 @@ export default function StorageAreasSection({
           ))}
         </Select>
 
-        {storageAreas.length === 0 && (
+        {showSearchRestoreLoader ? (
+          <SearchResultsLoadingState
+            label="Loading inventory"
+            detail="Restoring everything in this location."
+          />
+        ) : storageAreas.length === 0 && !hierarchyFiltersActive ? (
           <motion.div
             variants={pageItemVariants}
+            initial="hidden"
+            animate="show"
+            exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
             className="rounded-2xl border border-dashed border-gray-200 bg-white p-6 text-center shadow-sm"
           >
             <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]">
@@ -1836,17 +2058,10 @@ export default function StorageAreasSection({
               No storage areas yet
             </h2>
             <p className="mt-2 text-sm text-gray-500">
-              Add an item or create the first storage area for this location.
+              Create the first storage area for this location.
             </p>
             {canEditInventory && (
-              <div className="mt-4 grid gap-2">
-                <OpenGlobalAddItemButton
-                  canEditInventory={canEditInventory}
-                  context={{ locationId }}
-                  className="rounded-xl bg-[var(--stocksense-brand)] text-white"
-                >
-                  Add item here
-                </OpenGlobalAddItemButton>
+              <div className="mt-4">
                 <button
                   onClick={openCreateAreaModal}
                   className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-[var(--stocksense-brand)] shadow-sm"
@@ -1856,33 +2071,48 @@ export default function StorageAreasSection({
               </div>
             )}
           </motion.div>
-        )}
+        ) : visibleStorageAreas.length === 0 ? (
+          <motion.div
+            variants={pageItemVariants}
+            initial="hidden"
+            animate="show"
+            exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
+            className="rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm"
+          >
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+              <FaSearch className="h-5 w-5" />
+            </div>
+            <h2 className="mt-4 text-lg font-semibold text-gray-950">
+              No matching inventory
+            </h2>
+            <p className="mt-2 text-sm text-gray-500">
+              {normalizedSearch
+                ? `Nothing matched "${search.trim()}". Clear the search or try a different term.`
+                : 'Try another search or adjust the expiration filter.'}
+            </p>
+            {normalizedSearch ? (
+              <Button
+                onPress={clearSearch}
+                radius="lg"
+                variant="bordered"
+                className="mt-5 w-full border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] font-semibold text-[var(--stocksense-brand)]"
+              >
+                Clear search
+              </Button>
+            ) : null}
+          </motion.div>
+        ) : (
+          visibleStorageAreas.map((area) => {
+            const visibleCategories = area.visibleCategories ?? [];
+            const areaItemCount = area.areaItemCount ?? 0;
 
-        {storageAreas.map((area) => {
-          const areaNameMatches =
-            normalizedSearch && containsQuery(area.name, normalizedSearch);
-          const visibleCategories = areaNameMatches
-            ? area.categories || []
-            : (area.categories || []).filter((category) =>
-                filterCategoryVisible(category)
-              );
-          const areaItemCount = (area.categories || []).reduce(
-            (sum, category) => sum + (category.items?.length || 0),
-            0
-          );
-
-          if (
-            (normalizedSearch || expSoonEnabled) &&
-            !areaNameMatches &&
-            visibleCategories.length === 0
-          ) {
-            return null;
-          }
-
-          return (
+            return (
             <motion.article
               key={area.id}
               variants={pageItemVariants}
+              initial="hidden"
+              animate="show"
+              exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
               className="overflow-hidden rounded-2xl border border-stocksense-gray bg-white shadow-sm"
             >
               <div className="border-t-4 border-[var(--entity-area-accent)] p-4">
@@ -1928,15 +2158,7 @@ export default function StorageAreasSection({
                 </div>
 
                 {canEditInventory && (
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    <OpenGlobalAddItemButton
-                      canEditInventory={canEditInventory}
-                      context={{ locationId, storageAreaId: area.id }}
-                      variant="flat"
-                      className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-2 text-xs text-[var(--stocksense-brand)]"
-                    >
-                      Add
-                    </OpenGlobalAddItemButton>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
                     <button
                       onClick={() => openEditAreaModal(area)}
                       className="inline-flex h-9 items-center justify-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700"
@@ -1971,13 +2193,13 @@ export default function StorageAreasSection({
                     <div className="space-y-2 border-t border-gray-100 bg-gray-50/70 p-3">
                       {visibleCategories.length === 0 ? (
                         <div className="rounded-xl border border-dashed border-gray-200 bg-white px-3 py-4 text-center text-sm text-gray-500">
-                          {search || expSoonEnabled
+                          {normalizedSearch || expSoonEnabled
                             ? 'No matching categories or items.'
                             : 'No categories yet.'}
                         </div>
                       ) : (
                         visibleCategories.map((category) => {
-                          const items = (category.items || []).filter(filterItem);
+                          const items = category.visibleItems ?? [];
 
                           return (
                             <button
@@ -2033,8 +2255,9 @@ export default function StorageAreasSection({
                 )}
               </AnimatePresence>
             </motion.article>
-          );
-        })}
+            );
+          })
+        )}
         <PaginationControls
           currentPage={safeCurrentPage}
           totalPages={totalPages}
@@ -2074,7 +2297,13 @@ export default function StorageAreasSection({
           </div>
 
           <div className="mt-5 space-y-4">
-        {storageAreas.length === 0 ? (
+        {showSearchRestoreLoader ? (
+          <SearchResultsLoadingState
+            label="Loading inventory"
+            detail="Restoring everything in this location."
+            className="p-10"
+          />
+        ) : storageAreas.length === 0 && !hierarchyFiltersActive ? (
           <motion.div
             variants={pageItemVariants}
             className="rounded-2xl border border-dashed border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/35 p-10 text-center"
@@ -2099,7 +2328,7 @@ export default function StorageAreasSection({
               </button>
             )}
           </motion.div>
-        ) : desktopStorageAreas.length === 0 ? (
+        ) : visibleStorageAreas.length === 0 ? (
           <motion.div
             variants={pageItemVariants}
             className="rounded-2xl border border-white/70 bg-gray-50/60 p-8 text-center"
@@ -2111,11 +2340,23 @@ export default function StorageAreasSection({
               No matching inventory
             </h2>
             <p className="mt-1 text-sm text-gray-500">
-              Try another search or adjust the expiration filter.
+              {normalizedSearch
+                ? `Nothing matched "${search.trim()}". Clear the search to see this location again.`
+                : 'Try another search or adjust the expiration filter.'}
             </p>
+            {normalizedSearch ? (
+              <Button
+                onPress={clearSearch}
+                radius="lg"
+                variant="bordered"
+                className="mt-5 border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-5 text-sm font-semibold text-[var(--stocksense-brand)]"
+              >
+                Clear search
+              </Button>
+            ) : null}
           </motion.div>
         ) : (
-          desktopStorageAreas.map((area, areaIndex) => (
+          visibleStorageAreas.map((area, areaIndex) => (
             <motion.article
               key={area.id}
               initial={{ opacity: 0, y: 10, scale: 0.98 }}
@@ -2259,8 +2500,6 @@ export default function StorageAreasSection({
                         ) : (
                           area.visibleCategories.map((category, categoryIndex) => {
                       const items = category.visibleItems ?? [];
-                      const selectedMap = selectedByCategory[category.id] || {};
-                      const selectedCount = Object.values(selectedMap).filter(Boolean).length;
 
                       return (
                         <motion.section
@@ -2374,60 +2613,20 @@ export default function StorageAreasSection({
                                 exit="collapsed"
                                 className="overflow-hidden"
                               >
-                                {canEditInventory && selectedCount > 0 && (
-                                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-2">
-                                    <p className="text-xs font-semibold text-[var(--stocksense-brand)]">
-                                      {selectedCount} selected
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => openMoveModal(area.id, category.id)}
-                                        className="inline-flex h-8 items-center rounded-lg bg-white px-3 text-xs font-semibold text-[var(--stocksense-brand)] shadow-sm"
-                                      >
-                                        Move selected
-                                      </button>
-                                      <Button
-                                        size="sm"
-                                        color="danger"
-                                        variant="flat"
-                                        className="h-8 rounded-lg px-3 text-xs font-semibold"
-                                        onPress={() => {
-                                          const ids = Object.keys(selectedMap).filter(
-                                            (key) => selectedMap[key]
-                                          );
-                                          if (!ids.length) return;
-
-                                          openDeleteDialog('bulk-items', {
-                                            itemIds: ids,
-                                            categoryId: category.id,
-                                            storageAreaId: area.id,
-                                            categoryName: category.name,
-                                            areaName: area.name,
-                                            count: ids.length,
-                                          });
-                                        }}
-                                      >
-                                        Delete selected
-                                      </Button>
-                                    </div>
-                                  </div>
-                                )}
-
                                 <div className="mt-3 space-y-2">
                                   {items.length === 0 ? (
                                     <div className="rounded-2xl border border-dashed border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/25 px-5 py-6 text-center">
                                       <h4 className="text-sm font-semibold text-gray-950">
-                                        {search || expSoonEnabled
+                                        {normalizedSearch || expSoonEnabled
                                           ? 'No matching items'
                                           : 'No items yet'}
                                       </h4>
                                       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-600">
-                                        {search || expSoonEnabled
+                                        {normalizedSearch || expSoonEnabled
                                           ? 'Try another search or adjust the expiration filter.'
                                           : 'Add the first item to this category.'}
                                       </p>
-                                      {canEditInventory && !search && !expSoonEnabled ? (
+                                      {canEditInventory && !normalizedSearch && !expSoonEnabled ? (
                                         <button
                                           type="button"
                                           onClick={() => openCreateItemModal(area, category)}
@@ -2461,24 +2660,13 @@ export default function StorageAreasSection({
                                       duration: 0.18,
                                       delay: itemIndex * 0.015,
                                     }}
-                                    className={`flex items-center justify-between gap-3 rounded-2xl border bg-white px-3 py-3 shadow-sm transition hover:border-[var(--stocksense-brand-border)] hover:shadow-md ${
+                                    className={`flex items-start justify-between gap-3 rounded-2xl border bg-white px-3 py-3 shadow-sm transition hover:border-[var(--stocksense-brand-border)] hover:shadow-md ${
                                       selected
                                         ? 'border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]'
                                         : 'border-white/70'
                                     }`}
                                   >
                                     <div className="flex min-w-0 items-center gap-3">
-                                      {canEditInventory && (
-                                        <input
-                                          type="checkbox"
-                                          checked={selected}
-                                          onChange={() =>
-                                            toggleSelectItem(category.id, item.id)
-                                          }
-                                          className="h-4 w-4 shrink-0 cursor-pointer rounded border border-gray-300"
-                                          aria-label={`Select ${item.name}`}
-                                        />
-                                      )}
                                       {item.imageUrl ? (
                                         <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-white">
                                           <ImageWithLoader
@@ -2541,6 +2729,16 @@ export default function StorageAreasSection({
                                           </Button>
                                         </DropdownTrigger>
                                         <DropdownMenu aria-label={`${item.name} actions`}>
+                                          <DropdownItem
+                                            key="select"
+                                            onPress={() =>
+                                              toggleSelectItem(category.id, item.id)
+                                            }
+                                          >
+                                            {selected
+                                              ? 'Deselect for bulk action'
+                                              : 'Select for bulk action'}
+                                          </DropdownItem>
                                           <DropdownItem
                                             key="view"
                                             onPress={() =>
@@ -2678,7 +2876,7 @@ export default function StorageAreasSection({
         }}
       >
         <ModalContent
-          className={`${modalContentClass} max-h-[88svh] rounded-b-none sm:rounded-2xl`}
+          className={`${modalContentClass} max-h-[88svh] max-md:h-[88svh] max-md:max-h-[88svh] max-md:rounded-b-none max-md:rounded-t-3xl sm:rounded-2xl`}
           style={modalContentStyle}
         >
           {() => (
@@ -2697,40 +2895,165 @@ export default function StorageAreasSection({
 
               <ModalBody className={`space-y-3 ${modalBodyClass}`}>
                 {canEditInventory && activeMobileCategory && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => {
-                        openCreateItemModal(
-                          activeMobileCategory.area,
-                          activeMobileCategory.category
-                        );
-                      }}
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--stocksense-brand)] px-3 text-sm font-medium text-white"
-                    >
-                      <FaBoxOpen /> Add item
-                    </button>
-                    <button
-                      onClick={() =>
-                        openEditCategoryModal(
-                          activeMobileCategory.area,
-                          activeMobileCategory.category
-                        )
-                      }
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-medium text-amber-700"
-                    >
-                      <FaEdit /> Edit category
-                    </button>
-                  </div>
+                  <AnimatePresence initial={false} mode="wait">
+                    {activeMobileSelectionContext ? (
+                      <motion.div
+                        key="location-mobile-category-selection"
+                        initial={{ opacity: 0, y: -6, scale: 0.985 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -6, scale: 0.985 }}
+                        transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                        className="sticky top-3 z-10 rounded-2xl border border-gray-200 bg-white p-3 shadow-lg"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <h2 className="text-xl font-semibold tracking-tight text-gray-950">
+                              {activeMobileSelectionContext.itemIds.length} selected
+                            </h2>
+                            <p className="mt-0.5 text-xs text-gray-500">
+                              Tap cards to adjust selection.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={clearSelectedItems}
+                            className="min-h-10 shrink-0 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              selectVisibleItemsInCategory(
+                                activeMobileSelectionContext.category.id,
+                                activeMobileSelectionContext.visibleItems
+                              )
+                            }
+                            disabled={activeMobileSelectionContext.visibleItems.length === 0}
+                            className="min-h-11 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 text-sm font-semibold text-[var(--stocksense-brand)] disabled:opacity-50"
+                          >
+                            {activeMobileSelectionContext.allVisibleSelected
+                              ? 'Deselect visible'
+                              : 'Select visible'}
+                          </button>
+                          <span className="flex min-h-11 items-center rounded-xl border border-gray-200 bg-gray-50 px-3 text-xs font-medium text-gray-500">
+                            {activeMobileSelectionContext.visibleItems.length} visible
+                          </span>
+                        </div>
+
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <Button
+                            className="min-h-11 rounded-xl bg-[var(--stocksense-brand)] text-sm font-semibold text-white"
+                            onPress={() =>
+                              openMoveModal(
+                                activeMobileSelectionContext.area.id,
+                                activeMobileSelectionContext.category.id
+                              )
+                            }
+                            isDisabled={activeMobileSelectionContext.itemIds.length === 0}
+                          >
+                            Move
+                          </Button>
+                          <Button
+                            className="min-h-11 rounded-xl bg-rose-600 text-sm font-semibold text-white"
+                            onPress={() =>
+                              openDeleteDialog('bulk-items', {
+                                itemIds: activeMobileSelectionContext.itemIds,
+                                categoryId: activeMobileSelectionContext.category.id,
+                                storageAreaId: activeMobileSelectionContext.area.id,
+                                categoryName: activeMobileSelectionContext.category.name,
+                                areaName: activeMobileSelectionContext.area.name,
+                                count: activeMobileSelectionContext.itemIds.length,
+                              })
+                            }
+                            isDisabled={activeMobileSelectionContext.itemIds.length === 0}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="location-mobile-category-default"
+                        initial={{ opacity: 0, y: 6, scale: 0.995 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 6, scale: 0.995 }}
+                        transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                        className="grid grid-cols-2 gap-2"
+                      >
+                        <button
+                          onClick={() => {
+                            openCreateItemModal(
+                              activeMobileCategory.area,
+                              activeMobileCategory.category
+                            );
+                          }}
+                          className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--stocksense-brand)] px-3 text-sm font-medium text-white"
+                        >
+                          <FaBoxOpen /> Add item
+                        </button>
+                        <button
+                          onClick={() =>
+                            openEditCategoryModal(
+                              activeMobileCategory.area,
+                              activeMobileCategory.category
+                            )
+                          }
+                          className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-medium text-amber-700"
+                        >
+                          <FaEdit /> Edit category
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 )}
 
                 {activeMobileCategory?.items?.length ? (
                   activeMobileCategory.items.map((item) => {
                     const soon = isExpiringSoon(item.expiration_date, expDays);
+                    const selected = Boolean(
+                      selectedByCategory[activeMobileCategory.category.id]?.[item.id]
+                    );
 
                     return (
                       <div
                         key={item.id}
-                        className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm"
+                        role={activeMobileSelectionContext ? 'button' : undefined}
+                        tabIndex={activeMobileSelectionContext ? 0 : undefined}
+                        onClick={
+                          activeMobileSelectionContext
+                            ? () =>
+                                toggleSelectItem(
+                                  activeMobileCategory.category.id,
+                                  item.id
+                                )
+                            : undefined
+                        }
+                        onKeyDown={
+                          activeMobileSelectionContext
+                            ? (event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault();
+                                  toggleSelectItem(
+                                    activeMobileCategory.category.id,
+                                    item.id
+                                  );
+                                }
+                              }
+                            : undefined
+                        }
+                        className={`rounded-2xl border bg-white p-3 shadow-sm ${
+                          selected
+                            ? 'border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]'
+                            : 'border-gray-100'
+                        } ${
+                          activeMobileSelectionContext
+                            ? 'cursor-pointer transition active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]'
+                            : ''
+                        }`}
                       >
                         <div className="flex min-w-0 gap-3">
                           {item.imageUrl ? (
@@ -2771,54 +3094,85 @@ export default function StorageAreasSection({
                               )}
                             </div>
                           </div>
-                        </div>
 
-                        {canEditInventory && activeMobileCategory && (
-                          <div className="mt-3 grid grid-cols-3 gap-2">
-                            <button
-                              onClick={() =>
-                                openMoveModal(
-                                  activeMobileCategory.area.id,
-                                  activeMobileCategory.category.id,
-                                  item.id
-                                )
-                              }
-                              className="inline-flex h-9 items-center justify-center rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
-                              title="Move item"
+                          {canEditInventory && activeMobileCategory && (
+                            <div
+                              className="shrink-0"
+                              onClick={(event) => event.stopPropagation()}
+                              onKeyDown={(event) => event.stopPropagation()}
                             >
-                              <FaArrowsAlt />
-                            </button>
-                            <button
-                              onClick={() =>
-                                openEditItemModal(
-                                  activeMobileCategory.area,
-                                  activeMobileCategory.category,
-                                  item
-                                )
-                              }
-                              className="inline-flex h-9 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700"
-                              title="Edit item"
-                            >
-                              <FaEdit />
-                            </button>
-                            <button
-                              onClick={() =>
-                                openDeleteDialog('item', {
-                                  itemId: item.id,
-                                  itemName: item.name,
-                                  categoryId: activeMobileCategory.category.id,
-                                  storageAreaId: activeMobileCategory.area.id,
-                                  categoryName: activeMobileCategory.category.name,
-                                  areaName: activeMobileCategory.area.name,
-                                })
-                              }
-                              className="inline-flex h-9 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
-                              title="Delete item"
-                            >
-                              <FaTrash />
-                            </button>
-                          </div>
-                        )}
+                            <Dropdown placement="bottom-end">
+                              <DropdownTrigger>
+                                <Button
+                                  isIconOnly
+                                  variant="light"
+                                  radius="lg"
+                                  className="h-9 w-9 min-w-9 shrink-0 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+                                  aria-label={`${item.name} actions`}
+                                >
+                                  <FaEllipsisV className="h-4 w-4" />
+                                </Button>
+                              </DropdownTrigger>
+                              <DropdownMenu aria-label={`${item.name} actions`}>
+                                <DropdownItem
+                                  key="select"
+                                  onPress={() =>
+                                    toggleSelectItem(
+                                      activeMobileCategory.category.id,
+                                      item.id
+                                    )
+                                  }
+                                >
+                                  {selected
+                                    ? 'Deselect for bulk action'
+                                    : 'Select for bulk action'}
+                                </DropdownItem>
+                                <DropdownItem
+                                  key="edit"
+                                  onPress={() =>
+                                    openEditItemModal(
+                                      activeMobileCategory.area,
+                                      activeMobileCategory.category,
+                                      item
+                                    )
+                                  }
+                                >
+                                  Edit Item
+                                </DropdownItem>
+                                <DropdownItem
+                                  key="move"
+                                  onPress={() =>
+                                    openMoveModal(
+                                      activeMobileCategory.area.id,
+                                      activeMobileCategory.category.id,
+                                      item.id
+                                    )
+                                  }
+                                >
+                                  Move Item
+                                </DropdownItem>
+                                <DropdownItem
+                                  key="delete"
+                                  className="text-danger"
+                                  color="danger"
+                                  onPress={() =>
+                                    openDeleteDialog('item', {
+                                      itemId: item.id,
+                                      itemName: item.name,
+                                      categoryId: activeMobileCategory.category.id,
+                                      storageAreaId: activeMobileCategory.area.id,
+                                      categoryName: activeMobileCategory.category.name,
+                                      areaName: activeMobileCategory.area.name,
+                                    })
+                                  }
+                                >
+                                  Delete Item
+                                </DropdownItem>
+                              </DropdownMenu>
+                            </Dropdown>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     );
                   })
@@ -2845,16 +3199,6 @@ export default function StorageAreasSection({
                   </button>
                 )}
               </ModalBody>
-
-              <ModalFooter className={modalFooterClass}>
-                <Button
-                  variant="light"
-                  radius="lg"
-                  onPress={() => setMobileCategorySheet(null)}
-                >
-                  Close
-                </Button>
-              </ModalFooter>
             </>
           )}
         </ModalContent>

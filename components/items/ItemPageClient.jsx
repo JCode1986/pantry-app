@@ -63,6 +63,7 @@ import EntityImageManager from "@/components/inventory/EntityImageManager";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
+import SearchResultsLoadingState from "@/components/ui/SearchResultsLoadingState";
 import {
   daysUntil,
   isExpiringSoon,
@@ -530,6 +531,8 @@ export default function ItemsPageClient({
   ]);
 
   const filtersAreActive = activeFilterCount > 0;
+  const showSearchRestoreLoader =
+    isLoadingMoreItems && !normalizedSearch && totalItemCount === 0;
   const mobileSheetFilterCount = [
     locationFilter !== ALL_FILTER_KEY,
     areaFilter !== ALL_FILTER_KEY,
@@ -629,10 +632,13 @@ export default function ItemsPageClient({
       stockFilter,
     ]
   );
+  const itemsLoadRequestIdRef = useRef(0);
 
   const loadItemsPage = useCallback(
     async (page) => {
       const safePage = Math.max(1, page);
+      const requestId = itemsLoadRequestIdRef.current + 1;
+      itemsLoadRequestIdRef.current = requestId;
       setIsLoadingMoreItems(true);
       setItemsError(null);
 
@@ -644,9 +650,13 @@ export default function ItemsPageClient({
         });
 
         if (result?.error) {
-          setItemsError(result.error);
+          if (requestId === itemsLoadRequestIdRef.current) {
+            setItemsError(result.error);
+          }
           return;
         }
+
+        if (requestId !== itemsLoadRequestIdRef.current) return;
 
         const nextItems = result?.data?.items ?? [];
         const nextTotal = result?.data?.totalCount ?? 0;
@@ -657,9 +667,13 @@ export default function ItemsPageClient({
           setCurrentPage(nextTotalPages);
         }
       } catch (error) {
-        setItemsError(error?.message || "Could not load items.");
+        if (requestId === itemsLoadRequestIdRef.current) {
+          setItemsError(error?.message || "Could not load items.");
+        }
       } finally {
-        setIsLoadingMoreItems(false);
+        if (requestId === itemsLoadRequestIdRef.current) {
+          setIsLoadingMoreItems(false);
+        }
       }
     },
     [itemRequestFilters]
@@ -866,6 +880,7 @@ export default function ItemsPageClient({
   };
 
   const resetFilters = () => {
+    setIsLoadingMoreItems(true);
     setSearch("");
     setLocationFilter(ALL_FILTER_KEY);
     setAreaFilter(ALL_FILTER_KEY);
@@ -899,6 +914,7 @@ export default function ItemsPageClient({
 
   const clearFilter = (filterId) => {
     if (filterId === "search") {
+      setIsLoadingMoreItems(true);
       setSearch("");
       return;
     }
@@ -930,6 +946,17 @@ export default function ItemsPageClient({
       setStockFilter(STOCK_FILTERS.ALL);
     }
   };
+
+  const handleSearchChange = useCallback(
+    (value) => {
+      if (normalizedSearch && !value.trim() && totalItemCount === 0) {
+        setIsLoadingMoreItems(true);
+      }
+      setSearch(value);
+      setCurrentPage(1);
+    },
+    [normalizedSearch, totalItemCount]
+  );
 
   // ---- drawer helpers ----
   const openDrawer = (it) => {
@@ -1642,7 +1669,7 @@ export default function ItemsPageClient({
 
               <Input
                 value={search}
-                onValueChange={setSearch}
+                onValueChange={handleSearchChange}
                 placeholder="Search items"
                 startContent={<FaSearch className="text-gray-400" />}
                 classNames={{
@@ -1776,7 +1803,7 @@ export default function ItemsPageClient({
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(220px,280px)_auto] md:items-start">
           <Input
             value={search}
-            onValueChange={setSearch}
+            onValueChange={handleSearchChange}
             placeholder="Search items, locations, areas, categories..."
             startContent={<FaSearch className="text-gray-400" />}
             classNames={{
@@ -2040,15 +2067,13 @@ export default function ItemsPageClient({
                   </span>
                 )}
               </div>
-              <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-[var(--stocksense-brand)]">
-                <input
-                  type="checkbox"
-                  checked={allVisibleItemsSelected}
-                  onChange={toggleSelectAllVisibleItems}
-                  className="h-4 w-4 cursor-pointer rounded border border-[var(--stocksense-brand-border)]"
-                />
-                Select all visible
-              </label>
+              <button
+                type="button"
+                onClick={toggleSelectAllVisibleItems}
+                className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 py-1.5 text-sm font-medium text-[var(--stocksense-brand)] hover:bg-[var(--stocksense-brand-soft)]"
+              >
+                {allVisibleItemsSelected ? "Deselect visible" : "Select visible"}
+              </button>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -2141,26 +2166,6 @@ export default function ItemsPageClient({
                       : "border-stocksense-gray"
                   }`}
                 >
-                  {mobileSelectionMode && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.85 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={mobileSelectionTransition}
-                      className="mt-7 shrink-0 transform-gpu"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selected}
-                        onChange={() => toggleSelect(it.id)}
-                        onPointerDown={(event) => event.stopPropagation()}
-                        onPointerUp={(event) => event.stopPropagation()}
-                        onClick={(event) => event.stopPropagation()}
-                        className="h-5 w-5 cursor-pointer rounded border-gray-300 text-[var(--stocksense-brand)]"
-                        aria-label={`Select ${it.name}`}
-                      />
-                    </motion.div>
-                  )}
-
                   <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 text-[var(--stocksense-brand)]">
                     {it.imageUrl ? (
                       <ImageWithLoader
@@ -2221,7 +2226,12 @@ export default function ItemsPageClient({
               );
             })}
 
-            {totalItemCount === 0 && (
+            {showSearchRestoreLoader ? (
+              <SearchResultsLoadingState
+                label="Loading items"
+                detail="Restoring all items."
+              />
+            ) : totalItemCount === 0 && (
               <motion.div
                 key="mobile-empty"
                 variants={pageItemVariants}
@@ -2231,17 +2241,32 @@ export default function ItemsPageClient({
                 className="rounded-2xl border border-stocksense-gray bg-white px-5 py-8 text-center shadow-sm"
               >
                 <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
-                  <FaBoxOpen className="h-6 w-6" />
+                  {normalizedSearch ? (
+                    <FaSearch className="h-5 w-5" />
+                  ) : (
+                    <FaBoxOpen className="h-6 w-6" />
+                  )}
                 </div>
                 <h2 className="mt-4 text-lg font-semibold text-gray-950">
-                  {filtersAreActive ? "No matching items" : "No items yet"}
+                  {normalizedSearch ? "No matching items" : filtersAreActive ? "No matching items" : "No items yet"}
                 </h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  {filtersAreActive
+                <p className="mx-auto mt-1 max-w-xs text-sm leading-5 text-gray-500">
+                  {normalizedSearch
+                    ? `Nothing matched "${search.trim()}". Clear the search or try another item name.`
+                    : filtersAreActive
                     ? "Try changing your search or filters."
                     : "Start adding things you want to keep track of."}
                 </p>
-                {!filtersAreActive ? (
+                {normalizedSearch ? (
+                  <Button
+                    onPress={() => clearFilter("search")}
+                    radius="lg"
+                    variant="bordered"
+                    className="mt-5 w-full border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] font-semibold text-[var(--stocksense-brand)]"
+                  >
+                    Clear search
+                  </Button>
+                ) : !filtersAreActive ? (
                   <div className="mt-5">
                     <OpenGlobalAddItemButton
                       canEditInventory={canEditInventory}
@@ -2291,17 +2316,6 @@ export default function ItemsPageClient({
               <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
                 {/* Left: item image and info */}
                 <div className="flex min-w-0 flex-1 items-start gap-2.5">
-                  {canEditInventory && selectedCount > 0 && (
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      onClick={(event) => event.stopPropagation()}
-                      onKeyDown={(event) => event.stopPropagation()}
-                      onChange={() => toggleSelect(it.id)}
-                      aria-label={`Select ${it.name}`}
-                      className="mt-3 h-4 w-4 shrink-0 cursor-pointer rounded border border-[var(--stocksense-brand-border)]"
-                    />
-                  )}
                   <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] text-[var(--entity-item-accent)]">
                     {it.imageUrl ? (
                       <ImageWithLoader
@@ -2398,7 +2412,13 @@ export default function ItemsPageClient({
           );
         })}
 
-        {totalItemCount === 0 && (
+        {showSearchRestoreLoader ? (
+          <SearchResultsLoadingState
+            label="Loading items"
+            detail="Restoring all items."
+            className="p-8 sm:col-span-2 lg:col-span-3 xl:col-span-4"
+          />
+        ) : totalItemCount === 0 && (
           <motion.div
             key="empty"
             variants={pageItemVariants}
@@ -2407,12 +2427,33 @@ export default function ItemsPageClient({
             exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
             className="rounded-2xl border border-stocksense-gray bg-white p-8 text-center sm:col-span-2 lg:col-span-3 xl:col-span-4"
           >
-            <p className="text-gray-500">
-              {filtersAreActive
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+              {normalizedSearch ? (
+                <FaSearch className="h-5 w-5" />
+              ) : (
+                <FaBoxOpen className="h-6 w-6" />
+              )}
+            </div>
+            <h2 className="mt-4 text-lg font-semibold text-gray-950">
+              {normalizedSearch ? "No matching items" : filtersAreActive ? "No matching items" : "No items yet"}
+            </h2>
+            <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-gray-500">
+              {normalizedSearch
+                ? `Nothing matched "${search.trim()}". Clear the search to see items again.`
+                : filtersAreActive
                 ? "No items match your search or filters."
                 : "No items yet."}
             </p>
-            {!filtersAreActive ? (
+            {normalizedSearch ? (
+              <Button
+                onPress={() => clearFilter("search")}
+                radius="lg"
+                variant="bordered"
+                className="mt-5 border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-5 text-sm font-semibold text-[var(--stocksense-brand)]"
+              >
+                Clear search
+              </Button>
+            ) : !filtersAreActive ? (
               <div className="mt-4 flex justify-center">
                 <OpenGlobalAddItemButton canEditInventory={canEditInventory} />
               </div>

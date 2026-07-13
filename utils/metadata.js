@@ -1,4 +1,6 @@
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+import { getCanonicalAppUrl } from "@/utils/urlSecurity";
+
+const appUrl = getCanonicalAppUrl();
 
 export const siteConfig = {
   name: "WhereKeep",

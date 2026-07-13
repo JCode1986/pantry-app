@@ -53,6 +53,7 @@ import { emitInventoryChange } from "@/utils/clientEvents";
 import EntityImageManager from "@/components/inventory/EntityImageManager";
 import PaginationControls from "@/components/ui/PaginationControls";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
+import SearchResultsLoadingState from "@/components/ui/SearchResultsLoadingState";
 
 const pageSectionVariants = {
   hidden: { opacity: 0 },
@@ -250,9 +251,12 @@ export default function AreasPageClient({
   }, [sortBy]);
 
   const normalizedSearch = search.trim().toLowerCase();
+  const areasLoadRequestIdRef = useRef(0);
   const loadAreasPage = useCallback(
     async (page) => {
       const safePage = Math.max(1, page);
+      const requestId = areasLoadRequestIdRef.current + 1;
+      areasLoadRequestIdRef.current = requestId;
       setIsLoadingAreas(true);
       setAreasError("");
 
@@ -268,9 +272,13 @@ export default function AreasPageClient({
         });
 
         if (result?.error) {
-          setAreasError(result.error);
+          if (requestId === areasLoadRequestIdRef.current) {
+            setAreasError(result.error);
+          }
           return;
         }
+
+        if (requestId !== areasLoadRequestIdRef.current) return;
 
         const nextAreas = result?.data?.items ?? [];
         const nextTotal = result?.data?.totalCount ?? 0;
@@ -280,9 +288,13 @@ export default function AreasPageClient({
         const nextTotalPages = Math.max(1, Math.ceil(nextTotal / AREAS_PAGE_SIZE));
         if (safePage > nextTotalPages) setCurrentPage(nextTotalPages);
       } catch (error) {
-        setAreasError(error?.message || "Could not load storage areas.");
+        if (requestId === areasLoadRequestIdRef.current) {
+          setAreasError(error?.message || "Could not load storage areas.");
+        }
       } finally {
-        setIsLoadingAreas(false);
+        if (requestId === areasLoadRequestIdRef.current) {
+          setIsLoadingAreas(false);
+        }
       }
     },
     [locationFilter, normalizedSearch, sortBy]
@@ -305,6 +317,8 @@ export default function AreasPageClient({
   }, [locationFilter, normalizedSearch, sortBy]);
 
   const filtered = areas ?? [];
+  const showSearchRestoreLoader =
+    isLoadingAreas && !normalizedSearch && filtered.length === 0;
 
   const selectedCount = selectedIds.size;
   const selectionMode = selectedCount > 0;
@@ -371,6 +385,23 @@ export default function AreasPageClient({
   };
 
   const clearSelection = () => setSelectedIds(new Set());
+
+  const clearSearch = () => {
+    setIsLoadingAreas(true);
+    setSearch("");
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = useCallback(
+    (value) => {
+      if (normalizedSearch && !value.trim() && filtered.length === 0) {
+        setIsLoadingAreas(true);
+      }
+      setSearch(value);
+      setCurrentPage(1);
+    },
+    [filtered.length, normalizedSearch]
+  );
 
   const toggleSelectAllVisible = () => {
     if (!canEditInventory) return;
@@ -694,15 +725,20 @@ export default function AreasPageClient({
           </div>
         </div>
 
-        <div className="relative mt-4">
-          <FaSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search areas..."
-            className="h-11 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-3 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-[var(--stocksense-brand)]"
-          />
-        </div>
+        <Input
+          value={search}
+          onValueChange={handleSearchChange}
+          placeholder="Search storage areas"
+          radius="lg"
+          variant="bordered"
+          className="mt-4"
+          startContent={<FaSearch className="h-4 w-4 text-gray-400" />}
+          classNames={{
+            inputWrapper:
+              "min-h-11 border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]",
+            input: "text-sm text-gray-900 placeholder:text-gray-400",
+          }}
+        />
         <div className="mt-2 grid grid-cols-2 gap-2">
           <Select
             aria-label="Filter storage areas by location"
@@ -743,26 +779,106 @@ export default function AreasPageClient({
       ) : null}
 
       <motion.section variants={pageSectionVariants} className="grid gap-3 md:hidden">
-        {filtered.length === 0 ? (
+        {canEditInventory && selectionMode && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.985 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="sticky top-[4.75rem] z-30 rounded-2xl border border-gray-200 bg-white p-3 shadow-lg"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-xl font-semibold tracking-tight text-gray-950">
+                  {selectedCount} selected
+                </h2>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  Tap cards to adjust selection.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="min-h-10 shrink-0 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <button
+                type="button"
+                onClick={toggleSelectAllVisible}
+                disabled={filtered.length === 0 || deleteDialog.isDeleting}
+                className="min-h-11 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 text-sm font-semibold text-[var(--stocksense-brand)] disabled:opacity-50"
+              >
+                {allVisibleSelected ? "Deselect visible" : "Select visible"}
+              </button>
+              <span className="flex min-h-11 items-center rounded-xl border border-gray-200 bg-gray-50 px-3 text-xs font-medium text-gray-500">
+                {filtered.length} visible
+              </span>
+            </div>
+
+            <Button
+              className="mt-2 min-h-11 w-full rounded-xl bg-rose-600 text-sm font-semibold text-white"
+              onPress={openBulkDelete}
+              isDisabled={selectedCount === 0 || deleteDialog.isDeleting}
+            >
+              Delete
+            </Button>
+          </motion.div>
+        )}
+        {showSearchRestoreLoader ? (
+          <SearchResultsLoadingState
+            label="Loading storage areas"
+            detail="Restoring all storage areas."
+          />
+        ) : filtered.length === 0 ? (
           <motion.div
             key="mobile-empty"
             variants={pageItemVariants}
-            className="rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-7 text-center shadow-sm"
+            initial="hidden"
+            animate="show"
+            exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
+            className={`rounded-2xl bg-white px-5 py-7 text-center shadow-sm ${
+              normalizedSearch
+                ? "border border-[var(--stocksense-brand-border)]"
+                : "border border-dashed border-gray-200"
+            }`}
           >
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]">
-              <FaWarehouse className="h-6 w-6" />
+            <div className={`mx-auto grid h-14 w-14 place-items-center rounded-2xl border ${
+              normalizedSearch
+                ? "border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
+                : "border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]"
+            }`}>
+              {normalizedSearch ? (
+                <FaSearch className="h-5 w-5" />
+              ) : (
+                <FaWarehouse className="h-6 w-6" />
+              )}
             </div>
             <h2 className="mt-4 text-lg font-semibold text-gray-950">
-              No storage areas found
+              {normalizedSearch ? "No matching storage areas" : "No storage areas found"}
             </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Try a different search or add an item to create a storage area.
+            <p className="mx-auto mt-1 max-w-xs text-sm leading-5 text-gray-500">
+              {normalizedSearch
+                ? `Nothing matched "${search.trim()}". Clear the search or try another area name.`
+                : "Try a different filter or add an item to create a storage area."}
             </p>
-            {canEditInventory && (
+            {normalizedSearch ? (
+              <Button
+                onPress={clearSearch}
+                radius="lg"
+                variant="bordered"
+                className="mt-5 w-full border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] font-semibold text-[var(--stocksense-brand)]"
+              >
+                Clear search
+              </Button>
+            ) : canEditInventory ? (
               <div className="mt-5 flex justify-center">
                 <OpenGlobalAddItemButton canEditInventory={canEditInventory} />
               </div>
-            )}
+            ) : null}
           </motion.div>
         ) : (
           filtered.map((area) => (
@@ -770,12 +886,35 @@ export default function AreasPageClient({
               key={area.id}
               layout
               variants={pageItemVariants}
-              className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
+              initial="hidden"
+              animate="show"
+              exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
+              className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${
+                selectedIds.has(String(area.id))
+                  ? "border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]"
+                  : "border-gray-200"
+              }`}
             >
-              <button
-                type="button"
-                onClick={() => router.push(`/areas/${area.id}`)}
-                className="flex min-h-[112px] w-full items-center gap-4 p-4 text-left transition active:scale-[0.99]"
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  if (selectionMode) {
+                    toggleSelect(area.id);
+                    return;
+                  }
+                  router.push(`/areas/${area.id}`);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  if (selectionMode) {
+                    toggleSelect(area.id);
+                    return;
+                  }
+                  router.push(`/areas/${area.id}`);
+                }}
+                className="flex min-h-[112px] w-full cursor-pointer items-center gap-4 p-4 text-left transition active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]"
               >
                 {area.imageUrl ? (
                   <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-area-border)] bg-white">
@@ -806,27 +945,49 @@ export default function AreasPageClient({
                   </div>
                 </div>
 
-                <FaChevronRight className="h-4 w-4 shrink-0 text-[var(--stocksense-brand)]" />
-              </button>
-
-              {canEditInventory && (
-                <div className="grid grid-cols-2 gap-2 border-t border-gray-200 bg-gray-50 p-3">
-                  <button
-                    type="button"
-                    onClick={() => openDrawer(area)}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 text-sm font-semibold text-amber-700"
+                {canEditInventory ? (
+                  <span
+                    className="shrink-0"
+                    onClick={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
                   >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openDeleteForArea(area)}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 text-sm font-semibold text-rose-700"
-                  >
-                    Delete
-                  </button>
-                </div>
-              )}
+                    <Dropdown placement="bottom-end">
+                      <DropdownTrigger>
+                        <Button
+                          isIconOnly
+                          variant="light"
+                          radius="lg"
+                          className="h-9 w-9 min-w-9 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+                          aria-label={`${area.name} actions`}
+                        >
+                          <FaEllipsisV className="h-4 w-4" />
+                        </Button>
+                      </DropdownTrigger>
+                      <DropdownMenu aria-label={`${area.name} actions`}>
+                        <DropdownItem key="select" onPress={() => toggleSelect(area.id)}>
+                          {selectedIds.has(String(area.id))
+                            ? "Deselect for bulk action"
+                            : "Select for bulk action"}
+                        </DropdownItem>
+                        <DropdownItem key="edit" onPress={() => openDrawer(area)}>
+                          Edit Storage Area
+                        </DropdownItem>
+                        <DropdownItem
+                          key="delete"
+                          className="text-danger"
+                          color="danger"
+                          startContent={<FaTrash className="h-3.5 w-3.5" />}
+                          onPress={() => openDeleteForArea(area)}
+                        >
+                          Delete Storage Area
+                        </DropdownItem>
+                      </DropdownMenu>
+                    </Dropdown>
+                  </span>
+                ) : (
+                  <FaChevronRight className="h-4 w-4 shrink-0 text-[var(--stocksense-brand)]" />
+                )}
+              </div>
             </motion.article>
           ))
         )}
@@ -859,7 +1020,7 @@ export default function AreasPageClient({
           <div className="flex w-full max-w-5xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <Input
               value={search}
-              onValueChange={setSearch}
+              onValueChange={handleSearchChange}
               placeholder="Search storage areas"
               radius="lg"
               variant="bordered"
@@ -930,16 +1091,14 @@ export default function AreasPageClient({
                     Bulk actions for <span className="font-semibold">{selectedCount}</span>{" "}
                     storage area{selectedCount === 1 ? "" : "s"}
                   </p>
-                  <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-[var(--stocksense-brand)]">
-                    <input
-                      type="checkbox"
-                      checked={allVisibleSelected}
-                      onChange={toggleSelectAllVisible}
-                      disabled={filtered.length === 0 || deleteDialog.isDeleting}
-                      className="h-4 w-4 cursor-pointer rounded border border-[var(--stocksense-brand-border)]"
-                    />
-                    Select all visible
-                  </label>
+                  <button
+                    type="button"
+                    onClick={toggleSelectAllVisible}
+                    disabled={filtered.length === 0 || deleteDialog.isDeleting}
+                    className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 py-1.5 text-sm font-medium text-[var(--stocksense-brand)] hover:bg-[var(--stocksense-brand-soft)] disabled:opacity-50"
+                  >
+                    {allVisibleSelected ? "Deselect visible" : "Select visible"}
+                  </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button
@@ -1049,15 +1208,6 @@ export default function AreasPageClient({
 
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 flex-1 items-start gap-3">
-                          {canEditInventory && selectionMode && (
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.has(String(a.id))}
-                              onChange={() => toggleSelect(a.id)}
-                              aria-label={`Select ${a.name}`}
-                              className="mt-3 h-4 w-4 shrink-0 cursor-pointer rounded border border-[var(--stocksense-brand-border)]"
-                            />
-                          )}
                           {a.imageUrl ? (
                             <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white">
                               <ImageWithLoader
@@ -1292,6 +1442,12 @@ export default function AreasPageClient({
               />
             </div>
           </>
+        ) : showSearchRestoreLoader ? (
+          <SearchResultsLoadingState
+            label="Loading storage areas"
+            detail="Restoring all storage areas."
+            className="px-6 py-12"
+          />
         ) : (
           <div className="rounded-[1.75rem] border border-dashed border-[var(--stocksense-brand-border)] bg-white px-6 py-12 text-center shadow-sm">
             <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
@@ -1302,14 +1458,25 @@ export default function AreasPageClient({
               )}
             </div>
             <h2 className="mt-5 text-2xl font-semibold tracking-tight text-gray-950">
-              {hasActiveFilters ? "No storage areas match" : "No storage areas yet"}
+              {normalizedSearch ? "No matching storage areas" : hasActiveFilters ? "No storage areas match" : "No storage areas yet"}
             </h2>
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-600">
-              {hasActiveFilters
+              {normalizedSearch
+                ? `Nothing matched "${search.trim()}". Clear the search to see storage areas again.`
+                : hasActiveFilters
                 ? "Try a different search, location filter, or sort option."
                 : "Create a pantry, shelf, closet, drawer, cabinet, or bin to start organizing your home."}
             </p>
-            {canEditInventory && !hasActiveFilters ? (
+            {normalizedSearch ? (
+              <Button
+                onPress={clearSearch}
+                radius="lg"
+                variant="bordered"
+                className="mt-7 border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-5 text-sm font-semibold text-[var(--stocksense-brand)] shadow-sm"
+              >
+                Clear search
+              </Button>
+            ) : canEditInventory && !hasActiveFilters ? (
               <Button
                 onPress={openCreateAreaModal}
                 className="mt-7 min-h-10 rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm"

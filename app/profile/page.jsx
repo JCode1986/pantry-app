@@ -44,9 +44,17 @@ export default async function ProfilePage() {
     redirect("/login?redirectTo=/profile");
   }
 
+  const displayName =
+    account.user_metadata?.preferred_name ||
+    account.user_metadata?.display_name ||
+    account.user_metadata?.full_name ||
+    account.user_metadata?.name ||
+    "";
+
   const user = {
     id: account.id ?? "",
     email: account.email ?? "Unknown email",
+    displayName,
     role: account.role ?? account.aud ?? "authenticated",
     provider:
       account.app_metadata?.provider ??

@@ -647,10 +647,10 @@ export default function LandingPage() {
           <div className="rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-6 sm:p-8">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h2 className="text-2xl font-semibold tracking-tight text-gray-900">
+                <h2 className="text-2xl font-semibold tracking-tight text-gray-950">
                   Stop searching. Start knowing where everything is.
                 </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-700">
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-800">
                   Create your free account, save your first item, and build a home
                   where everything finally has a place.
                 </p>
@@ -665,7 +665,7 @@ export default function LandingPage() {
                     Log in
                   </Link>
                 </div>
-                <p className="mt-2 text-center text-xs text-gray-500 sm:text-left lg:text-right">
+                <p className="mt-2 text-center text-xs font-medium text-gray-700 sm:text-left lg:text-right">
                   No credit card required • Start with the free plan
                 </p>
               </div>
