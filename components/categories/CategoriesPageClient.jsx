@@ -21,13 +21,16 @@ import {
 } from "@heroui/react";
 import {
   FaBoxOpen,
+  FaCamera,
   FaChevronRight,
   FaEllipsisV,
+  FaImage,
   FaMapMarkedAlt,
   FaPlus,
   FaSearch,
   FaTags,
   FaTrash,
+  FaUpload,
   FaWarehouse,
 } from "react-icons/fa";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
@@ -47,9 +50,11 @@ import {
   deleteCategory,
   getCategoriesPageAction,
   updateCategoryName,
+  uploadInventoryImage,
 } from "@/app/actions/server";
 import { emitInventoryChange } from "@/utils/clientEvents";
 import PaginationControls from "@/components/ui/PaginationControls";
+import ImageWithLoader from "@/components/ui/ImageWithLoader";
 
 const pageSectionVariants = {
   hidden: { opacity: 0 },
@@ -67,6 +72,8 @@ const pageItemVariants = {
 
 const CATEGORIES_PAGE_SIZE = 24;
 const ALL_FILTER_KEY = "all";
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const SORT_OPTIONS = [
   ["name_asc", "A-Z"],
   ["name_desc", "Z-A"],
@@ -93,6 +100,13 @@ function sortCategoriesForDisplay(items, sortBy) {
 function formatCount(count, singular, plural = `${singular}s`) {
   const value = count ?? 0;
   return `${value.toLocaleString()} ${value === 1 ? singular : plural}`;
+}
+
+function validateImageFile(file) {
+  if (!file) return "";
+  if (!IMAGE_TYPES.has(file.type)) return "Choose a JPG, PNG, WebP, or GIF image.";
+  if (file.size > MAX_IMAGE_SIZE) return "Images must be 5 MB or smaller.";
+  return "";
 }
 
 export default function CategoriesPageClient({
@@ -128,6 +142,9 @@ export default function CategoriesPageClient({
   const [createCategoryName, setCreateCategoryName] = useState("");
   const [createCategoryLocationId, setCreateCategoryLocationId] = useState("");
   const [createCategoryAreaId, setCreateCategoryAreaId] = useState("");
+  const [createCategoryImageFile, setCreateCategoryImageFile] = useState(null);
+  const [createCategoryImagePreview, setCreateCategoryImagePreview] = useState(null);
+  const [createCategoryImageMessage, setCreateCategoryImageMessage] = useState("");
   const [createCategoryError, setCreateCategoryError] = useState("");
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -136,6 +153,12 @@ export default function CategoriesPageClient({
     () => categories.find((c) => String(c.id) === String(activeCategoryId)) || null,
     [categories, activeCategoryId]
   );
+
+  useEffect(() => {
+    return () => {
+      if (createCategoryImagePreview) URL.revokeObjectURL(createCategoryImagePreview);
+    };
+  }, [createCategoryImagePreview]);
 
   useEffect(() => {
     const handleItemAdded = (event) => {
@@ -456,7 +479,56 @@ export default function CategoriesPageClient({
     setCreateCategoryName("");
     setCreateCategoryLocationId("");
     setCreateCategoryAreaId("");
+    setCreateCategoryImageFile(null);
+    setCreateCategoryImagePreview((currentPreview) => {
+      if (currentPreview) URL.revokeObjectURL(currentPreview);
+      return null;
+    });
+    setCreateCategoryImageMessage("");
     setCreateCategoryError("");
+  };
+
+  const selectCreateCategoryImageFile = (file) => {
+    const imageError = validateImageFile(file);
+    if (imageError) {
+      setCreateCategoryImageMessage(imageError);
+      return;
+    }
+
+    setCreateCategoryImageFile(file ?? null);
+    setCreateCategoryImageMessage("");
+    setCreateCategoryImagePreview((currentPreview) => {
+      if (currentPreview) URL.revokeObjectURL(currentPreview);
+      return file ? URL.createObjectURL(file) : null;
+    });
+  };
+
+  const clearCreateCategoryImageFile = () => {
+    setCreateCategoryImageFile(null);
+    setCreateCategoryImageMessage("");
+    setCreateCategoryImagePreview((currentPreview) => {
+      if (currentPreview) URL.revokeObjectURL(currentPreview);
+      return null;
+    });
+  };
+
+  const uploadCreatedCategoryImage = async (categoryId) => {
+    if (!createCategoryImageFile || !categoryId) return null;
+
+    const formData = new FormData();
+    formData.append("image", createCategoryImageFile);
+
+    const result = await uploadInventoryImage("category", categoryId, formData);
+    if (result?.error) {
+      const message =
+        typeof result.error === "string"
+          ? result.error
+          : "Category was added, but the photo could not be uploaded.";
+      setCreateCategoryImageMessage(message);
+      return null;
+    }
+
+    return result?.data ?? null;
   };
 
   const handleCreateLocationChange = (keys) => {
@@ -490,11 +562,12 @@ export default function CategoriesPageClient({
         (option) => String(option.id) === String(area?.location_id)
       );
       const created = result.data;
+      const uploadedImage = await uploadCreatedCategoryImage(created?.id);
       const createdCategory = {
         id: created?.id,
         name: created?.name ?? name,
-        image_path: null,
-        imageUrl: null,
+        image_path: uploadedImage?.imagePath ?? null,
+        imageUrl: uploadedImage?.imageUrl ?? null,
         insertedAt: created?.created_at ?? null,
         storageArea: {
           id: area?.id ?? createCategoryAreaId,
@@ -537,6 +610,7 @@ export default function CategoriesPageClient({
       });
       setCreateCategoryOpen(false);
       setCreateCategoryName("");
+      clearCreateCategoryImageFile();
       setRefreshNonce((current) => current + 1);
       router.refresh();
     } catch (error) {
@@ -777,7 +851,7 @@ export default function CategoriesPageClient({
               >
                 {category.imageUrl ? (
                   <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-category-border)] bg-white">
-                    <img
+                    <ImageWithLoader
                       src={category.imageUrl}
                       alt=""
                       className="h-full w-full object-cover"
@@ -1082,7 +1156,7 @@ export default function CategoriesPageClient({
                           )}
                           {c.imageUrl ? (
                             <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white">
-                              <img
+                              <ImageWithLoader
                                 src={c.imageUrl}
                                 alt=""
                                 className="h-full w-full object-cover"
@@ -1396,6 +1470,111 @@ export default function CategoriesPageClient({
                       <SelectItem key={String(area.id)}>{area.name}</SelectItem>
                     ))}
                   </Select>
+                  <div className="rounded-2xl border border-gray-200 bg-white p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                        <FaImage className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+                        Category photo optional
+                      </div>
+                      {createCategoryImageFile ? (
+                        <span className="rounded-full bg-[var(--stocksense-brand-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--stocksense-brand)]">
+                          Ready to upload
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:h-28 sm:w-40">
+                        {createCategoryImagePreview ? (
+                          <ImageWithLoader
+                            src={createCategoryImagePreview}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="grid h-full w-full place-items-center text-xs text-gray-400">
+                            Optional photo
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-1 flex-col gap-2">
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            className="min-h-10 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] sm:hidden"
+                            isDisabled={isCreatingCategory}
+                            onPress={() =>
+                              document
+                                .getElementById("create-category-camera-input")
+                                ?.click()
+                            }
+                            startContent={<FaCamera className="h-3.5 w-3.5" />}
+                          >
+                            Take photo
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            className="min-h-10 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
+                            isDisabled={isCreatingCategory}
+                            onPress={() =>
+                              document
+                                .getElementById("create-category-image-input")
+                                ?.click()
+                            }
+                            startContent={<FaUpload className="h-3.5 w-3.5" />}
+                          >
+                            {createCategoryImageFile ? "Change photo" : "Add photo"}
+                          </Button>
+                          {createCategoryImageFile ? (
+                            <Button
+                              size="sm"
+                              variant="flat"
+                              className="min-h-10 rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
+                              isDisabled={isCreatingCategory}
+                              onPress={clearCreateCategoryImageFile}
+                              startContent={<FaTrash className="h-3.5 w-3.5" />}
+                            >
+                              Remove photo
+                            </Button>
+                          ) : null}
+                        </div>
+                        <input
+                          id="create-category-image-input"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            event.target.value = "";
+                            selectCreateCategoryImageFile(file);
+                          }}
+                        />
+                        <input
+                          id="create-category-camera-input"
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            event.target.value = "";
+                            selectCreateCategoryImageFile(file);
+                          }}
+                        />
+                        <p className="text-xs leading-5 text-gray-500 max-md:hidden">
+                          {createCategoryImageFile
+                            ? createCategoryImageFile.name
+                            : "Take a photo or choose one from your camera roll. Max 5 MB."}
+                        </p>
+                        {createCategoryImageMessage ? (
+                          <p className="text-xs text-rose-700">
+                            {createCategoryImageMessage}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
                   {filterAreas.length === 0 ? (
                     <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                       Add a storage area before creating categories.

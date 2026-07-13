@@ -44,6 +44,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ConfirmDeleteModal from '@/components/modals/ConfirmDeleteModal';
 import { emitInventoryChange } from '@/utils/clientEvents';
 import EntityImageManager from '@/components/inventory/EntityImageManager';
+import ImageWithLoader from '@/components/ui/ImageWithLoader';
 import MobileSuggestionChips from '@/components/modals/MobileSuggestionChips';
 import MobileSheetCloseButton from '@/components/modals/MobileSheetCloseButton';
 import useDesktopAutoFocus from '@/components/modals/useDesktopAutoFocus';
@@ -67,10 +68,10 @@ const modalHeaderClass =
   'shrink-0 border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-base font-semibold text-[var(--stocksense-brand)] max-md:sticky max-md:top-0 max-md:z-20 max-md:px-4 max-md:py-3';
 
 const modalFooterClass =
-  'wherekeep-modal-footer flex shrink-0 flex-col-reverse gap-2 border-t border-gray-200 bg-white sm:flex-row sm:justify-end max-md:sticky max-md:bottom-0 max-md:z-20 max-md:px-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)]';
+  'wherekeep-modal-footer flex shrink-0 flex-col-reverse gap-2 border-t border-gray-200 bg-white sm:flex-row sm:justify-end max-md:sticky max-md:bottom-0 max-md:z-20 max-md:px-4 max-md:pb-[max(4.5rem,calc(env(safe-area-inset-bottom)+1rem))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)]';
 
 const modalBodyClass =
-  'wherekeep-modal-body min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pt-5 max-md:px-4 max-md:pb-28 max-md:pt-4';
+  'wherekeep-modal-body min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pt-5 max-md:px-4 max-md:pb-40 max-md:pt-4';
 
 const modalInputClassNames = {
   inputWrapper:
@@ -1012,7 +1013,7 @@ export default function LocationsSection({
                   >
                     {loc.imageUrl ? (
                       <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-location-border)] bg-white">
-                        <img
+                        <ImageWithLoader
                           src={loc.imageUrl}
                           alt=""
                           className="h-full w-full object-cover"
@@ -1158,7 +1159,7 @@ export default function LocationsSection({
                         <div className="flex min-w-0 flex-1 items-start gap-3">
                           {loc.imageUrl ? (
                             <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white">
-                              <img
+                              <ImageWithLoader
                                 src={loc.imageUrl}
                                 alt=""
                                 className="h-full w-full object-cover"
@@ -1280,7 +1281,7 @@ export default function LocationsSection({
                               >
                                 {item.imageUrl ? (
                                   <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-white">
-                                    <img
+                                    <ImageWithLoader
                                       src={item.imageUrl}
                                       alt=""
                                       className="h-full w-full object-cover"
@@ -1482,7 +1483,7 @@ export default function LocationsSection({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:h-32 sm:w-44">
                     {locationModal.imagePreview ? (
-                      <img
+                      <ImageWithLoader
                         src={locationModal.imagePreview}
                         alt=""
                         className="h-full w-full object-contain"

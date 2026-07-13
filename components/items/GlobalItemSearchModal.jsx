@@ -34,6 +34,7 @@ import {
   modalHeaderClass,
   modalInputClassNames,
 } from "@/components/modals/modalTheme";
+import ImageWithLoader from "@/components/ui/ImageWithLoader";
 
 const RECENT_SEARCHES_KEY = "wherekeep:recent-item-searches";
 const MAX_RECENT_SEARCHES = 6;
@@ -359,7 +360,7 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
                           <div className="flex min-w-0 flex-1 gap-3">
                             {imageUrl ? (
                               <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
-                                <img
+                                <ImageWithLoader
                                   src={imageUrl}
                                   alt=""
                                   className="h-full w-full object-cover"

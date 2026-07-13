@@ -32,7 +32,9 @@ import {
   FaMapMarkedAlt,
   FaSearch,
   FaShoppingBasket,
+  FaTags,
   FaTimes,
+  FaWarehouse,
 } from "react-icons/fa";
 import {
   addCategory,
@@ -60,6 +62,7 @@ import { emitInventoryChange } from "@/utils/clientEvents";
 import EntityImageManager from "@/components/inventory/EntityImageManager";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
+import ImageWithLoader from "@/components/ui/ImageWithLoader";
 import {
   daysUntil,
   isExpiringSoon,
@@ -184,6 +187,108 @@ function PaginationControls({
         </Button>
       </div>
     </div>
+  );
+}
+
+function HierarchyImageTile({ imageUrl, icon: Icon, label }) {
+  return (
+    <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] md:h-20 md:w-full">
+      {imageUrl ? (
+        <ImageWithLoader
+          src={imageUrl}
+          alt={`${label} image`}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <Icon className="h-5 w-5" />
+      )}
+    </div>
+  );
+}
+
+function ItemHierarchyCard({ item }) {
+  if (!item) return null;
+
+  const levels = [
+    {
+      key: "location",
+      label: "Location",
+      name: item.location?.name || "Unknown location",
+      href: item.location?.id ? `/locations/${item.location.id}` : null,
+      imageUrl: item.location?.imageUrl,
+      icon: FaMapMarkedAlt,
+    },
+    {
+      key: "area",
+      label: "Storage Area",
+      name: item.area?.name || "Storage area",
+      href: item.area?.id ? `/areas/${item.area.id}` : null,
+      imageUrl: item.area?.imageUrl,
+      icon: FaWarehouse,
+    },
+    {
+      key: "category",
+      label: "Category",
+      name: item.category?.name || "Category",
+      href: item.category?.id ? `/categories/${item.category.id}` : null,
+      imageUrl: item.category?.imageUrl,
+      icon: FaTags,
+    },
+  ];
+
+  return (
+    <section className="rounded-3xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3 shadow-sm sm:p-4">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--stocksense-brand)]">
+            Stored in
+          </p>
+          <h3 className="text-base font-semibold text-gray-950">
+            Item location
+          </h3>
+        </div>
+        <p className="text-xs text-gray-500">
+          Location / Storage Area / Category
+        </p>
+      </div>
+
+      <div className="mt-3 grid gap-2 md:grid-cols-3">
+        {levels.map((level) => {
+          const content = (
+            <div className="flex h-full min-w-0 items-center gap-3 rounded-2xl border border-[var(--stocksense-brand-border)] bg-white/90 p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:flex-col md:items-stretch md:gap-3">
+              <HierarchyImageTile
+                imageUrl={level.imageUrl}
+                icon={level.icon}
+                label={level.label}
+              />
+              <div className="min-w-0 flex-1 md:text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                  {level.label}
+                </p>
+                <p
+                  className="mt-0.5 whitespace-normal break-words text-sm font-semibold leading-5 text-gray-950"
+                  title={level.name}
+                >
+                  {level.name}
+                </p>
+              </div>
+            </div>
+          );
+
+          return level.href ? (
+            <Link
+              key={level.key}
+              href={level.href}
+              className="block rounded-2xl focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]"
+            >
+              {content}
+            </Link>
+          ) : (
+            <div key={level.key}>{content}</div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -2058,7 +2163,7 @@ export default function ItemsPageClient({
 
                   <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 text-[var(--stocksense-brand)]">
                     {it.imageUrl ? (
-                      <img
+                      <ImageWithLoader
                         src={it.imageUrl}
                         alt=""
                         className="h-full w-full object-cover"
@@ -2199,7 +2304,7 @@ export default function ItemsPageClient({
                   )}
                   <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] text-[var(--entity-item-accent)]">
                     {it.imageUrl ? (
-                      <img
+                      <ImageWithLoader
                         src={it.imageUrl}
                         alt=""
                         className="h-full w-full object-cover"
@@ -2534,13 +2639,7 @@ export default function ItemsPageClient({
                   >
                     {activeItem?.name || "Item"}
                   </div>
-                  <div
-                    className="truncate text-sm text-gray-500"
-                    title={`${activeItem?.location?.name || "Unknown location"} / ${activeItem?.area?.name || "-"} / ${activeItem?.category?.name || "-"}`}
-                  >
-                    {activeItem?.location?.name || "Unknown location"} • {activeItem?.area?.name || "—"} •{" "}
-                    {activeItem?.category?.name || "—"}
-                  </div>
+                  <div className="truncate text-sm text-gray-500">Item details</div>
                 </div>
                 {canEditInventory ? (
                   <Button
@@ -2556,6 +2655,8 @@ export default function ItemsPageClient({
               </ModalHeader>
 
               <ModalBody className={`space-y-5 ${modalBodyClass}`}>
+                <ItemHierarchyCard item={activeItem} />
+
                 {canEditInventory ? (
                   <>
                     <div className="space-y-2">

@@ -16,6 +16,7 @@ import {
 import { getRecentActivityAction } from '@/app/actions/activity';
 import { themedSelectClassNames } from '@/components/modals/modalTheme';
 import { INVENTORY_CHANGE_EVENT } from '@/utils/clientEvents';
+import ImageWithLoader from '@/components/ui/ImageWithLoader';
 
 const PAGE_SIZE = 12;
 const DASHBOARD_ACTIVITY_LIMIT = 5;
@@ -313,7 +314,7 @@ function ActivityThumb({ row, entity }) {
   if (imageUrl) {
     return (
       <span className="block h-11 w-11 shrink-0 overflow-hidden rounded-2xl border border-gray-200 bg-white">
-        <img
+        <ImageWithLoader
           src={imageUrl}
           alt=""
           className="h-full w-full object-cover"

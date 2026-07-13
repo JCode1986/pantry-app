@@ -54,6 +54,7 @@ import {
   themedSelectClassNames,
 } from "@/components/modals/modalTheme";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
+import ImageWithLoader from "@/components/ui/ImageWithLoader";
 
 const FILTERS = [
   { value: "all", label: "All" },
@@ -1282,7 +1283,7 @@ export default function ShoppingListPageClient({
 
                     <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl border border-[var(--entity-shopping-border)] bg-[var(--entity-shopping-soft)] text-[var(--entity-shopping-accent)] md:h-20 md:w-20">
                       {item.imageUrl ? (
-                        <img
+                        <ImageWithLoader
                           src={item.imageUrl}
                           alt=""
                           className="h-full w-full object-cover"

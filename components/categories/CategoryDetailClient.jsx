@@ -49,6 +49,7 @@ import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import MoveItemsModal from "@/components/items/MoveItemsModal";
 import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
 import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
+import ImageWithLoader from "@/components/ui/ImageWithLoader";
 import {
   modalBodyClass,
   modalContentClass,
@@ -814,7 +815,7 @@ export default function CategoryDetailClient({
         <div className="mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-md shadow-slate-900/5">
           <div className="h-44 bg-[var(--entity-category-soft)]">
             {categoryImageUrl ? (
-              <img
+              <ImageWithLoader
                 src={categoryImageUrl}
                 alt=""
                 className="h-full w-full object-cover"
@@ -917,7 +918,7 @@ export default function CategoryDetailClient({
           <div className="flex min-w-0 items-start gap-4">
             {categoryImageUrl ? (
               <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white shadow-sm">
-                <img
+                <ImageWithLoader
                   src={categoryImageUrl}
                   alt=""
                   className="h-full w-full object-cover"
@@ -1200,7 +1201,7 @@ export default function CategoryDetailClient({
                 )}
                 {item.imageUrl ? (
                   <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-item-border)] bg-white">
-                    <img
+                    <ImageWithLoader
                       src={item.imageUrl}
                       alt=""
                       className="h-full w-full object-cover"
@@ -1453,7 +1454,7 @@ export default function CategoryDetailClient({
                       ) : null}
                       {item.imageUrl ? (
                         <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-[var(--entity-item-border)] bg-white">
-                          <img
+                          <ImageWithLoader
                             src={item.imageUrl}
                             alt=""
                             className="h-full w-full object-cover"
