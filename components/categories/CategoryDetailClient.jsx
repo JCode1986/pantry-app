@@ -1149,7 +1149,7 @@ export default function CategoryDetailClient({
         </div>
 
         {canEditInventory && selectedCount > 0 && (
-          <div className="sticky top-[4.75rem] z-30 mt-3 rounded-2xl border border-gray-200 bg-white p-3 shadow-lg">
+          <div className="sticky top-[4.75rem] z-[70] mt-3 rounded-2xl border border-gray-200 bg-white p-3 shadow-lg">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xl font-semibold tracking-tight text-gray-950">

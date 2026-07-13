@@ -1715,13 +1715,65 @@ export default function ProfileClient({
                         </p>
                       </div>
                     ))}
-                    {sharingInvites.length > 0 && (
-                      <p className="text-xs text-gray-500">
-                        {sharingInvites.length} pending invite{sharingInvites.length === 1 ? "" : "s"}.
-                      </p>
-                    )}
                   </div>
                 </MobileInlineAccordion>
+
+                {sharingIsOwner && sharingInvites.length > 0 && (
+                  <MobileInlineAccordion
+                    title={`Pending invites (${sharingInvites.length})`}
+                  >
+                    <div className="space-y-2">
+                      {sharingInvites.map((invite) => (
+                        <div
+                          key={invite.id}
+                          className="rounded-xl border border-gray-200 bg-white px-3 py-3"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-gray-900">
+                              {invite.email}
+                            </p>
+                            <p className="mt-0.5 text-xs text-gray-500">
+                              {formatHouseholdRole(invite.role)} access - Expires{" "}
+                              {formatBillingDate(invite.expiresAt) ?? "soon"}
+                              {invite.status === "expired" ? " - Expired" : ""}
+                            </p>
+                          </div>
+                          <div className="mt-3 grid grid-cols-3 gap-2">
+                            <Button
+                              size="sm"
+                              variant="flat"
+                              className="rounded-lg border border-stocksense-gray bg-white px-2 text-gray-700"
+                              onPress={() => handleCopyInvite(invite)}
+                              startContent={<FaCopy className="h-3.5 w-3.5" />}
+                            >
+                              {copiedInviteId === invite.id ? "Copied" : "Copy"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="flat"
+                              className="rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-2 text-[var(--stocksense-brand)]"
+                              onPress={() => handleResendInvite(invite.id)}
+                              isLoading={sharingLoading === `resend:${invite.id}`}
+                              startContent={<FaEnvelope className="h-3.5 w-3.5" />}
+                            >
+                              Resend
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="flat"
+                              className="rounded-lg border border-rose-200 bg-rose-50 px-2 text-rose-700"
+                              onPress={() => handleRevokeInvite(invite.id)}
+                              isLoading={sharingLoading === `revoke:${invite.id}`}
+                              startContent={<FaTimesCircle className="h-3.5 w-3.5" />}
+                            >
+                              Revoke
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </MobileInlineAccordion>
+                )}
               </>
             )}
           </div>
