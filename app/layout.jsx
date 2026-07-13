@@ -1,6 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navigation from "@/components/app-shell/Navigation";
+import SupportChatbot from "@/components/app-shell/SupportChatbot";
 import { getSessionForLayout } from "./actions/auth";
 import { Providers } from "@/components/app-shell/Providers";
 import { getPreferenceBootScript } from "@/utils/appPreferences";
@@ -325,6 +326,7 @@ export default async function RootLayout({ children }) {
       <div className={`bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10 ${currentUser?.id ? "wherekeep-auth-shell" : ""}`}>
         {children}
       </div>
+      {currentUser?.id && <SupportChatbot />}
     </>
   );
 

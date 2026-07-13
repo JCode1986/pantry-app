@@ -1574,7 +1574,7 @@ export default function ItemsPageClient({
         variants={pageItemVariants}
         className={
           mobileSelectionMode
-            ? "sticky top-[4.75rem] z-30 md:hidden"
+            ? "sticky top-[4.75rem] z-[70] md:hidden"
             : "space-y-3 md:hidden"
         }
       >

@@ -785,7 +785,7 @@ export default function AreasPageClient({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.985 }}
             transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            className="sticky top-[4.75rem] z-30 rounded-2xl border border-gray-200 bg-white p-3 shadow-lg"
+            className="sticky top-[4.75rem] z-[70] rounded-2xl border border-gray-200 bg-white p-3 shadow-lg"
           >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
