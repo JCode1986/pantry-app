@@ -39,6 +39,7 @@ import {
   FaTrash,
   FaChevronUp,
   FaEllipsisV,
+  FaCamera,
   FaImage,
   FaSearch,
   FaArrowsAlt,
@@ -54,6 +55,7 @@ import MoveItemsModal from '@/components/items/MoveItemsModal';
 import OpenGlobalAddItemButton from '@/components/ui/OpenGlobalAddItemButton';
 import { emitInventoryChange, emitItemAdded } from '@/utils/clientEvents';
 import EntityImageManager from '@/components/inventory/EntityImageManager';
+import ImageWithLoader from '@/components/ui/ImageWithLoader';
 import MobileSuggestionChips from '@/components/modals/MobileSuggestionChips';
 import MobileSheetCloseButton from '@/components/modals/MobileSheetCloseButton';
 import { themedSelectClassNames } from '@/components/modals/modalTheme';
@@ -104,10 +106,10 @@ const mobileSheetModalClassNames = {
 const modalHeaderClass =
   'shrink-0 border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-base font-semibold text-[var(--stocksense-brand)] max-md:sticky max-md:top-0 max-md:z-20 max-md:px-4 max-md:py-3';
 
-const modalBodyClass = 'wherekeep-modal-body min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pt-5 max-md:px-4 max-md:pb-28 max-md:pt-4';
+const modalBodyClass = 'wherekeep-modal-body min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pt-5 max-md:px-4 max-md:pb-40 max-md:pt-4';
 
 const modalFooterClass =
-  'wherekeep-modal-footer flex shrink-0 flex-col-reverse gap-2 border-t border-gray-200 bg-white sm:flex-row sm:justify-end max-md:sticky max-md:bottom-0 max-md:z-20 max-md:px-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)]';
+  'wherekeep-modal-footer flex shrink-0 flex-col-reverse gap-2 border-t border-gray-200 bg-white sm:flex-row sm:justify-end max-md:sticky max-md:bottom-0 max-md:z-20 max-md:px-4 max-md:pb-[max(4.5rem,calc(env(safe-area-inset-bottom)+1rem))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)]';
 
 const modalInputClassNames = {
   inputWrapper:
@@ -173,7 +175,7 @@ function CreateImagePicker({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:h-28 sm:w-40">
           {imagePreview ? (
-            <img
+            <ImageWithLoader
               src={imagePreview}
               alt=""
               className="h-full w-full object-cover"
@@ -193,6 +195,21 @@ function CreateImagePicker({
               <input
                 type="file"
                 accept="image/*"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = '';
+                  onSelect(file);
+                }}
+              />
+            </label>
+            <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 text-sm font-semibold text-[var(--stocksense-brand)] sm:hidden">
+              <FaCamera className="h-3.5 w-3.5" />
+              Take photo
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
                 className="hidden"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
@@ -1879,7 +1896,7 @@ export default function StorageAreasSection({
                   >
                     {area.imageUrl ? (
                       <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-[var(--entity-area-border)] bg-white">
-                        <img
+                        <ImageWithLoader
                           src={area.imageUrl}
                           alt=""
                           className="h-full w-full object-cover"
@@ -1977,7 +1994,7 @@ export default function StorageAreasSection({
                               <div className="flex min-w-0 items-center gap-3">
                                 {category.imageUrl ? (
                                   <div className="h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-[var(--entity-category-border)] bg-white">
-                                    <img
+                                    <ImageWithLoader
                                       src={category.imageUrl}
                                       alt=""
                                       className="h-full w-full object-cover"
@@ -2129,7 +2146,7 @@ export default function StorageAreasSection({
                     </button>
                     {area.imageUrl ? (
                       <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-area-border)] bg-white">
-                        <img
+                        <ImageWithLoader
                           src={area.imageUrl}
                           alt=""
                           className="h-full w-full object-cover"
@@ -2270,7 +2287,7 @@ export default function StorageAreasSection({
                               </button>
                               {category.imageUrl ? (
                                 <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-[var(--entity-category-border)] bg-white">
-                                  <img
+                                  <ImageWithLoader
                                     src={category.imageUrl}
                                     alt=""
                                     className="h-full w-full object-cover"
@@ -2464,7 +2481,7 @@ export default function StorageAreasSection({
                                       )}
                                       {item.imageUrl ? (
                                         <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-white">
-                                          <img
+                                          <ImageWithLoader
                                             src={item.imageUrl}
                                             alt=""
                                             className="h-full w-full object-cover"
@@ -2718,7 +2735,7 @@ export default function StorageAreasSection({
                         <div className="flex min-w-0 gap-3">
                           {item.imageUrl ? (
                             <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-gray-50">
-                              <img
+                              <ImageWithLoader
                                 src={item.imageUrl}
                                 alt=""
                                 className="h-full w-full object-cover"
@@ -2822,7 +2839,7 @@ export default function StorageAreasSection({
                         areaName: activeMobileCategory.area.name,
                       });
                     }}
-                    className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 text-sm font-medium text-rose-700"
+                    className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 text-base font-semibold text-rose-700"
                   >
                     <FaTrash /> Delete category
                   </button>

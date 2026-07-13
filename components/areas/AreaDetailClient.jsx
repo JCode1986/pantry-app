@@ -21,15 +21,18 @@ import {
 } from "@heroui/react";
 import {
   FaBoxOpen,
+  FaCamera,
   FaChevronLeft,
   FaChevronRight,
   FaEdit,
   FaEllipsisV,
+  FaImage,
   FaPlus,
   FaSearch,
   FaTag,
   FaTags,
   FaTrash,
+  FaUpload,
   FaWarehouse,
 } from "react-icons/fa";
 
@@ -40,6 +43,7 @@ import {
   updateCategoryName,
   deleteCategory,
   updateStorageArea,
+  uploadInventoryImage,
 } from "@/app/actions/server";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import EntityImageManager from "@/components/inventory/EntityImageManager";
@@ -59,10 +63,13 @@ import {
 import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
 import { emitInventoryChange } from "@/utils/clientEvents";
 import PaginationControls from "@/components/ui/PaginationControls";
+import ImageWithLoader from "@/components/ui/ImageWithLoader";
 import { daysUntil, isExpiringSoon, toNonNegativeInteger } from "@/utils/pantry/date";
 
 const CATEGORY_SUGGESTIONS = ["Food", "Documents", "Tools", "Medicine", "Clothes", "Electronics"];
 const AREA_DETAIL_PAGE_SIZE = 24;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const SORT_OPTIONS = [
   ["name_asc", "A-Z"],
   ["name_desc", "Z-A"],
@@ -101,6 +108,13 @@ function formatExpiration(value) {
   }).format(date);
 }
 
+function validateImageFile(file) {
+  if (!file) return "";
+  if (!IMAGE_TYPES.has(file.type)) return "Choose a JPG, PNG, WebP, or GIF image.";
+  if (file.size > MAX_IMAGE_SIZE) return "Images must be 5 MB or smaller.";
+  return "";
+}
+
 const pageVariants = {
   hidden: { opacity: 0 },
   show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
@@ -137,6 +151,9 @@ export default function AreaDetailClient({
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
   const [categoriesError, setCategoriesError] = useState("");
   const [newCategory, setNewCategory] = useState("");
+  const [newCategoryImageFile, setNewCategoryImageFile] = useState(null);
+  const [newCategoryImagePreview, setNewCategoryImagePreview] = useState(null);
+  const [newCategoryImageMessage, setNewCategoryImageMessage] = useState("");
   const [collapsedCategoryIds, setCollapsedCategoryIds] = useState(() => new Set());
   const [mobileAddOpen, setMobileAddOpen] = useState(false);
 
@@ -162,6 +179,12 @@ export default function AreaDetailClient({
     name: "",
     busy: false,
   });
+
+  useEffect(() => {
+    return () => {
+      if (newCategoryImagePreview) URL.revokeObjectURL(newCategoryImagePreview);
+    };
+  }, [newCategoryImagePreview]);
 
   const normalizedSearch = search.trim().toLowerCase();
   const loadCategoryPage = useCallback(
@@ -399,6 +422,22 @@ export default function AreaDetailClient({
 
       const created = result?.data;
       if (!created?.id) throw new Error("Category create failed: no id returned");
+      let uploadedImage = null;
+
+      if (newCategoryImageFile) {
+        const formData = new FormData();
+        formData.append("image", newCategoryImageFile);
+        const imageResult = await uploadInventoryImage("category", created.id, formData);
+        if (imageResult?.error) {
+          setNewCategoryImageMessage(
+            typeof imageResult.error === "string"
+              ? imageResult.error
+              : "Category was added, but the photo could not be uploaded."
+          );
+        } else {
+          uploadedImage = imageResult?.data ?? null;
+        }
+      }
 
       setCategories((prev) =>
         sortCategoriesForDisplay(
@@ -407,8 +446,8 @@ export default function AreaDetailClient({
               ? {
                   id: created.id,
                   name: created.name,
-                  image_path: created.image_path ?? null,
-                  imageUrl: null,
+                  image_path: uploadedImage?.imagePath ?? created.image_path ?? null,
+                  imageUrl: uploadedImage?.imageUrl ?? null,
                   itemsCount: 0,
                 }
               : c
@@ -422,6 +461,7 @@ export default function AreaDetailClient({
         id: created.id,
       });
       setMobileAddOpen(false);
+      clearNewCategoryImageFile();
     } catch (e) {
       console.error("addCategory failed:", e);
 
@@ -433,6 +473,30 @@ export default function AreaDetailClient({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const selectNewCategoryImageFile = (file) => {
+    const imageError = validateImageFile(file);
+    if (imageError) {
+      setNewCategoryImageMessage(imageError);
+      return;
+    }
+
+    setNewCategoryImageFile(file ?? null);
+    setNewCategoryImageMessage("");
+    setNewCategoryImagePreview((currentPreview) => {
+      if (currentPreview) URL.revokeObjectURL(currentPreview);
+      return file ? URL.createObjectURL(file) : null;
+    });
+  };
+
+  const clearNewCategoryImageFile = () => {
+    setNewCategoryImageFile(null);
+    setNewCategoryImageMessage("");
+    setNewCategoryImagePreview((currentPreview) => {
+      if (currentPreview) URL.revokeObjectURL(currentPreview);
+      return null;
+    });
   };
 
   const handleRename = async () => {
@@ -565,7 +629,7 @@ export default function AreaDetailClient({
         <div className="mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-md shadow-slate-900/5">
           <div className="h-44 bg-[var(--entity-area-soft)]">
             {areaImageUrl ? (
-              <img src={areaImageUrl} alt="" className="h-full w-full object-cover" />
+              <ImageWithLoader src={areaImageUrl} alt="" className="h-full w-full object-cover" />
             ) : (
               <div className="grid h-full w-full place-items-center text-[var(--entity-area-accent)]">
                 <FaWarehouse className="h-14 w-14" />
@@ -650,7 +714,7 @@ export default function AreaDetailClient({
             <div className="flex items-center gap-3">
               {areaImageUrl && (
                 <div className="h-14 w-14 overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
-                  <img
+                  <ImageWithLoader
                     src={areaImageUrl}
                     alt=""
                     className="h-full w-full object-cover"
@@ -746,7 +810,7 @@ export default function AreaDetailClient({
           <div className="flex min-w-0 items-start gap-4">
             {areaImageUrl ? (
               <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white shadow-sm">
-                <img src={areaImageUrl} alt="" className="h-full w-full object-cover" />
+                <ImageWithLoader src={areaImageUrl} alt="" className="h-full w-full object-cover" />
               </div>
             ) : (
               <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] shadow-sm">
@@ -955,7 +1019,7 @@ export default function AreaDetailClient({
             >
               {cat.imageUrl ? (
                 <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-category-border)] bg-white">
-                  <img src={cat.imageUrl} alt="" className="h-full w-full object-cover" />
+                  <ImageWithLoader src={cat.imageUrl} alt="" className="h-full w-full object-cover" />
                 </div>
               ) : (
                 <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
@@ -1125,7 +1189,7 @@ export default function AreaDetailClient({
                         </span>
                         {cat.imageUrl ? (
                           <span className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white">
-                            <img
+                            <ImageWithLoader
                               src={cat.imageUrl}
                               alt=""
                               className="h-full w-full object-cover"
@@ -1273,7 +1337,7 @@ export default function AreaDetailClient({
                                 <div className="flex min-w-0 items-center gap-3">
                                   {item.imageUrl ? (
                                     <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-white">
-                                      <img
+                                      <ImageWithLoader
                                         src={item.imageUrl}
                                         alt=""
                                         className="h-full w-full object-cover"
@@ -1482,6 +1546,89 @@ export default function AreaDetailClient({
                     suggestions={CATEGORY_SUGGESTIONS}
                     onSelect={setNewCategory}
                   />
+                  <div className="rounded-2xl border border-gray-200 bg-white p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                        <FaImage className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+                        Category photo optional
+                      </div>
+                      {newCategoryImageFile ? (
+                        <span className="rounded-full bg-[var(--stocksense-brand-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--stocksense-brand)]">
+                          Ready to upload
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:h-28 sm:w-40">
+                        {newCategoryImagePreview ? (
+                          <ImageWithLoader
+                            src={newCategoryImagePreview}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="grid h-full w-full place-items-center text-xs text-gray-400">
+                            Optional photo
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-1 flex-col gap-2">
+                        <div className="flex flex-wrap gap-2">
+                          <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 text-sm font-semibold text-[var(--stocksense-brand)] sm:hidden">
+                            <FaCamera className="h-3.5 w-3.5" />
+                            Take photo
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              className="hidden"
+                              onChange={(event) => {
+                                const file = event.target.files?.[0];
+                                event.target.value = "";
+                                selectNewCategoryImageFile(file);
+                              }}
+                            />
+                          </label>
+                          <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 text-sm font-semibold text-[var(--stocksense-brand)]">
+                            <FaUpload className="h-3.5 w-3.5" />
+                            {newCategoryImageFile ? "Change photo" : "Add photo"}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(event) => {
+                                const file = event.target.files?.[0];
+                                event.target.value = "";
+                                selectNewCategoryImageFile(file);
+                              }}
+                            />
+                          </label>
+                          {newCategoryImageFile ? (
+                            <Button
+                              size="sm"
+                              variant="flat"
+                              className="min-h-10 rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
+                              isDisabled={isSaving}
+                              onPress={clearNewCategoryImageFile}
+                              startContent={<FaTrash className="h-3.5 w-3.5" />}
+                            >
+                              Remove photo
+                            </Button>
+                          ) : null}
+                        </div>
+                        <p className="text-xs leading-5 text-gray-500 max-md:hidden">
+                          {newCategoryImageFile
+                            ? newCategoryImageFile.name
+                            : "Take a photo or choose one from your camera roll. Max 5 MB."}
+                        </p>
+                        {newCategoryImageMessage ? (
+                          <p className="text-xs text-rose-700">
+                            {newCategoryImageMessage}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
                 </ModalBody>
                 <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
                   <Button

@@ -24,6 +24,7 @@ import { deleteLocation, updateLocationName } from "@/app/actions/server";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import EntityImageManager from "@/components/inventory/EntityImageManager";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
+import ImageWithLoader from "@/components/ui/ImageWithLoader";
 import {
   modalBodyClass,
   modalContentClass,
@@ -126,7 +127,7 @@ export default function LocationDetailHeaderClient({
         <div className="mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-md shadow-slate-900/5">
           <div className="h-44 bg-[var(--entity-location-soft)]">
             {currentImageUrl ? (
-              <img
+              <ImageWithLoader
                 src={currentImageUrl}
                 alt=""
                 className="h-full w-full object-cover"
@@ -202,7 +203,7 @@ export default function LocationDetailHeaderClient({
           <div className="flex min-w-0 gap-4">
             {currentImageUrl ? (
               <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-location-border)] bg-white shadow-sm">
-                <img src={currentImageUrl} alt="" className="h-full w-full object-cover" />
+                <ImageWithLoader src={currentImageUrl} alt="" className="h-full w-full object-cover" />
               </div>
             ) : (
               <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-[var(--entity-location-border)] bg-[var(--entity-location-soft)] text-[var(--entity-location-accent)] shadow-sm">

@@ -52,6 +52,7 @@ import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
 import { emitInventoryChange } from "@/utils/clientEvents";
 import EntityImageManager from "@/components/inventory/EntityImageManager";
 import PaginationControls from "@/components/ui/PaginationControls";
+import ImageWithLoader from "@/components/ui/ImageWithLoader";
 
 const pageSectionVariants = {
   hidden: { opacity: 0 },
@@ -778,7 +779,7 @@ export default function AreasPageClient({
               >
                 {area.imageUrl ? (
                   <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-area-border)] bg-white">
-                    <img src={area.imageUrl} alt="" className="h-full w-full object-cover" />
+                    <ImageWithLoader src={area.imageUrl} alt="" className="h-full w-full object-cover" />
                   </div>
                 ) : (
                   <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]">
@@ -1059,7 +1060,7 @@ export default function AreasPageClient({
                           )}
                           {a.imageUrl ? (
                             <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white">
-                              <img
+                              <ImageWithLoader
                                 src={a.imageUrl}
                                 alt=""
                                 className="h-full w-full object-cover"
@@ -1177,7 +1178,7 @@ export default function AreasPageClient({
                               >
                                 {item.imageUrl ? (
                                   <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-white">
-                                    <img
+                                    <ImageWithLoader
                                       src={item.imageUrl}
                                       alt=""
                                       className="h-full w-full object-cover"
@@ -1383,7 +1384,7 @@ export default function AreasPageClient({
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                       <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:h-28 sm:w-40">
                         {createAreaImagePreview ? (
-                          <img
+                          <ImageWithLoader
                             src={createAreaImagePreview}
                             alt=""
                             className="h-full w-full object-cover"

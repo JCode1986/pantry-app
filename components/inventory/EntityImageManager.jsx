@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@heroui/react";
-import { FaCamera, FaImage, FaSpinner, FaTrash, FaUpload } from "react-icons/fa";
+import { FaCamera, FaCheck, FaImage, FaSpinner, FaTrash, FaUpload } from "react-icons/fa";
 import {
   removeInventoryImage,
   uploadInventoryImage,
 } from "@/app/actions/server";
+import ImageWithLoader from "@/components/ui/ImageWithLoader";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -21,9 +22,20 @@ export default function EntityImageManager({
   const cameraInputRef = useRef(null);
   const [isWorking, setIsWorking] = useState(false);
   const [error, setError] = useState("");
+  const [pendingFile, setPendingFile] = useState(null);
+  const [pendingPreview, setPendingPreview] = useState(null);
+  const [pendingRemove, setPendingRemove] = useState(false);
   const displayLabel = /optional/i.test(label) ? label : `${label} optional`;
+  const visibleImageUrl = pendingRemove ? null : pendingPreview || imageUrl;
+  const hasPendingChange = Boolean(pendingFile || pendingRemove);
 
-  const uploadImage = async (file) => {
+  useEffect(() => {
+    return () => {
+      if (pendingPreview) URL.revokeObjectURL(pendingPreview);
+    };
+  }, [pendingPreview]);
+
+  const stageImage = (file) => {
     if (!file || !entityType || !entityId) return;
 
     if (file.size > MAX_IMAGE_BYTES) {
@@ -31,13 +43,48 @@ export default function EntityImageManager({
       return;
     }
 
+    setError("");
+    setPendingRemove(false);
+    setPendingFile(file);
+    setPendingPreview((currentPreview) => {
+      if (currentPreview) URL.revokeObjectURL(currentPreview);
+      return URL.createObjectURL(file);
+    });
+  };
+
+  const clearPendingChange = () => {
+    setPendingFile(null);
+    setPendingRemove(false);
+    setError("");
+    setPendingPreview((currentPreview) => {
+      if (currentPreview) URL.revokeObjectURL(currentPreview);
+      return null;
+    });
+  };
+
+  const saveImageChange = async () => {
+    if (!entityType || !entityId || !hasPendingChange) return;
+
     setIsWorking(true);
     setError("");
 
-    const formData = new FormData();
-    formData.append("image", file);
+    if (pendingRemove) {
+      const result = await removeInventoryImage(entityType, entityId);
+      setIsWorking(false);
+
+      if (result?.error) {
+        setError(typeof result.error === "string" ? result.error : "Could not remove image.");
+        return;
+      }
+
+      clearPendingChange();
+      onChange?.(result.data);
+      return;
+    }
 
     try {
+      const formData = new FormData();
+      formData.append("image", pendingFile);
       const result = await uploadInventoryImage(entityType, entityId, formData);
 
       if (result?.error) {
@@ -45,6 +92,7 @@ export default function EntityImageManager({
         return;
       }
 
+      clearPendingChange();
       onChange?.(result.data);
     } catch (err) {
       console.error("uploadInventoryImage request error:", err);
@@ -58,21 +106,14 @@ export default function EntityImageManager({
     }
   };
 
-  const removeImage = async () => {
-    if (!entityType || !entityId) return;
-
-    setIsWorking(true);
+  const stageRemoveImage = () => {
     setError("");
-
-    const result = await removeInventoryImage(entityType, entityId);
-    setIsWorking(false);
-
-    if (result?.error) {
-      setError(typeof result.error === "string" ? result.error : "Could not remove image.");
-      return;
-    }
-
-    onChange?.(result.data);
+    setPendingFile(null);
+    setPendingRemove(true);
+    setPendingPreview((currentPreview) => {
+      if (currentPreview) URL.revokeObjectURL(currentPreview);
+      return null;
+    });
   };
 
   return (
@@ -87,15 +128,15 @@ export default function EntityImageManager({
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:h-32 sm:w-44">
-          {imageUrl ? (
-            <img
-              src={imageUrl}
+          {visibleImageUrl ? (
+            <ImageWithLoader
+              src={visibleImageUrl}
               alt=""
               className="h-full w-full object-contain"
             />
           ) : (
             <div className="grid h-full w-full place-items-center text-xs text-gray-400">
-              Optional photo
+              {pendingRemove ? "Photo will be removed" : "Optional photo"}
             </div>
           )}
         </div>
@@ -109,7 +150,7 @@ export default function EntityImageManager({
             onChange={(event) => {
               const file = event.target.files?.[0];
               event.target.value = "";
-              uploadImage(file);
+              stageImage(file);
             }}
           />
           <input
@@ -121,7 +162,7 @@ export default function EntityImageManager({
             onChange={(event) => {
               const file = event.target.files?.[0];
               event.target.value = "";
-              uploadImage(file);
+              stageImage(file);
             }}
           />
           <div className="flex flex-wrap gap-2">
@@ -143,23 +184,53 @@ export default function EntityImageManager({
               onPress={() => fileInputRef.current?.click()}
               startContent={<FaUpload className="h-3.5 w-3.5" />}
             >
-              {imageUrl ? "Change photo" : "Add photo"}
+              {visibleImageUrl ? "Change photo" : "Add photo"}
             </Button>
-            {imageUrl && (
+            {(imageUrl || pendingFile) && (
               <Button
                 size="sm"
                 variant="flat"
                 className="min-h-10 rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
                 isDisabled={isWorking}
-                onPress={removeImage}
+                onPress={pendingFile ? clearPendingChange : stageRemoveImage}
                 startContent={<FaTrash className="h-3.5 w-3.5" />}
               >
-                Remove photo
+                {pendingFile ? "Clear photo" : "Remove photo"}
+              </Button>
+            )}
+            {hasPendingChange && (
+              <Button
+                size="sm"
+                className="min-h-10 rounded-xl bg-[var(--stocksense-brand)] text-white"
+                isDisabled={isWorking || !entityId}
+                onPress={saveImageChange}
+                startContent={
+                  isWorking ? (
+                    <FaSpinner className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <FaCheck className="h-3.5 w-3.5" />
+                  )
+                }
+              >
+                Save photo
+              </Button>
+            )}
+            {hasPendingChange && (
+              <Button
+                size="sm"
+                variant="flat"
+                className="min-h-10 rounded-xl border border-gray-200 bg-white text-gray-700"
+                isDisabled={isWorking}
+                onPress={clearPendingChange}
+              >
+                Cancel change
               </Button>
             )}
           </div>
           <p className="text-xs leading-5 text-gray-500 max-md:hidden">
-            Take a photo or choose one from your camera roll. Max 5 MB.
+            {hasPendingChange
+              ? "Save this photo change before closing."
+              : "Take a photo or choose one from your camera roll. Max 5 MB."}
           </p>
           {error && <p className="text-xs text-rose-700">{error}</p>}
         </div>

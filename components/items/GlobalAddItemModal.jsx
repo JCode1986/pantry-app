@@ -53,6 +53,7 @@ import {
 } from "@/components/modals/modalTheme";
 import BarcodeScannerModal from "@/components/items/BarcodeScannerModal";
 import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
+import ImageWithLoader from "@/components/ui/ImageWithLoader";
 
 const NEW_VALUE = "__new__";
 const EMPTY_LIST = [];
@@ -1516,7 +1517,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                             <div className="flex items-center gap-3">
                               {productPreview.imageUrl && (
                                 <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-stocksense-gray bg-white">
-                                  <img
+                                  <ImageWithLoader
                                     src={productPreview.imageUrl}
                                     alt=""
                                     className="h-full w-full object-cover"
@@ -1643,7 +1644,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                           <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:h-32 sm:w-44">
                             {selectedImagePreview || productPreview?.imageUrl ? (
-                              <img
+                              <ImageWithLoader
                                 src={selectedImagePreview || productPreview.imageUrl}
                                 alt=""
                                 className="h-full w-full object-contain"
@@ -1710,7 +1711,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
             </ModalBody>
 
             <ModalFooter
-              className="wherekeep-modal-footer flex shrink-0 flex-col gap-2 border-t border-gray-200 bg-white max-md:sticky max-md:bottom-0 max-md:z-20 max-md:px-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)] sm:flex-row sm:items-center sm:justify-end"
+              className="wherekeep-modal-footer flex shrink-0 flex-col gap-2 border-t border-gray-200 bg-white max-md:sticky max-md:bottom-0 max-md:z-20 max-md:px-4 max-md:pb-[max(4.5rem,calc(env(safe-area-inset-bottom)+1rem))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)] sm:flex-row sm:items-center sm:justify-end"
             >
               <AnimatePresence initial={false}>
                 {mobileAddedToast && (

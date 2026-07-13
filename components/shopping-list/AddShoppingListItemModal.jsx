@@ -27,6 +27,7 @@ import MobileSuggestionChips from "@/components/modals/MobileSuggestionChips";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
 import useDesktopAutoFocus from "@/components/modals/useDesktopAutoFocus";
+import ImageWithLoader from "@/components/ui/ImageWithLoader";
 
 const EMPTY_FORM = {
   name: "",
@@ -251,7 +252,11 @@ export default function AddShoppingListItemModal({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:h-28 sm:w-40">
                     {imagePreview ? (
-                      <img src={imagePreview} alt="" className="h-full w-full object-contain" />
+                      <ImageWithLoader
+                        src={imagePreview}
+                        alt=""
+                        className="h-full w-full object-contain"
+                      />
                     ) : (
                       <div className="grid h-full w-full place-items-center text-xs text-gray-400">
                         Optional photo

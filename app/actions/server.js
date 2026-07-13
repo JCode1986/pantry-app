@@ -2195,9 +2195,12 @@ async function normalizeItemsForList({
   const locationMap = new Map(
     (locationsRaw ?? []).map((location) => [String(location.id), location])
   );
-  const urlsByPath = await getInventoryImageUrls(
-    (itemsRaw ?? []).map((item) => item.image_path)
-  );
+  const urlsByPath = await getInventoryImageUrls([
+    ...(itemsRaw ?? []).map((item) => item.image_path),
+    ...(categoriesRaw ?? []).map((category) => category.image_path),
+    ...(areasRaw ?? []).map((area) => area.image_path),
+    ...(locationsRaw ?? []).map((location) => location.image_path),
+  ]);
 
   return (itemsRaw ?? []).map((item) => {
     const category = item.category_id
@@ -2219,17 +2222,28 @@ async function normalizeItemsForList({
       image_path: item.image_path ?? null,
       imageUrl: urlsByPath.get(item.image_path) ?? null,
       category_id: item.category_id ?? null,
-      category: category ? { id: category.id, name: category.name } : null,
+      category: category
+        ? {
+            id: category.id,
+            name: category.name,
+            image_path: category.image_path ?? null,
+            imageUrl: urlsByPath.get(category.image_path) ?? null,
+          }
+        : null,
       area: area
         ? {
             id: area.id,
             name: area.name,
+            image_path: area.image_path ?? null,
+            imageUrl: urlsByPath.get(area.image_path) ?? null,
           }
         : null,
       location: location
         ? {
             id: location.id,
             name: location.name,
+            image_path: location.image_path ?? null,
+            imageUrl: urlsByPath.get(location.image_path) ?? null,
           }
         : null,
     };
@@ -2343,7 +2357,7 @@ export async function getItemsPageAction({
   const { data: categoriesRaw, error: categoriesError } = categoryIds.length
     ? await supabase
         .from('storage_categories')
-        .select('id, name, storage_area_id')
+        .select('id, name, storage_area_id, image_path')
         .in('id', categoryIds)
     : { data: [], error: null };
 
@@ -2361,7 +2375,7 @@ export async function getItemsPageAction({
   const { data: areasRaw, error: areasError } = areaIds.length
     ? await supabase
         .from('storage_areas')
-        .select('id, name, location_id')
+        .select('id, name, location_id, image_path')
         .in('id', areaIds)
     : { data: [], error: null };
 
@@ -2377,7 +2391,7 @@ export async function getItemsPageAction({
     ...new Set((areasRaw ?? []).map((area) => area.location_id).filter(Boolean)),
   ];
   const { data: locationsRaw, error: locationsError } = locationIds.length
-    ? await supabase.from('locations').select('id, name').in('id', locationIds)
+    ? await supabase.from('locations').select('id, name, image_path').in('id', locationIds)
     : { data: [], error: null };
 
   if (locationsError) {

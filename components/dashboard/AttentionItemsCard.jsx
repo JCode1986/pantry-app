@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LuPackage, LuPackageOpen } from "react-icons/lu";
 import { daysUntil } from "@/utils/pantry/date";
+import ImageWithLoader from "@/components/ui/ImageWithLoader";
 
 function itemPath(item) {
   return [item.locationName, item.areaName, item.categoryName]
@@ -26,7 +27,7 @@ function ItemThumb({ item }) {
   if (item.imageUrl) {
     return (
       <span className="block h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-white">
-        <img
+        <ImageWithLoader
           src={item.imageUrl}
           alt=""
           className="h-full w-full object-cover"
