@@ -10,6 +10,7 @@ import {
 import {
   getHouseholdBilling,
   getHouseholdForUser,
+  hasHouseholdInviteMetadata,
 } from "@/utils/households";
 
 const APPEARANCE_UPGRADE_MESSAGE =
@@ -66,7 +67,7 @@ async function canCustomizeAppearance(user) {
   const { household } = await getHouseholdForUser({
     userId: user?.id,
     email: user?.email,
-    createIfMissing: true,
+    createIfMissing: !hasHouseholdInviteMetadata(user),
   });
   const billing = await getHouseholdBilling(household);
 

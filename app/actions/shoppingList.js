@@ -9,6 +9,7 @@ import {
   canEditHouseholdInventory,
   getHouseholdBilling,
   getHouseholdForUser,
+  hasHouseholdInviteMetadata,
 } from "@/utils/households";
 import {
   getInventoryImageUrl,
@@ -97,7 +98,7 @@ async function getAuthedHousehold() {
     const { household, member } = await getHouseholdForUser({
       userId: user.id,
       email: user.email,
-      createIfMissing: true,
+      createIfMissing: !hasHouseholdInviteMetadata(user),
     });
 
     if (!household?.id) {

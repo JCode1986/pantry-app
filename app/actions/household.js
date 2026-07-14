@@ -14,6 +14,7 @@ import {
   getHouseholdForUser,
   getHouseholdMemberCount,
   getInviteExpirationDate,
+  hasHouseholdInviteMetadata,
   isValidInviteEmail,
   normalizeHouseholdRole,
   normalizeInviteEmail,
@@ -89,7 +90,7 @@ async function getAuthedHousehold({ createIfMissing = true } = {}) {
     const { household, member } = await getHouseholdForUser({
       userId: user.id,
       email: user.email,
-      createIfMissing,
+      createIfMissing: createIfMissing && !hasHouseholdInviteMetadata(user),
     });
 
     if (!household || !member) {

@@ -29,6 +29,15 @@ export function hasHouseholdInviteMetadata(user) {
   return Boolean(user?.invited_at || user?.user_metadata?.household_invite_token);
 }
 
+function isDuplicateOwnerHouseholdError(error) {
+  return (
+    error?.code === "23505" ||
+    /households_owner_id_key|duplicate key value violates unique constraint/i.test(
+      error?.message || ""
+    )
+  );
+}
+
 export async function getCanEditInventoryForUser(user) {
   if (!user?.id) return false;
 
@@ -174,7 +183,7 @@ export async function getHouseholdForUser({
     .select("id, owner_id, name, created_at, updated_at")
     .single();
 
-  if (householdError?.code === "23505") {
+  if (isDuplicateOwnerHouseholdError(householdError)) {
     household = await getOwnedHousehold();
     householdError = household ? null : householdError;
   }

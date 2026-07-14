@@ -8,6 +8,7 @@ import {
   canEditHouseholdInventory,
   getHouseholdBilling,
   getHouseholdForUser,
+  hasHouseholdInviteMetadata,
 } from '@/utils/households';
 import {
   INVENTORY_IMAGE_BUCKET,
@@ -540,7 +541,7 @@ async function getCurrentHouseholdContext() {
   const { household, member } = await getHouseholdForUser({
     userId: user.id,
     email: user.email,
-    createIfMissing: true,
+    createIfMissing: !hasHouseholdInviteMetadata(user),
   });
 
   return { user, household, member };
