@@ -11,7 +11,7 @@ import {
   ModalHeader,
 } from "@heroui/react";
 import { FaClock, FaSignOutAlt, FaSpinner } from "react-icons/fa";
-import { logoutAction, refreshTokenIfNeeded } from "@/app/actions/auth";
+import { refreshTokenIfNeeded } from "@/app/actions/auth";
 import {
   DEFAULT_PREFERENCES,
   PREFERENCE_STORAGE_KEY,
@@ -128,11 +128,10 @@ export default function InactivityLogout({ isAuthenticated: serverAuthenticated 
 
     try {
       resetLocalPreferences();
-      const result = await logoutAction();
-      window.location.href = result?.redirectTo || "/login";
+      window.location.replace("/logout");
     } catch (error) {
       console.error("Idle logout failed:", error);
-      window.location.href = "/login";
+      window.location.replace("/logout");
     }
   }, []);
 

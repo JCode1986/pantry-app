@@ -22,7 +22,9 @@ export default function ForgotPasswordPage() {
     setOk(null);
 
     const origin =
-      typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+      typeof window !== 'undefined'
+        ? window.location.origin
+        : process.env.NEXT_PUBLIC_APP_URL || 'https://www.wherekeep.com';
 
     const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${origin}/reset-password`,

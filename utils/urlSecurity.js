@@ -3,6 +3,11 @@ const DEFAULT_APP_URL =
     ? "https://www.wherekeep.com"
     : "http://localhost:3000";
 
+const KNOWN_APP_ORIGINS = new Set([
+  "https://www.wherekeep.com",
+  "https://wherekeep.com",
+]);
+
 export function getCanonicalAppUrl() {
   const candidate = process.env.NEXT_PUBLIC_APP_URL || DEFAULT_APP_URL;
 
@@ -22,7 +27,11 @@ export function isAllowedOrigin(origin) {
   if (!origin) return true;
 
   try {
-    return new URL(origin).origin === getCanonicalAppUrl();
+    const requestOrigin = new URL(origin).origin;
+    return (
+      requestOrigin === getCanonicalAppUrl() ||
+      KNOWN_APP_ORIGINS.has(requestOrigin)
+    );
   } catch {
     return false;
   }

@@ -124,6 +124,38 @@ function getUserDisplayName(user) {
   return name ? String(name).trim() : "";
 }
 
+function getEmailDisplayName(email) {
+  const name = String(email || "").split("@")[0]?.trim();
+  return name || "";
+}
+
+function getInviteOwnerDisplayName(user) {
+  return getUserDisplayName(user) || getEmailDisplayName(user?.email) || "the household owner";
+}
+
+async function getUserDisplayNameById(admin, userId, fallback = "") {
+  if (!userId) return fallback;
+
+  const { data, error } = await admin.auth.admin.getUserById(userId);
+  if (error) {
+    console.warn("Could not load household owner display name:", error);
+    return fallback;
+  }
+
+  return getUserDisplayName(data?.user) || getEmailDisplayName(data?.user?.email) || fallback;
+}
+
+function needsInvitePasswordSetup(user) {
+  return (
+    user?.user_metadata?.requires_password_setup !== false &&
+    Boolean(
+      user?.user_metadata?.requires_password_setup ||
+        user?.invited_at ||
+        user?.user_metadata?.household_invite_token
+    )
+  );
+}
+
 async function getMemberDisplayNames(admin, members = []) {
   const userIds = [
     ...new Set(
@@ -203,13 +235,26 @@ function createEmailClient() {
   );
 }
 
-async function sendExistingUserInviteEmail({ email, redirectTo }) {
+async function sendExistingUserInviteEmail({
+  email,
+  redirectTo,
+  householdName,
+  ownerDisplayName,
+  role,
+}) {
   const supabase = createEmailClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
       emailRedirectTo: redirectTo,
       shouldCreateUser: false,
+      data: {
+        household_name: householdName,
+        household_owner_name: ownerDisplayName,
+        owner_display_name: ownerDisplayName,
+        invited_by_display_name: ownerDisplayName,
+        household_invite_role: normalizeHouseholdRole(role),
+      },
     },
   });
 
@@ -223,7 +268,15 @@ async function sendExistingUserInviteEmail({ email, redirectTo }) {
   return { sent: true, emailType: "magic_link", error: null };
 }
 
-async function sendInviteEmail({ admin, email, householdName, inviteToken, appUrl, role }) {
+async function sendInviteEmail({
+  admin,
+  email,
+  householdName,
+  ownerDisplayName,
+  inviteToken,
+  appUrl,
+  role,
+}) {
   const acceptPath = `/invite/${inviteToken}`;
   const redirectTo = `${appUrl}/magic-link-sync?redirectTo=${encodeURIComponent(acceptPath)}`;
 
@@ -231,6 +284,9 @@ async function sendInviteEmail({ admin, email, householdName, inviteToken, appUr
     redirectTo,
     data: {
       household_name: householdName,
+      household_owner_name: ownerDisplayName,
+      owner_display_name: ownerDisplayName,
+      invited_by_display_name: ownerDisplayName,
       household_invite_token: inviteToken,
       household_invite_role: normalizeHouseholdRole(role),
       requires_password_setup: true,
@@ -239,7 +295,13 @@ async function sendInviteEmail({ admin, email, householdName, inviteToken, appUr
 
   if (error) {
     if (isAlreadyRegisteredError(error)) {
-      return sendExistingUserInviteEmail({ email, redirectTo });
+      return sendExistingUserInviteEmail({
+        email,
+        redirectTo,
+        householdName,
+        ownerDisplayName,
+        role,
+      });
     }
 
     return {
@@ -350,7 +412,11 @@ async function prepareExistingHouseholdForInviteAcceptance({
 
   if (inviteDeleteError) throw inviteDeleteError;
 
-  return { error: null };
+  return {
+    error: null,
+    mergedExistingData: hasSavedData,
+    dataSummary,
+  };
 }
 
 export async function getHouseholdSharingAction() {
@@ -485,6 +551,7 @@ export async function createHouseholdInviteAction(email, role = HOUSEHOLD_ROLES.
       admin,
       email: normalizedEmail,
       householdName: household.name,
+      ownerDisplayName: getInviteOwnerDisplayName(user),
       inviteToken: token,
       appUrl,
       role: inviteRole,
@@ -595,6 +662,7 @@ export async function resendHouseholdInviteAction(inviteId) {
       admin,
       email: invite.email,
       householdName: household.name,
+      ownerDisplayName: getInviteOwnerDisplayName(user),
       inviteToken: token,
       appUrl,
       role: normalizeHouseholdRole(invite.role),
@@ -743,12 +811,40 @@ export async function getHouseholdInvitePreviewAction(token) {
     const admin = createAdminClient();
     const { data: invite, error } = await admin
       .from("household_invites")
-      .select("email, role, status, expires_at, households(name)")
+      .select("id, household_id, email, role, status, expires_at, accepted_by, households(owner_id, name)")
       .eq("token", token)
       .maybeSingle();
 
     if (error) throw error;
     if (!invite) return actionError("This invite link was not found.");
+
+    const ownerDisplayName = await getUserDisplayNameById(
+      admin,
+      invite.households?.owner_id,
+      "the household owner"
+    );
+
+    let alreadyAccepted = false;
+    let requiresPasswordSetup = false;
+    const { user } = await getAuthedUser();
+
+    if (
+      user?.id &&
+      invite.status === "accepted" &&
+      normalizeInviteEmail(user.email) === normalizeInviteEmail(invite.email)
+    ) {
+      const { data: membership, error: membershipError } = await admin
+        .from("household_members")
+        .select("household_id")
+        .eq("user_id", user.id)
+        .eq("household_id", invite.household_id)
+        .maybeSingle();
+
+      if (membershipError) throw membershipError;
+
+      alreadyAccepted = Boolean(membership?.household_id);
+      requiresPasswordSetup = alreadyAccepted ? needsInvitePasswordSetup(user) : false;
+    }
 
     return {
       data: {
@@ -757,6 +853,9 @@ export async function getHouseholdInvitePreviewAction(token) {
         status: invite.status,
         expiresAt: invite.expires_at,
         householdName: invite.households?.name || "Household",
+        ownerDisplayName,
+        alreadyAccepted,
+        requiresPasswordSetup,
       },
       error: null,
     };
@@ -776,13 +875,50 @@ export async function acceptHouseholdInviteAction(token, options = {}) {
     const admin = createAdminClient();
     const { data: invite, error: inviteError } = await admin
       .from("household_invites")
-      .select("id, household_id, email, role, status, expires_at, households(id, owner_id, name)")
+      .select("id, household_id, email, role, status, expires_at, accepted_by, households(id, owner_id, name)")
       .eq("token", token)
       .maybeSingle();
 
     if (inviteError) throw inviteError;
     if (!invite) return actionError("This invite link was not found.");
-    if (invite.status !== "pending") return actionError("This invite is no longer active.");
+
+    if (normalizeInviteEmail(user.email) !== normalizeInviteEmail(invite.email)) {
+      return actionError(`This invite was sent to ${invite.email}. Log in with that email to accept it.`);
+    }
+
+    const household = invite.households;
+    const ownerDisplayName = await getUserDisplayNameById(
+      admin,
+      household?.owner_id,
+      "the household owner"
+    );
+
+    if (invite.status !== "pending") {
+      if (invite.status === "accepted") {
+        const { data: acceptedMembership, error: acceptedMembershipError } = await admin
+          .from("household_members")
+          .select("household_id")
+          .eq("user_id", user.id)
+          .eq("household_id", invite.household_id)
+          .maybeSingle();
+
+        if (acceptedMembershipError) throw acceptedMembershipError;
+
+        if (acceptedMembership?.household_id) {
+          return {
+            data: {
+              householdName: household?.name || "Household",
+              ownerDisplayName,
+              requiresPasswordSetup: needsInvitePasswordSetup(user),
+              alreadyAccepted: true,
+            },
+            error: null,
+          };
+        }
+      }
+
+      return actionError("This invite is no longer active.");
+    }
 
     const expiresAt = new Date(invite.expires_at);
     if (Number.isNaN(expiresAt.getTime()) || expiresAt < new Date()) {
@@ -793,11 +929,6 @@ export async function acceptHouseholdInviteAction(token, options = {}) {
       return actionError("This invite has expired. Ask for a new one.");
     }
 
-    if (normalizeInviteEmail(user.email) !== normalizeInviteEmail(invite.email)) {
-      return actionError(`This invite was sent to ${invite.email}. Log in with that email to accept it.`);
-    }
-
-    const household = invite.households;
     const billing = await getHouseholdBilling(household);
     if (billing.effectivePlanId !== "family") {
       return actionError("This household needs an active Family plan before members can join.");
@@ -817,11 +948,13 @@ export async function acceptHouseholdInviteAction(token, options = {}) {
 
     if (membershipError) throw membershipError;
 
+    let preparation = null;
+
     if (
       existingMembership?.household_id &&
       existingMembership.household_id !== invite.household_id
     ) {
-      const preparation = await prepareExistingHouseholdForInviteAcceptance({
+      preparation = await prepareExistingHouseholdForInviteAcceptance({
         admin,
         fromHouseholdId: existingMembership.household_id,
         toHouseholdId: invite.household_id,
@@ -835,6 +968,7 @@ export async function acceptHouseholdInviteAction(token, options = {}) {
           data: {
             requiresMerge: true,
             householdName: household?.name || "Household",
+            ownerDisplayName,
             role: normalizeHouseholdRole(invite.role),
             dataSummary: preparation.dataSummary,
           },
@@ -881,9 +1015,7 @@ export async function acceptHouseholdInviteAction(token, options = {}) {
 
     if (updateInviteError) throw updateInviteError;
 
-    const requiresPasswordSetup = Boolean(
-      user.invited_at || user.user_metadata?.household_invite_token
-    );
+    const requiresPasswordSetup = needsInvitePasswordSetup(user);
 
     const { data: updatedUser, error: updateUserError } =
       await admin.auth.admin.updateUserById(user.id, {
@@ -920,7 +1052,10 @@ export async function acceptHouseholdInviteAction(token, options = {}) {
     return {
       data: {
         householdName: household?.name || "Household",
+        ownerDisplayName,
         requiresPasswordSetup,
+        mergedExistingData: Boolean(preparation?.mergedExistingData),
+        dataSummary: preparation?.dataSummary ?? null,
       },
       error: null,
     };

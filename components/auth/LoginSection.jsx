@@ -164,7 +164,7 @@ export default function LoginPage({ mode = 'login' }) {
         emailRedirectTo:
           typeof window !== 'undefined'
             ? `${window.location.origin}/magic-link-sync?redirectTo=${encodeURIComponent(loginRedirect)}`
-            : `http://localhost:3000/magic-link-sync?redirectTo=${encodeURIComponent(loginRedirect)}`,
+            : `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.wherekeep.com'}/magic-link-sync?redirectTo=${encodeURIComponent(loginRedirect)}`,
       },
     });
 

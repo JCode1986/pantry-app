@@ -14,22 +14,45 @@ function redirectWithCookies(url, sourceResponse) {
   return copyCookies(sourceResponse, NextResponse.redirect(url));
 }
 
+function isSupabaseAuthCookie(name) {
+  return (
+    name.startsWith("sb-") &&
+    (name.includes("-auth-token") || name.includes("-auth-token."))
+  );
+}
+
+function clearAuthCookies(response, request) {
+  response.cookies.delete("pantry_session");
+
+  request.cookies.getAll().forEach((cookie) => {
+    if (isSupabaseAuthCookie(cookie.name)) {
+      response.cookies.delete(cookie.name);
+    }
+  });
+
+  response.cookies.getAll().forEach((cookie) => {
+    if (isSupabaseAuthCookie(cookie.name)) {
+      response.cookies.delete(cookie.name);
+    }
+  });
+
+  return response;
+}
+
+function hasSupabaseAuthCookie(request) {
+  return request.cookies.getAll().some((cookie) => isSupabaseAuthCookie(cookie.name));
+}
+
 export async function middleware(req) {
   const { response: supabaseResponse, user } = await updateSession(req);
   const session = await getSession();
   const hasAppSession = Boolean(session?.user?.access_token);
-  const requiresPasswordSetup = Boolean(
-    user?.user_metadata?.requires_password_setup ||
-      session?.user?.user?.user_metadata?.requires_password_setup
-  );
+  const hasSupabaseAuthSession = hasSupabaseAuthCookie(req);
 
   const { pathname } = req.nextUrl;
   const isLoginPage = pathname === "/login";
   const isSignupPage = pathname === "/signup";
   const isAuthPage = isLoginPage || isSignupPage;
-  const isProfilePage = pathname === "/profile" || pathname.startsWith("/profile/");
-  const isInvitePage = pathname === "/invite" || pathname.startsWith("/invite/");
-  const isMagicLinkSyncPage = pathname === "/magic-link-sync";
 
   const protectedRoots = [
     "/locations",
@@ -45,6 +68,10 @@ export async function middleware(req) {
     (root) => pathname === root || pathname.startsWith(root + "/")
   );
 
+  if (!user && hasAppSession) {
+    session.destroy();
+  }
+
   // If Supabase has no active user for a protected route, send them through login.
   if (!user && isProtected && !isAuthPage) {
     const loginUrl = new URL("/login", req.url);
@@ -53,33 +80,16 @@ export async function middleware(req) {
       `${pathname}${req.nextUrl.search}`
     );
     const redirect = redirectWithCookies(loginUrl, supabaseResponse);
-    redirect.cookies.delete("pantry_session");
-    return redirect;
+    return clearAuthCookies(redirect, req);
   }
 
-  if (
-    user &&
-    requiresPasswordSetup &&
-    !isProfilePage &&
-    !isInvitePage &&
-    !isMagicLinkSyncPage
-  ) {
-    return redirectWithCookies(
-      new URL("/profile?setup=password", req.url),
-      supabaseResponse
-    );
+  if (!user && (hasAppSession || hasSupabaseAuthSession)) {
+    return clearAuthCookies(supabaseResponse, req);
   }
 
   // If both auth layers agree the user is signed in, keep auth pages out of the way.
   // If Iron Session is missing, allow /login so the app session can be repaired.
   if (isAuthPage && user && hasAppSession) {
-    if (requiresPasswordSetup) {
-      return redirectWithCookies(
-        new URL("/profile?setup=password", req.url),
-        supabaseResponse
-      );
-    }
-
     const redirectTo = req.nextUrl.searchParams.get("redirectTo");
     const safeRedirect =
       redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//")

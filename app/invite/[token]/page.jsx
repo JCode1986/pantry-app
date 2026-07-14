@@ -21,12 +21,19 @@ export default async function InvitePage({ params }) {
   const session = await getSessionForLayout();
   const account = session?.user?.user;
   const previewResult = await getHouseholdInvitePreviewAction(token);
+  const preview = previewResult?.data ?? null;
+  const inactiveInviteError =
+    preview &&
+    preview.status !== "pending" &&
+    !preview.alreadyAccepted
+      ? "This invite is no longer active."
+      : null;
 
   return (
     <AcceptInviteClient
       token={token}
-      preview={previewResult?.data ?? null}
-      previewError={previewResult?.error ?? null}
+      preview={preview}
+      previewError={previewResult?.error ?? inactiveInviteError}
       isAuthenticated={Boolean(session?.user?.access_token && account?.id)}
       userEmail={account?.email ?? null}
     />

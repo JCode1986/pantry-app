@@ -1,7 +1,10 @@
 import { Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import Navigation from "@/components/app-shell/Navigation";
 import SupportChatbot from "@/components/app-shell/SupportChatbot";
+import InviteAcceptedModal from "@/components/auth/InviteAcceptedModal";
+import InvitePasswordSetupModal from "@/components/auth/InvitePasswordSetupModal";
 import { getSessionForLayout } from "./actions/auth";
 import { Providers } from "@/components/app-shell/Providers";
 import { getPreferenceBootScript } from "@/utils/appPreferences";
@@ -99,6 +102,16 @@ function toDateString(date) {
   return `${year}-${month}-${day}`;
 }
 
+function getErrorMessage(error) {
+  if (!error) return null;
+  return error.message || error.code || String(error);
+}
+
+function logNavigationWarning(message, details) {
+  if (process.env.NODE_ENV === "production") return;
+  console.warn(message, details);
+}
+
 async function getNavigationAttentionCounts(supabase, withinDays = 3) {
   const today = toDateString(new Date());
   const cutoff = toDateString(addDays(new Date(), withinDays));
@@ -142,14 +155,14 @@ async function getNavigationAttentionCounts(supabase, withinDays = 3) {
     categoriesError ||
     itemsError
   ) {
-    console.error("Navigation attention count error:", {
-      expiredError,
-      expiringSoonError,
-      shoppingListError,
-      locationsError,
-      storageAreasError,
-      categoriesError,
-      itemsError,
+    logNavigationWarning("Navigation attention counts unavailable.", {
+      expiredError: getErrorMessage(expiredError),
+      expiringSoonError: getErrorMessage(expiringSoonError),
+      shoppingListError: getErrorMessage(shoppingListError),
+      locationsError: getErrorMessage(locationsError),
+      storageAreasError: getErrorMessage(storageAreasError),
+      categoriesError: getErrorMessage(categoriesError),
+      itemsError: getErrorMessage(itemsError),
     });
     return {
       expiredCount: 0,
@@ -198,9 +211,9 @@ async function getNavigationHouseholdCounts(householdId) {
   ]);
 
   if (membersError || invitesError) {
-    console.error("Navigation household count error:", {
-      membersError,
-      invitesError,
+    logNavigationWarning("Navigation household counts unavailable.", {
+      membersError: getErrorMessage(membersError),
+      invitesError: getErrorMessage(invitesError),
     });
     return {
       memberCount: 0,
@@ -224,6 +237,17 @@ function getPreferredName(user) {
     "";
 
   return name ? String(name).trim() : "";
+}
+
+function needsInvitePasswordSetup(user) {
+  return (
+    user?.user_metadata?.requires_password_setup !== false &&
+    Boolean(
+      user?.user_metadata?.requires_password_setup ||
+        user?.invited_at ||
+        user?.user_metadata?.household_invite_token
+    )
+  );
 }
 
 export default async function RootLayout({ children }) {
@@ -258,7 +282,7 @@ export default async function RootLayout({ children }) {
       } = await supabase.auth.getUser();
       currentUser = user ?? null;
     } catch (err) {
-      console.error("Navigation Supabase user error:", err);
+      logNavigationWarning("Navigation Supabase user unavailable.", getErrorMessage(err));
     }
   }
 
@@ -272,9 +296,12 @@ export default async function RootLayout({ children }) {
 
       if (!userError && user?.id === currentUser.id) {
         currentUser = user;
+      } else if (!user) {
+        currentUser = null;
       }
     } catch (err) {
-      console.error("Navigation Supabase display name error:", err);
+      logNavigationWarning("Navigation Supabase display name unavailable.", getErrorMessage(err));
+      currentUser = null;
     }
   }
 
@@ -299,7 +326,7 @@ export default async function RootLayout({ children }) {
         ...(await getNavigationHouseholdCounts(household?.id)),
       };
     } catch (err) {
-      console.error("Navigation household role error:", err);
+      logNavigationWarning("Navigation household summary unavailable.", getErrorMessage(err));
     }
 
     try {
@@ -309,7 +336,7 @@ export default async function RootLayout({ children }) {
         ...(await getNavigationAttentionCounts(supabase)),
       };
     } catch (err) {
-      console.error("Navigation attention count error:", err);
+      logNavigationWarning("Navigation attention counts unavailable.", getErrorMessage(err));
     }
   }
 
@@ -326,6 +353,16 @@ export default async function RootLayout({ children }) {
       <div className={`bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10 ${currentUser?.id ? "wherekeep-auth-shell" : ""}`}>
         {children}
       </div>
+      {currentUser?.id && (
+        <InvitePasswordSetupModal
+          requiresPasswordSetup={needsInvitePasswordSetup(currentUser)}
+        />
+      )}
+      {currentUser?.id && (
+        <Suspense fallback={null}>
+          <InviteAcceptedModal />
+        </Suspense>
+      )}
       {currentUser?.id && <SupportChatbot />}
     </>
   );

@@ -1,5 +1,6 @@
 import { getSession } from '@/lib/sessionOptions';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@/utils/supabase/server';
 import { isAllowedOrigin } from '@/utils/urlSecurity';
 
 function json(payload, status = 200) {
@@ -29,7 +30,7 @@ function getTokenClient() {
 export async function POST(req) {
   try {
     if (!isAllowedOrigin(req.headers.get('origin'))) {
-      return json({ error: 'Invalid request origin.' }, 403);
+      return json({ code: 'invalid-origin', error: 'Invalid request origin.' }, 403);
     }
 
     const body = await req.json();
@@ -40,11 +41,11 @@ export async function POST(req) {
     const expiresAt = Number(body?.expires_at);
 
     if (!accessToken || !refreshToken || !Number.isFinite(expiresAt)) {
-      return json({ error: 'Session tokens are required.' }, 400);
+      return json({ code: 'missing-session-tokens', error: 'Session tokens are required.' }, 400);
     }
 
     if (expiresAt <= Math.floor(Date.now() / 1000)) {
-      return json({ error: 'Session token has expired.' }, 401);
+      return json({ code: 'expired-session-token', error: 'Session token has expired.' }, 401);
     }
 
     const supabase = getTokenClient();
@@ -54,11 +55,24 @@ export async function POST(req) {
     } = await supabase.auth.getUser(accessToken);
 
     if (error || !user?.id) {
-      return json({ error: 'Invalid session token.' }, 401);
+      return json({ code: 'invalid-session-token', error: 'Invalid session token.' }, 401);
     }
 
     if (body?.user?.id && body.user.id !== user.id) {
-      return json({ error: 'Session user mismatch.' }, 403);
+      return json({ code: 'session-user-mismatch', error: 'Session user mismatch.' }, 403);
+    }
+
+    const serverSupabase = await createClient();
+    const { error: setSessionError } = await serverSupabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+
+    if (setSessionError) {
+      return json({
+        code: 'server-session-sync-failed',
+        error: setSessionError.message || 'Failed to sync server session.',
+      }, 401);
     }
 
     const session = await getSession();
@@ -76,6 +90,6 @@ export async function POST(req) {
     return json({ success: true });
   } catch (err) {
     console.error('API sync-session error:', err);
-    return json({ error: 'Failed to sync session' }, 500);
+    return json({ code: 'sync-exception', error: 'Failed to sync session' }, 500);
   }
 }
