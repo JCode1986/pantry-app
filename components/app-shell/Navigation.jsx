@@ -465,7 +465,7 @@ function SidebarCountBadge({ value }) {
   if (value === null || value === undefined || value <= 0) return null;
 
   return (
-    <span className="ml-auto min-w-7 rounded-full border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-2 py-0.5 text-center text-[11px] font-semibold leading-5 text-[var(--stocksense-brand)]">
+    <span className="ml-auto min-w-7 shrink-0 rounded-full border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-2 py-0.5 text-center text-[11px] font-semibold leading-5 text-[var(--stocksense-brand)]">
       {value > 999 ? "999+" : value}
     </span>
   );
@@ -1103,7 +1103,7 @@ function DesktopSidebar({
   return (
     <aside
       className={cx(
-        "fixed inset-y-0 left-0 z-50 hidden border-r border-[var(--stocksense-brand-border)] bg-white/95 py-5 shadow-xl backdrop-blur transition-[width,padding] duration-200 lg:flex lg:flex-col",
+        "fixed inset-y-0 left-0 z-50 hidden h-dvh max-h-dvh min-h-0 border-r border-[var(--stocksense-brand-border)] bg-white/95 py-5 shadow-xl backdrop-blur transition-[width,padding] duration-200 lg:flex lg:flex-col",
         isCollapsed ? "w-24 px-4" : "w-60 px-4"
       )}
     >
@@ -1116,7 +1116,7 @@ function DesktopSidebar({
         <ToggleIcon className="h-4 w-4" />
       </button>
 
-      <div className={cx("flex items-center", isCollapsed ? "justify-center" : "px-2")}>
+      <div className={cx("shrink-0 flex items-center", isCollapsed ? "justify-center" : "px-2")}>
         <Link
           href="/"
           className={cx(
@@ -1135,7 +1135,12 @@ function DesktopSidebar({
         </Link>
       </div>
 
-      <div className={cx("mt-7 flex-1 space-y-6 overflow-y-auto", isCollapsed ? "pr-0" : "pr-1")}>
+      <div
+        className={cx(
+          "mt-7 min-h-0 flex-1 space-y-6 overflow-x-hidden overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable]",
+          isCollapsed ? "pr-0" : "pr-1"
+        )}
+      >
         {desktopSidebarSections.map((section) => (
           <section key={section.title}>
             {!isCollapsed && (
@@ -1239,7 +1244,7 @@ function DesktopSidebar({
         ))}
       </div>
 
-      <div className="space-y-3 border-t border-gray-100 pt-4">
+      <div className="shrink-0 space-y-3 border-t border-gray-100 pt-4">
         <div className={cx("rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3", isCollapsed && "p-2")}>
           <div className={cx("flex items-center gap-3", isCollapsed && "justify-center")}>
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-[var(--stocksense-brand)] shadow-sm">
@@ -1250,7 +1255,7 @@ function DesktopSidebar({
                 <p className="truncate text-sm font-semibold text-gray-950">
                   {accountName}
                 </p>
-                <p className="mt-0.5 text-xs font-medium text-[var(--stocksense-brand)]">
+                <p className="mt-0.5 truncate text-xs font-medium text-[var(--stocksense-brand)]">
                   {accountMeta}
                 </p>
               </div>
@@ -1273,7 +1278,7 @@ function DesktopSidebar({
           ) : (
             <LuLogOut className="h-4 w-4" />
           )}
-          {!isCollapsed && <span>{loggingOut ? "Logging out..." : "Sign out"}</span>}
+          {!isCollapsed && <span className="min-w-0 truncate">{loggingOut ? "Logging out..." : "Sign out"}</span>}
         </button>
       </div>
     </aside>

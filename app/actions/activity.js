@@ -6,6 +6,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import {
   getHouseholdBilling,
   getHouseholdForUser,
+  hasHouseholdInviteMetadata,
 } from "@/utils/households";
 import { getInventoryImageUrls } from "@/utils/inventoryImages";
 
@@ -485,7 +486,7 @@ export async function getActivityFilterOptionsAction() {
     const { household } = await getHouseholdForUser({
       userId: user.id,
       email: user.email,
-      createIfMissing: true,
+      createIfMissing: !hasHouseholdInviteMetadata(user),
     });
 
     if (!household?.id) {
@@ -544,7 +545,7 @@ export async function getRecentActivityAction(filters = {}) {
     const { household } = await getHouseholdForUser({
       userId: user.id,
       email: user.email,
-      createIfMissing: true,
+      createIfMissing: !hasHouseholdInviteMetadata(user),
     });
     const supabase = await createClient();
     let query = supabase
