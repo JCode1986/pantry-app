@@ -78,7 +78,7 @@ export async function logoutAction() {
   return {
     success: true,
     error: null,
-    redirectTo: "/login",
+    redirectTo: "/logout",
   };
 }
 

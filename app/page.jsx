@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
 import { getSessionForLayout } from './actions/auth';
+import { redirect } from 'next/navigation';
 import LandingPage from '@/components/marketing/LandingPage';
 import MobileDashboardHome from '@/components/dashboard/MobileDashboardHome';
 import DesktopDashboardToolbar from '@/components/dashboard/DesktopDashboardToolbar';
@@ -7,7 +8,10 @@ import AttentionItemsCard from '@/components/dashboard/AttentionItemsCard';
 import InventoryByLocation from '@/components/dashboard/InventoryByLocation';
 import { createPageMetadata, siteConfig } from '@/utils/metadata';
 import { BILLING_PLANS } from '@/utils/billingPlans';
-import { getCanEditInventoryForUser } from '@/utils/households';
+import {
+  getCanEditInventoryForUser,
+  getHouseholdForUser,
+} from '@/utils/households';
 import { getInventoryImageUrls } from '@/utils/inventoryImages';
 import { LuClock3, LuPackageMinus, LuTriangleAlert } from 'react-icons/lu';
 
@@ -50,6 +54,11 @@ function getGreeting() {
   if (hour < 12) return 'Good morning';
   if (hour < 18) return 'Good afternoon';
   return 'Good evening';
+}
+
+function getPendingInviteToken(user) {
+  const token = user?.user_metadata?.household_invite_token;
+  return typeof token === 'string' && token.trim() ? token.trim() : null;
 }
 
 function LandingStructuredData() {
@@ -402,6 +411,19 @@ export default async function HomePage() {
         <LandingPage />
       </>
     );
+  }
+
+  const pendingInviteToken = getPendingInviteToken(currentUser);
+  if (pendingInviteToken) {
+    const { member } = await getHouseholdForUser({
+      userId: currentUser.id,
+      email: currentUser.email,
+      createIfMissing: false,
+    });
+
+    if (!member?.household_id) {
+      redirect(`/invite/${encodeURIComponent(pendingInviteToken)}`);
+    }
   }
 
   const [
