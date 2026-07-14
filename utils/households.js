@@ -25,13 +25,17 @@ export function canEditHouseholdInventory(member) {
   return role === HOUSEHOLD_ROLES.OWNER || role === HOUSEHOLD_ROLES.EDITOR;
 }
 
+export function hasHouseholdInviteMetadata(user) {
+  return Boolean(user?.invited_at || user?.user_metadata?.household_invite_token);
+}
+
 export async function getCanEditInventoryForUser(user) {
   if (!user?.id) return false;
 
   const { member } = await getHouseholdForUser({
     userId: user.id,
     email: user.email,
-    createIfMissing: true,
+    createIfMissing: !hasHouseholdInviteMetadata(user),
   });
 
   return canEditHouseholdInventory(member);
@@ -72,6 +76,43 @@ export async function getHouseholdForUser({
   if (!userId) return { household: null, member: null };
 
   const admin = createAdminClient();
+  const normalizedEmail = normalizeInviteEmail(email);
+
+  async function getOwnedHousehold() {
+    const { data: household, error } = await admin
+      .from("households")
+      .select("id, owner_id, name, created_at, updated_at")
+      .eq("owner_id", userId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return household ?? null;
+  }
+
+  async function ensureOwnerMember(household) {
+    if (!household?.id) return null;
+
+    const { data: ownerMember, error } = await admin
+      .from("household_members")
+      .upsert(
+        {
+          household_id: household.id,
+          user_id: userId,
+          email: normalizedEmail || null,
+          role: HOUSEHOLD_ROLES.OWNER,
+        },
+        { onConflict: "user_id" }
+      )
+      .select("household_id, user_id, email, role, joined_at")
+      .single();
+
+    if (error) throw error;
+    return {
+      ...ownerMember,
+      role: normalizeHouseholdRole(ownerMember.role),
+    };
+  }
+
   const { data: member, error: memberError } = await admin
     .from("household_members")
     .select("household_id, user_id, email, role, joined_at")
@@ -83,7 +124,6 @@ export async function getHouseholdForUser({
   if (memberError) throw memberError;
 
   if (member?.household_id) {
-    const normalizedEmail = normalizeInviteEmail(email);
     let resolvedMember = {
       ...member,
       role: normalizeHouseholdRole(member.role),
@@ -119,29 +159,29 @@ export async function getHouseholdForUser({
 
   if (!createIfMissing) return { household: null, member: null };
 
-  const nameSeed = normalizeInviteEmail(email).split("@")[0] || "My";
+  const existingOwnedHousehold = await getOwnedHousehold();
+  if (existingOwnedHousehold?.id) {
+    const ownerMember = await ensureOwnerMember(existingOwnedHousehold);
+    return { household: existingOwnedHousehold, member: ownerMember };
+  }
+
+  const nameSeed = normalizedEmail.split("@")[0] || "My";
   const householdName = `${nameSeed}'s Household`;
 
-  const { data: household, error: householdError } = await admin
+  let { data: household, error: householdError } = await admin
     .from("households")
     .insert({ owner_id: userId, name: householdName })
     .select("id, owner_id, name, created_at, updated_at")
     .single();
 
+  if (householdError?.code === "23505") {
+    household = await getOwnedHousehold();
+    householdError = household ? null : householdError;
+  }
+
   if (householdError) throw householdError;
 
-  const { data: createdMember, error: createdMemberError } = await admin
-    .from("household_members")
-    .insert({
-      household_id: household.id,
-      user_id: userId,
-      email: normalizeInviteEmail(email) || null,
-      role: "owner",
-    })
-    .select("household_id, user_id, email, role, joined_at")
-    .single();
-
-  if (createdMemberError) throw createdMemberError;
+  const createdMember = await ensureOwnerMember(household);
 
   return { household, member: createdMember };
 }

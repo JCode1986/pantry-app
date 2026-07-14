@@ -10,9 +10,11 @@ import { Providers } from "@/components/app-shell/Providers";
 import { getPreferenceBootScript } from "@/utils/appPreferences";
 import { siteConfig } from "@/utils/metadata";
 import {
+  HOUSEHOLD_ROLES,
   canEditHouseholdInventory,
   getHouseholdBilling,
   getHouseholdForUser,
+  hasHouseholdInviteMetadata,
   normalizeHouseholdRole,
 } from "@/utils/households";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -310,13 +312,13 @@ export default async function RootLayout({ children }) {
       const { household, member } = await getHouseholdForUser({
         userId: currentUser.id,
         email: currentUser.email,
-        createIfMissing: true,
+        createIfMissing: !hasHouseholdInviteMetadata(currentUser),
       });
       const billing = await getHouseholdBilling(household);
       canEditInventory = canEditHouseholdInventory(member);
       navigationSummary = {
         householdName: household?.name || "",
-        householdRole: normalizeHouseholdRole(member?.role),
+        householdRole: normalizeHouseholdRole(member?.role, HOUSEHOLD_ROLES.VIEWER),
         effectivePlanId: billing.effectivePlanId,
         isFamilyPlan: billing.effectivePlanId === "family",
         displayName: getPreferredName(currentUser),
