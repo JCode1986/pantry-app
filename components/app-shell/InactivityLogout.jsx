@@ -12,11 +12,7 @@ import {
 } from "@heroui/react";
 import { FaClock, FaSignOutAlt, FaSpinner } from "react-icons/fa";
 import { refreshTokenIfNeeded } from "@/app/actions/auth";
-import {
-  DEFAULT_PREFERENCES,
-  PREFERENCE_STORAGE_KEY,
-  applyAppPreferences,
-} from "@/utils/appPreferences";
+import { clearBrowserLogoutStorage } from "@/utils/logoutStorage";
 import { useSession } from "@/lib/SessionContext";
 import {
   modalBodyClass,
@@ -47,16 +43,6 @@ function formatCountdown(totalSeconds) {
   const seconds = safeSeconds % 60;
 
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
-
-function resetLocalPreferences() {
-  try {
-    window.localStorage.removeItem(PREFERENCE_STORAGE_KEY);
-  } catch {
-    // Ignore storage failures while logging out.
-  }
-
-  applyAppPreferences(DEFAULT_PREFERENCES);
 }
 
 export default function InactivityLogout({ isAuthenticated: serverAuthenticated = false }) {
@@ -127,7 +113,7 @@ export default function InactivityLogout({ isAuthenticated: serverAuthenticated 
     setWarningOpen(true);
 
     try {
-      resetLocalPreferences();
+      clearBrowserLogoutStorage();
       window.location.replace("/logout");
     } catch (error) {
       console.error("Idle logout failed:", error);

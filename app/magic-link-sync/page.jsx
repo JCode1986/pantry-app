@@ -8,14 +8,28 @@ import WhereKeepLoader from '@/components/ui/WhereKeepLoader';
 export default function MagicLinkSyncPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get('redirectTo') || '/';
+  const redirectTo = searchParams.get('redirectTo') || '';
 
   useEffect(() => {
+    const getInviteRedirectFromSession = (session) => {
+      const token = session?.user?.user_metadata?.household_invite_token;
+
+      if (typeof token !== 'string' || !token.trim()) {
+        return '/';
+      }
+
+      return `/invite/${encodeURIComponent(token.trim())}`;
+    };
+
+    const getSafeRedirect = (value, fallback = '/') => {
+      return value && value.startsWith('/') && !value.startsWith('//')
+        ? value
+        : fallback;
+    };
+
     const redirectToLogin = (errorCode) => {
       const safeRedirect =
-        redirectTo.startsWith('/') && !redirectTo.startsWith('//')
-          ? redirectTo
-          : '/';
+        getSafeRedirect(redirectTo, '/');
       const params = new URLSearchParams({
         error: errorCode,
       });
@@ -77,12 +91,12 @@ export default function MagicLinkSyncPage() {
           return;
         }
 
-        const safeRedirect =
-          redirectTo.startsWith('/') && !redirectTo.startsWith('//')
-            ? redirectTo
-            : '/';
+        const safeRedirect = getSafeRedirect(
+          redirectTo,
+          getInviteRedirectFromSession(activeSession)
+        );
 
-        router.replace(safeRedirect);
+        window.location.replace(safeRedirect);
       } catch (err) {
         console.error('Sync error:', err);
         redirectToLogin('sync-exception');

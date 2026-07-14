@@ -157,6 +157,18 @@ function needsInvitePasswordSetup(user) {
   );
 }
 
+function getAcceptedInviteMetadata(user, requiresPasswordSetup) {
+  const metadata = {
+    ...(user?.user_metadata ?? {}),
+    requires_password_setup: requiresPasswordSetup,
+  };
+
+  delete metadata.household_invite_token;
+  delete metadata.household_invite_role;
+
+  return metadata;
+}
+
 async function getMemberDisplayNames(admin, members = []) {
   const userIds = [
     ...new Set(
@@ -1017,13 +1029,14 @@ export async function acceptHouseholdInviteAction(token, options = {}) {
     if (updateInviteError) throw updateInviteError;
 
     const requiresPasswordSetup = needsInvitePasswordSetup(user);
+    const acceptedInviteMetadata = getAcceptedInviteMetadata(
+      user,
+      requiresPasswordSetup
+    );
 
     const { data: updatedUser, error: updateUserError } =
       await admin.auth.admin.updateUserById(user.id, {
-        user_metadata: {
-          ...(user.user_metadata ?? {}),
-          requires_password_setup: requiresPasswordSetup,
-        },
+        user_metadata: acceptedInviteMetadata,
       });
 
     if (updateUserError) throw updateUserError;
@@ -1034,10 +1047,7 @@ export async function acceptHouseholdInviteAction(token, options = {}) {
         ...session.user,
         user: updatedUser?.user ?? {
           ...user,
-          user_metadata: {
-            ...(user.user_metadata ?? {}),
-            requires_password_setup: requiresPasswordSetup,
-          },
+          user_metadata: acceptedInviteMetadata,
         },
       };
       await session.save();

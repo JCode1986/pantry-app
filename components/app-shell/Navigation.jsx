@@ -31,14 +31,13 @@ import WhereKeepLogo from "@/components/ui/WhereKeepLogo";
 import {
   DEFAULT_PREFERENCES,
   FONT_OPTIONS,
-  PREFERENCE_STORAGE_KEY,
   THEME_OPTIONS,
-  applyAppPreferences,
   getFontById,
   getThemeById,
   readStoredPreferences,
   saveStoredPreferences,
 } from "@/utils/appPreferences";
+import { clearBrowserLogoutStorage } from "@/utils/logoutStorage";
 import {
   Button,
   Input,
@@ -1676,8 +1675,7 @@ export default function Navigation({
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
-      localStorage.removeItem(PREFERENCE_STORAGE_KEY);
-      applyAppPreferences(DEFAULT_PREFERENCES);
+      clearBrowserLogoutStorage();
       window.location.replace("/logout");
     } catch (err) {
       console.error("Logout failed:", err);
