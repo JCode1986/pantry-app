@@ -11,45 +11,81 @@ export default function MagicLinkSyncPage() {
   const redirectTo = searchParams.get('redirectTo') || '/';
 
   useEffect(() => {
+    const redirectToLogin = (errorCode) => {
+      const safeRedirect =
+        redirectTo.startsWith('/') && !redirectTo.startsWith('//')
+          ? redirectTo
+          : '/';
+      const params = new URLSearchParams({
+        error: errorCode,
+      });
+
+      if (safeRedirect !== '/') {
+        params.set('redirectTo', safeRedirect);
+      }
+
+      router.replace(`/login?${params.toString()}`);
+    };
+
     const syncSession = async () => {
       try {
-        // ✅ Get Supabase session from localStorage
-        const { data: { session }, error } = await supabase.auth.getSession();
+        let activeSession = null;
+        let sessionError = null;
 
-        if (error || !session) {
-          console.error('No session found or error:', error);
-          router.push('/login?error=invalid-session');
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const {
+            data: { session },
+            error,
+          } = await supabase.auth.getSession();
+
+          if (session?.access_token && session?.refresh_token) {
+            activeSession = session;
+            break;
+          }
+
+          sessionError = error;
+          await new Promise((resolve) => window.setTimeout(resolve, 200));
+        }
+
+        if (sessionError || !activeSession) {
+          console.error('No session found or error:', sessionError);
+          redirectToLogin('invalid-session');
           return;
         }
 
-        // ✅ Send session to API to store in Iron Session
         const res = await fetch('/api/sync-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            access_token: session.access_token,
-            refresh_token: session.refresh_token,
-            expires_at: session.expires_at,
-            user: session.user,
+            access_token: activeSession.access_token,
+            refresh_token: activeSession.refresh_token,
+            expires_at: activeSession.expires_at,
+            user: activeSession.user,
           }),
         });
 
         if (!res.ok) {
-          console.error('Failed to sync session:', await res.text());
-          router.push('/login?error=sync-failed');
+          let errorCode = 'sync-failed';
+          try {
+            const payload = await res.json();
+            if (typeof payload?.code === 'string') errorCode = payload.code;
+            console.error('Failed to sync session:', payload);
+          } catch {
+            console.error('Failed to sync session:', await res.text());
+          }
+          redirectToLogin(errorCode);
           return;
         }
 
-        // ✅ Redirect to homepage (or dashboard)
         const safeRedirect =
           redirectTo.startsWith('/') && !redirectTo.startsWith('//')
             ? redirectTo
             : '/';
 
-        router.push(safeRedirect);
+        router.replace(safeRedirect);
       } catch (err) {
         console.error('Sync error:', err);
-        router.push('/login?error=sync-exception');
+        redirectToLogin('sync-exception');
       }
     };
 

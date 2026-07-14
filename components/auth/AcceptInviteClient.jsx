@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   Button,
   Modal,
@@ -11,11 +12,51 @@ import {
   ModalHeader,
 } from "@heroui/react";
 import { motion } from "framer-motion";
-import { FaCheckCircle, FaEnvelopeOpenText, FaSignInAlt, FaUserFriends } from "react-icons/fa";
+import {
+  FaCheckCircle,
+  FaEnvelopeOpenText,
+  FaSignInAlt,
+  FaUserFriends,
+} from "react-icons/fa";
 import { acceptHouseholdInviteAction } from "@/app/actions/household";
 
 function formatInviteRole(role) {
   return role === "viewer" ? "Viewer" : "Editor";
+}
+
+function pluralize(count, singular, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function formatDataSummary(summary) {
+  const parts = [];
+  if (summary?.locations > 0) {
+    parts.push(pluralize(summary.locations, "location"));
+  }
+  if (summary?.shoppingListItems > 0) {
+    parts.push(pluralize(summary.shoppingListItems, "shopping list item"));
+  }
+
+  if (parts.length === 0) return "your existing data";
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+function getDashboardInviteUrl(details = {}) {
+  const params = new URLSearchParams();
+
+  if (!details?.requiresPasswordSetup) {
+    params.set("inviteAccepted", "1");
+    params.set("household", details?.householdName || "your household");
+
+    if (details?.mergedExistingData) {
+      params.set("merged", "1");
+      params.set("summary", formatDataSummary(details?.dataSummary));
+    }
+  }
+
+  const query = params.toString();
+  return query ? `/?${query}` : "/";
 }
 
 export default function AcceptInviteClient({
@@ -25,11 +66,16 @@ export default function AcceptInviteClient({
   isAuthenticated,
   userEmail,
 }) {
+  const router = useRouter();
+  const initialAccepted = Boolean(preview?.alreadyAccepted);
   const [loading, setLoading] = useState(false);
-  const [accepted, setAccepted] = useState(false);
-  const [requiresPasswordSetup, setRequiresPasswordSetup] = useState(false);
   const [mergePrompt, setMergePrompt] = useState(null);
   const [error, setError] = useState(previewError ?? null);
+
+  useEffect(() => {
+    if (!initialAccepted) return;
+    router.replace(getDashboardInviteUrl(preview));
+  }, [initialAccepted, preview, router]);
 
   const handleAccept = async ({ mergeExistingData = false } = {}) => {
     setLoading(true);
@@ -48,19 +94,29 @@ export default function AcceptInviteClient({
       return;
     }
 
-    setRequiresPasswordSetup(Boolean(result?.data?.requiresPasswordSetup));
     setMergePrompt(null);
-    setAccepted(true);
+    router.replace(getDashboardInviteUrl(result?.data ?? {}));
   };
+
+  const householdName =
+    mergePrompt?.householdName ||
+    preview?.householdName ||
+    "this household";
+  const ownerDisplayName =
+    mergePrompt?.ownerDisplayName ||
+    preview?.ownerDisplayName ||
+    "the household owner";
+  const inviteAlreadyAccepted = initialAccepted;
 
   return (
     <>
-    <main className="page-enter fixed inset-0 z-[90] flex min-h-[100svh] items-center justify-center overflow-y-auto bg-gradient-to-br from-stocksense-teal/10 via-stocksense-sky/10 to-stocksense-lime/10 px-4 py-10">
+    <main className="page-enter fixed inset-0 z-[90] flex min-h-[100svh] items-center justify-center overflow-y-auto bg-gradient-to-br from-stocksense-teal/20 via-stocksense-sky/20 to-stocksense-lime/20 px-4 py-10">
+      <div className="pointer-events-none absolute inset-0 bg-slate-900/35" />
       <motion.section
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="w-full max-w-lg overflow-hidden rounded-2xl border border-stocksense-gray bg-white shadow-lg"
+        className="relative z-10 w-full max-w-lg overflow-hidden rounded-2xl border border-white/15 bg-white shadow-2xl"
       >
         <div className="bg-gradient-to-r from-stocksense-teal to-stocksense-sky px-6 py-6 text-white">
           <div className="flex items-center gap-3">
@@ -68,9 +124,9 @@ export default function AcceptInviteClient({
               <FaUserFriends className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold">Join household</h1>
+              <h1 className="text-xl font-semibold">{ownerDisplayName} invited you</h1>
               <p className="text-sm text-white/80">
-                Accept the invite to share WhereKeep inventory.
+                Join {preview?.householdName ?? "a shared household"} on WhereKeep.
               </p>
             </div>
           </div>
@@ -83,38 +139,7 @@ export default function AcceptInviteClient({
             </div>
           )}
 
-          {accepted ? (
-            <div className="space-y-4">
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-700">
-                <div className="flex items-center gap-2 font-semibold">
-                  <FaCheckCircle className="h-4 w-4 text-[var(--stocksense-brand)]" />
-                  You joined {preview?.householdName ?? "this household"}.
-                </div>
-                <p className="mt-1">
-                  Shared locations, areas, categories, and items are now available in your account.
-                </p>
-              </div>
-
-              {requiresPasswordSetup ? (
-                <Button
-                  as={Link}
-                  href="/profile#change-password"
-                  className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
-                >
-                  Set password
-                </Button>
-              ) : (
-                <Button
-                  as={Link}
-                  href="/"
-                  className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
-                >
-                  Continue
-                </Button>
-              )}
-            </div>
-          ) : (
-            <>
+          <>
               <div className="rounded-xl border border-stocksense-gray bg-gray-50/60 px-3 py-3">
                 <div className="flex items-start gap-3">
                   <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-[var(--stocksense-brand)] shadow-sm">
@@ -123,6 +148,9 @@ export default function AcceptInviteClient({
                   <div className="min-w-0">
                     <div className="text-sm font-semibold text-gray-900">
                       {preview?.householdName ?? "Household invite"}
+                    </div>
+                    <div className="mt-1 break-words text-sm text-gray-500">
+                      Invited by: {ownerDisplayName}
                     </div>
                     <div className="mt-1 break-words text-sm text-gray-500">
                       Invited email: {preview?.email ?? "Unknown"}
@@ -144,10 +172,10 @@ export default function AcceptInviteClient({
                   className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
                   onPress={() => handleAccept()}
                   isLoading={loading}
-                  isDisabled={loading || Boolean(previewError)}
+                  isDisabled={loading || inviteAlreadyAccepted || Boolean(previewError)}
                   startContent={<FaCheckCircle className="h-4 w-4" />}
                 >
-                  Accept invite
+                  {inviteAlreadyAccepted ? "Invite accepted" : "Accept invite"}
                 </Button>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -169,8 +197,7 @@ export default function AcceptInviteClient({
                   </Button>
                 </div>
               )}
-            </>
-          )}
+          </>
         </div>
       </motion.section>
     </main>
@@ -179,11 +206,12 @@ export default function AcceptInviteClient({
       onOpenChange={() => {}}
       isDismissable={false}
       hideCloseButton
-      backdrop="blur"
+      backdrop="opaque"
       placement="center"
       className="max-w-md"
       classNames={{
         wrapper: "z-[100] max-md:items-end",
+        backdrop: "bg-slate-900/45",
         base: "max-md:m-0 max-md:w-screen max-md:max-w-none max-md:rounded-b-none max-md:rounded-t-2xl",
       }}
     >
@@ -196,6 +224,9 @@ export default function AcceptInviteClient({
             This account already has saved inventory. To join{" "}
             {mergePrompt?.householdName ?? preview?.householdName ?? "this Family household"}{" "}
             with this account, you need to merge your existing data into the household.
+          </p>
+          <p className="rounded-lg border border-amber-200 bg-white px-3 py-2 font-medium text-amber-950">
+            This will move {formatDataSummary(mergePrompt?.dataSummary)} into {mergePrompt?.householdName ?? "the shared household"}.
           </p>
           <p>
             If you do not want to merge your data, cancel and delete your existing inventory first, or join with a different email.

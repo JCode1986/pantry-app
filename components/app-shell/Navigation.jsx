@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { logoutAction } from "@/app/actions/auth";
 import {
   updatePreferredNameAction,
   updateUserPreferencesAction,
@@ -131,6 +130,16 @@ function toDateString(date) {
   return `${year}-${month}-${day}`;
 }
 
+function getErrorMessage(error) {
+  if (!error) return null;
+  return error.message || error.code || String(error);
+}
+
+function logNavigationWarning(message, details) {
+  if (process.env.NODE_ENV === "production") return;
+  console.warn(message, details);
+}
+
 async function fetchAttentionCounts() {
   const supabase = createBrowserSupabaseClient();
   const today = toDateString(new Date());
@@ -175,14 +184,14 @@ async function fetchAttentionCounts() {
     categoriesError ||
     itemsError
   ) {
-    console.error("Navigation attention count error:", {
-      expiredError,
-      expiringSoonError,
-      shoppingListError,
-      locationsError,
-      storageAreasError,
-      categoriesError,
-      itemsError,
+    logNavigationWarning("Navigation attention counts unavailable.", {
+      expiredError: getErrorMessage(expiredError),
+      expiringSoonError: getErrorMessage(expiringSoonError),
+      shoppingListError: getErrorMessage(shoppingListError),
+      locationsError: getErrorMessage(locationsError),
+      storageAreasError: getErrorMessage(storageAreasError),
+      categoriesError: getErrorMessage(categoriesError),
+      itemsError: getErrorMessage(itemsError),
     });
     return null;
   }
@@ -1664,11 +1673,10 @@ export default function Navigation({
     try {
       localStorage.removeItem(PREFERENCE_STORAGE_KEY);
       applyAppPreferences(DEFAULT_PREFERENCES);
-      const result = await logoutAction();
-      window.location.href = result?.redirectTo || "/login";
+      window.location.replace("/logout");
     } catch (err) {
       console.error("Logout failed:", err);
-      setLoggingOut(false);
+      window.location.replace("/logout");
     }
   };
 

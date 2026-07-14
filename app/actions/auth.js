@@ -240,5 +240,33 @@ export async function refreshTokenIfNeeded() {
  */
 export async function getSessionForLayout() {
   const session = await getSession(); // iron-session read is OK
-  return session ?? null;
+  const sessionUser = session?.user?.user;
+
+  if (!session?.user?.access_token || !sessionUser?.id) {
+    return null;
+  }
+
+  try {
+    const { createClient } = await import('@/utils/supabase/server');
+    const supa = await createClient();
+    const {
+      data: { user },
+      error,
+    } = await supa.auth.getUser();
+
+    if (error || !user?.id || user.id !== sessionUser.id) {
+      return null;
+    }
+
+    return {
+      ...session,
+      user: {
+        ...session.user,
+        user,
+      },
+    };
+  } catch (err) {
+    console.warn("Could not verify layout session:", err);
+    return null;
+  }
 }

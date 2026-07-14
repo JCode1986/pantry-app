@@ -135,7 +135,7 @@ function PasswordSetupNotice() {
         <div>
           <h2 className="text-base font-semibold">Set a password to continue</h2>
           <p className="mt-1 text-sm text-amber-800">
-            You joined through an invite link. Use the Change password form below before using the dashboard.
+            You joined through an invite link. Create a password to finish securing your account.
           </p>
         </div>
       </div>

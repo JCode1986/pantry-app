@@ -1,5 +1,4 @@
 import { createClient } from '@/utils/supabase/server';
-import { redirect } from 'next/navigation';
 import { getSessionForLayout } from './actions/auth';
 import LandingPage from '@/components/marketing/LandingPage';
 import MobileDashboardHome from '@/components/dashboard/MobileDashboardHome';
@@ -51,13 +50,6 @@ function getGreeting() {
   if (hour < 12) return 'Good morning';
   if (hour < 18) return 'Good afternoon';
   return 'Good evening';
-}
-
-function needsInvitePasswordSetup(user) {
-  return Boolean(
-    user?.user_metadata?.requires_password_setup &&
-      (user?.invited_at || user?.user_metadata?.household_invite_token)
-  );
 }
 
 function LandingStructuredData() {
@@ -410,10 +402,6 @@ export default async function HomePage() {
         <LandingPage />
       </>
     );
-  }
-
-  if (needsInvitePasswordSetup(currentUser)) {
-    redirect('/profile?setup=password');
   }
 
   const [
