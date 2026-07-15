@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -51,9 +52,13 @@ import {
   modalInputClassNames,
   themedSelectClassNames,
 } from "@/components/modals/modalTheme";
-import BarcodeScannerModal from "@/components/items/BarcodeScannerModal";
 import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
+
+const BarcodeScannerModal = dynamic(
+  () => import("@/components/items/BarcodeScannerModal"),
+  { ssr: false }
+);
 
 const NEW_VALUE = "__new__";
 const EMPTY_LIST = [];
@@ -1808,12 +1813,14 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
           )}
         </ModalContent>
       </Modal>
-      <BarcodeScannerModal
-        isOpen={isScannerOpen}
-        onOpenChange={handleScannerOpenChange}
-        onScan={lookupBarcode}
-        autoStart={autoStartBarcodeScanner}
-      />
+      {isScannerOpen && (
+        <BarcodeScannerModal
+          isOpen={isScannerOpen}
+          onOpenChange={handleScannerOpenChange}
+          onScan={lookupBarcode}
+          autoStart={autoStartBarcodeScanner}
+        />
+      )}
     </>
   );
 }

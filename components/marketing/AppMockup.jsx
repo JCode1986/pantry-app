@@ -34,42 +34,31 @@ export function ProductScreenshotCard({ type }) {
   const Icon = mockup.icon;
 
   return (
-    <div className="group">
-      <article className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition duration-200 group-hover:-translate-y-1 group-hover:shadow-xl">
-        <MarketingImage
-          imageKey={mockup.imageKey}
-          alt={`${mockup.title} WhereKeep screenshot`}
-          className="aspect-[4/3] rounded-none border-0 shadow-none"
-          imageClassName="!object-contain bg-white"
-          sizes="(min-width: 1024px) 33vw, 100vw"
-        />
-        <div className="flex items-start justify-between gap-3 p-4">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--stocksense-brand)]">
-              {mockup.eyebrow}
-            </div>
-            <h3 className="mt-1 text-lg font-semibold text-gray-900">
-              {mockup.title}
-            </h3>
-            <p className="mt-1 text-sm leading-5 text-gray-600">
-              {mockup.description}
-            </p>
+    <article className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-xl">
+      <MarketingImage
+        imageKey={mockup.imageKey}
+        alt={`${mockup.title} WhereKeep screenshot`}
+        className="aspect-[4/3] rounded-none border-0 shadow-none"
+        imageClassName="!object-contain bg-white"
+        sizes="(min-width: 1024px) 33vw, 100vw"
+      />
+      <div className="flex items-start justify-between gap-3 p-4">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--stocksense-brand)]">
+            {mockup.eyebrow}
           </div>
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
-            <Icon className="h-4 w-4" />
-          </div>
+          <h3 className="mt-1 text-lg font-semibold text-gray-900">
+            {mockup.title}
+          </h3>
+          <p className="mt-1 text-sm leading-5 text-gray-600">
+            {mockup.description}
+          </p>
         </div>
-      </article>
-      <div className="pointer-events-none fixed left-1/2 top-1/2 z-50 hidden h-[80vh] w-[50vw] -translate-x-1/2 -translate-y-1/2 scale-95 opacity-0 transition duration-300 ease-out group-hover:scale-100 group-hover:opacity-100 lg:block">
-        <MarketingImage
-          imageKey={mockup.imageKey}
-          alt={`${mockup.title} enlarged WhereKeep screenshot`}
-          className="h-full w-full rounded-2xl border border-gray-200 bg-white shadow-2xl"
-          imageClassName="!object-contain bg-white"
-          sizes="50vw"
-        />
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+          <Icon className="h-4 w-4" />
+        </div>
       </div>
-    </div>
+    </article>
   );
 }
 

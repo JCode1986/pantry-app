@@ -4,7 +4,7 @@ import { getSession } from "@/lib/sessionOptions";
 import { supabase } from "@/lib/supabaseClient";
 
 /** LOGIN – server action */
-export async function login({ email, password, redirectTo = "/" }) {
+export async function login({ email, password, redirectTo = "/dashboard" }) {
   const { createClient } = await import('@/utils/supabase/server');
   const supa = await createClient();
   const session = await getSession();

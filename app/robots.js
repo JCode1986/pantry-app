@@ -3,6 +3,7 @@ import { siteConfig } from "@/utils/metadata";
 const privatePaths = [
   "/areas",
   "/categories",
+  "/dashboard",
   "/forgot-password",
   "/invite",
   "/items",

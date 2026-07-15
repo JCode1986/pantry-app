@@ -33,8 +33,8 @@ function createMessage(role, content) {
   };
 }
 
-export default function SupportChatbot() {
-  const [isOpen, setIsOpen] = useState(false);
+export default function SupportChatbot({ defaultOpen = false }) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const [messages, setMessages] = useState(INITIAL_MESSAGES);
   const [draft, setDraft] = useState("");
   const [isSending, setIsSending] = useState(false);
