@@ -32,6 +32,8 @@ export default function ImageWithLoader({
       <img
         src={src}
         alt={alt}
+        loading="lazy"
+        decoding="async"
         {...props}
         className={`block ${className} transition-opacity duration-200 ${
           isLoaded ? "opacity-100" : "opacity-0"

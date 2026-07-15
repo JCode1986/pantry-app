@@ -5,14 +5,11 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "start": "next start"
   },
   "dependencies": {
     "@heroui/react": "^2.8.5",
-    "@heroui/system": "^2.4.23",
     "@heroui/theme": "^2.4.23",
-    "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.50.5",
     "framer-motion": "^12.23.26",

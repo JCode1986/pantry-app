@@ -55,6 +55,7 @@ export async function middleware(req) {
   const isAuthPage = isLoginPage || isSignupPage;
 
   const protectedRoots = [
+    "/dashboard",
     "/locations",
     "/storage-areas",
     "/areas",
@@ -63,6 +64,7 @@ export async function middleware(req) {
     "/items",
     "/shopping-list",
     "/profile",
+    "/support/chat",
   ];
   const isProtected = protectedRoots.some(
     (root) => pathname === root || pathname.startsWith(root + "/")
@@ -87,6 +89,10 @@ export async function middleware(req) {
     return clearAuthCookies(supabaseResponse, req);
   }
 
+  if (pathname === "/" && user && hasAppSession) {
+    return redirectWithCookies(new URL("/dashboard", req.url), supabaseResponse);
+  }
+
   // If both auth layers agree the user is signed in, keep auth pages out of the way.
   // If Iron Session is missing, allow /login so the app session can be repaired.
   if (isAuthPage && user && hasAppSession) {
@@ -94,7 +100,7 @@ export async function middleware(req) {
     const safeRedirect =
       redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//")
         ? redirectTo
-        : "/";
+        : "/dashboard";
 
     return redirectWithCookies(new URL(safeRedirect, req.url), supabaseResponse);
   }

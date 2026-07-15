@@ -91,7 +91,7 @@ import {
 } from "react-icons/lu";
 
 const navItems = [
-  { href: "/", label: "Overview", icon: FaHome },
+  { href: "/dashboard", label: "Overview", icon: FaHome },
   { href: "/activity", label: "Activity", menuLabel: "Recent Activity", icon: FaBolt, mobileOnly: true },
   { href: "/locations", label: "Locations", icon: FaMapMarkedAlt },
   { href: "/areas", label: "Areas", icon: FaWarehouse },
@@ -299,7 +299,7 @@ function MobileTopBar({ attentionCount, onOpenMenu, onOpenAttention }) {
           <FaBars className="h-4 w-4" />
         </button>
 
-        <Link href="/" className="flex min-w-0 items-center justify-center gap-2">
+        <Link href="/dashboard" className="flex min-w-0 items-center justify-center gap-2">
           <WhereKeepLogo showWordmark={false} markClassName="h-8" />
           <span className="truncate bg-gradient-to-r from-[var(--stocksense-brand-border)] via-[var(--stocksense-brand)] to-[var(--stocksense-brand-dark)] bg-clip-text text-lg font-bold text-transparent">
             WhereKeep
@@ -381,7 +381,7 @@ const mobileMenuSections = [
   {
     title: "Dashboard",
     items: [
-      { href: "/", label: "Overview", icon: FaHome },
+      { href: "/dashboard", label: "Overview", icon: FaHome },
       { href: "/activity", label: "Recent Activity", icon: FaBolt },
     ],
   },
@@ -403,6 +403,11 @@ const mobileMenuSections = [
         icon: FaShoppingBasket,
         countKey: "shoppingListNeededItems",
       },
+      {
+        href: "/support/chat",
+        label: "Ask WhereKeep",
+        icon: LuLifeBuoy,
+      },
     ],
   },
   {
@@ -415,7 +420,7 @@ const desktopSidebarSections = [
   {
     title: "HOME",
     items: [
-      { href: "/", label: "Overview", icon: LuHouse },
+      { href: "/dashboard", label: "Overview", icon: LuHouse },
       { href: "/activity", label: "Activities", icon: LuActivity },
       { href: "/locations", label: "Locations", icon: LuMapPin, countKey: "locationsCount" },
       { href: "/areas", label: "Storage Areas", icon: LuWarehouse, countKey: "storageAreasCount" },
@@ -1117,7 +1122,7 @@ function DesktopSidebar({
 
       <div className={cx("shrink-0 flex items-center", isCollapsed ? "justify-center" : "px-2")}>
         <Link
-          href="/"
+          href="/dashboard"
           className={cx(
             "flex min-w-0 items-center",
             isCollapsed ? "justify-center" : "flex-1 px-1"
@@ -1324,7 +1329,7 @@ function MobileMenu({
               className="mb-5 flex items-center justify-between gap-3"
             >
               <Link
-                href="/"
+                href="/dashboard"
                 onClick={onClose}
                 className="flex min-w-0 items-center gap-2"
               >
@@ -1639,11 +1644,11 @@ export default function Navigation({
     const uniqueRoutes = [...new Set(routeItems)];
     const match =
       uniqueRoutes
-        .filter((href) => href !== "/" && pathname?.startsWith(href))
+        .filter((href) => href !== "/dashboard" && pathname?.startsWith(href))
         .sort((a, b) => b.length - a.length)[0] ||
-      uniqueRoutes.find((href) => href === "/");
+      uniqueRoutes.find((href) => href === "/dashboard");
 
-    return match || "/";
+    return match || "/dashboard";
   }, [pathname]);
 
   useEffect(() => {
@@ -2269,9 +2274,9 @@ export default function Navigation({
       >
         <div className="mx-auto grid max-w-md grid-cols-5 items-end gap-1">
           <Link
-            href="/"
-            className={bottomNavItemClass(activeHref === "/")}
-            aria-current={activeHref === "/" ? "page" : undefined}
+            href="/dashboard"
+            className={bottomNavItemClass(activeHref === "/dashboard")}
+            aria-current={activeHref === "/dashboard" ? "page" : undefined}
           >
             <FaHome className="h-4 w-4" />
             <span className="text-[11px] font-medium">Home</span>

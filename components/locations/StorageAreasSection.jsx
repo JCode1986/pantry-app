@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Button,
@@ -50,7 +51,6 @@ import {
   FaExclamationTriangle,
 } from 'react-icons/fa';
 import ConfirmDeleteModal from '@/components/modals/ConfirmDeleteModal';
-import MoveItemsModal from '@/components/items/MoveItemsModal';
 import { emitInventoryChange, emitItemAdded } from '@/utils/clientEvents';
 import EntityImageManager from '@/components/inventory/EntityImageManager';
 import ImageWithLoader from '@/components/ui/ImageWithLoader';
@@ -69,6 +69,10 @@ import {
 } from '@/utils/pantry/date';
 import { containsQuery } from '@/utils/pantry/search';
 import { parseDate } from '@internationalized/date';
+
+const MoveItemsModal = dynamic(() => import('@/components/items/MoveItemsModal'), {
+  ssr: false,
+});
 
 const collapseVariants = {
   collapsed: { height: 0, opacity: 0, transition: { duration: 0.2 } },
@@ -3564,7 +3568,7 @@ export default function StorageAreasSection({
         </ModalContent>
       </Modal>}
 
-      {canEditInventory && <MoveItemsModal
+      {canEditInventory && moveModal.open && <MoveItemsModal
         moveModal={moveModal}
         setMoveModal={setMoveModal}
         locationsForMove={locationsForMove}

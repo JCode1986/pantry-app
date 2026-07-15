@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -46,7 +47,6 @@ import {
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import EntityImageManager from "@/components/inventory/EntityImageManager";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
-import MoveItemsModal from "@/components/items/MoveItemsModal";
 import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
 import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
@@ -64,6 +64,10 @@ import { emitInventoryChange, ITEM_ADDED_EVENT } from "@/utils/clientEvents";
 import { daysUntil, isExpiringSoon, toNonNegativeInteger } from "@/utils/pantry/date";
 import PaginationControls from "@/components/ui/PaginationControls";
 import SearchResultsLoadingState from "@/components/ui/SearchResultsLoadingState";
+
+const MoveItemsModal = dynamic(() => import("@/components/items/MoveItemsModal"), {
+  ssr: false,
+});
 
 function formatExpiration(value) {
   if (!value) return "None";
@@ -1965,7 +1969,7 @@ export default function CategoryDetailClient({
         </Modal>
       )}
 
-      {canEditInventory && (
+      {canEditInventory && moveModal.open && (
         <MoveItemsModal
           moveModal={moveModal}
           setMoveModal={setMoveModal}
