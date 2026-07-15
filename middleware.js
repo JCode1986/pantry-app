@@ -64,6 +64,7 @@ export async function middleware(req) {
     "/items",
     "/shopping-list",
     "/profile",
+    "/support/chat",
   ];
   const isProtected = protectedRoots.some(
     (root) => pathname === root || pathname.startsWith(root + "/")

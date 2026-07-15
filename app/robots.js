@@ -14,6 +14,7 @@ const privatePaths = [
   "/reset-password",
   "/signup",
   "/shopping-list",
+  "/support/chat",
 ];
 
 const publicPaths = [

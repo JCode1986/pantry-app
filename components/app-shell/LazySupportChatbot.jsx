@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 const SupportChatbot = dynamic(() => import("@/components/app-shell/SupportChatbot"), {
@@ -8,14 +9,19 @@ const SupportChatbot = dynamic(() => import("@/components/app-shell/SupportChatb
 });
 
 export default function LazySupportChatbot() {
+  const pathname = usePathname();
   const [shouldLoad, setShouldLoad] = useState(false);
 
+  if (pathname === "/support/chat" || pathname?.startsWith("/support/chat/")) {
+    return null;
+  }
+
   if (shouldLoad) {
-    return <SupportChatbot defaultOpen />;
+    return <SupportChatbot defaultOpen className="hidden md:block" />;
   }
 
   return (
-    <div className="fixed bottom-[6.25rem] right-4 z-[60] md:bottom-6 lg:right-6">
+    <div className="fixed bottom-[6.25rem] right-4 z-[60] hidden md:bottom-6 md:block lg:right-6">
       <button
         type="button"
         onClick={() => setShouldLoad(true)}

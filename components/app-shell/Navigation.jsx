@@ -403,6 +403,11 @@ const mobileMenuSections = [
         icon: FaShoppingBasket,
         countKey: "shoppingListNeededItems",
       },
+      {
+        href: "/support/chat",
+        label: "Ask WhereKeep",
+        icon: LuLifeBuoy,
+      },
     ],
   },
   {
