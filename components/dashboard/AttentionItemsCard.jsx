@@ -24,11 +24,13 @@ function expirationLabel(expirationDate) {
 }
 
 function ItemThumb({ item }) {
-  if (item.imageUrl) {
+  const imageUrl = item.imageThumbUrl || item.imageUrl;
+
+  if (imageUrl) {
     return (
       <span className="block h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-white">
         <ImageWithLoader
-          src={item.imageUrl}
+          src={imageUrl}
           alt=""
           className="h-full w-full object-cover"
           loading="lazy"

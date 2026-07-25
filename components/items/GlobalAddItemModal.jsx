@@ -973,6 +973,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
             ...added,
             image_path: imageResult.data.imagePath ?? added.image_path,
             imageUrl: imageResult.data.imageUrl ?? added.imageUrl,
+            imageThumbUrl: imageResult.data.imageThumbUrl ?? added.imageThumbUrl ?? null,
           };
         }
       } catch (error) {

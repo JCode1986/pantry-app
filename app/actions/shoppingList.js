@@ -12,6 +12,7 @@ import {
   hasHouseholdInviteMetadata,
 } from "@/utils/households";
 import {
+  INVENTORY_IMAGE_VARIANT,
   getInventoryImageUrl,
   getInventoryImageUrls,
 } from "@/utils/inventoryImages";
@@ -56,6 +57,7 @@ function serializeShoppingListItem(row) {
     image_path: row.image_path ?? null,
     imagePath: row.image_path ?? null,
     imageUrl: row.imageUrl ?? null,
+    imageThumbUrl: row.imageThumbUrl ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -63,21 +65,29 @@ function serializeShoppingListItem(row) {
 
 async function serializeShoppingListItemWithImage(row) {
   if (!row) return null;
+  const [imageUrl, imageThumbUrl] = await Promise.all([
+    getInventoryImageUrl(row.image_path),
+    getInventoryImageUrl(row.image_path, { variant: INVENTORY_IMAGE_VARIANT.CARD }),
+  ]);
   return serializeShoppingListItem({
     ...row,
-    imageUrl: await getInventoryImageUrl(row.image_path),
+    imageUrl,
+    imageThumbUrl,
   });
 }
 
 async function serializeShoppingListItemsWithImages(rows) {
-  const urlsByPath = await getInventoryImageUrls(
-    (rows ?? []).map((row) => row?.image_path)
-  );
+  const imagePaths = (rows ?? []).map((row) => row?.image_path);
+  const [urlsByPath, thumbUrlsByPath] = await Promise.all([
+    getInventoryImageUrls(imagePaths),
+    getInventoryImageUrls(imagePaths, { variant: INVENTORY_IMAGE_VARIANT.CARD }),
+  ]);
 
   return (rows ?? []).map((row) =>
     serializeShoppingListItem({
       ...row,
       imageUrl: urlsByPath.get(row?.image_path) ?? null,
+      imageThumbUrl: thumbUrlsByPath.get(row?.image_path) ?? null,
     })
   );
 }
@@ -708,6 +718,9 @@ export async function moveShoppingListItemToInventoryAction(itemId, input = {}) 
           expirationDate: inventoryItem.expiration_date ?? null,
           image_path: inventoryItem.image_path ?? null,
           imageUrl: await getInventoryImageUrl(inventoryItem.image_path),
+          imageThumbUrl: await getInventoryImageUrl(inventoryItem.image_path, {
+            variant: INVENTORY_IMAGE_VARIANT.CARD,
+          }),
           categoryId: inventoryItem.category_id,
           locationId: destinationPath.locationId,
           locationName: destinationPath.location,

@@ -162,6 +162,7 @@ export default function AddShoppingListItemModal({
             image_path: imageResult.data.imagePath ?? nextItem.image_path ?? null,
             imagePath: imageResult.data.imagePath ?? nextItem.imagePath ?? null,
             imageUrl: imageResult.data.imageUrl ?? nextItem.imageUrl ?? null,
+            imageThumbUrl: imageResult.data.imageThumbUrl ?? nextItem.imageThumbUrl ?? null,
           };
         }
       } catch (error) {

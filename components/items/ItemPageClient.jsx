@@ -57,7 +57,6 @@ import {
   mobileSheetModalClassNames,
   themedSelectClassNames,
 } from "@/components/modals/modalTheme";
-import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
 import { emitInventoryChange } from "@/utils/clientEvents";
 import EntityImageManager from "@/components/inventory/EntityImageManager";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
@@ -102,7 +101,7 @@ const mobileDefaultPanelMotion = {
   transition: mobileSelectionTransition,
 };
 
-const ITEMS_PER_PAGE = 25;
+const ITEMS_PER_PAGE = 24;
 const ALL_FILTER_KEY = "all";
 const NEW_LOCATION_VALUE = "__new_location__";
 const NEW_AREA_VALUE = "__new_area__";
@@ -1022,12 +1021,17 @@ export default function ItemsPageClient({
     closeDrawer();
   };
 
-  const handleActiveItemImageChange = ({ imagePath, imageUrl }) => {
+  const handleActiveItemImageChange = ({ imagePath, imageUrl, imageThumbUrl }) => {
     if (!activeItem?.id) return;
     setItems((prev) =>
       prev.map((item) =>
         item.id === activeItem.id
-          ? { ...item, image_path: imagePath ?? null, imageUrl: imageUrl ?? null }
+          ? {
+              ...item,
+              image_path: imagePath ?? null,
+              imageUrl: imageUrl ?? null,
+              imageThumbUrl: imageThumbUrl ?? null,
+            }
           : item
       )
     );
@@ -1648,23 +1652,15 @@ export default function ItemsPageClient({
                     {totals.total} {totals.total === 1 ? "item" : "items"} stored
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {canEditInventory && paginatedItems.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => enterMobileSelection()}
-                      className="min-h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 shadow-sm"
-                    >
-                      Select
-                    </button>
-                  )}
-                  <OpenGlobalAddItemButton
-                    canEditInventory={canEditInventory}
-                    className="min-h-10 rounded-xl bg-[var(--stocksense-brand)] px-3 text-sm font-semibold text-white"
+                {canEditInventory && paginatedItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => enterMobileSelection()}
+                    className="min-h-10 shrink-0 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 shadow-sm"
                   >
-                    Add
-                  </OpenGlobalAddItemButton>
-                </div>
+                    Select
+                  </button>
+                )}
               </div>
 
               <Input
@@ -1754,12 +1750,6 @@ export default function ItemsPageClient({
                 : "Search items across all locations."}
             </p>
           </div>
-          <OpenGlobalAddItemButton
-            canEditInventory={canEditInventory}
-            className="min-h-11 w-full max-w-40 rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm sm:w-auto"
-          >
-            Add Item
-          </OpenGlobalAddItemButton>
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -2169,7 +2159,7 @@ export default function ItemsPageClient({
                   <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 text-[var(--stocksense-brand)]">
                     {it.imageUrl ? (
                       <ImageWithLoader
-                        src={it.imageUrl}
+                        src={it.imageThumbUrl || it.imageUrl}
                         alt=""
                         className="h-full w-full object-cover"
                       />
@@ -2266,15 +2256,6 @@ export default function ItemsPageClient({
                   >
                     Clear search
                   </Button>
-                ) : !filtersAreActive ? (
-                  <div className="mt-5">
-                    <OpenGlobalAddItemButton
-                      canEditInventory={canEditInventory}
-                      className="min-h-11 rounded-xl bg-[var(--stocksense-brand)] px-4 font-semibold text-white"
-                    >
-                      Add item
-                    </OpenGlobalAddItemButton>
-                  </div>
                 ) : null}
               </motion.div>
             )}
@@ -2298,10 +2279,20 @@ export default function ItemsPageClient({
               exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
               role="button"
               tabIndex={0}
-              onClick={() => openDrawer(it)}
+              onClick={() => {
+                if (selectedCount > 0) {
+                  toggleSelect(it.id);
+                  return;
+                }
+                openDrawer(it);
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
+                  if (selectedCount > 0) {
+                    toggleSelect(it.id);
+                    return;
+                  }
                   openDrawer(it);
                 }
               }}
@@ -2316,10 +2307,26 @@ export default function ItemsPageClient({
               <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
                 {/* Left: item image and info */}
                 <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                  {canEditInventory && selectedCount > 0 ? (
+                    <label
+                      className="mt-1 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center"
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleSelect(it.id)}
+                        aria-label={`Select ${it.name}`}
+                        className="h-5 w-5 cursor-pointer rounded border-gray-300 text-[var(--stocksense-brand)] accent-[var(--stocksense-brand)] focus:ring-[var(--stocksense-brand-border)]"
+                      />
+                    </label>
+                  ) : null}
+
                   <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] text-[var(--entity-item-accent)]">
                     {it.imageUrl ? (
                       <ImageWithLoader
-                        src={it.imageUrl}
+                        src={it.imageThumbUrl || it.imageUrl}
                         alt=""
                         className="h-full w-full object-cover"
                       />
@@ -2453,10 +2460,6 @@ export default function ItemsPageClient({
               >
                 Clear search
               </Button>
-            ) : !filtersAreActive ? (
-              <div className="mt-4 flex justify-center">
-                <OpenGlobalAddItemButton canEditInventory={canEditInventory} />
-              </div>
             ) : null}
           </motion.div>
         )}

@@ -483,6 +483,7 @@ export default function AreaDetailClient({
                   name: created.name,
                   image_path: uploadedImage?.imagePath ?? created.image_path ?? null,
                   imageUrl: uploadedImage?.imageUrl ?? null,
+                  imageThumbUrl: uploadedImage?.imageThumbUrl ?? null,
                   itemsCount: 0,
                 }
               : c
@@ -658,7 +659,7 @@ export default function AreaDetailClient({
     input?.focus({ preventScroll: true });
   };
 
-  const handleCategoryImageChange = ({ imageUrl }) => {
+  const handleCategoryImageChange = ({ imageUrl, imageThumbUrl }) => {
     const id = renameModal.id;
     if (!id) return;
 
@@ -666,7 +667,11 @@ export default function AreaDetailClient({
     setCategories((prev) =>
       prev.map((category) =>
         String(category.id) === String(id)
-          ? { ...category, imageUrl: imageUrl ?? null }
+          ? {
+              ...category,
+              imageUrl: imageUrl ?? null,
+              imageThumbUrl: imageThumbUrl ?? null,
+            }
           : category
       )
     );
@@ -1218,7 +1223,7 @@ export default function AreaDetailClient({
               >
                 {cat.imageUrl ? (
                   <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-category-border)] bg-white">
-                    <ImageWithLoader src={cat.imageUrl} alt="" className="h-full w-full object-cover" />
+                    <ImageWithLoader src={cat.imageThumbUrl || cat.imageUrl} alt="" className="h-full w-full object-cover" />
                   </div>
                 ) : (
                   <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
@@ -1490,56 +1495,60 @@ export default function AreaDetailClient({
                 >
                   <div className="border-b border-gray-100 px-5 py-4">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                      <button
-                        type="button"
-                        onClick={() => toggleCategoryCollapsed(cat.id)}
-                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                        aria-expanded={!collapsed}
-                      >
-                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
-                          {collapsed ? (
-                            <FaChevronRight className="h-3.5 w-3.5" />
-                          ) : (
-                            <FaChevronRight className="h-3.5 w-3.5 rotate-90 transition" />
-                          )}
-                        </span>
-                        {cat.imageUrl ? (
-                          <span className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white">
-                            <ImageWithLoader
-                              src={cat.imageUrl}
-                              alt=""
-                              className="h-full w-full object-cover"
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        {canEditInventory && selectionMode ? (
+                          <label
+                            className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center"
+                            onClick={(event) => event.stopPropagation()}
+                            onKeyDown={(event) => event.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() => toggleSelectCategory(cat.id)}
+                              aria-label={`Select ${cat.name}`}
+                              className="h-5 w-5 cursor-pointer rounded border-gray-300 text-[var(--stocksense-brand)] accent-[var(--stocksense-brand)] focus:ring-[var(--stocksense-brand-border)]"
                             />
+                          </label>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => toggleCategoryCollapsed(cat.id)}
+                          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                          aria-expanded={!collapsed}
+                        >
+                          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+                            {collapsed ? (
+                              <FaChevronRight className="h-3.5 w-3.5" />
+                            ) : (
+                              <FaChevronRight className="h-3.5 w-3.5 rotate-90 transition" />
+                            )}
                           </span>
-                        ) : (
-                          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
-                            <FaTag className="h-4 w-4" />
+                          {cat.imageUrl ? (
+                            <span className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white">
+                              <ImageWithLoader
+                                src={cat.imageThumbUrl || cat.imageUrl}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            </span>
+                          ) : (
+                            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
+                              <FaTag className="h-4 w-4" />
+                            </span>
+                          )}
+                          <span className="min-w-0">
+                            <span className="block truncate text-xl font-semibold leading-7 text-gray-950">
+                              {cat.name}
+                            </span>
+                            <span className="mt-1 block text-sm font-medium text-gray-500">
+                              {formatCount(cat.itemsCount ?? items.length, "item")}
+                            </span>
                           </span>
-                        )}
-                        <span className="min-w-0">
-                          <span className="block truncate text-xl font-semibold leading-7 text-gray-950">
-                            {cat.name}
-                          </span>
-                          <span className="mt-1 block text-sm font-medium text-gray-500">
-                            {formatCount(cat.itemsCount ?? items.length, "item")}
-                          </span>
-                        </span>
-                      </button>
+                        </button>
+                      </div>
 
                       <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                        {canEditInventory && (
-                          <OpenGlobalAddItemButton
-                            canEditInventory={canEditInventory}
-                            context={{
-                              locationId: area?.location?.id,
-                              storageAreaId: area?.id,
-                              categoryId: cat.id,
-                            }}
-                            className="min-h-10 rounded-xl bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white shadow-sm"
-                          >
-                            Add Item
-                          </OpenGlobalAddItemButton>
-                        )}
                         <Dropdown placement="bottom-end">
                           <DropdownTrigger>
                             <Button
@@ -1632,19 +1641,6 @@ export default function AreaDetailClient({
                           <p className="mt-1 text-sm text-gray-500">
                             Add your first item to this category.
                           </p>
-                          {canEditInventory ? (
-                            <OpenGlobalAddItemButton
-                              canEditInventory={canEditInventory}
-                              context={{
-                                locationId: area?.location?.id,
-                                storageAreaId: area?.id,
-                                categoryId: cat.id,
-                              }}
-                              className="mt-5 min-h-10 rounded-xl bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white shadow-sm"
-                            >
-                              Add Item
-                            </OpenGlobalAddItemButton>
-                          ) : null}
                         </div>
                       ) : (
                         <div className="space-y-2">
@@ -1667,7 +1663,7 @@ export default function AreaDetailClient({
                                   {item.imageUrl ? (
                                     <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-white">
                                       <ImageWithLoader
-                                        src={item.imageUrl}
+                                        src={item.imageThumbUrl || item.imageUrl}
                                         alt=""
                                         className="h-full w-full object-cover"
                                       />

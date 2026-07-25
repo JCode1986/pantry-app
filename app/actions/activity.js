@@ -8,7 +8,10 @@ import {
   getHouseholdForUser,
   hasHouseholdInviteMetadata,
 } from "@/utils/households";
-import { getInventoryImageUrls } from "@/utils/inventoryImages";
+import {
+  INVENTORY_IMAGE_VARIANT,
+  getInventoryImageUrls,
+} from "@/utils/inventoryImages";
 
 const DEFAULT_LIMIT = 12;
 const MAX_LIMIT = 50;
@@ -238,7 +241,9 @@ async function enrichActivityImages(supabase, items) {
       return activityImagePath(row) || imagePathByRowKey.get(`${entityType}:${entityId}`);
     })
     .filter(Boolean);
-  const urlsByPath = await getInventoryImageUrls(imagePaths);
+  const urlsByPath = await getInventoryImageUrls(imagePaths, {
+    variant: INVENTORY_IMAGE_VARIANT.CARD,
+  });
 
   return items.map((row) => {
     const entityType = String(row?.entity_type || "").toLowerCase();
@@ -250,6 +255,7 @@ async function enrichActivityImages(supabase, items) {
       ...row,
       image_path: row.image_path ?? imagePath ?? null,
       imageUrl: imagePath ? urlsByPath.get(imagePath) ?? null : null,
+      imageThumbUrl: imagePath ? urlsByPath.get(imagePath) ?? null : null,
     };
   });
 }

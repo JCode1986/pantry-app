@@ -527,6 +527,7 @@ export default function AreasPageClient({
           name: created.name ?? name,
           image_path: uploadedImage?.imagePath ?? created.image_path ?? null,
           imageUrl: uploadedImage?.imageUrl ?? null,
+          imageThumbUrl: uploadedImage?.imageThumbUrl ?? null,
           created_at: created.created_at ?? null,
           location: {
             id: targetLocationId,
@@ -591,12 +592,17 @@ export default function AreasPageClient({
     });
   };
 
-  const handleAreaImageChange = ({ imagePath, imageUrl }) => {
+  const handleAreaImageChange = ({ imagePath, imageUrl, imageThumbUrl }) => {
     if (!activeArea?.id) return;
     setAreas((prev) =>
       prev.map((area) =>
         area.id === activeArea.id
-          ? { ...area, image_path: imagePath ?? null, imageUrl: imageUrl ?? null }
+          ? {
+              ...area,
+              image_path: imagePath ?? null,
+              imageUrl: imageUrl ?? null,
+              imageThumbUrl: imageThumbUrl ?? null,
+            }
           : area
       )
     );
@@ -918,7 +924,7 @@ export default function AreasPageClient({
               >
                 {area.imageUrl ? (
                   <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-area-border)] bg-white">
-                    <ImageWithLoader src={area.imageUrl} alt="" className="h-full w-full object-cover" />
+                    <ImageWithLoader src={area.imageThumbUrl || area.imageUrl} alt="" className="h-full w-full object-cover" />
                   </div>
                 ) : (
                   <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]">
@@ -1208,10 +1214,26 @@ export default function AreasPageClient({
 
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 flex-1 items-start gap-3">
+                          {canEditInventory && selectionMode ? (
+                            <label
+                              className="mt-1 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center"
+                              onClick={(event) => event.stopPropagation()}
+                              onKeyDown={(event) => event.stopPropagation()}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.has(String(a.id))}
+                                onChange={() => toggleSelect(a.id)}
+                                aria-label={`Select ${a.name}`}
+                                className="h-5 w-5 cursor-pointer rounded border-gray-300 text-[var(--stocksense-brand)] accent-[var(--stocksense-brand)] focus:ring-[var(--stocksense-brand-border)]"
+                              />
+                            </label>
+                          ) : null}
+
                           {a.imageUrl ? (
                             <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white">
                               <ImageWithLoader
-                                src={a.imageUrl}
+                                src={a.imageThumbUrl || a.imageUrl}
                                 alt=""
                                 className="h-full w-full object-cover"
                               />
@@ -1329,7 +1351,7 @@ export default function AreasPageClient({
                                 {item.imageUrl ? (
                                   <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-white">
                                     <ImageWithLoader
-                                      src={item.imageUrl}
+                                      src={item.imageThumbUrl || item.imageUrl}
                                       alt=""
                                       className="h-full w-full object-cover"
                                     />

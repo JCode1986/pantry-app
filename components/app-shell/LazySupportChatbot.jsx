@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const SupportChatbot = dynamic(() => import("@/components/app-shell/SupportChatbot"), {
   ssr: false,
@@ -11,8 +11,17 @@ const SupportChatbot = dynamic(() => import("@/components/app-shell/SupportChatb
 export default function LazySupportChatbot() {
   const pathname = usePathname();
   const [shouldLoad, setShouldLoad] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (pathname === "/support/chat" || pathname?.startsWith("/support/chat/")) {
+    return null;
+  }
+
+  if (!mounted) {
     return null;
   }
 
@@ -21,7 +30,7 @@ export default function LazySupportChatbot() {
   }
 
   return (
-    <div className="fixed bottom-[6.25rem] right-4 z-[60] hidden md:bottom-6 md:block lg:right-6">
+    <div className="fixed bottom-[6.25rem] right-4 z-30 hidden md:bottom-6 md:block lg:right-6">
       <button
         type="button"
         onClick={() => setShouldLoad(true)}

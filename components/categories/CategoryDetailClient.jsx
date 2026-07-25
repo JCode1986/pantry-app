@@ -696,7 +696,7 @@ export default function CategoryDetailClient({
     }
   };
 
-  const handleItemImageChange = ({ imagePath, imageUrl }) => {
+  const handleItemImageChange = ({ imagePath, imageUrl, imageThumbUrl }) => {
     const itemId = itemModal.itemId;
     if (!itemId) return;
 
@@ -707,6 +707,7 @@ export default function CategoryDetailClient({
               ...item,
               image_path: imagePath ?? null,
               imageUrl: imageUrl ?? null,
+              imageThumbUrl: imageThumbUrl ?? null,
             }
           : item
       )
@@ -714,6 +715,7 @@ export default function CategoryDetailClient({
     setItemModal((prev) => ({
       ...prev,
       imageUrl: imageUrl ?? null,
+      imageThumbUrl: imageThumbUrl ?? null,
     }));
     emitInventoryChange({
       entity: "item",
@@ -1245,7 +1247,7 @@ export default function CategoryDetailClient({
                 {item.imageUrl ? (
                   <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-item-border)] bg-white">
                     <ImageWithLoader
-                      src={item.imageUrl}
+                      src={item.imageThumbUrl || item.imageUrl}
                       alt=""
                       className="h-full w-full object-cover"
                     />
@@ -1560,10 +1562,25 @@ export default function CategoryDetailClient({
                     }`}
                   >
                     <div className="flex min-w-0 items-center gap-3">
+                      {canEditInventory && selectedCount > 0 ? (
+                        <label
+                          className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center"
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectItem(item.id)}
+                            aria-label={`Select ${item.name}`}
+                            className="h-5 w-5 cursor-pointer rounded border-gray-300 text-[var(--stocksense-brand)] accent-[var(--stocksense-brand)] focus:ring-[var(--stocksense-brand-border)]"
+                          />
+                        </label>
+                      ) : null}
                       {item.imageUrl ? (
                         <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-[var(--entity-item-border)] bg-white">
                           <ImageWithLoader
-                            src={item.imageUrl}
+                            src={item.imageThumbUrl || item.imageUrl}
                             alt=""
                             className="h-full w-full object-cover"
                           />

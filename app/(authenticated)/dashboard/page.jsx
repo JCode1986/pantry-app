@@ -10,7 +10,10 @@ import {
   getCanEditInventoryForUser,
   getHouseholdForUser,
 } from '@/utils/households';
-import { getInventoryImageUrls } from '@/utils/inventoryImages';
+import {
+  INVENTORY_IMAGE_VARIANT,
+  getInventoryImageUrls,
+} from '@/utils/inventoryImages';
 import { LuClock3, LuPackageMinus, LuTriangleAlert } from 'react-icons/lu';
 
 export const metadata = createPageMetadata({
@@ -176,7 +179,8 @@ async function hydrateDashboardItems(supabase, itemsRaw = []) {
   if (itemsRaw.length === 0) return [];
 
   const imageUrlsByPath = await getInventoryImageUrls(
-    itemsRaw.map((item) => item.image_path)
+    itemsRaw.map((item) => item.image_path),
+    { variant: INVENTORY_IMAGE_VARIANT.CARD }
   );
   const categoryIds = [
     ...new Set(itemsRaw.map((item) => item.category_id).filter(Boolean)),
@@ -229,6 +233,7 @@ async function hydrateDashboardItems(supabase, itemsRaw = []) {
       quantity: item.quantity ?? 0,
       expirationDate: item.expiration_date,
       imageUrl: imageUrlsByPath.get(item.image_path) ?? null,
+      imageThumbUrl: imageUrlsByPath.get(item.image_path) ?? null,
       categoryId: category?.id ?? item.category_id ?? null,
       categoryName: category?.name ?? null,
       areaName: area?.name ?? null,

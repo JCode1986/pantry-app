@@ -471,7 +471,7 @@ export default function SupportChatbot({
   }
 
   return (
-    <div className={`fixed bottom-[6.25rem] right-4 z-[60] md:bottom-6 lg:right-6 ${className}`}>
+    <div className={`fixed bottom-[6.25rem] right-4 z-30 md:bottom-6 lg:right-6 ${className}`}>
       {isOpen ? (
         chatPanel
       ) : (

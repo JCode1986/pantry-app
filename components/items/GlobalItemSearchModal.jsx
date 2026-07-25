@@ -341,7 +341,7 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
               <div className="min-h-[220px] flex-1 space-y-2 overflow-x-hidden max-md:min-h-0 max-md:pb-4">
                 <AnimatePresence initial={false}>
                   {results.map((item) => {
-                    const imageUrl = item.imageUrl;
+                    const imageUrl = item.imageThumbUrl || item.imageUrl;
                     const expirationLabel = formatExpirationDate(item.expirationDate);
                     const isShoppingListItem = isShoppingListResult(item);
 
