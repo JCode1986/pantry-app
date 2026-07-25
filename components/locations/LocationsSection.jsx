@@ -332,12 +332,8 @@ export default function LocationsSection({
   const selectedCount = selectedIds.size;
   const selectionMode = selectedCount > 0;
   const showDesktopAddLocationTile = canEditInventory && !normalizedSearch;
-  const desktopLocationCardCount =
-    filteredLocations.length + (showDesktopAddLocationTile ? 1 : 0);
   const desktopLocationGridClass =
-    desktopLocationCardCount <= 3
-      ? 'grid max-w-[1180px] grid-cols-1 items-stretch gap-5 lg:grid-cols-2'
-      : 'grid max-w-[1360px] grid-cols-1 items-stretch gap-5 lg:grid-cols-2 xl:grid-cols-3';
+    'grid grid-cols-1 items-stretch gap-5 lg:grid-cols-2 xl:grid-cols-3';
   const allVisibleSelected =
     filteredLocations.length > 0 &&
     filteredLocations.every((location) => selectedIds.has(String(location.id)));
@@ -510,16 +506,22 @@ export default function LocationsSection({
     }));
   };
 
-  const handleLocationImageChange = ({ imagePath, imageUrl }) => {
+  const handleLocationImageChange = ({ imagePath, imageUrl, imageThumbUrl }) => {
     setLocationModal((prev) => ({
       ...prev,
       image_path: imagePath ?? null,
       imageUrl: imageUrl ?? null,
+      imageThumbUrl: imageThumbUrl ?? null,
     }));
     setAllLocations((prev) =>
       prev.map((loc) =>
         loc.id === locationModal.locationId
-          ? { ...loc, image_path: imagePath ?? null, imageUrl: imageUrl ?? null }
+          ? {
+              ...loc,
+              image_path: imagePath ?? null,
+              imageUrl: imageUrl ?? null,
+              imageThumbUrl: imageThumbUrl ?? null,
+            }
           : loc
       )
     );
@@ -634,6 +636,8 @@ export default function LocationsSection({
               ...createdLocation,
               image_path: imageResult.data.imagePath ?? createdLocation.image_path,
               imageUrl: imageResult.data.imageUrl ?? createdLocation.imageUrl,
+              imageThumbUrl:
+                imageResult.data.imageThumbUrl ?? createdLocation.imageThumbUrl ?? null,
             };
           }
         } catch (err) {
@@ -1149,7 +1153,7 @@ export default function LocationsSection({
                     {loc.imageUrl ? (
                       <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-location-border)] bg-white">
                         <ImageWithLoader
-                          src={loc.imageUrl}
+                          src={loc.imageThumbUrl || loc.imageUrl}
                           alt=""
                           className="h-full w-full object-cover"
                         />
@@ -1344,10 +1348,22 @@ export default function LocationsSection({
 
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 flex-1 items-start gap-3">
+                          {canEditInventory && selectionMode && !loc._optimistic ? (
+                            <label className="mt-1 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center">
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.has(String(loc.id))}
+                                onChange={() => toggleSelect(loc.id)}
+                                aria-label={`Select ${loc.name}`}
+                                className="h-5 w-5 cursor-pointer rounded border-gray-300 text-[var(--stocksense-brand)] accent-[var(--stocksense-brand)] focus:ring-[var(--stocksense-brand-border)]"
+                              />
+                            </label>
+                          ) : null}
+
                           {loc.imageUrl ? (
                             <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white">
                               <ImageWithLoader
-                                src={loc.imageUrl}
+                                src={loc.imageThumbUrl || loc.imageUrl}
                                 alt=""
                                 className="h-full w-full object-cover"
                               />
@@ -1477,7 +1493,7 @@ export default function LocationsSection({
                                 {item.imageUrl ? (
                                   <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-white">
                                     <ImageWithLoader
-                                      src={item.imageUrl}
+                                      src={item.imageThumbUrl || item.imageUrl}
                                       alt=""
                                       className="h-full w-full object-cover"
                                     />

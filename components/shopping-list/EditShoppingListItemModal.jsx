@@ -124,13 +124,14 @@ export default function EditShoppingListItemModal({
     onClose?.();
   };
 
-  const handleImageChange = ({ imagePath, imageUrl }) => {
+  const handleImageChange = ({ imagePath, imageUrl, imageThumbUrl }) => {
     if (!item) return;
     onUpdated?.({
       ...item,
       image_path: imagePath ?? null,
       imagePath: imagePath ?? null,
       imageUrl: imageUrl ?? null,
+      imageThumbUrl: imageThumbUrl ?? null,
     });
   };
 

@@ -4,7 +4,10 @@ import LocationDetailHeaderClient from '@/components/locations/LocationDetailHea
 import { notFound } from 'next/navigation';
 import { createPageMetadata, NO_INDEX_ROBOTS } from '@/utils/metadata';
 import { getCanEditInventoryForUser } from '@/utils/households';
-import { getInventoryImageUrls } from '@/utils/inventoryImages';
+import {
+  INVENTORY_IMAGE_VARIANT,
+  getInventoryImageUrls,
+} from '@/utils/inventoryImages';
 import { getLocationStorageAreasPageAction } from '@/app/actions/server';
 
 // export const dynamic = 'force-dynamic'; // optional if you want fresh data on each request
@@ -89,7 +92,12 @@ export default async function Page({ params }) {
     })),
   }));
 
-  const locationImageUrl = (await getInventoryImageUrls([location.image_path])).get(location.image_path) ?? null;
+  const locationImageUrl =
+    (
+      await getInventoryImageUrls([location.image_path], {
+        variant: INVENTORY_IMAGE_VARIANT.DETAIL,
+      })
+    ).get(location.image_path) ?? null;
   const totalAreas = storageAreasResult.data.totalCount ?? storageAreas.length;
   const totalCategories = storageAreas.reduce(
     (sum, area) => sum + (area.categories?.length ?? 0),

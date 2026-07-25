@@ -454,7 +454,7 @@ export default function CategoriesPageClient({
     });
   };
 
-  const handleCategoryImageChange = ({ imagePath, imageUrl }) => {
+  const handleCategoryImageChange = ({ imagePath, imageUrl, imageThumbUrl }) => {
     if (!activeCategory?.id) return;
 
     setCategories((prev) =>
@@ -464,6 +464,7 @@ export default function CategoriesPageClient({
               ...category,
               image_path: imagePath ?? null,
               imageUrl: imageUrl ?? null,
+              imageThumbUrl: imageThumbUrl ?? null,
             }
           : category
       )
@@ -599,6 +600,7 @@ export default function CategoriesPageClient({
         name: created?.name ?? name,
         image_path: uploadedImage?.imagePath ?? null,
         imageUrl: uploadedImage?.imageUrl ?? null,
+        imageThumbUrl: uploadedImage?.imageThumbUrl ?? null,
         insertedAt: created?.created_at ?? null,
         storageArea: {
           id: area?.id ?? createCategoryAreaId,
@@ -991,7 +993,7 @@ export default function CategoriesPageClient({
                 {category.imageUrl ? (
                   <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-[var(--entity-category-border)] bg-white">
                     <ImageWithLoader
-                      src={category.imageUrl}
+                      src={category.imageThumbUrl || category.imageUrl}
                       alt=""
                       className="h-full w-full object-cover"
                     />
@@ -1304,10 +1306,26 @@ export default function CategoriesPageClient({
 
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 flex-1 items-start gap-3">
+                          {canEditInventory && selectionMode ? (
+                            <label
+                              className="mt-1 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center"
+                              onClick={(event) => event.stopPropagation()}
+                              onKeyDown={(event) => event.stopPropagation()}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.has(String(c.id))}
+                                onChange={() => toggleSelect(c.id)}
+                                aria-label={`Select ${c.name}`}
+                                className="h-5 w-5 cursor-pointer rounded border-gray-300 text-[var(--stocksense-brand)] accent-[var(--stocksense-brand)] focus:ring-[var(--stocksense-brand-border)]"
+                              />
+                            </label>
+                          ) : null}
+
                           {c.imageUrl ? (
                             <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white">
                               <ImageWithLoader
-                                src={c.imageUrl}
+                                src={c.imageThumbUrl || c.imageUrl}
                                 alt=""
                                 className="h-full w-full object-cover"
                               />

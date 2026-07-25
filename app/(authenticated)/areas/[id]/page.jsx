@@ -3,7 +3,10 @@ import { notFound } from "next/navigation";
 import AreaDetailClient from "@/components/areas/AreaDetailClient";
 import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
 import { getCanEditInventoryForUser } from "@/utils/households";
-import { getInventoryImageUrls } from "@/utils/inventoryImages";
+import {
+  INVENTORY_IMAGE_VARIANT,
+  getInventoryImageUrls,
+} from "@/utils/inventoryImages";
 import { getAreaCategoriesPageAction } from "@/app/actions/server";
 
 export async function generateMetadata({ params }) {
@@ -61,7 +64,9 @@ export default async function Page({ params }) {
 
   const [categoriesResult, imageUrlsByPath] = await Promise.all([
     getAreaCategoriesPageAction({ areaId: id, offset: 0, limit: 24 }),
-    getInventoryImageUrls([area.image_path]),
+    getInventoryImageUrls([area.image_path], {
+      variant: INVENTORY_IMAGE_VARIANT.DETAIL,
+    }),
   ]);
   const categories = categoriesResult.data.items ?? [];
 

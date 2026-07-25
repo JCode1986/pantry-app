@@ -24,7 +24,7 @@ export default async function Page({ searchParams }) {
   const [itemsResult, hierarchyResult] = await Promise.all([
     getItemsPageAction({
       offset: 0,
-      limit: 25,
+      limit: 24,
       filters: {
         expirationFilter: params?.expiration,
         expirationDays: params?.days,

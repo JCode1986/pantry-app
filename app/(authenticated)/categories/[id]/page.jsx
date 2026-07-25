@@ -3,7 +3,10 @@ import { createClient } from "@/utils/supabase/server";
 import CategoryDetailClient from "@/components/categories/CategoryDetailClient";
 import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
 import { getCanEditInventoryForUser } from "@/utils/households";
-import { getInventoryImageUrls } from "@/utils/inventoryImages";
+import {
+  INVENTORY_IMAGE_VARIANT,
+  getInventoryImageUrls,
+} from "@/utils/inventoryImages";
 import { getItemsPageAction } from "@/app/actions/server";
 
 export async function generateMetadata({ params }) {
@@ -118,7 +121,9 @@ export default async function CategoryDetailPage({ params }) {
   }
 
   const [imageUrlsByPath, itemsResult] = await Promise.all([
-    getInventoryImageUrls([category.image_path]),
+    getInventoryImageUrls([category.image_path], {
+      variant: INVENTORY_IMAGE_VARIANT.DETAIL,
+    }),
     getItemsPageAction({
       offset: 0,
       limit: 24,

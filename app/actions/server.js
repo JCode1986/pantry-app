@@ -13,6 +13,7 @@ import {
 import {
   INVENTORY_IMAGE_BUCKET,
   INVENTORY_IMAGE_ENTITY,
+  INVENTORY_IMAGE_VARIANT,
   getInventoryImageUrl,
   getInventoryImageUrls,
 } from '@/utils/inventoryImages';
@@ -915,6 +916,9 @@ export async function uploadInventoryImage(entityType, entityId, formData) {
       data: {
         imagePath: path,
         imageUrl: await getInventoryImageUrl(path),
+        imageThumbUrl: await getInventoryImageUrl(path, {
+          variant: INVENTORY_IMAGE_VARIANT.CARD,
+        }),
       },
       error: null,
     };
@@ -969,7 +973,7 @@ export async function removeInventoryImage(entityType, entityId) {
       since: startedAt,
     });
     revalidateEntityPaths(normalizedType);
-    return { data: { imagePath: null, imageUrl: null }, error: null };
+    return { data: { imagePath: null, imageUrl: null, imageThumbUrl: null }, error: null };
   } catch (err) {
     console.error('removeInventoryImage error:', err);
     return { data: null, error: err?.message || 'Could not remove image.' };
@@ -1379,6 +1383,9 @@ export async function addItem(
       ...data,
       image_path: imagePath ?? data.image_path ?? null,
       imageUrl: imagePath ? await getInventoryImageUrl(imagePath) : null,
+      imageThumbUrl: imagePath
+        ? await getInventoryImageUrl(imagePath, { variant: INVENTORY_IMAGE_VARIANT.CARD })
+        : null,
     },
   };
 }
@@ -1426,7 +1433,7 @@ export async function getInventoryHierarchy() {
   };
 }
 
-const ITEMS_PAGE_SIZE_DEFAULT = 25;
+const ITEMS_PAGE_SIZE_DEFAULT = 24;
 const ITEMS_PAGE_SIZE_MAX = 200;
 const ITEM_LIST_FILTERS = {
   ALL: 'all',
@@ -1704,23 +1711,37 @@ async function fetchStorageAreasForLocations(supabase, locationIds = []) {
     .in('location_id', locationIds);
 }
 
-function normalizeStorageAreaRows(storageAreasRaw = [], imageUrlsByPath = new Map()) {
+function normalizeStorageAreaRows(
+  storageAreasRaw = [],
+  imageUrlsByPath = new Map(),
+  imageThumbUrlsByPath = new Map()
+) {
   return (storageAreasRaw ?? []).map((area) => ({
     id: area.id,
     name: area.name,
     image_path: area.image_path ?? null,
     imageUrl: imageUrlsByPath.get(area.image_path) ?? null,
+    imageThumbUrl: imageThumbUrlsByPath.get(area.image_path) ?? null,
     categories: (area.storage_categories ?? []).map((category) => ({
       id: category.id,
       name: category.name,
       image_path: category.image_path ?? null,
       imageUrl: imageUrlsByPath.get(category.image_path) ?? null,
+      imageThumbUrl: imageThumbUrlsByPath.get(category.image_path) ?? null,
       items: (category.items ?? []).map((item) => ({
         ...item,
         imageUrl: imageUrlsByPath.get(item.image_path) ?? null,
+        imageThumbUrl: imageThumbUrlsByPath.get(item.image_path) ?? null,
       })),
     })),
   }));
+}
+
+async function getOriginalAndCardImageUrls(paths = []) {
+  return Promise.all([
+    getInventoryImageUrls(paths),
+    getInventoryImageUrls(paths, { variant: INVENTORY_IMAGE_VARIANT.CARD }),
+  ]);
 }
 
 export async function getLocationsPageAction({
@@ -1773,7 +1794,7 @@ export async function getLocationsPageAction({
       )
     ),
   ];
-  const imageUrlsByPath = await getInventoryImageUrls(imagePaths);
+  const [imageUrlsByPath, imageThumbUrlsByPath] = await getOriginalAndCardImageUrls(imagePaths);
   const areasByLocation = new Map();
 
   for (const area of areasRaw ?? []) {
@@ -1813,6 +1834,7 @@ export async function getLocationsPageAction({
             name: item.name,
             image_path: item.image_path ?? null,
             imageUrl: imageUrlsByPath.get(item.image_path) ?? null,
+            imageThumbUrl: imageThumbUrlsByPath.get(item.image_path) ?? null,
             created_at: item.created_at,
             storagePath: [location.name, area.name, category.name]
               .filter(Boolean)
@@ -1828,6 +1850,7 @@ export async function getLocationsPageAction({
       name: location.name,
       image_path: location.image_path ?? null,
       imageUrl: imageUrlsByPath.get(location.image_path) ?? null,
+      imageThumbUrl: imageThumbUrlsByPath.get(location.image_path) ?? null,
       created_at: location.created_at,
       areasCount: areas.length,
       categoriesCount,
@@ -1998,17 +2021,20 @@ export async function getLocationStorageAreasPageAction({
   const sortedAreas = (areaPageRows ?? [])
     .map((area) => areaMap.get(String(area.id)))
     .filter(Boolean);
-  const imageUrlsByPath = await getInventoryImageUrls(
-    sortedAreas.flatMap((area) => [
+  const imagePaths = sortedAreas.flatMap((area) => [
       area.image_path,
       ...(area.storage_categories ?? []).flatMap((category) => [
         category.image_path,
         ...(category.items ?? []).map((item) => item.image_path),
       ]),
-    ])
-  );
+    ]);
+  const [imageUrlsByPath, imageThumbUrlsByPath] = await getOriginalAndCardImageUrls(imagePaths);
 
-  const items = normalizeStorageAreaRows(sortedAreas, imageUrlsByPath);
+  const items = normalizeStorageAreaRows(
+    sortedAreas,
+    imageUrlsByPath,
+    imageThumbUrlsByPath
+  );
 
   return {
     data: {
@@ -2077,7 +2103,7 @@ export async function getStorageAreasPageAction({
     return { data: emptyPageData(), error: locationsError.message };
   }
 
-  const imageUrlsByPath = await getInventoryImageUrls(
+  const [imageUrlsByPath, imageThumbUrlsByPath] = await getOriginalAndCardImageUrls(
     (areasRaw ?? []).map((area) => area.image_path)
   );
   const locationMap = new Map((locationsRaw ?? []).map((location) => [String(location.id), location]));
@@ -2090,6 +2116,7 @@ export async function getStorageAreasPageAction({
       name: area.name,
       image_path: area.image_path ?? null,
       imageUrl: imageUrlsByPath.get(area.image_path) ?? null,
+      imageThumbUrl: imageThumbUrlsByPath.get(area.image_path) ?? null,
       location: location
         ? { id: location.id, name: location.name }
         : { id: null, name: 'Unknown location' },
@@ -2216,7 +2243,7 @@ export async function getCategoriesPageAction({
     return { data: emptyPageData(), error: locationsError.message };
   }
 
-  const imageUrlsByPath = await getInventoryImageUrls(
+  const [imageUrlsByPath, imageThumbUrlsByPath] = await getOriginalAndCardImageUrls(
     (categoriesRaw ?? []).map((category) => category.image_path)
   );
   const areaMap = new Map((areasRaw ?? []).map((area) => [String(area.id), area]));
@@ -2234,6 +2261,7 @@ export async function getCategoriesPageAction({
       name: category.name,
       image_path: category.image_path ?? null,
       imageUrl: imageUrlsByPath.get(category.image_path) ?? null,
+      imageThumbUrl: imageThumbUrlsByPath.get(category.image_path) ?? null,
       insertedAt: category.inserted_at,
       storageArea: {
         id: area?.id ?? null,
@@ -2270,12 +2298,13 @@ async function normalizeItemsForList({
   const locationMap = new Map(
     (locationsRaw ?? []).map((location) => [String(location.id), location])
   );
-  const urlsByPath = await getInventoryImageUrls([
+  const imagePaths = [
     ...(itemsRaw ?? []).map((item) => item.image_path),
     ...(categoriesRaw ?? []).map((category) => category.image_path),
     ...(areasRaw ?? []).map((area) => area.image_path),
     ...(locationsRaw ?? []).map((location) => location.image_path),
-  ]);
+  ];
+  const [urlsByPath, thumbUrlsByPath] = await getOriginalAndCardImageUrls(imagePaths);
 
   return (itemsRaw ?? []).map((item) => {
     const category = item.category_id
@@ -2296,6 +2325,7 @@ async function normalizeItemsForList({
       barcode: item.barcode ?? null,
       image_path: item.image_path ?? null,
       imageUrl: urlsByPath.get(item.image_path) ?? null,
+      imageThumbUrl: thumbUrlsByPath.get(item.image_path) ?? null,
       category_id: item.category_id ?? null,
       category: category
         ? {
@@ -2303,6 +2333,7 @@ async function normalizeItemsForList({
             name: category.name,
             image_path: category.image_path ?? null,
             imageUrl: urlsByPath.get(category.image_path) ?? null,
+            imageThumbUrl: thumbUrlsByPath.get(category.image_path) ?? null,
           }
         : null,
       area: area
@@ -2311,6 +2342,7 @@ async function normalizeItemsForList({
             name: area.name,
             image_path: area.image_path ?? null,
             imageUrl: urlsByPath.get(area.image_path) ?? null,
+            imageThumbUrl: thumbUrlsByPath.get(area.image_path) ?? null,
           }
         : null,
       location: location
@@ -2319,6 +2351,7 @@ async function normalizeItemsForList({
             name: location.name,
             image_path: location.image_path ?? null,
             imageUrl: urlsByPath.get(location.image_path) ?? null,
+            imageThumbUrl: thumbUrlsByPath.get(location.image_path) ?? null,
           }
         : null,
     };
@@ -2587,10 +2620,11 @@ export async function searchItems(query) {
   const locationMap = new Map(
     (locationsRaw ?? []).map((location) => [String(location.id), location])
   );
-  const urlsByPath = await getInventoryImageUrls([
+  const searchImagePaths = [
     ...items.map((item) => item.image_path),
     ...shoppingListItems.map((item) => item.image_path),
-  ]);
+  ];
+  const [urlsByPath, thumbUrlsByPath] = await getOriginalAndCardImageUrls(searchImagePaths);
 
   const inventoryResults = items.map((item) => {
     const category = item.category_id
@@ -2611,6 +2645,7 @@ export async function searchItems(query) {
       expirationDate: item.expiration_date ?? null,
       barcode: item.barcode ?? null,
       imageUrl: urlsByPath.get(item.image_path) ?? null,
+      imageThumbUrl: thumbUrlsByPath.get(item.image_path) ?? null,
       category: category
         ? { id: category.id, name: category.name }
         : null,
@@ -2638,6 +2673,7 @@ export async function searchItems(query) {
       sourceItemId: item.source_item_id ?? null,
       sourceCategoryId: item.source_category_id ?? null,
       imageUrl: urlsByPath.get(item.image_path) ?? null,
+      imageThumbUrl: thumbUrlsByPath.get(item.image_path) ?? null,
       createdAt: item.created_at ?? null,
       updatedAt: item.updated_at ?? null,
     }));
@@ -2857,6 +2893,9 @@ export async function addItemWithPath({
       ...data,
       image_path: imagePath ?? data.image_path ?? null,
       imageUrl: imagePath ? await getInventoryImageUrl(imagePath) : null,
+      imageThumbUrl: imagePath
+        ? await getInventoryImageUrl(imagePath, { variant: INVENTORY_IMAGE_VARIANT.CARD })
+        : null,
       locationId: finalLocationId,
       locationName: finalLocationName,
       storageAreaId: finalStorageAreaId,

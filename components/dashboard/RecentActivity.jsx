@@ -305,7 +305,7 @@ function entityIcon(entity) {
 }
 
 function activityImageUrl(row) {
-  return row?.imageUrl || row?.image_url || row?.thumbnailUrl || null;
+  return row?.imageThumbUrl || row?.imageUrl || row?.image_url || row?.thumbnailUrl || null;
 }
 
 function ActivityThumb({ row, entity }) {
