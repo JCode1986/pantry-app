@@ -39,9 +39,11 @@ import { parseDate } from "@internationalized/date";
 import {
   deleteCategory,
   deleteItem,
+  deleteItems,
+  getInventoryHierarchy,
   getItemsPageAction,
   updateCategoryName,
-  updateItemLocation,
+  updateItemsLocation,
   updateItem,
 } from "@/app/actions/server";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
@@ -62,6 +64,7 @@ import {
 } from "@/components/modals/modalTheme";
 import { emitInventoryChange, ITEM_ADDED_EVENT } from "@/utils/clientEvents";
 import { daysUntil, isExpiringSoon, toNonNegativeInteger } from "@/utils/pantry/date";
+import { normalizeMoveLocations } from "@/utils/pantry/moveLocations";
 import PaginationControls from "@/components/ui/PaginationControls";
 import SearchResultsLoadingState from "@/components/ui/SearchResultsLoadingState";
 
@@ -176,6 +179,15 @@ export default function CategoryDetailClient({
     targetCategoryId: null,
     itemIds: [],
   });
+  const [moveLocationsForModal, setMoveLocationsForModal] = useState(() =>
+    normalizeMoveLocations(moveLocations)
+  );
+  const [moveDestinationsLoaded, setMoveDestinationsLoaded] = useState(
+    () => (moveLocations ?? []).length > 0
+  );
+  const [isLoadingMoveDestinations, setIsLoadingMoveDestinations] = useState(false);
+  const [moveDestinationsError, setMoveDestinationsError] = useState("");
+  const moveDestinationsRequestRef = useRef(null);
   const [selectedItemIds, setSelectedItemIds] = useState(() => new Set());
   const itemModalExpirationDateValue = useMemo(() => {
     if (!itemModal.expirationDate) return null;
@@ -316,17 +328,54 @@ export default function CategoryDetailClient({
       icon: FaExclamationTriangle,
     },
   ];
-  const normalizedMoveLocations = useMemo(
-    () =>
-      (moveLocations ?? []).map((moveLocation) => ({
-        ...moveLocation,
-        storageAreas:
-          moveLocation.storageAreas ?? moveLocation.storage_areas ?? [],
-      })),
-    [moveLocations]
+  useEffect(() => {
+    const nextMoveLocations = normalizeMoveLocations(moveLocations);
+    if (nextMoveLocations.length === 0) return;
+
+    setMoveLocationsForModal(nextMoveLocations);
+    setMoveDestinationsLoaded(true);
+  }, [moveLocations]);
+
+  const loadMoveDestinations = useCallback(
+    async ({ force = false } = {}) => {
+      if (!force && moveDestinationsLoaded) return moveLocationsForModal;
+      if (moveDestinationsRequestRef.current) {
+        return moveDestinationsRequestRef.current;
+      }
+
+      setIsLoadingMoveDestinations(true);
+      setMoveDestinationsError("");
+
+      const request = getInventoryHierarchy()
+        .then((result) => {
+          if (result?.error) {
+            throw new Error(result.error);
+          }
+
+          const nextMoveLocations = normalizeMoveLocations(result?.data ?? []);
+          setMoveLocationsForModal(nextMoveLocations);
+          setMoveDestinationsLoaded(true);
+          return nextMoveLocations;
+        })
+        .catch((error) => {
+          setMoveDestinationsError(
+            error?.message || "Could not load move destinations."
+          );
+          return null;
+        })
+        .finally(() => {
+          setIsLoadingMoveDestinations(false);
+          moveDestinationsRequestRef.current = null;
+        });
+
+      moveDestinationsRequestRef.current = request;
+      return request;
+    },
+    [moveDestinationsLoaded, moveLocationsForModal]
   );
+
   const currentStorageAreas = useMemo(() => {
-    const currentLocation = normalizedMoveLocations.find(
+    const currentLocation = moveLocationsForModal.find(
       (moveLocation) => String(moveLocation.id) === String(location?.id)
     );
 
@@ -343,7 +392,7 @@ export default function CategoryDetailClient({
         categories: [{ id: category.id, name: categoryName }],
       },
     ];
-  }, [area?.id, area?.name, category?.id, categoryName, location?.id, normalizedMoveLocations]);
+  }, [area?.id, area?.name, category?.id, categoryName, location?.id, moveLocationsForModal]);
 
   const closeItemModal = () => setItemModal(emptyItemModal);
 
@@ -542,6 +591,7 @@ export default function CategoryDetailClient({
       targetCategoryId: category.id,
       itemIds,
     });
+    void loadMoveDestinations();
   };
 
   const openEditItem = (item) => {
@@ -731,11 +781,10 @@ export default function CategoryDetailClient({
     try {
       if (deleteDialog.entityType === "items") {
         const itemIds = deleteDialog.payload.itemIds ?? [];
-        const results = await Promise.all(itemIds.map((itemId) => deleteItem(itemId)));
-        const hasError = results.some((result) => result?.error);
+        const result = await deleteItems(itemIds);
 
-        if (hasError) {
-          console.error("bulk delete category detail item errors:", results);
+        if (result?.error) {
+          console.error("bulk delete category detail item errors:", result);
           setDeleteDialog((prev) => ({ ...prev, isDeleting: false }));
           return;
         }
@@ -803,17 +852,12 @@ export default function CategoryDetailClient({
     if (!targetCategoryId || itemIds.length === 0) return;
     if (String(targetCategoryId) === String(sourceCategoryId)) return;
 
-    const results = await Promise.all(
-      itemIds.map((itemId) =>
-        updateItemLocation(itemId, {
-          categoryId: targetCategoryId,
-        })
-      )
-    );
+    const result = await updateItemsLocation(itemIds, {
+      categoryId: targetCategoryId,
+    });
 
-    const hasError = results.some((result) => result?.error);
-    if (hasError) {
-      console.error("move category detail item errors:", results);
+    if (result?.error) {
+      console.error("move category detail item errors:", result);
       return;
     }
 
@@ -855,6 +899,8 @@ export default function CategoryDetailClient({
               <ImageWithLoader
                 src={categoryImageUrl}
                 alt=""
+                loading="eager"
+                fetchPriority="high"
                 className="h-full w-full object-cover"
               />
             ) : (
@@ -958,6 +1004,8 @@ export default function CategoryDetailClient({
                 <ImageWithLoader
                   src={categoryImageUrl}
                   alt=""
+                  loading="eager"
+                  fetchPriority="high"
                   className="h-full w-full object-cover"
                 />
               </div>
@@ -1990,10 +2038,13 @@ export default function CategoryDetailClient({
         <MoveItemsModal
           moveModal={moveModal}
           setMoveModal={setMoveModal}
-          locationsForMove={normalizedMoveLocations}
+          locationsForMove={moveLocationsForModal}
           storageAreas={currentStorageAreas}
           currentLocationId={location?.id ?? null}
           onConfirm={confirmMove}
+          isLoadingDestinations={isLoadingMoveDestinations}
+          destinationsError={moveDestinationsError}
+          onRetryLoadDestinations={() => loadMoveDestinations({ force: true })}
         />
       )}
 

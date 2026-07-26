@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -20,9 +21,9 @@ import {
   SelectItem,
 } from "@heroui/react";
 import {
+  FaArrowsAlt,
   FaBoxOpen,
   FaCamera,
-  FaChevronLeft,
   FaChevronRight,
   FaEdit,
   FaEllipsisV,
@@ -38,8 +39,13 @@ import {
 
 import {
   addCategory,
+  deleteItems,
   deleteStorageArea,
+  getCategoryItemsAction,
+  getInventoryHierarchy,
   getAreaCategoriesPageAction,
+  updateItem,
+  updateItemsLocation,
   updateCategoryName,
   deleteCategory,
   updateStorageArea,
@@ -60,12 +66,19 @@ import {
   mobileSheetModalClassNames,
   themedSelectClassNames,
 } from "@/components/modals/modalTheme";
-import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
 import { emitInventoryChange } from "@/utils/clientEvents";
 import PaginationControls from "@/components/ui/PaginationControls";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
 import SearchResultsLoadingState from "@/components/ui/SearchResultsLoadingState";
 import { daysUntil, isExpiringSoon, toNonNegativeInteger } from "@/utils/pantry/date";
+import { normalizeMoveLocations } from "@/utils/pantry/moveLocations";
+
+const MoveItemsModal = dynamic(() => import("@/components/items/MoveItemsModal"), {
+  ssr: false,
+});
+const AreaItemEditModal = dynamic(() => import("@/components/areas/AreaItemEditModal"), {
+  ssr: false,
+});
 
 const CATEGORY_SUGGESTIONS = ["Food", "Documents", "Tools", "Medicine", "Clothes", "Electronics"];
 const AREA_DETAIL_PAGE_SIZE = 24;
@@ -135,6 +148,18 @@ const collapseVariants = {
   open: { height: "auto", opacity: 1, transition: { duration: 0.25 } },
 };
 
+const emptyItemModal = {
+  open: false,
+  itemId: null,
+  categoryId: null,
+  categoryName: "",
+  name: "",
+  quantity: "0",
+  expirationDate: "",
+  barcode: "",
+  imageUrl: null,
+};
+
 export default function AreaDetailClient({
   area,
   initialCategories,
@@ -155,7 +180,10 @@ export default function AreaDetailClient({
   const [newCategoryImageFile, setNewCategoryImageFile] = useState(null);
   const [newCategoryImagePreview, setNewCategoryImagePreview] = useState(null);
   const [newCategoryImageMessage, setNewCategoryImageMessage] = useState("");
-  const [collapsedCategoryIds, setCollapsedCategoryIds] = useState(() => new Set());
+  const [collapsedCategoryIds, setCollapsedCategoryIds] = useState(
+    () => new Set((initialCategories ?? []).map((category) => String(category.id)))
+  );
+  const [selectedItemIds, setSelectedItemIds] = useState(() => new Set());
   const [mobileAddOpen, setMobileAddOpen] = useState(false);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState(() => new Set());
 
@@ -164,6 +192,26 @@ export default function AreaDetailClient({
   const [editAreaName, setEditAreaName] = useState(area?.name ?? "");
   const [deleteAreaOpen, setDeleteAreaOpen] = useState(false);
   const [isDeletingArea, setIsDeletingArea] = useState(false);
+  const [itemModal, setItemModal] = useState(emptyItemModal);
+  const [itemDeleteDialog, setItemDeleteDialog] = useState({
+    open: false,
+    payload: null,
+    isDeleting: false,
+  });
+  const [moveModal, setMoveModal] = useState({
+    open: false,
+    sourceAreaId: area?.id ?? null,
+    sourceCategoryId: null,
+    targetLocationId: area?.location?.id ?? null,
+    targetAreaId: area?.id ?? null,
+    targetCategoryId: null,
+    itemIds: [],
+  });
+  const [moveLocationsForModal, setMoveLocationsForModal] = useState([]);
+  const [moveDestinationsLoaded, setMoveDestinationsLoaded] = useState(false);
+  const [isLoadingMoveDestinations, setIsLoadingMoveDestinations] = useState(false);
+  const [moveDestinationsError, setMoveDestinationsError] = useState("");
+  const moveDestinationsRequestRef = useRef(null);
 
   const [renameModal, setRenameModal] = useState({
     open: false,
@@ -172,9 +220,8 @@ export default function AreaDetailClient({
     imageUrl: null,
   });
   const shouldAutoFocus = useDesktopAutoFocus(
-    mobileAddOpen || editAreaOpen || renameModal.open
+    mobileAddOpen || editAreaOpen || renameModal.open || itemModal.open
   );
-
   const [deleteModal, setDeleteModal] = useState({
     open: false,
     mode: "single",
@@ -192,6 +239,10 @@ export default function AreaDetailClient({
   }, [newCategoryImagePreview]);
 
   const normalizedSearch = search.trim().toLowerCase();
+  const categoryItemsLoadKey = useMemo(
+    () => JSON.stringify({ search: normalizedSearch, sortBy: "name_asc" }),
+    [normalizedSearch]
+  );
   const categoryLoadRequestIdRef = useRef(0);
   const loadCategoryPage = useCallback(
     async (page) => {
@@ -221,6 +272,10 @@ export default function AreaDetailClient({
         const nextCategories = result?.data?.items ?? [];
         const nextTotal = result?.data?.totalCount ?? 0;
         setCategories(nextCategories);
+        setCollapsedCategoryIds(
+          new Set(nextCategories.map((category) => String(category.id)))
+        );
+        setSelectedItemIds(new Set());
         setTotalCategoryCount(nextTotal);
 
         const nextTotalPages = Math.max(1, Math.ceil(nextTotal / AREA_DETAIL_PAGE_SIZE));
@@ -259,6 +314,7 @@ export default function AreaDetailClient({
     isLoadingCategories && !normalizedSearch && filtered.length === 0;
   const selectedCount = selectedCategoryIds.size;
   const selectionMode = selectedCount > 0;
+  const itemSelectionMode = selectedItemIds.size > 0;
   const allVisibleSelected =
     filtered.length > 0 &&
     filtered.every((category) => selectedCategoryIds.has(String(category.id)));
@@ -291,6 +347,276 @@ export default function AreaDetailClient({
       items: categories.reduce((sum, c) => sum + (c.itemsCount || 0), 0),
     };
   }, [categories, totalCategoryCount]);
+
+  useEffect(() => {
+    setSelectedItemIds((current) => {
+      const availableIds = new Set(
+        categories.flatMap((category) =>
+          (category.items ?? []).map((item) => String(item.id))
+        )
+      );
+      const next = new Set(
+        Array.from(current).filter((itemId) => availableIds.has(String(itemId)))
+      );
+
+      return next.size === current.size ? current : next;
+    });
+  }, [categories]);
+
+  const currentStorageAreas = useMemo(
+    () => [
+      {
+        id: area?.id,
+        name: areaName,
+        categories: categories.map((category) => ({
+          id: category.id,
+          name: category.name,
+        })),
+      },
+    ],
+    [area?.id, areaName, categories]
+  );
+
+  const fallbackLocationsForMove = useMemo(
+    () => [
+      {
+        id: area?.location?.id,
+        name: area?.location?.name ?? "Location",
+        storageAreas: currentStorageAreas,
+      },
+    ],
+    [area?.location?.id, area?.location?.name, currentStorageAreas]
+  );
+
+  const locationsForMove = useMemo(
+    () =>
+      moveLocationsForModal.length > 0
+        ? moveLocationsForModal
+        : fallbackLocationsForMove,
+    [fallbackLocationsForMove, moveLocationsForModal]
+  );
+
+  const closeItemModal = () => setItemModal(emptyItemModal);
+
+  const loadMoveDestinations = useCallback(
+    async ({ force = false } = {}) => {
+      if (!force && moveDestinationsLoaded) return moveLocationsForModal;
+      if (moveDestinationsRequestRef.current) {
+        return moveDestinationsRequestRef.current;
+      }
+
+      setIsLoadingMoveDestinations(true);
+      setMoveDestinationsError("");
+
+      const request = getInventoryHierarchy()
+        .then((result) => {
+          if (result?.error) {
+            throw new Error(result.error);
+          }
+
+          const nextMoveLocations = normalizeMoveLocations(result?.data ?? []);
+          setMoveLocationsForModal(nextMoveLocations);
+          setMoveDestinationsLoaded(true);
+          return nextMoveLocations;
+        })
+        .catch((error) => {
+          setMoveDestinationsError(
+            error?.message || "Could not load move destinations."
+          );
+          return null;
+        })
+        .finally(() => {
+          setIsLoadingMoveDestinations(false);
+          moveDestinationsRequestRef.current = null;
+        });
+
+      moveDestinationsRequestRef.current = request;
+      return request;
+    },
+    [moveDestinationsLoaded, moveLocationsForModal]
+  );
+
+  const toggleSelectItem = (itemId) => {
+    if (!canEditInventory) return;
+    const key = String(itemId);
+
+    setSelectedItemIds((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const setVisibleItemsSelected = (itemIds, selected) => {
+    if (!canEditInventory || itemIds.length === 0) return;
+    setSelectedItemIds((current) => {
+      const next = new Set(current);
+      itemIds.forEach((itemId) => {
+        if (selected) next.add(String(itemId));
+        else next.delete(String(itemId));
+      });
+      return next;
+    });
+  };
+
+  const clearItemSelection = () => {
+    setSelectedItemIds(new Set());
+  };
+
+  const openEditItem = (item, category) => {
+    if (!canEditInventory) return;
+    setItemModal({
+      open: true,
+      itemId: item.id,
+      categoryId: category.id,
+      categoryName: category.name,
+      name: item.name ?? "",
+      quantity: String(item.quantity ?? 0),
+      expirationDate: item.expiration_date ?? "",
+      barcode: item.barcode ?? "",
+      imageUrl: item.imageUrl ?? null,
+    });
+  };
+
+  const openMoveItem = (item, category) => {
+    if (!canEditInventory || !item?.id || !category?.id) return;
+
+    setMoveModal({
+      open: true,
+      sourceAreaId: area?.id ?? null,
+      sourceCategoryId: category.id,
+      targetLocationId: area?.location?.id ?? null,
+      targetAreaId: area?.id ?? null,
+      targetCategoryId: category.id,
+      itemIds: [item.id],
+    });
+    void loadMoveDestinations();
+  };
+
+  const openMoveSelectedItems = (category, itemIds) => {
+    if (!canEditInventory || !category?.id || itemIds.length === 0) return;
+
+    setMoveModal({
+      open: true,
+      sourceAreaId: area?.id ?? null,
+      sourceCategoryId: category.id,
+      targetLocationId: area?.location?.id ?? null,
+      targetAreaId: area?.id ?? null,
+      targetCategoryId: category.id,
+      itemIds,
+    });
+    void loadMoveDestinations();
+  };
+
+  const openDeleteItem = (item, category) => {
+    if (!canEditInventory) return;
+    setItemDeleteDialog({
+      open: true,
+      payload: {
+        ...item,
+        categoryId: category?.id ?? item?.category_id ?? item?.categoryId,
+        categoryName: category?.name ?? item?.categoryName,
+      },
+      isDeleting: false,
+    });
+  };
+
+  const openDeleteSelectedItems = (category, itemIds) => {
+    if (!canEditInventory || !category?.id || itemIds.length === 0) return;
+
+    setItemDeleteDialog({
+      open: true,
+      payload: {
+        itemIds,
+        count: itemIds.length,
+        categoryId: category.id,
+        categoryName: category.name,
+      },
+      isDeleting: false,
+    });
+  };
+
+  const loadCategoryItems = useCallback(
+    async (categoryId, options = {}) => {
+      const categoryKey = String(categoryId);
+      const target = categories.find(
+        (category) => String(category.id) === categoryKey
+      );
+      if (
+        !target ||
+        target.itemsLoading ||
+        (target.itemsLoaded &&
+          target.itemsLoadKey === categoryItemsLoadKey &&
+          !options.force)
+      ) {
+        return;
+      }
+
+      setCategories((prev) =>
+        prev.map((category) =>
+          String(category.id) === categoryKey
+            ? { ...category, itemsLoading: true, itemsError: "" }
+            : category
+        )
+      );
+
+      try {
+        const result = await getCategoryItemsAction({
+          categoryId,
+          filters: {
+            search: normalizedSearch,
+            sortBy: "name_asc",
+          },
+        });
+
+        if (result?.error) {
+          setCategories((prev) =>
+            prev.map((category) =>
+              String(category.id) === categoryKey
+                ? {
+                    ...category,
+                    itemsLoading: false,
+                    itemsError: result.error,
+                  }
+                : category
+            )
+          );
+          return;
+        }
+
+        const items = result?.data?.items ?? [];
+        setCategories((prev) =>
+          prev.map((category) =>
+            String(category.id) === categoryKey
+              ? {
+                  ...category,
+                  items,
+                  itemsCount: result?.data?.totalCount ?? items.length,
+                  itemsLoaded: true,
+                  itemsLoadKey: categoryItemsLoadKey,
+                  itemsLoading: false,
+                  itemsError: "",
+                }
+              : category
+          )
+        );
+      } catch (error) {
+        setCategories((prev) =>
+          prev.map((category) =>
+            String(category.id) === categoryKey
+              ? {
+                  ...category,
+                  itemsLoading: false,
+                  itemsError: error?.message || "Could not load items.",
+                }
+              : category
+          )
+        );
+      }
+    },
+    [categories, categoryItemsLoadKey, normalizedSearch]
+  );
 
   useEffect(() => {
     const handleItemAdded = (event) => {
@@ -365,6 +691,223 @@ export default function AreaDetailClient({
   }, [area?.id, sortBy]);
 
   // ---------------- Actions ----------------
+
+  const saveItem = async () => {
+    if (!canEditInventory || !itemModal.itemId) return;
+    const name = itemModal.name.trim();
+    if (!name) return;
+
+    const payload = {
+      name,
+      quantity: toNonNegativeInteger(itemModal.quantity, 0),
+      expiration_date: itemModal.expirationDate || null,
+      barcode: itemModal.barcode,
+    };
+
+    setIsSaving(true);
+
+    try {
+      const result = await updateItem(itemModal.itemId, payload);
+      if (result?.error) throw result.error;
+
+      setCategories((prev) =>
+        prev.map((category) => ({
+          ...category,
+          items: (category.items ?? []).map((item) =>
+            String(item.id) === String(itemModal.itemId)
+              ? {
+                  ...item,
+                  name: result.data?.name ?? payload.name,
+                  quantity: result.data?.quantity ?? payload.quantity,
+                  expiration_date:
+                    result.data?.expiration_date ?? payload.expiration_date,
+                  barcode: result.data?.barcode ?? (payload.barcode.trim() || null),
+                }
+              : item
+          ),
+        }))
+      );
+      emitInventoryChange({
+        entity: "item",
+        action: "updated",
+        id: itemModal.itemId,
+      });
+      closeItemModal();
+      router.refresh();
+    } catch (err) {
+      console.error("update area detail item error:", err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleItemImageChange = ({ imagePath, imageUrl, imageThumbUrl }) => {
+    const itemId = itemModal.itemId;
+    if (!itemId) return;
+
+    setCategories((prev) =>
+      prev.map((category) => ({
+        ...category,
+        items: (category.items ?? []).map((item) =>
+          String(item.id) === String(itemId)
+            ? {
+                ...item,
+                image_path: imagePath ?? null,
+                imageUrl: imageUrl ?? null,
+                imageThumbUrl: imageThumbUrl ?? null,
+              }
+            : item
+        ),
+      }))
+    );
+    setItemModal((prev) => ({
+      ...prev,
+      imageUrl: imageUrl ?? null,
+      imageThumbUrl: imageThumbUrl ?? null,
+    }));
+    emitInventoryChange({
+      entity: "item",
+      action: imagePath ? "image_updated" : "image_removed",
+      id: itemId,
+    });
+  };
+
+  const confirmDeleteItem = async () => {
+    const payload = itemDeleteDialog.payload;
+    if (!canEditInventory || !payload) return;
+
+    const itemIds = payload.itemIds?.length
+      ? payload.itemIds.map(String)
+      : payload.id
+        ? [String(payload.id)]
+        : [];
+    if (itemIds.length === 0) return;
+
+    setItemDeleteDialog((prev) => ({ ...prev, isDeleting: true }));
+
+    try {
+      const result = await deleteItems(itemIds);
+      if (result?.error) throw result.error;
+
+      const deleted = new Set(itemIds);
+      const categoryKey = String(payload.categoryId ?? payload.category_id);
+      setCategories((prev) =>
+        prev.map((category) => {
+          if (String(category.id) !== categoryKey) return category;
+
+          return {
+            ...category,
+            itemsCount: Math.max(
+              0,
+              (category.itemsCount ?? category.items?.length ?? deleted.size) -
+                deleted.size
+            ),
+            items: (category.items ?? []).filter(
+              (currentItem) => !deleted.has(String(currentItem.id))
+            ),
+          };
+        })
+      );
+      setSelectedItemIds((current) => {
+        const next = new Set(current);
+        deleted.forEach((itemId) => next.delete(itemId));
+        return next;
+      });
+      setItemDeleteDialog({ open: false, payload: null, isDeleting: false });
+      emitInventoryChange({
+        entity: "item",
+        action: "deleted",
+        ids: itemIds,
+      });
+      router.refresh();
+    } catch (err) {
+      console.error("delete area detail item error:", err);
+      setItemDeleteDialog((prev) => ({ ...prev, isDeleting: false }));
+    }
+  };
+
+  const confirmMove = async () => {
+    if (!canEditInventory) return;
+    const { sourceCategoryId, targetAreaId, targetCategoryId, itemIds } = moveModal;
+    if (!targetCategoryId || itemIds.length === 0) return;
+    if (String(targetCategoryId) === String(sourceCategoryId)) return;
+
+    const moved = new Set(itemIds.map(String));
+    const sourceCategory = categories.find(
+      (category) => String(category.id) === String(sourceCategoryId)
+    );
+    const movedItems = (sourceCategory?.items ?? []).filter((item) =>
+      moved.has(String(item.id))
+    );
+
+    const result = await updateItemsLocation(itemIds, {
+      categoryId: targetCategoryId,
+    });
+
+    if (result?.error) {
+      console.error("move area detail item errors:", result);
+      return;
+    }
+
+    setCategories((prev) =>
+      prev.map((category) => {
+        if (String(category.id) === String(sourceCategoryId)) {
+          return {
+            ...category,
+            itemsCount: Math.max(
+              0,
+              (category.itemsCount ?? category.items?.length ?? moved.size) - moved.size
+            ),
+            items: (category.items ?? []).filter(
+              (item) => !moved.has(String(item.id))
+            ),
+          };
+        }
+
+        if (
+          String(targetAreaId) === String(area?.id) &&
+          String(category.id) === String(targetCategoryId)
+        ) {
+          return {
+            ...category,
+            itemsCount:
+              (category.itemsCount ?? category.items?.length ?? 0) + moved.size,
+            items: category.itemsLoaded
+              ? [
+                  ...(category.items ?? []),
+                  ...movedItems.map((item) => ({
+                    ...item,
+                    category_id: targetCategoryId,
+                  })),
+                ]
+              : category.items ?? [],
+          };
+        }
+
+        return category;
+      })
+    );
+    setSelectedItemIds((current) => {
+      const next = new Set(current);
+      moved.forEach((itemId) => next.delete(itemId));
+      return next;
+    });
+    setMoveModal({
+      open: false,
+      sourceAreaId: area?.id ?? null,
+      sourceCategoryId: null,
+      targetLocationId: area?.location?.id ?? null,
+      targetAreaId: area?.id ?? null,
+      targetCategoryId: null,
+      itemIds: [],
+    });
+    emitInventoryChange({
+      entity: "item",
+      action: "moved",
+      ids: itemIds,
+    });
+    router.refresh();
+  };
 
   const handleRenameArea = async () => {
     if (!canEditInventory) return;
@@ -582,13 +1125,24 @@ export default function AreaDetailClient({
 
   const toggleCategoryCollapsed = (categoryId) => {
     const key = String(categoryId);
+    const isCollapsed = collapsedCategoryIds.has(key);
     setCollapsedCategoryIds((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
+    if (isCollapsed) {
+      void loadCategoryItems(categoryId);
+    }
   };
+
+  useEffect(() => {
+    if (!normalizedSearch) return;
+    filtered.forEach((category) => {
+      void loadCategoryItems(category.id);
+    });
+  }, [filtered, loadCategoryItems, normalizedSearch]);
 
   const clearSelection = () => {
     setSelectedCategoryIds(new Set());
@@ -751,7 +1305,13 @@ export default function AreaDetailClient({
         <div className="mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-md shadow-slate-900/5">
           <div className="h-44 bg-[var(--entity-area-soft)]">
             {areaImageUrl ? (
-              <ImageWithLoader src={areaImageUrl} alt="" className="h-full w-full object-cover" />
+              <ImageWithLoader
+                src={areaImageUrl}
+                alt=""
+                loading="eager"
+                fetchPriority="high"
+                className="h-full w-full object-cover"
+              />
             ) : (
               <div className="grid h-full w-full place-items-center text-[var(--entity-area-accent)]">
                 <FaWarehouse className="h-14 w-14" />
@@ -818,91 +1378,6 @@ export default function AreaDetailClient({
         </div>
       </motion.header>
 
-      {/* Header */}
-      <motion.div variants={pageItemVariants} className="hidden">
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <Link href="/areas" className="inline-flex items-center gap-2 hover:text-[var(--stocksense-brand)]">
-            <FaChevronLeft className="h-3.5 w-3.5" />
-            Areas
-          </Link>
-          <span className="text-gray-300">/</span>
-          <span className="text-gray-600">{area?.location?.name || "Location"}</span>
-          <span className="text-gray-300">/</span>
-          <span className="font-medium text-gray-800">{areaName || "Area"}</span>
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <div>
-            <div className="flex items-center gap-3">
-              {areaImageUrl && (
-                <div className="h-14 w-14 overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
-                  <ImageWithLoader
-                    src={areaImageUrl}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              )}
-              <h1 className="text-3xl font-semibold tracking-tight text-gray-950">
-                {areaName}
-              </h1>
-            </div>
-            <p className="text-sm text-gray-500">
-              {canEditInventory ? "Manage" : "View"} categories for{" "}
-              <span className="font-medium">{area?.location?.name}</span>.
-              Click a category to view items.
-            </p>
-
-            <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-500">
-              <span>{totals.categories} categories</span>
-              <span>{totals.items} items</span>
-            </div>
-          </div>
-
-          <div className="flex w-full max-w-3xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <Input
-              value={search}
-              onValueChange={handleSearchChange}
-              placeholder="Search categories..."
-              startContent={<FaSearch className="text-gray-400" />}
-              className="w-full sm:w-80"
-              radius="lg"
-              variant="bordered"
-            />
-            <OpenGlobalAddItemButton
-              canEditInventory={canEditInventory}
-              context={{
-                locationId: area?.location?.id,
-                storageAreaId: area?.id,
-              }}
-            />
-            {canEditInventory && (
-              <>
-                <Button
-                  variant="flat"
-                  className="rounded-xl border border-amber-200 bg-amber-50 text-amber-700"
-                  onPress={() => {
-                    setEditAreaName(areaName);
-                    setEditAreaOpen(true);
-                  }}
-                  startContent={<FaEdit />}
-                >
-                  Edit
-                </Button>
-                <Button
-                  variant="flat"
-                  className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
-                  onPress={() => setDeleteAreaOpen(true)}
-                  startContent={<FaTrash />}
-                >
-                  Delete
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-      </motion.div>
-
       <motion.section variants={pageItemVariants} className="max-md:hidden">
         <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
           <Link
@@ -932,7 +1407,13 @@ export default function AreaDetailClient({
           <div className="flex min-w-0 items-start gap-4">
             {areaImageUrl ? (
               <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-white shadow-sm">
-                <ImageWithLoader src={areaImageUrl} alt="" className="h-full w-full object-cover" />
+                <ImageWithLoader
+                  src={areaImageUrl}
+                  alt=""
+                  loading="eager"
+                  fetchPriority="high"
+                  className="h-full w-full object-cover"
+                />
               </div>
             ) : (
               <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] shadow-sm">
@@ -1062,16 +1543,6 @@ export default function AreaDetailClient({
                 Add Category
               </Button>
             )}
-            <OpenGlobalAddItemButton
-              canEditInventory={canEditInventory}
-              context={{
-                locationId: area?.location?.id,
-                storageAreaId: area?.id,
-              }}
-              className="rounded-xl bg-[var(--stocksense-brand)] text-white shadow-sm"
-            >
-              Add Item
-            </OpenGlobalAddItemButton>
           </div>
         </div>
       </motion.section>
@@ -1479,6 +1950,16 @@ export default function AreaDetailClient({
               const items = cat.items ?? [];
               const collapsed = collapsedCategoryIds.has(String(cat.id));
               const selected = selectedCategoryIds.has(String(cat.id));
+              const categoryItemIds = items.map((item) => String(item.id));
+              const selectedCategoryItemCount = categoryItemIds.filter((itemId) =>
+                selectedItemIds.has(itemId)
+              ).length;
+              const selectedCategoryItemIds = categoryItemIds.filter((itemId) =>
+                selectedItemIds.has(itemId)
+              );
+              const allCategoryItemsSelected =
+                categoryItemIds.length > 0 &&
+                selectedCategoryItemCount === categoryItemIds.length;
 
               return (
                 <motion.article
@@ -1630,7 +2111,17 @@ export default function AreaDetailClient({
                         className="overflow-hidden"
                       >
                     <div className="bg-gray-50/60 px-5 py-4">
-                      {items.length === 0 ? (
+                      {cat.itemsLoading ? (
+                        <SearchResultsLoadingState
+                          label="Loading items"
+                          detail="Fetching this category."
+                          className="rounded-2xl border border-dashed border-[var(--stocksense-brand-border)] bg-white px-5 py-8"
+                        />
+                      ) : cat.itemsError ? (
+                        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+                          {cat.itemsError}
+                        </div>
+                      ) : items.length === 0 ? (
                         <div className="rounded-2xl border border-dashed border-[var(--stocksense-brand-border)] bg-white px-5 py-8 text-center">
                           <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
                             <FaBoxOpen className="h-5 w-5" />
@@ -1644,6 +2135,68 @@ export default function AreaDetailClient({
                         </div>
                       ) : (
                         <div className="space-y-2">
+                          {canEditInventory && itemSelectionMode ? (
+                            <div className="mb-3 rounded-2xl border border-[var(--entity-item-border)] bg-[var(--entity-item-soft)] p-3">
+                              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold text-[var(--entity-item-accent)]">
+                                    {selectedCategoryItemCount} of {categoryItemIds.length} visible item{categoryItemIds.length === 1 ? "" : "s"} selected
+                                  </p>
+                                  <p className="mt-0.5 text-xs text-gray-600">
+                                    Use checkboxes to adjust items in {cat.name}.
+                                  </p>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  <Button
+                                    variant="bordered"
+                                    className="rounded-xl border-[var(--entity-item-border)] bg-white text-[var(--entity-item-accent)]"
+                                    onPress={() =>
+                                      setVisibleItemsSelected(
+                                        categoryItemIds,
+                                        !allCategoryItemsSelected
+                                      )
+                                    }
+                                    isDisabled={categoryItemIds.length === 0}
+                                  >
+                                    {allCategoryItemsSelected
+                                      ? "Deselect all visible"
+                                      : "Select all visible"}
+                                  </Button>
+                                  <Button
+                                    variant="light"
+                                    className="rounded-xl bg-white text-gray-700"
+                                    onPress={clearItemSelection}
+                                  >
+                                    Clear
+                                  </Button>
+                                  <Button
+                                    className="rounded-xl bg-[var(--stocksense-brand)] text-white"
+                                    onPress={() =>
+                                      openMoveSelectedItems(
+                                        cat,
+                                        selectedCategoryItemIds
+                                      )
+                                    }
+                                    isDisabled={selectedCategoryItemCount === 0}
+                                  >
+                                    Move
+                                  </Button>
+                                  <Button
+                                    className="rounded-xl bg-rose-600 text-white"
+                                    onPress={() =>
+                                      openDeleteSelectedItems(
+                                        cat,
+                                        selectedCategoryItemIds
+                                      )
+                                    }
+                                    isDisabled={selectedCategoryItemCount === 0}
+                                  >
+                                    Delete
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : null}
                           {items.map((item) => {
                             const expirationDays = daysUntil(item.expiration_date);
                             const expired = expirationDays < 0;
@@ -1653,13 +2206,33 @@ export default function AreaDetailClient({
                               isExpiringSoon(item.expiration_date, 7);
                             const quantity = toNonNegativeInteger(item.quantity, 0);
                             const lowStock = quantity <= 1;
+                            const itemSelected = selectedItemIds.has(String(item.id));
 
                             return (
                               <div
                                 key={item.id}
-                                className="flex flex-col gap-3 rounded-2xl border border-white bg-white px-4 py-3 shadow-sm transition hover:border-[var(--stocksense-brand-border)] hover:bg-[var(--stocksense-brand-soft)]/25 md:flex-row md:items-center md:justify-between"
+                                className={`flex flex-col gap-3 rounded-2xl border bg-white px-4 py-3 shadow-sm transition hover:border-[var(--stocksense-brand-border)] hover:bg-[var(--stocksense-brand-soft)]/25 md:flex-row md:items-center md:justify-between ${
+                                  itemSelected
+                                    ? "border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]"
+                                    : "border-white"
+                                }`}
                               >
                                 <div className="flex min-w-0 items-center gap-3">
+                                  {canEditInventory && itemSelectionMode ? (
+                                    <label
+                                      className="hidden h-6 w-6 shrink-0 cursor-pointer items-center justify-center md:flex"
+                                      onClick={(event) => event.stopPropagation()}
+                                      onKeyDown={(event) => event.stopPropagation()}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={itemSelected}
+                                        onChange={() => toggleSelectItem(item.id)}
+                                        aria-label={`Select ${item.name}`}
+                                        className="h-5 w-5 cursor-pointer rounded border-gray-300 text-[var(--stocksense-brand)] accent-[var(--stocksense-brand)] focus:ring-[var(--stocksense-brand-border)]"
+                                      />
+                                    </label>
+                                  ) : null}
                                   {item.imageUrl ? (
                                     <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-[var(--stocksense-brand-border)] bg-white">
                                       <ImageWithLoader
@@ -1711,27 +2284,53 @@ export default function AreaDetailClient({
                                   ) : (
                                     <span>No expiration</span>
                                   )}
-                                  <Dropdown placement="bottom-end">
-                                    <DropdownTrigger>
-                                      <Button
-                                        isIconOnly
-                                        variant="light"
-                                        radius="lg"
-                                        className="h-9 w-9 min-w-9 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-                                        aria-label={`${item.name} actions`}
-                                      >
-                                        <FaEllipsisV className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownTrigger>
-                                    <DropdownMenu aria-label={`${item.name} actions`}>
-                                      <DropdownItem
-                                        key="view"
-                                        onPress={() => router.push(`/categories/${cat.id}`)}
-                                      >
-                                        View in Category
-                                      </DropdownItem>
-                                    </DropdownMenu>
-                                  </Dropdown>
+                                  {canEditInventory ? (
+                                    <Dropdown placement="bottom-end">
+                                      <DropdownTrigger>
+                                        <Button
+                                          isIconOnly
+                                          variant="light"
+                                          radius="lg"
+                                          className="h-9 w-9 min-w-9 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+                                          aria-label={`${item.name} actions`}
+                                        >
+                                          <FaEllipsisV className="h-4 w-4" />
+                                        </Button>
+                                      </DropdownTrigger>
+                                      <DropdownMenu aria-label={`${item.name} actions`}>
+                                        <DropdownItem
+                                          key="edit"
+                                          onPress={() => openEditItem(item, cat)}
+                                        >
+                                          Edit Item
+                                        </DropdownItem>
+                                        <DropdownItem
+                                          key="move"
+                                          startContent={<FaArrowsAlt className="h-3.5 w-3.5" />}
+                                          onPress={() => openMoveItem(item, cat)}
+                                        >
+                                          Move Item
+                                        </DropdownItem>
+                                        <DropdownItem
+                                          key="select"
+                                          onPress={() => toggleSelectItem(item.id)}
+                                        >
+                                          {itemSelected
+                                            ? "Deselect for bulk action"
+                                            : "Select for bulk action"}
+                                        </DropdownItem>
+                                        <DropdownItem
+                                          key="delete"
+                                          className="text-danger"
+                                          color="danger"
+                                          startContent={<FaTrash className="h-3.5 w-3.5" />}
+                                          onPress={() => openDeleteItem(item, cat)}
+                                        >
+                                          Delete Item
+                                        </DropdownItem>
+                                      </DropdownMenu>
+                                    </Dropdown>
+                                  ) : null}
                                 </div>
                               </div>
                             );
@@ -2147,6 +2746,84 @@ export default function AreaDetailClient({
           )}
         </ModalContent>
       </Modal>}
+
+      {canEditInventory && itemModal.open && (
+        <AreaItemEditModal
+          itemModal={itemModal}
+          setItemModal={setItemModal}
+          isSaving={isSaving}
+          onClose={closeItemModal}
+          onSave={saveItem}
+          onImageChange={handleItemImageChange}
+          onDelete={() => {
+            const targetCategory = {
+              id: itemModal.categoryId,
+              name: itemModal.categoryName,
+            };
+            const targetItem = {
+              id: itemModal.itemId,
+              name: itemModal.name,
+            };
+            closeItemModal();
+            openDeleteItem(targetItem, targetCategory);
+          }}
+        />
+      )}
+
+      {canEditInventory && moveModal.open && (
+        <MoveItemsModal
+          moveModal={moveModal}
+          setMoveModal={setMoveModal}
+          locationsForMove={locationsForMove}
+          storageAreas={currentStorageAreas}
+          currentLocationId={area?.location?.id ?? null}
+          onConfirm={confirmMove}
+          isLoadingDestinations={isLoadingMoveDestinations}
+          destinationsError={moveDestinationsError}
+          onRetryLoadDestinations={() => loadMoveDestinations({ force: true })}
+        />
+      )}
+
+      {canEditInventory && (
+        <ConfirmDeleteModal
+          isOpen={itemDeleteDialog.open}
+          isDeleting={itemDeleteDialog.isDeleting}
+          onCancel={() =>
+            setItemDeleteDialog({
+              open: false,
+              payload: null,
+              isDeleting: false,
+            })
+          }
+          onConfirm={confirmDeleteItem}
+          title={
+            itemDeleteDialog.payload?.itemIds?.length
+              ? `Delete ${itemDeleteDialog.payload.count ?? itemDeleteDialog.payload.itemIds.length} item${
+                  (itemDeleteDialog.payload.count ?? itemDeleteDialog.payload.itemIds.length) === 1
+                    ? ""
+                    : "s"
+                }?`
+              : `Delete "${itemDeleteDialog.payload?.name ?? "item"}"?`
+          }
+          description={
+            itemDeleteDialog.payload?.itemIds?.length
+              ? `This will permanently delete ${
+                  itemDeleteDialog.payload.count ?? itemDeleteDialog.payload.itemIds.length
+                } selected item${
+                  (itemDeleteDialog.payload.count ?? itemDeleteDialog.payload.itemIds.length) === 1
+                    ? ""
+                    : "s"
+                } from ${
+                  itemDeleteDialog.payload?.categoryName ?? "this category"
+                }. This cannot be undone.`
+              : `This will permanently delete "${
+                  itemDeleteDialog.payload?.name ?? "this item"
+                }" from ${
+                  itemDeleteDialog.payload?.categoryName ?? "this category"
+                }. This cannot be undone.`
+          }
+        />
+      )}
 
       {canEditInventory && (
         <ConfirmDeleteModal

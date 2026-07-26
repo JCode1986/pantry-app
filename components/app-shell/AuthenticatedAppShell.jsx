@@ -55,23 +55,23 @@ async function getNavigationAttentionCounts(supabase, withinDays = 3) {
   ] = await Promise.all([
     supabase
       .from("items")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact", head: true })
       .not("expiration_date", "is", null)
       .lt("expiration_date", today),
     supabase
       .from("items")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact", head: true })
       .not("expiration_date", "is", null)
       .gte("expiration_date", today)
       .lte("expiration_date", cutoff),
     supabase
       .from("shopping_list_items")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact", head: true })
       .eq("status", "needed"),
-    supabase.from("locations").select("*", { count: "exact", head: true }),
-    supabase.from("storage_areas").select("*", { count: "exact", head: true }),
-    supabase.from("storage_categories").select("*", { count: "exact", head: true }),
-    supabase.from("items").select("*", { count: "exact", head: true }),
+    supabase.from("locations").select("id", { count: "exact", head: true }),
+    supabase.from("storage_areas").select("id", { count: "exact", head: true }),
+    supabase.from("storage_categories").select("id", { count: "exact", head: true }),
+    supabase.from("items").select("id", { count: "exact", head: true }),
   ]);
 
   if (
@@ -129,11 +129,11 @@ async function getNavigationHouseholdCounts(householdId) {
   ] = await Promise.all([
     admin
       .from("household_members")
-      .select("*", { count: "exact", head: true })
+      .select("user_id", { count: "exact", head: true })
       .eq("household_id", householdId),
     admin
       .from("household_invites")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact", head: true })
       .eq("household_id", householdId)
       .eq("status", "pending"),
   ]);
