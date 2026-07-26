@@ -53,6 +53,9 @@ export default function MoveItemsModal({
   currentLocationId,
   onConfirm,
   onDestinationCreated,
+  isLoadingDestinations = false,
+  destinationsError = "",
+  onRetryLoadDestinations,
 }) {
   const [localLocations, setLocalLocations] = useState([]);
   const [newLocationName, setNewLocationName] = useState("");
@@ -132,6 +135,7 @@ export default function MoveItemsModal({
   ]);
 
   const canMove =
+    !isLoadingDestinations &&
     Boolean(
       moveModal.targetAreaId &&
         moveModal.targetAreaId !== NEW_AREA_VALUE &&
@@ -388,6 +392,27 @@ export default function MoveItemsModal({
                   </p>
                 </div>
               ) : null}
+              {isLoadingDestinations ? (
+                <div className="rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/40 px-3 py-2 text-sm font-medium text-[var(--stocksense-brand)]">
+                  Loading move destinations...
+                </div>
+              ) : null}
+              {destinationsError ? (
+                <div className="flex flex-col gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between">
+                  <span>{destinationsError}</span>
+                  {onRetryLoadDestinations ? (
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      color="danger"
+                      className="rounded-xl"
+                      onPress={onRetryLoadDestinations}
+                    >
+                      Retry
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="space-y-1">
                 <Select
                   label="Location"
@@ -397,6 +422,7 @@ export default function MoveItemsModal({
                       : new Set()
                   }
                   onSelectionChange={(keys) => handleLocationChange(getSelectedValue(keys))}
+                  isDisabled={isLoadingDestinations}
                   variant="bordered"
                   radius="lg"
                   classNames={themedSelectClassNames}
@@ -442,6 +468,7 @@ export default function MoveItemsModal({
                   }
                   onSelectionChange={(keys) => handleAreaChange(getSelectedValue(keys))}
                   isDisabled={
+                    isLoadingDestinations ||
                     !moveModal.targetLocationId ||
                     moveModal.targetLocationId === NEW_LOCATION_VALUE
                   }
@@ -502,6 +529,7 @@ export default function MoveItemsModal({
                     }))
                   }
                   isDisabled={
+                    isLoadingDestinations ||
                     !moveModal.targetAreaId ||
                     moveModal.targetAreaId === NEW_AREA_VALUE
                   }

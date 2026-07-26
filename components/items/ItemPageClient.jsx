@@ -41,9 +41,12 @@ import {
   addLocation,
   addStorageArea,
   deleteItem,
+  deleteItems,
+  getInventoryHierarchy,
   getItemsPageAction,
   updateItem,
   updateItemLocation,
+  updateItemsLocation,
 } from "@/app/actions/server";
 import { deleteItemAndAddToShoppingListAction } from "@/app/actions/shoppingList";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
@@ -69,6 +72,7 @@ import {
   toNonNegativeInteger,
   toPositiveInteger,
 } from "@/utils/pantry/date";
+import { normalizeMoveLocations } from "@/utils/pantry/moveLocations";
 
 const pageSectionVariants = {
   hidden: { opacity: 0 },
@@ -295,7 +299,8 @@ function ItemHierarchyCard({ item }) {
 export default function ItemsPageClient({
   initialItems,
   initialTotalItems,
-  moveLocations,
+  initialLocationCount = 0,
+  moveLocations = [],
   canEditInventory = true,
   initialExpirationFilter,
   initialExpirationDays,
@@ -364,7 +369,15 @@ export default function ItemsPageClient({
     areaId: null,
     categoryId: null,
   });
-  const [localMoveLocations, setLocalMoveLocations] = useState(() => moveLocations || []);
+  const [localMoveLocations, setLocalMoveLocations] = useState(() =>
+    normalizeMoveLocations(moveLocations)
+  );
+  const [hierarchyLoaded, setHierarchyLoaded] = useState(
+    () => (moveLocations ?? []).length > 0
+  );
+  const [isLoadingHierarchy, setIsLoadingHierarchy] = useState(false);
+  const [hierarchyError, setHierarchyError] = useState("");
+  const hierarchyRequestRef = useRef(null);
   const [moveCreateNames, setMoveCreateNames] = useState({
     location: "",
     area: "",
@@ -417,8 +430,46 @@ export default function ItemsPageClient({
   }, [editExp]);
 
   useEffect(() => {
-    setLocalMoveLocations(moveLocations || []);
+    const nextMoveLocations = normalizeMoveLocations(moveLocations);
+    if (nextMoveLocations.length === 0) return;
+
+    setLocalMoveLocations(nextMoveLocations);
+    setHierarchyLoaded(true);
   }, [moveLocations]);
+
+  const loadHierarchy = useCallback(
+    async ({ force = false } = {}) => {
+      if (!force && hierarchyLoaded) return localMoveLocations;
+      if (hierarchyRequestRef.current) return hierarchyRequestRef.current;
+
+      setIsLoadingHierarchy(true);
+      setHierarchyError("");
+
+      const request = getInventoryHierarchy()
+        .then((result) => {
+          if (result?.error) {
+            throw new Error(result.error);
+          }
+
+          const nextMoveLocations = normalizeMoveLocations(result?.data ?? []);
+          setLocalMoveLocations(nextMoveLocations);
+          setHierarchyLoaded(true);
+          return nextMoveLocations;
+        })
+        .catch((error) => {
+          setHierarchyError(error?.message || "Could not load inventory filters.");
+          return null;
+        })
+        .finally(() => {
+          setIsLoadingHierarchy(false);
+          hierarchyRequestRef.current = null;
+        });
+
+      hierarchyRequestRef.current = request;
+      return request;
+    },
+    [hierarchyLoaded, localMoveLocations]
+  );
 
   useEffect(() => {
     if (moveModalOpen) return;
@@ -458,6 +509,10 @@ export default function ItemsPageClient({
   const locationOptions = useMemo(
     () => localMoveLocations || [],
     [localMoveLocations]
+  );
+  const locationSummaryCount = Math.max(
+    initialLocationCount ?? 0,
+    locationOptions.length
   );
 
   const areaOptions = useMemo(() => {
@@ -765,7 +820,7 @@ export default function ItemsPageClient({
     },
     {
       label: "Locations",
-      value: locationOptions.length,
+      value: locationSummaryCount,
       description: "Spaces represented",
       icon: FaMapMarkedAlt,
       className:
@@ -1054,26 +1109,38 @@ export default function ItemsPageClient({
     // - if bulk: first available in hierarchy
     const seed = mode === "single" ? activeItem : null;
 
-    const currentLocId = seed?.location?.id ?? locationOptions?.[0]?.id ?? null;
-    const loc =
-      locationOptions.find((l) => String(l.id) === String(currentLocId)) ||
-      locationOptions[0];
+    const applyMoveTarget = (locations) => {
+      const options = locations ?? [];
+      const currentLocId = seed?.location?.id ?? options?.[0]?.id ?? null;
+      const loc =
+        options.find((l) => String(l.id) === String(currentLocId)) ||
+        options[0];
 
-    const areas = loc?.storage_areas || [];
-    const currentAreaId = seed?.area?.id ?? areas?.[0]?.id ?? null;
-    const area =
-      areas.find((a) => String(a.id) === String(currentAreaId)) || areas?.[0] || null;
+      const areas = loc?.storage_areas || [];
+      const currentAreaId = seed?.area?.id ?? areas?.[0]?.id ?? null;
+      const area =
+        areas.find((a) => String(a.id) === String(currentAreaId)) ||
+        areas?.[0] ||
+        null;
 
-    const cats = area?.categories || [];
-    const currentCatId = seed?.category?.id ?? cats?.[0]?.id ?? null;
+      const cats = area?.categories || [];
+      const currentCatId = seed?.category?.id ?? cats?.[0]?.id ?? null;
 
-    setMoveTarget({
-      locationId: loc?.id ?? null,
-      areaId: area?.id ?? null,
-      categoryId: currentCatId ?? null,
-    });
+      setMoveTarget({
+        locationId: loc?.id ?? null,
+        areaId: area?.id ?? null,
+        categoryId: currentCatId ?? null,
+      });
+    };
+
+    applyMoveTarget(locationOptions);
 
     setMoveModalOpen(true);
+    void loadHierarchy().then((locations) => {
+      if (locations?.length) {
+        applyMoveTarget(locations);
+      }
+    });
   };
 
   const currentLocation = useMemo(() => {
@@ -1276,14 +1343,12 @@ export default function ItemsPageClient({
 
     const ids = Array.from(selectedIds);
 
-    // Update DB for all selected items
-    const results = await Promise.all(
-      ids.map((id) => updateItemLocation(id, { categoryId: moveTarget.categoryId }))
-    );
+    const result = await updateItemsLocation(ids, {
+      categoryId: moveTarget.categoryId,
+    });
 
-    const hasError = results.some((r) => r?.error);
-    if (hasError) {
-      console.error("Bulk move errors:", results);
+    if (result?.error) {
+      console.error("Bulk move errors:", result);
       alert("There was a problem moving one or more items. Some changes may not have applied.");
       return;
     }
@@ -1493,11 +1558,10 @@ export default function ItemsPageClient({
 
       if (deleteDialog.mode === "bulk") {
         const ids = deleteDialog.payload.itemIds || [];
-        const results = await Promise.all(ids.map((id) => deleteItem(id)));
+        const result = await deleteItems(ids);
 
-        const hasError = results.some((r) => r?.error);
-        if (hasError) {
-          console.error("Bulk delete errors:", results);
+        if (result?.error) {
+          console.error("Bulk delete errors:", result);
           alert("There was a problem deleting one or more items.");
         }
 
@@ -1699,7 +1763,10 @@ export default function ItemsPageClient({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFilterSheetOpen(true)}
+                  onClick={() => {
+                    setFilterSheetOpen(true);
+                    void loadHierarchy();
+                  }}
                   className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-800 shadow-sm"
                 >
                   <FaFilter className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
@@ -1808,6 +1875,9 @@ export default function ItemsPageClient({
             onSelectionChange={(keys) =>
               handleLocationFilterChange(getSelectedValue(keys) || ALL_FILTER_KEY)
             }
+            onOpenChange={(open) => {
+              if (open) void loadHierarchy();
+            }}
             variant="bordered"
             radius="lg"
             classNames={themedSelectClassNames}
@@ -1820,7 +1890,13 @@ export default function ItemsPageClient({
 
           <button
             type="button"
-            onClick={() => setShowAdvancedFilters((value) => !value)}
+            onClick={() => {
+              setShowAdvancedFilters((value) => {
+                const nextValue = !value;
+                if (nextValue) void loadHierarchy();
+                return nextValue;
+              });
+            }}
             className={`flex h-14 items-center justify-between gap-2 rounded-xl border px-4 text-sm font-medium transition md:justify-center ${
               advancedFiltersAreActive
                 ? "border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
@@ -1863,7 +1939,10 @@ export default function ItemsPageClient({
                     onSelectionChange={(keys) =>
                       handleAreaFilterChange(getSelectedValue(keys) || ALL_FILTER_KEY)
                     }
-                    isDisabled={areaOptions.length === 0}
+                    onOpenChange={(open) => {
+                      if (open) void loadHierarchy();
+                    }}
+                    isDisabled={isLoadingHierarchy || areaOptions.length === 0}
                     variant="bordered"
                     radius="lg"
                     classNames={themedSelectClassNames}
@@ -1885,7 +1964,10 @@ export default function ItemsPageClient({
                     onSelectionChange={(keys) =>
                       setCategoryFilter(getSelectedValue(keys) || ALL_FILTER_KEY)
                     }
-                    isDisabled={categoryOptions.length === 0}
+                    onOpenChange={(open) => {
+                      if (open) void loadHierarchy();
+                    }}
+                    isDisabled={isLoadingHierarchy || categoryOptions.length === 0}
                     variant="bordered"
                     radius="lg"
                     classNames={themedSelectClassNames}
@@ -1901,6 +1983,26 @@ export default function ItemsPageClient({
                       </SelectItem>
                     ))}
                   </Select>
+
+                  {isLoadingHierarchy ? (
+                    <div className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 py-2 text-xs font-medium text-[var(--stocksense-brand)] sm:col-span-2 lg:col-span-4">
+                      Loading locations, storage areas, and categories...
+                    </div>
+                  ) : null}
+                  {hierarchyError ? (
+                    <div className="flex flex-col gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 sm:col-span-2 lg:col-span-4 md:flex-row md:items-center md:justify-between">
+                      <span>{hierarchyError}</span>
+                      <Button
+                        size="sm"
+                        color="danger"
+                        variant="flat"
+                        className="rounded-xl"
+                        onPress={() => loadHierarchy({ force: true })}
+                      >
+                        Retry
+                      </Button>
+                    </div>
+                  ) : null}
 
                   <div className="flex gap-2 sm:col-span-2 lg:col-span-1">
                     <Select
@@ -2481,7 +2583,10 @@ export default function ItemsPageClient({
 
       <Modal
         isOpen={filterSheetOpen}
-        onOpenChange={setFilterSheetOpen}
+        onOpenChange={(open) => {
+          setFilterSheetOpen(open);
+          if (open) void loadHierarchy();
+        }}
         placement="bottom"
         size="full"
         classNames={{
@@ -2503,6 +2608,25 @@ export default function ItemsPageClient({
               </ModalHeader>
 
               <ModalBody className="wherekeep-modal-body min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 pb-6">
+                {isLoadingHierarchy ? (
+                  <div className="rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/40 px-3 py-2 text-sm font-medium text-[var(--stocksense-brand)]">
+                    Loading locations, storage areas, and categories...
+                  </div>
+                ) : null}
+                {hierarchyError ? (
+                  <div className="flex flex-col gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                    <span>{hierarchyError}</span>
+                    <Button
+                      size="sm"
+                      color="danger"
+                      variant="flat"
+                      className="rounded-xl self-start"
+                      onPress={() => loadHierarchy({ force: true })}
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                ) : null}
                 <Select
                   aria-label="Filter by location"
                   label="Location"
@@ -2510,6 +2634,9 @@ export default function ItemsPageClient({
                   onSelectionChange={(keys) =>
                     handleLocationFilterChange(getSelectedValue(keys) || ALL_FILTER_KEY)
                   }
+                  onOpenChange={(open) => {
+                    if (open) void loadHierarchy();
+                  }}
                   variant="bordered"
                   radius="lg"
                   classNames={themedSelectClassNames}
@@ -2529,7 +2656,10 @@ export default function ItemsPageClient({
                   onSelectionChange={(keys) =>
                     handleAreaFilterChange(getSelectedValue(keys) || ALL_FILTER_KEY)
                   }
-                  isDisabled={areaOptions.length === 0}
+                  onOpenChange={(open) => {
+                    if (open) void loadHierarchy();
+                  }}
+                  isDisabled={isLoadingHierarchy || areaOptions.length === 0}
                   variant="bordered"
                   radius="lg"
                   classNames={themedSelectClassNames}
@@ -2551,7 +2681,10 @@ export default function ItemsPageClient({
                   onSelectionChange={(keys) =>
                     setCategoryFilter(getSelectedValue(keys) || ALL_FILTER_KEY)
                   }
-                  isDisabled={categoryOptions.length === 0}
+                  onOpenChange={(open) => {
+                    if (open) void loadHierarchy();
+                  }}
+                  isDisabled={isLoadingHierarchy || categoryOptions.length === 0}
                   variant="bordered"
                   radius="lg"
                   classNames={themedSelectClassNames}
@@ -2918,6 +3051,25 @@ export default function ItemsPageClient({
                     </p>
                   </div>
                 ) : null}
+                {isLoadingHierarchy ? (
+                  <div className="rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/40 px-3 py-2 text-sm font-medium text-[var(--stocksense-brand)]">
+                    Loading move destinations...
+                  </div>
+                ) : null}
+                {hierarchyError ? (
+                  <div className="flex flex-col gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between">
+                    <span>{hierarchyError}</span>
+                    <Button
+                      size="sm"
+                      color="danger"
+                      variant="flat"
+                      className="rounded-xl"
+                      onPress={() => loadHierarchy({ force: true })}
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                ) : null}
                 <Select
                   label="Location"
                   selectedKeys={
@@ -2948,6 +3100,7 @@ export default function ItemsPageClient({
                       categoryId: firstCat?.id ?? null,
                     });
                   }}
+                  isDisabled={isLoadingHierarchy}
                   variant="bordered"
                   radius="lg"
                   classNames={themedSelectClassNames}
@@ -3011,7 +3164,11 @@ export default function ItemsPageClient({
                       categoryId: firstCat?.id ?? null,
                     }));
                   }}
-                  isDisabled={!moveTarget.locationId || moveTarget.locationId === NEW_LOCATION_VALUE}
+                  isDisabled={
+                    isLoadingHierarchy ||
+                    !moveTarget.locationId ||
+                    moveTarget.locationId === NEW_LOCATION_VALUE
+                  }
                   variant="bordered"
                   radius="lg"
                   classNames={themedSelectClassNames}
@@ -3028,7 +3185,11 @@ export default function ItemsPageClient({
                       value={moveCreateNames.area}
                       onValueChange={(value) => updateMoveCreateName("area", value)}
                       placeholder="Pantry, shelf, drawer..."
-                      isDisabled={!moveTarget.locationId || moveTarget.locationId === NEW_LOCATION_VALUE}
+                      isDisabled={
+                        isLoadingHierarchy ||
+                        !moveTarget.locationId ||
+                        moveTarget.locationId === NEW_LOCATION_VALUE
+                      }
                       variant="bordered"
                       radius="lg"
                       classNames={modalInputClassNames}
@@ -3063,7 +3224,11 @@ export default function ItemsPageClient({
                       categoryId: getSelectedValue(keys) || null,
                     }))
                   }
-                  isDisabled={!moveTarget.areaId || moveTarget.areaId === NEW_AREA_VALUE}
+                  isDisabled={
+                    isLoadingHierarchy ||
+                    !moveTarget.areaId ||
+                    moveTarget.areaId === NEW_AREA_VALUE
+                  }
                   variant="bordered"
                   radius="lg"
                   classNames={themedSelectClassNames}
@@ -3082,7 +3247,11 @@ export default function ItemsPageClient({
                       value={moveCreateNames.category}
                       onValueChange={(value) => updateMoveCreateName("category", value)}
                       placeholder="Snacks, tools, cleaning..."
-                      isDisabled={!moveTarget.areaId || moveTarget.areaId === NEW_AREA_VALUE}
+                      isDisabled={
+                        isLoadingHierarchy ||
+                        !moveTarget.areaId ||
+                        moveTarget.areaId === NEW_AREA_VALUE
+                      }
                       variant="bordered"
                       radius="lg"
                       classNames={modalInputClassNames}
@@ -3133,7 +3302,11 @@ export default function ItemsPageClient({
                     if (selectedIds.size > 0 && !drawerOpen) confirmMoveBulk();
                     else confirmMoveSingle();
                   }}
-                  isDisabled={!canConfirmMove || Boolean(shoppingListMoveAction)}
+                  isDisabled={
+                    isLoadingHierarchy ||
+                    !canConfirmMove ||
+                    Boolean(shoppingListMoveAction)
+                  }
                 >
                   Move
                 </Button>

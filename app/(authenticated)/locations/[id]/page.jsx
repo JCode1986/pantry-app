@@ -59,39 +59,6 @@ export default async function Page({ params }) {
   });
   const storageAreas = storageAreasResult.data.items ?? [];
 
-  // 3) Fetch ALL locations for the "Move items" modal
-  const { data: allLocationsRaw, error: allLocationsError } = await supabase
-    .from('locations')
-    .select(`
-      id,
-      name,
-      storage_areas (
-        id,
-        name,
-        storage_categories (
-          id,
-          name
-        )
-      )
-    `);
-
-  if (allLocationsError) {
-    console.error('All locations fetch error:', JSON.stringify(allLocationsError, null, 2));
-  }
-
-  const allLocations = (allLocationsRaw ?? []).map((loc) => ({
-    id: loc.id,
-    name: loc.name,
-    storage_areas: (loc.storage_areas ?? []).map((sa) => ({
-      id: sa.id,
-      name: sa.name,
-      categories: (sa.storage_categories ?? []).map((cat) => ({
-        id: cat.id,
-        name: cat.name,
-      })),
-    })),
-  }));
-
   const locationImageUrl =
     (
       await getInventoryImageUrls([location.image_path], {
@@ -107,7 +74,8 @@ export default async function Page({ params }) {
     (sum, area) =>
       sum +
       (area.categories ?? []).reduce(
-        (categorySum, category) => categorySum + (category.items?.length ?? 0),
+        (categorySum, category) =>
+          categorySum + (category.itemsCount ?? category.items?.length ?? 0),
         0
       ),
     0
@@ -130,7 +98,6 @@ export default async function Page({ params }) {
         locationId={location.id}
         initialStorageAreas={storageAreas}
         initialTotalStorageAreas={storageAreasResult.data.totalCount}
-        allLocations={allLocations}
         canEditInventory={canEditInventory}
       />
     </main>

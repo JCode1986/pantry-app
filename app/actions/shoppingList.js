@@ -65,29 +65,27 @@ function serializeShoppingListItem(row) {
 
 async function serializeShoppingListItemWithImage(row) {
   if (!row) return null;
-  const [imageUrl, imageThumbUrl] = await Promise.all([
-    getInventoryImageUrl(row.image_path),
-    getInventoryImageUrl(row.image_path, { variant: INVENTORY_IMAGE_VARIANT.CARD }),
-  ]);
+  const imageUrl = await getInventoryImageUrl(row.image_path, {
+    variant: INVENTORY_IMAGE_VARIANT.CARD,
+  });
   return serializeShoppingListItem({
     ...row,
     imageUrl,
-    imageThumbUrl,
+    imageThumbUrl: imageUrl,
   });
 }
 
 async function serializeShoppingListItemsWithImages(rows) {
   const imagePaths = (rows ?? []).map((row) => row?.image_path);
-  const [urlsByPath, thumbUrlsByPath] = await Promise.all([
-    getInventoryImageUrls(imagePaths),
-    getInventoryImageUrls(imagePaths, { variant: INVENTORY_IMAGE_VARIANT.CARD }),
-  ]);
+  const urlsByPath = await getInventoryImageUrls(imagePaths, {
+    variant: INVENTORY_IMAGE_VARIANT.CARD,
+  });
 
   return (rows ?? []).map((row) =>
     serializeShoppingListItem({
       ...row,
       imageUrl: urlsByPath.get(row?.image_path) ?? null,
-      imageThumbUrl: thumbUrlsByPath.get(row?.image_path) ?? null,
+      imageThumbUrl: urlsByPath.get(row?.image_path) ?? null,
     })
   );
 }
@@ -708,6 +706,10 @@ export async function moveShoppingListItemToInventoryAction(itemId, input = {}) 
     revalidateShoppingListAndInventoryPaths([
       destinationPath.categoryId ? `/categories/${destinationPath.categoryId}` : null,
     ]);
+    const inventoryItemImageUrl = await getInventoryImageUrl(inventoryItem.image_path, {
+      variant: INVENTORY_IMAGE_VARIANT.CARD,
+    });
+
     return {
       data: {
         shoppingListItem: await serializeShoppingListItemWithImage(shoppingListItem),
@@ -717,10 +719,8 @@ export async function moveShoppingListItemToInventoryAction(itemId, input = {}) 
           quantity: inventoryItem.quantity ?? 0,
           expirationDate: inventoryItem.expiration_date ?? null,
           image_path: inventoryItem.image_path ?? null,
-          imageUrl: await getInventoryImageUrl(inventoryItem.image_path),
-          imageThumbUrl: await getInventoryImageUrl(inventoryItem.image_path, {
-            variant: INVENTORY_IMAGE_VARIANT.CARD,
-          }),
+          imageUrl: inventoryItemImageUrl,
+          imageThumbUrl: inventoryItemImageUrl,
           categoryId: inventoryItem.category_id,
           locationId: destinationPath.locationId,
           locationName: destinationPath.location,

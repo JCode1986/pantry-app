@@ -5,18 +5,6 @@ import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  updatePreferredNameAction,
-  updateUserPreferencesAction,
-} from "@/app/actions/preferences";
-import {
-  createHouseholdInviteAction,
-  getHouseholdSharingAction,
-  removeHouseholdMemberAction,
-  resendHouseholdInviteAction,
-  revokeHouseholdInviteAction,
-  updateHouseholdMemberRoleAction,
-} from "@/app/actions/household";
 import { INVENTORY_CHANGE_EVENT } from "@/utils/clientEvents";
 import { createClient as createBrowserSupabaseClient } from "@/utils/supabase/client";
 import {
@@ -155,23 +143,23 @@ async function fetchAttentionCounts() {
   ] = await Promise.all([
     supabase
       .from("items")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact", head: true })
       .not("expiration_date", "is", null)
       .lt("expiration_date", today),
     supabase
       .from("items")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact", head: true })
       .not("expiration_date", "is", null)
       .gte("expiration_date", today)
       .lte("expiration_date", cutoff),
     supabase
       .from("shopping_list_items")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact", head: true })
       .eq("status", "needed"),
-    supabase.from("locations").select("*", { count: "exact", head: true }),
-    supabase.from("storage_areas").select("*", { count: "exact", head: true }),
-    supabase.from("storage_categories").select("*", { count: "exact", head: true }),
-    supabase.from("items").select("*", { count: "exact", head: true }),
+    supabase.from("locations").select("id", { count: "exact", head: true }),
+    supabase.from("storage_areas").select("id", { count: "exact", head: true }),
+    supabase.from("storage_categories").select("id", { count: "exact", head: true }),
+    supabase.from("items").select("id", { count: "exact", head: true }),
   ]);
 
   if (
@@ -1733,6 +1721,7 @@ export default function Navigation({
     setSharingLoading(true);
     setSharingError("");
 
+    const { getHouseholdSharingAction } = await import("@/app/actions/household");
     const result = await getHouseholdSharingAction();
     if (result?.error) {
       setSharingError(result.error);
@@ -1770,6 +1759,7 @@ export default function Navigation({
     setPreferenceSaving(true);
     setPreferenceMessage(null);
 
+    const { updateUserPreferencesAction } = await import("@/app/actions/preferences");
     const result = await updateUserPreferencesAction(normalized);
 
     setPreferenceSaving(false);
@@ -1806,6 +1796,7 @@ export default function Navigation({
     setPreferenceSaving(true);
     setPreferenceMessage(null);
 
+    const { updatePreferredNameAction } = await import("@/app/actions/preferences");
     const result = await updatePreferredNameAction(normalizedName);
 
     setPreferenceSaving(false);
@@ -1857,6 +1848,7 @@ export default function Navigation({
     setSharingActionLoading("invite");
     setSharingMessage(null);
 
+    const { createHouseholdInviteAction } = await import("@/app/actions/household");
     const result = await createHouseholdInviteAction(inviteEmail, inviteRole);
     setSharingActionLoading("");
 
@@ -1898,6 +1890,7 @@ export default function Navigation({
     setSharingActionLoading(`resend:${inviteId}`);
     setSharingMessage(null);
 
+    const { resendHouseholdInviteAction } = await import("@/app/actions/household");
     const result = await resendHouseholdInviteAction(inviteId);
     setSharingActionLoading("");
 
@@ -1931,6 +1924,7 @@ export default function Navigation({
     setSharingActionLoading(`revoke:${inviteId}`);
     setSharingMessage(null);
 
+    const { revokeHouseholdInviteAction } = await import("@/app/actions/household");
     const result = await revokeHouseholdInviteAction(inviteId);
     setSharingActionLoading("");
 
@@ -1952,6 +1946,7 @@ export default function Navigation({
     setSharingActionLoading(`role:${member.userId}`);
     setSharingMessage(null);
 
+    const { updateHouseholdMemberRoleAction } = await import("@/app/actions/household");
     const result = await updateHouseholdMemberRoleAction(member.userId, role);
     setSharingActionLoading("");
 
@@ -1992,6 +1987,7 @@ export default function Navigation({
     setSharingActionLoading(`remove:${member.userId}`);
     setSharingMessage(null);
 
+    const { removeHouseholdMemberAction } = await import("@/app/actions/household");
     const result = await removeHouseholdMemberAction(member.userId);
     setSharingActionLoading("");
     setRemoveMemberCandidate(null);
@@ -2058,6 +2054,8 @@ export default function Navigation({
 
   useEffect(() => {
     let cancelled = false;
+    let idleCallbackId = null;
+    let fallbackTimeoutId = null;
 
     const refreshAttentionCounts = async () => {
       const nextCounts = await fetchAttentionCounts();
@@ -2066,11 +2064,27 @@ export default function Navigation({
       }
     };
 
-    refreshAttentionCounts();
+    if (typeof window.requestIdleCallback === "function") {
+      idleCallbackId = window.requestIdleCallback(refreshAttentionCounts, {
+        timeout: 2500,
+      });
+    } else {
+      fallbackTimeoutId = window.setTimeout(refreshAttentionCounts, 1200);
+    }
+
     window.addEventListener(INVENTORY_CHANGE_EVENT, refreshAttentionCounts);
 
     return () => {
       cancelled = true;
+      if (
+        idleCallbackId !== null &&
+        typeof window.cancelIdleCallback === "function"
+      ) {
+        window.cancelIdleCallback(idleCallbackId);
+      }
+      if (fallbackTimeoutId !== null) {
+        window.clearTimeout(fallbackTimeoutId);
+      }
       window.removeEventListener(INVENTORY_CHANGE_EVENT, refreshAttentionCounts);
     };
   }, [pathname]);

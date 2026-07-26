@@ -3,7 +3,6 @@ import { createClient } from "@/utils/supabase/server";
 import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
 import { getCanEditInventoryForUser } from "@/utils/households";
 import {
-  getInventoryHierarchy,
   getItemsPageAction,
 } from "@/app/actions/server";
 
@@ -21,7 +20,7 @@ export default async function Page({ searchParams }) {
     data: { user },
   } = await supabase.auth.getUser();
   const canEditInventory = await getCanEditInventoryForUser(user);
-  const [itemsResult, hierarchyResult] = await Promise.all([
+  const [itemsResult, { count: locationCount = 0 }] = await Promise.all([
     getItemsPageAction({
       offset: 0,
       limit: 24,
@@ -31,33 +30,19 @@ export default async function Page({ searchParams }) {
         stockFilter: params?.stock,
       },
     }),
-    getInventoryHierarchy(),
+    supabase.from("locations").select("id", { count: "exact", head: true }),
   ]);
 
   if (itemsResult?.error) {
     console.error("Items fetch error:", itemsResult.error);
   }
 
-  if (hierarchyResult?.error) {
-    console.error("Items hierarchy fetch error:", hierarchyResult.error);
-  }
-
-  const moveLocations = (hierarchyResult?.data ?? []).map((location) => ({
-    id: location.id,
-    name: location.name,
-    storage_areas: (location.storageAreas ?? []).map((area) => ({
-      id: area.id,
-      name: area.name,
-      categories: area.categories ?? [],
-    })),
-  }));
-
   return (
     <main className="page-enter mx-auto max-w-[1500px] px-5 py-8 md:min-h-[100vh] lg:px-6 xl:px-8 max-md:px-4 max-md:pb-0 max-md:pt-4">
       <ItemsPageClient
         initialItems={itemsResult?.data?.items ?? []}
         initialTotalItems={itemsResult?.data?.totalCount ?? 0}
-        moveLocations={moveLocations}
+        initialLocationCount={locationCount ?? 0}
         canEditInventory={canEditInventory}
         initialExpirationFilter={params?.expiration}
         initialExpirationDays={params?.days}

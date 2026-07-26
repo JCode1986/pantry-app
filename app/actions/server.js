@@ -1728,20 +1728,24 @@ function normalizeStorageAreaRows(
       image_path: category.image_path ?? null,
       imageUrl: imageUrlsByPath.get(category.image_path) ?? null,
       imageThumbUrl: imageThumbUrlsByPath.get(category.image_path) ?? null,
-      items: (category.items ?? []).map((item) => ({
-        ...item,
-        imageUrl: imageUrlsByPath.get(item.image_path) ?? null,
-        imageThumbUrl: imageThumbUrlsByPath.get(item.image_path) ?? null,
-      })),
+      itemsCount: (category.items ?? []).length,
+      itemsLoaded: (category.items ?? []).some((item) => item?.name),
+      items: (category.items ?? [])
+        .filter((item) => item?.name)
+        .map((item) => ({
+          ...item,
+          imageUrl: imageUrlsByPath.get(item.image_path) ?? null,
+          imageThumbUrl: imageThumbUrlsByPath.get(item.image_path) ?? null,
+        })),
     })),
   }));
 }
 
 async function getOriginalAndCardImageUrls(paths = []) {
-  return Promise.all([
-    getInventoryImageUrls(paths),
-    getInventoryImageUrls(paths, { variant: INVENTORY_IMAGE_VARIANT.CARD }),
-  ]);
+  const cardUrlsByPath = await getInventoryImageUrls(paths, {
+    variant: INVENTORY_IMAGE_VARIANT.CARD,
+  });
+  return [cardUrlsByPath, cardUrlsByPath];
 }
 
 export async function getLocationsPageAction({
@@ -1997,16 +2001,7 @@ export async function getLocationStorageAreasPageAction({
             id,
             name,
             image_path,
-            items:items!fk_items_category (
-              id,
-              name,
-              quantity,
-              expiration_date,
-              category_id,
-              barcode,
-              image_path,
-              created_at
-            )
+            items:items!fk_items_category ( id )
           )
         `
         )
@@ -2023,10 +2018,7 @@ export async function getLocationStorageAreasPageAction({
     .filter(Boolean);
   const imagePaths = sortedAreas.flatMap((area) => [
       area.image_path,
-      ...(area.storage_categories ?? []).flatMap((category) => [
-        category.image_path,
-        ...(category.items ?? []).map((item) => item.image_path),
-      ]),
+      ...(area.storage_categories ?? []).map((category) => category.image_path),
     ]);
   const [imageUrlsByPath, imageThumbUrlsByPath] = await getOriginalAndCardImageUrls(imagePaths);
 
@@ -2192,12 +2184,7 @@ export async function getCategoriesPageAction({
       image_path,
       inserted_at,
       storage_area_id,
-      items:items!fk_items_category (
-        id,
-        name,
-        quantity,
-        expiration_date
-      )
+      items:items!fk_items_category ( id )
     `,
       { count: 'exact' }
     );
@@ -2271,8 +2258,9 @@ export async function getCategoriesPageAction({
         id: location?.id ?? null,
         name: location?.name ?? 'Unknown location',
       },
-      items: category.items ?? [],
+      items: [],
       itemsCount: (category.items ?? []).length,
+      itemsLoaded: false,
     };
   });
 
@@ -2356,6 +2344,83 @@ async function normalizeItemsForList({
         : null,
     };
   });
+}
+
+export async function getCategoryItemsAction({
+  categoryId,
+  filters = {},
+} = {}) {
+  const safeCategoryId = normalizeFilterId(categoryId);
+  if (!safeCategoryId) {
+    return { data: { items: [], totalCount: 0 }, error: 'Category is required.' };
+  }
+
+  const normalizedFilters = normalizeItemListFilters({
+    ...filters,
+    categoryId: safeCategoryId,
+  });
+  const supabase = await createClient();
+
+  let query = supabase
+    .from('items')
+    .select('id, name, quantity, expiration_date, category_id, image_path, barcode', {
+      count: 'exact',
+    })
+    .eq('category_id', safeCategoryId);
+
+  if (normalizedFilters.search) {
+    query = query.or(
+      [
+        `name.ilike.%${normalizedFilters.search}%`,
+        `barcode.ilike.%${normalizedFilters.search}%`,
+      ].join(',')
+    );
+  }
+
+  const today = toDateString(new Date());
+  const cutoff = toDateString(addDays(new Date(), normalizedFilters.expirationDays));
+
+  if (normalizedFilters.expirationFilter === ITEM_LIST_FILTERS.EXPIRED) {
+    query = query.not('expiration_date', 'is', null).lt('expiration_date', today);
+  } else if (normalizedFilters.expirationFilter === ITEM_LIST_FILTERS.SOON) {
+    query = query
+      .not('expiration_date', 'is', null)
+      .gte('expiration_date', today)
+      .lte('expiration_date', cutoff);
+  } else if (normalizedFilters.expirationFilter === ITEM_LIST_FILTERS.NONE) {
+    query = query.is('expiration_date', null);
+  }
+
+  if (normalizedFilters.stockFilter === ITEM_LIST_FILTERS.IN_STOCK) {
+    query = query.gt('quantity', 0);
+  } else if (normalizedFilters.stockFilter === ITEM_LIST_FILTERS.LOW_OR_EMPTY) {
+    query = query.lte('quantity', 1);
+  }
+
+  const { data: itemsRaw, error, count } = await applyItemSort(
+    query,
+    normalizedFilters.sortBy
+  );
+
+  if (error) {
+    console.error('getCategoryItemsAction error:', error);
+    return { data: { items: [], totalCount: 0 }, error: error.message };
+  }
+
+  const imagePaths = (itemsRaw ?? []).map((item) => item.image_path);
+  const [urlsByPath, thumbUrlsByPath] = await getOriginalAndCardImageUrls(imagePaths);
+
+  return {
+    data: {
+      items: (itemsRaw ?? []).map((item) => ({
+        ...item,
+        imageUrl: urlsByPath.get(item.image_path) ?? null,
+        imageThumbUrl: thumbUrlsByPath.get(item.image_path) ?? null,
+      })),
+      totalCount: count ?? (itemsRaw ?? []).length,
+    },
+    error: null,
+  };
 }
 
 export async function getItemsPageAction({
@@ -2997,6 +3062,181 @@ export async function deleteItem(itemId) {
     existingItem?.category_id ? `/categories/${existingItem.category_id}` : null,
   ]);
   return { success: true };
+}
+
+export async function deleteItems(itemIds = []) {
+  const ids = [...new Set((itemIds ?? []).map((id) => String(id)).filter(Boolean))];
+  if (ids.length === 0) return { data: { deletedIds: [] }, error: null };
+
+  const startedAt = new Date(Date.now() - 5000).toISOString();
+  const { household, user, error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
+
+  const supabase = await createClient();
+  const admin = createAdminClient();
+
+  const { data: existingItems, error: existingError } = await supabase
+    .from('items')
+    .select('id, category_id')
+    .in('id', ids);
+
+  if (existingError) {
+    console.error('deleteItems existing items error:', existingError);
+    return { data: { deletedIds: [] }, error: existingError.message };
+  }
+
+  const existingIds = (existingItems ?? []).map((item) => String(item.id));
+  if (existingIds.length === 0) {
+    return { data: { deletedIds: [] }, error: null };
+  }
+
+  const { error } = await supabase.from('items').delete().in('id', existingIds);
+  if (error) {
+    console.error('deleteItems error:', error);
+    return { data: { deletedIds: [] }, error: error.message };
+  }
+
+  await stampActivityActor({
+    admin,
+    household,
+    user,
+    entityType: 'item',
+    entityIds: existingIds,
+    action: 'deleted',
+    since: startedAt,
+  });
+
+  revalidateEntityPaths(INVENTORY_IMAGE_ENTITY.ITEM, [
+    ...new Set(
+      (existingItems ?? [])
+        .map((item) => (item.category_id ? `/categories/${item.category_id}` : null))
+        .filter(Boolean)
+    ),
+  ]);
+
+  return {
+    data: {
+      deletedIds: existingIds,
+      failed: ids
+        .filter((id) => !existingIds.includes(String(id)))
+        .map((id) => ({ id, error: 'Item not found.' })),
+    },
+    error: null,
+  };
+}
+
+export async function updateItemsLocation(itemIds = [], values = {}) {
+  const ids = [...new Set((itemIds ?? []).map((id) => String(id)).filter(Boolean))];
+  if (ids.length === 0) return { data: { movedIds: [] }, error: null };
+
+  const { household, user, error: permissionError } = await requireInventoryEditor();
+  if (permissionError) return validationError(permissionError);
+
+  const { categoryId, category_id } = values || {};
+  const newCategoryId =
+    categoryId !== undefined && categoryId !== null
+      ? categoryId
+      : category_id;
+
+  if (!newCategoryId) {
+    return validationError('Missing categoryId in updateItemsLocation');
+  }
+
+  const supabase = await createClient();
+  const startedAt = new Date(Date.now() - 5000).toISOString();
+
+  const { data: existingItems, error: existingItemsError } = await supabase
+    .from('items')
+    .select('id, name, quantity, expiration_date, category_id')
+    .in('id', ids);
+
+  if (existingItemsError) {
+    console.error('updateItemsLocation existing items error:', existingItemsError);
+    return { data: { movedIds: [] }, error: existingItemsError.message };
+  }
+
+  const itemsToMove = (existingItems ?? []).filter(
+    (item) => String(item.category_id) !== String(newCategoryId)
+  );
+
+  if (itemsToMove.length === 0) {
+    return {
+      data: {
+        movedIds: [],
+        skippedIds: (existingItems ?? []).map((item) => String(item.id)),
+        failed: ids
+          .filter(
+            (id) =>
+              !(existingItems ?? []).some((item) => String(item.id) === String(id))
+          )
+          .map((id) => ({ id, error: 'Item not found.' })),
+      },
+      error: null,
+    };
+  }
+
+  const sourceCategoryIds = [
+    ...new Set(itemsToMove.map((item) => item.category_id).filter(Boolean)),
+  ];
+  const categoryPaths = await Promise.all([
+    ...sourceCategoryIds.map((sourceCategoryId) =>
+      getCategoryPath(supabase, sourceCategoryId)
+    ),
+    getCategoryPath(supabase, newCategoryId),
+  ]);
+  const toPath = categoryPaths[categoryPaths.length - 1];
+  const fromPathsByCategoryId = new Map(
+    sourceCategoryIds.map((sourceCategoryId, index) => [
+      String(sourceCategoryId),
+      categoryPaths[index],
+    ])
+  );
+
+  const moveIds = itemsToMove.map((item) => String(item.id));
+  const { data: updatedItems, error } = await supabase
+    .from('items')
+    .update({ category_id: newCategoryId })
+    .in('id', moveIds)
+    .select('id, name, quantity, expiration_date, category_id, image_path, barcode');
+
+  if (error) {
+    console.error('updateItemsLocation DB error:', error);
+    return { data: { movedIds: [] }, error };
+  }
+
+  await Promise.all(
+    itemsToMove.map((item) =>
+      recordItemMoveActivity({
+        startedAt,
+        user,
+        household,
+        item: {
+          ...item,
+          category_id: newCategoryId,
+        },
+        fromPath: fromPathsByCategoryId.get(String(item.category_id)),
+        toPath,
+      })
+    )
+  );
+
+  revalidateEntityPaths(INVENTORY_IMAGE_ENTITY.ITEM, [
+    ...sourceCategoryIds.map((sourceCategoryId) => `/categories/${sourceCategoryId}`),
+    `/categories/${newCategoryId}`,
+  ]);
+
+  return {
+    data: {
+      movedIds: moveIds,
+      items: updatedItems ?? [],
+      failed: ids
+        .filter(
+          (id) => !(existingItems ?? []).some((item) => String(item.id) === String(id))
+        )
+        .map((id) => ({ id, error: 'Item not found.' })),
+    },
+    error: null,
+  };
 }
 
 export async function addCategory(storageAreaId, name) {

@@ -29,9 +29,11 @@ import {
   deleteCategory,
   addItem,
   updateItem,
-  deleteItem,
+  deleteItems,
+  getInventoryHierarchy,
+  getCategoryItemsAction,
   getLocationStorageAreasPageAction,
-  updateItemLocation,
+  updateItemsLocation,
   uploadInventoryImage,
 } from '@/app/actions/server';
 import {
@@ -68,6 +70,7 @@ import {
   toPositiveInteger,
 } from '@/utils/pantry/date';
 import { containsQuery } from '@/utils/pantry/search';
+import { normalizeMoveLocations } from '@/utils/pantry/moveLocations';
 import { parseDate } from '@internationalized/date';
 
 const MoveItemsModal = dynamic(() => import('@/components/items/MoveItemsModal'), {
@@ -326,6 +329,16 @@ export default function StorageAreasSection({
   const [expSoonEnabled, setExpSoonEnabled] = useState(false);
   const [expDays, setExpDays] = useState(7);
   const normalizedSearch = search.trim().toLowerCase();
+  const categoryItemsLoadKey = useMemo(
+    () =>
+      JSON.stringify({
+        search: normalizedSearch,
+        expirationFilter: expSoonEnabled ? 'soon' : 'all',
+        expirationDays: expDays,
+        sortBy: 'name_asc',
+      }),
+    [expDays, expSoonEnabled, normalizedSearch]
+  );
   const storageLoadRequestIdRef = useRef(0);
 
   const loadStorageAreaPage = useCallback(
@@ -421,6 +434,15 @@ export default function StorageAreasSection({
     targetCategoryId: null,
     itemIds: [],
   });
+  const [moveLocationsForModal, setMoveLocationsForModal] = useState(() =>
+    normalizeMoveLocations(allLocations)
+  );
+  const [moveDestinationsLoaded, setMoveDestinationsLoaded] = useState(
+    () => (allLocations ?? []).length > 0
+  );
+  const [isLoadingMoveDestinations, setIsLoadingMoveDestinations] = useState(false);
+  const [moveDestinationsError, setMoveDestinationsError] = useState('');
+  const moveDestinationsRequestRef = useRef(null);
 
   // Delete dialog state
   const [deleteDialog, setDeleteDialog] = useState({
@@ -429,6 +451,52 @@ export default function StorageAreasSection({
     payload: null,
     isDeleting: false,
   });
+
+  useEffect(() => {
+    const nextMoveLocations = normalizeMoveLocations(allLocations);
+    if (nextMoveLocations.length === 0) return;
+
+    setMoveLocationsForModal(nextMoveLocations);
+    setMoveDestinationsLoaded(true);
+  }, [allLocations]);
+
+  const loadMoveDestinations = useCallback(
+    async ({ force = false } = {}) => {
+      if (!force && moveDestinationsLoaded) return moveLocationsForModal;
+      if (moveDestinationsRequestRef.current) {
+        return moveDestinationsRequestRef.current;
+      }
+
+      setIsLoadingMoveDestinations(true);
+      setMoveDestinationsError('');
+
+      const request = getInventoryHierarchy()
+        .then((result) => {
+          if (result?.error) {
+            throw new Error(result.error);
+          }
+
+          const nextMoveLocations = normalizeMoveLocations(result?.data ?? []);
+          setMoveLocationsForModal(nextMoveLocations);
+          setMoveDestinationsLoaded(true);
+          return nextMoveLocations;
+        })
+        .catch((error) => {
+          setMoveDestinationsError(
+            error?.message || 'Could not load move destinations.'
+          );
+          return null;
+        })
+        .finally(() => {
+          setIsLoadingMoveDestinations(false);
+          moveDestinationsRequestRef.current = null;
+        });
+
+      moveDestinationsRequestRef.current = request;
+      return request;
+    },
+    [moveDestinationsLoaded, moveLocationsForModal]
+  );
 
   useEffect(() => {
     const handleItemAdded = (event) => {
@@ -604,50 +672,24 @@ export default function StorageAreasSection({
   };
 
 
-  // Build locations list for the modal, normalize storageAreas vs storage_areas
-  const locationsForMove = useMemo(() => {
-    if (allLocations && allLocations.length) {
-      return allLocations.map((loc) => ({
-        ...loc,
-        storageAreas: loc.storageAreas || loc.storage_areas || [],
-      }));
-    }
-    // fallback: only current location with current storageAreas
-    return [
+  const fallbackLocationsForMove = useMemo(
+    () => [
       {
         id: locationId,
         name: locationName,
         storageAreas,
       },
-    ];
-  }, [allLocations, locationId, locationName, storageAreas]);
-
-  const expansionSignature = useMemo(
-    () =>
-      (storageAreas || [])
-        .map((area) => `${area.id}:${(area.categories || []).map((c) => c.id).join(',')}`)
-        .join('|'),
-    [storageAreas]
+    ],
+    [locationId, locationName, storageAreas]
   );
 
-  useEffect(() => {
-    const areaState = {};
-    const categoryState = {};
-
-    for (const areaGroup of expansionSignature.split('|')) {
-      if (!areaGroup) continue;
-
-      const [areaId, categoryList = ''] = areaGroup.split(':');
-      if (areaId) areaState[areaId] = true;
-
-      for (const categoryId of categoryList.split(',')) {
-        if (categoryId) categoryState[categoryId] = true;
-      }
-    }
-
-    setExpandedAreas(areaState);
-    setExpandedCategories(categoryState);
-  }, [expansionSignature]);
+  const locationsForMove = useMemo(
+    () =>
+      moveLocationsForModal.length > 0
+        ? moveLocationsForModal
+        : fallbackLocationsForMove,
+    [fallbackLocationsForMove, moveLocationsForModal]
+  );
 
   const totalAreas = totalStorageAreaCount;
   const totalCategories = useMemo(
@@ -658,7 +700,9 @@ export default function StorageAreasSection({
   const totalItems = useMemo(() => {
     let n = 0;
     for (const a of storageAreas ?? []) {
-      for (const c of a.categories || []) n += c.items?.length || 0;
+      for (const c of a.categories || []) {
+        n += c.itemsCount ?? c.items?.length ?? 0;
+      }
     }
     return n;
   }, [storageAreas]);
@@ -710,23 +754,28 @@ export default function StorageAreasSection({
       [id]: !prev[id],
     }));
 
-  const toggleCategory = (id) =>
+  const toggleCategory = (id) => {
+    const isExpanded = Boolean(expandedCategories[id]);
     setExpandedCategories((prev) => ({
       ...prev,
       [id]: !prev[id],
     }));
+    if (!isExpanded) {
+      void loadCategoryItems(id);
+    }
+  };
 
   const expandAllAreas = () => {
     setExpandedAreas(
       Object.fromEntries((storageAreas || []).map((area) => [area.id, true]))
     );
-    setExpandedCategories(
-      Object.fromEntries(
-        (storageAreas || []).flatMap((area) =>
-          (area.categories || []).map((category) => [category.id, true])
-        )
-      )
+    const categoryEntries = (storageAreas || []).flatMap((area) =>
+      (area.categories || []).map((category) => [category.id, true])
     );
+    setExpandedCategories(Object.fromEntries(categoryEntries));
+    categoryEntries.forEach(([categoryId]) => {
+      void loadCategoryItems(categoryId);
+    });
   };
 
   const collapseAllAreas = () => {
@@ -1259,7 +1308,7 @@ export default function StorageAreasSection({
 
   const performDeleteItem = async (itemId, categoryId, storageAreaId) => {
     if (!canEditInventory) return;
-    const result = await deleteItem(itemId);
+    const result = await deleteItems([itemId]);
     if (!result?.error) {
       setStorageAreas((prev) =>
         prev.map((area) =>
@@ -1270,7 +1319,13 @@ export default function StorageAreasSection({
                   cat.id === categoryId
                     ? {
                         ...cat,
-                        items: cat.items.filter((it) => it.id !== itemId),
+                        itemsCount: Math.max(
+                          0,
+                          (cat.itemsCount ?? cat.items?.length ?? 1) - 1
+                        ),
+                        items: (cat.items ?? []).filter(
+                          (it) => String(it.id) !== String(itemId)
+                        ),
                       }
                     : cat
                 ),
@@ -1284,16 +1339,19 @@ export default function StorageAreasSection({
         id: itemId,
       });
     } else {
-      console.error('deleteItem error:', result.error);
+      console.error('deleteItems error:', result.error);
     }
   };
 
   const performBulkDeleteItems = async (itemIds, categoryId, storageAreaId) => {
     if (!canEditInventory) return;
-    for (const id of itemIds) {
-      await deleteItem(id);
+    const result = await deleteItems(itemIds);
+    if (result?.error) {
+      console.error('bulk delete item errors:', result);
+      return;
     }
 
+    const deletedSet = new Set(itemIds.map(String));
     setStorageAreas((prev) =>
       prev.map((area) =>
         area.id === storageAreaId
@@ -1303,7 +1361,14 @@ export default function StorageAreasSection({
                 cat.id === categoryId
                   ? {
                       ...cat,
-                      items: (cat.items || []).filter((i) => !itemIds.includes(i.id)),
+                      itemsCount: Math.max(
+                        0,
+                        (cat.itemsCount ?? cat.items?.length ?? deletedSet.size) -
+                          deletedSet.size
+                      ),
+                      items: (cat.items || []).filter(
+                        (i) => !deletedSet.has(String(i.id))
+                      ),
                     }
                   : cat
               ),
@@ -1440,6 +1505,104 @@ export default function StorageAreasSection({
     setSelectedByCategory({});
   };
 
+  const updateCategoryInStorageAreas = useCallback((categoryId, updater) => {
+    const categoryKey = String(categoryId);
+    setStorageAreas((prev) =>
+      prev.map((area) => ({
+        ...area,
+        categories: (area.categories ?? []).map((category) =>
+          String(category.id) === categoryKey ? updater(category) : category
+        ),
+      }))
+    );
+  }, []);
+
+  const loadCategoryItems = useCallback(
+    async (categoryId, options = {}) => {
+      const categoryKey = String(categoryId);
+      let target = null;
+
+      for (const area of storageAreas ?? []) {
+        target = (area.categories ?? []).find(
+          (category) => String(category.id) === categoryKey
+        );
+        if (target) break;
+      }
+
+      if (
+        !target ||
+        target.itemsLoading ||
+        (target.itemsLoaded &&
+          target.itemsLoadKey === categoryItemsLoadKey &&
+          !options.force)
+      ) {
+        return;
+      }
+
+      updateCategoryInStorageAreas(categoryId, (category) => ({
+        ...category,
+        itemsLoading: true,
+        itemsError: '',
+      }));
+
+      try {
+        const result = await getCategoryItemsAction({
+          categoryId,
+          filters: {
+            search: normalizedSearch,
+            expirationFilter: expSoonEnabled ? 'soon' : 'all',
+            expirationDays: expDays,
+            sortBy: 'name_asc',
+          },
+        });
+
+        if (result?.error) {
+          updateCategoryInStorageAreas(categoryId, (category) => ({
+            ...category,
+            itemsLoading: false,
+            itemsError: result.error,
+          }));
+          return;
+        }
+
+        const items = result?.data?.items ?? [];
+        updateCategoryInStorageAreas(categoryId, (category) => ({
+          ...category,
+          items,
+          itemsCount: result?.data?.totalCount ?? items.length,
+          itemsLoaded: true,
+          itemsLoadKey: categoryItemsLoadKey,
+          itemsLoading: false,
+          itemsError: '',
+        }));
+      } catch (error) {
+        updateCategoryInStorageAreas(categoryId, (category) => ({
+          ...category,
+          itemsLoading: false,
+          itemsError: error?.message || 'Could not load items.',
+        }));
+      }
+    },
+    [
+      expDays,
+      expSoonEnabled,
+      categoryItemsLoadKey,
+      normalizedSearch,
+      storageAreas,
+      updateCategoryInStorageAreas,
+    ]
+  );
+
+  useEffect(() => {
+    if (!normalizedSearch && !expSoonEnabled) return;
+
+    for (const area of storageAreas ?? []) {
+      for (const category of area.categories ?? []) {
+        void loadCategoryItems(category.id);
+      }
+    }
+  }, [expSoonEnabled, loadCategoryItems, normalizedSearch, storageAreas]);
+
   // ---------- Move items logic ----------
 
   const openMoveModal = (areaId, categoryId, singleItemId = null) => {
@@ -1467,6 +1630,7 @@ export default function StorageAreasSection({
       targetCategoryId: categoryId,
       itemIds,
     });
+    void loadMoveDestinations();
   };
 
   const handleConfirmMove = async () => {
@@ -1490,22 +1654,17 @@ export default function StorageAreasSection({
     const sourceCat = sourceArea?.categories?.find(
       (c) => String(c.id) === String(sourceCategoryId)
     );
+    const itemIdSet = new Set(itemIds.map(String));
     const itemsToMove = (sourceCat?.items || []).filter((it) =>
-      itemIds.includes(it.id)
+      itemIdSet.has(String(it.id))
     );
 
-    // --- DB update: only change category_id ---
-    const results = await Promise.all(
-      itemsToMove.map((it) =>
-        updateItemLocation(it.id, {
-          categoryId: targetCategoryId,
-        })
-      )
-    );
+    const result = await updateItemsLocation(itemIds, {
+      categoryId: targetCategoryId,
+    });
 
-    const hasError = results.some((r) => r?.error);
-    if (hasError) {
-      console.error('Error moving some items:', results);
+    if (result?.error) {
+      console.error('Error moving some items:', result);
       alert('There was a problem moving one or more items. Nothing was changed.');
       return;
     }
@@ -1528,7 +1687,14 @@ export default function StorageAreasSection({
               if (String(cat.id) === String(sourceCategoryId)) {
                 return {
                   ...cat,
-                  items: (cat.items || []).filter((it) => !itemIds.includes(it.id)),
+                  itemsCount: Math.max(
+                    0,
+                    (cat.itemsCount ?? cat.items?.length ?? itemIds.length) -
+                      itemIds.length
+                  ),
+                  items: (cat.items || []).filter(
+                    (it) => !itemIdSet.has(String(it.id))
+                  ),
                 };
               }
 
@@ -1536,13 +1702,17 @@ export default function StorageAreasSection({
               if (String(cat.id) === String(targetCategoryId)) {
                 return {
                   ...cat,
-                  items: [
-                    ...(cat.items || []),
-                    ...itemsToMove.map((it) => ({
-                      ...it,
-                      category_id: targetCategoryId,
-                    })),
-                  ],
+                  itemsCount:
+                    (cat.itemsCount ?? cat.items?.length ?? 0) + itemIds.length,
+                  items: cat.itemsLoaded
+                    ? [
+                        ...(cat.items || []),
+                        ...itemsToMove.map((it) => ({
+                          ...it,
+                          category_id: targetCategoryId,
+                        })),
+                      ]
+                    : cat.items || [],
                 };
               }
 
@@ -1562,7 +1732,14 @@ export default function StorageAreasSection({
               String(cat.id) === String(sourceCategoryId)
                 ? {
                     ...cat,
-                    items: (cat.items || []).filter((it) => !itemIds.includes(it.id)),
+                    itemsCount: Math.max(
+                      0,
+                      (cat.itemsCount ?? cat.items?.length ?? itemIds.length) -
+                        itemIds.length
+                    ),
+                    items: (cat.items || []).filter(
+                      (it) => !itemIdSet.has(String(it.id))
+                    ),
                   }
                 : cat
             ),
@@ -1708,7 +1885,7 @@ export default function StorageAreasSection({
             .filter(Boolean);
 
           const areaItemCount = (area.categories ?? []).reduce(
-            (sum, category) => sum + (category.items?.length ?? 0),
+            (sum, category) => sum + (category.itemsCount ?? category.items?.length ?? 0),
             0
           );
           const shouldShowArea =
@@ -2217,17 +2394,19 @@ export default function StorageAreasSection({
                       ) : (
                         visibleCategories.map((category) => {
                           const items = category.visibleItems ?? [];
+                          const itemCount = category.itemsCount ?? items.length;
 
                           return (
                             <button
                               key={category.id}
                               type="button"
-                              onClick={() =>
+                              onClick={() => {
                                 setMobileCategorySheet({
                                   areaId: area.id,
                                   categoryId: category.id,
-                                })
-                              }
+                                });
+                                void loadCategoryItems(category.id);
+                              }}
                               className="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white p-3 text-left shadow-sm"
                             >
                               <div className="flex min-w-0 items-center gap-3">
@@ -2249,7 +2428,7 @@ export default function StorageAreasSection({
                                     {category.name}
                                   </p>
                                   <p className="text-xs text-gray-500">
-                                    {items.length} {items.length === 1 ? 'item' : 'items'}
+                                    {itemCount} {itemCount === 1 ? 'item' : 'items'}
                                   </p>
                                 </div>
                               </div>
@@ -2564,8 +2743,8 @@ export default function StorageAreasSection({
                                   </h3>
                                 </div>
                                 <p className="text-xs font-medium text-gray-500">
-                                  {(category.items ?? []).length}{' '}
-                                  {(category.items ?? []).length === 1 ? 'item' : 'items'}
+                                  {category.itemsCount ?? (category.items ?? []).length}{' '}
+                                  {(category.itemsCount ?? (category.items ?? []).length) === 1 ? 'item' : 'items'}
                                 </p>
                               </div>
                             </div>
@@ -2631,7 +2810,17 @@ export default function StorageAreasSection({
                                 className="overflow-hidden"
                               >
                                 <div className="mt-3 space-y-2">
-                                  {items.length === 0 ? (
+                                  {category.itemsLoading ? (
+                                    <SearchResultsLoadingState
+                                      label="Loading items"
+                                      detail="Fetching this category."
+                                      className="rounded-2xl border border-dashed border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/25 px-5 py-6"
+                                    />
+                                  ) : category.itemsError ? (
+                                    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+                                      {category.itemsError}
+                                    </div>
+                                  ) : items.length === 0 ? (
                                     <div className="rounded-2xl border border-dashed border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/25 px-5 py-6 text-center">
                                       <h4 className="text-sm font-semibold text-gray-950">
                                         {normalizedSearch || expSoonEnabled
@@ -3049,7 +3238,30 @@ export default function StorageAreasSection({
                   </AnimatePresence>
                 )}
 
-                {activeMobileCategory?.items?.length ? (
+                {activeMobileCategory?.category?.itemsLoading ? (
+                  <SearchResultsLoadingState
+                    label="Loading items"
+                    detail="Fetching this category."
+                    className="rounded-2xl border border-dashed border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/25 px-5 py-6"
+                  />
+                ) : activeMobileCategory?.category?.itemsError ? (
+                  <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-5 text-center text-sm text-rose-700">
+                    <p>{activeMobileCategory.category.itemsError}</p>
+                    <Button
+                      size="sm"
+                      color="danger"
+                      variant="flat"
+                      className="rounded-xl"
+                      onPress={() =>
+                        loadCategoryItems(activeMobileCategory.category.id, {
+                          force: true,
+                        })
+                      }
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                ) : activeMobileCategory?.items?.length ? (
                   activeMobileCategory.items.map((item) => {
                     const soon = isExpiringSoon(item.expiration_date, expDays);
                     const selected = Boolean(
@@ -3610,6 +3822,9 @@ export default function StorageAreasSection({
         currentLocationId={locationId}
         onConfirm={handleConfirmMove}
         onDestinationCreated={handleMoveDestinationCreated}
+        isLoadingDestinations={isLoadingMoveDestinations}
+        destinationsError={moveDestinationsError}
+        onRetryLoadDestinations={() => loadMoveDestinations({ force: true })}
       />}
 
       {/* Reusable delete confirmation modal */}
