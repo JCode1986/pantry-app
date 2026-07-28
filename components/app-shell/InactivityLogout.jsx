@@ -51,7 +51,8 @@ export default function InactivityLogout({ isAuthenticated: serverAuthenticated 
   const clientAuthenticated = Boolean(session?.access_token) && !loading;
   const isAuthenticated = serverAuthenticated || clientAuthenticated;
 
-  const [lastActivityAt, setLastActivityAt] = useState(() => Date.now());
+  const [mounted, setMounted] = useState(false);
+  const [lastActivityAt, setLastActivityAt] = useState(0);
   const [warningOpen, setWarningOpen] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(
     WARNING_DURATION_SECONDS
@@ -73,6 +74,13 @@ export default function InactivityLogout({ isAuthenticated: serverAuthenticated 
     0,
     Math.min(100, (secondsRemaining / WARNING_DURATION_SECONDS) * 100)
   );
+
+  useEffect(() => {
+    const now = Date.now();
+    setMounted(true);
+    setLastActivityAt(now);
+    lastActivityAtRef.current = now;
+  }, []);
 
   useEffect(() => {
     lastActivityAtRef.current = lastActivityAt;
@@ -257,7 +265,7 @@ export default function InactivityLogout({ isAuthenticated: serverAuthenticated 
     };
   }, [isAuthenticated, markActive]);
 
-  if (!isAuthenticated) return null;
+  if (!mounted || !isAuthenticated) return null;
 
   return (
     <Modal

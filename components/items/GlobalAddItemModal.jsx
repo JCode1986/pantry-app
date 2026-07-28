@@ -323,8 +323,8 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
   const [isListening, setIsListening] = useState(false);
   const [isParsingVoice, setIsParsingVoice] = useState(false);
   const [mobileAddedToast, setMobileAddedToast] = useState(null);
-  const [addMethod, setAddMethod] = useState(readStoredAddMethod);
-  const [keepAdding, setKeepAdding] = useState(readStoredKeepAdding);
+  const [addMethod, setAddMethod] = useState("barcode");
+  const [keepAdding, setKeepAdding] = useState(true);
 
   const selectedLocation = useMemo(
     () => byId(locations, locationId),
@@ -376,6 +376,11 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
       return null;
     }
   }, [form.expirationDate]);
+
+  useEffect(() => {
+    setAddMethod(readStoredAddMethod());
+    setKeepAdding(readStoredKeepAdding());
+  }, []);
 
   const savePreferredAddMethod = useCallback((method) => {
     if (!ADD_METHODS.some((item) => item.id === method)) return;
