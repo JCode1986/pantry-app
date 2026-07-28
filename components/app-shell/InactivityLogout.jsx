@@ -153,6 +153,8 @@ export default function InactivityLogout({ isAuthenticated: serverAuthenticated 
   }, [isStayingSignedIn, markActive, performLogout, router]);
 
   useEffect(() => {
+    if (!mounted) return;
+
     if (!isAuthenticated) {
       setWarningOpen(false);
       setIsLoggingOut(false);
@@ -161,10 +163,10 @@ export default function InactivityLogout({ isAuthenticated: serverAuthenticated 
     }
 
     markActive();
-  }, [isAuthenticated, markActive, session?.access_token]);
+  }, [isAuthenticated, markActive, mounted, session?.access_token]);
 
   useEffect(() => {
-    if (!isAuthenticated || loggingOutRef.current) return;
+    if (!mounted || !isAuthenticated || loggingOutRef.current) return;
 
     const now = Date.now();
     const warningAt = lastActivityAt + WARNING_START_MS;
@@ -195,10 +197,10 @@ export default function InactivityLogout({ isAuthenticated: serverAuthenticated 
       if (warningTimer) window.clearTimeout(warningTimer);
       if (logoutTimer) window.clearTimeout(logoutTimer);
     };
-  }, [isAuthenticated, lastActivityAt, logoutAt, performLogout]);
+  }, [isAuthenticated, lastActivityAt, logoutAt, mounted, performLogout]);
 
   useEffect(() => {
-    if (!warningOpen || !isAuthenticated || loggingOutRef.current) return;
+    if (!mounted || !warningOpen || !isAuthenticated || loggingOutRef.current) return;
 
     const updateCountdown = () => {
       const nextSeconds = Math.ceil((logoutAt - Date.now()) / 1000);
@@ -216,10 +218,10 @@ export default function InactivityLogout({ isAuthenticated: serverAuthenticated 
     const interval = window.setInterval(updateCountdown, 1000);
 
     return () => window.clearInterval(interval);
-  }, [isAuthenticated, logoutAt, performLogout, warningOpen]);
+  }, [isAuthenticated, logoutAt, mounted, performLogout, warningOpen]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!mounted || !isAuthenticated) return;
 
     const handleActivity = () => {
       if (warningOpenRef.current || loggingOutRef.current) return;
@@ -263,7 +265,7 @@ export default function InactivityLogout({ isAuthenticated: serverAuthenticated 
       });
       window.removeEventListener("storage", handleStorage);
     };
-  }, [isAuthenticated, markActive]);
+  }, [isAuthenticated, markActive, mounted]);
 
   if (!mounted || !isAuthenticated) return null;
 
