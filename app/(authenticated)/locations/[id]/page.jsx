@@ -12,6 +12,47 @@ import { getLocationStorageAreasPageAction } from '@/app/actions/server';
 
 // export const dynamic = 'force-dynamic'; // optional if you want fresh data on each request
 
+function firstRpcRow(data) {
+  return Array.isArray(data) ? data[0] : data;
+}
+
+async function getLocationStats(supabase, locationId, fallbackAreas = []) {
+  try {
+    const { data, error } = await supabase.rpc('wherekeep_location_page_summaries', {
+      p_location_ids: [String(locationId)],
+    });
+    const row = firstRpcRow(data);
+
+    if (!error && row) {
+      return {
+        totalAreas: Number(row.areas_count ?? 0),
+        totalCategories: Number(row.categories_count ?? 0),
+        totalItems: Number(row.items_count ?? 0),
+      };
+    }
+  } catch {
+    // Fall through to the page-data fallback while the RPC is not installed.
+  }
+
+  return {
+    totalAreas: fallbackAreas.length,
+    totalCategories: fallbackAreas.reduce(
+      (sum, area) => sum + (area.categories?.length ?? 0),
+      0
+    ),
+    totalItems: fallbackAreas.reduce(
+      (sum, area) =>
+        sum +
+        (area.categories ?? []).reduce(
+          (categorySum, category) =>
+            categorySum + (category.itemsCount ?? category.items?.length ?? 0),
+          0
+        ),
+      0
+    ),
+  };
+}
+
 export async function generateMetadata({ params }) {
   const { id } = await params;
   const supabase = await createClient();
@@ -65,21 +106,7 @@ export default async function Page({ params }) {
         variant: INVENTORY_IMAGE_VARIANT.DETAIL,
       })
     ).get(location.image_path) ?? null;
-  const totalAreas = storageAreasResult.data.totalCount ?? storageAreas.length;
-  const totalCategories = storageAreas.reduce(
-    (sum, area) => sum + (area.categories?.length ?? 0),
-    0
-  );
-  const totalItems = storageAreas.reduce(
-    (sum, area) =>
-      sum +
-      (area.categories ?? []).reduce(
-        (categorySum, category) =>
-          categorySum + (category.itemsCount ?? category.items?.length ?? 0),
-        0
-      ),
-    0
-  );
+  const locationStats = await getLocationStats(supabase, id, storageAreas);
 
   return (
     <main className="page-enter mx-auto max-w-[1560px] px-5 py-8 md:min-h-[100vh] lg:px-6 xl:px-8 max-md:px-4 max-md:pb-0 max-md:pt-4">
@@ -88,9 +115,9 @@ export default async function Page({ params }) {
         imageUrl={locationImageUrl}
         canEditInventory={canEditInventory}
         stats={{
-          totalAreas,
-          totalCategories,
-          totalItems,
+          totalAreas: locationStats.totalAreas,
+          totalCategories: locationStats.totalCategories,
+          totalItems: locationStats.totalItems,
         }}
       />
       <StorageAreasSection

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -33,9 +34,7 @@ import {
   FaUpload,
   FaWarehouse,
 } from "react-icons/fa";
-import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
-import EntityImageManager from "@/components/inventory/EntityImageManager";
 import {
   modalBodyClass,
   modalContentClass,
@@ -56,6 +55,15 @@ import { emitInventoryChange } from "@/utils/clientEvents";
 import PaginationControls from "@/components/ui/PaginationControls";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
 import SearchResultsLoadingState from "@/components/ui/SearchResultsLoadingState";
+
+const EntityImageManager = dynamic(
+  () => import("@/components/inventory/EntityImageManager"),
+  { ssr: false }
+);
+const ConfirmDeleteModal = dynamic(
+  () => import("@/components/modals/ConfirmDeleteModal"),
+  { ssr: false }
+);
 
 const pageSectionVariants = {
   hidden: { opacity: 0 },

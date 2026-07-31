@@ -52,9 +52,7 @@ import {
   FaBarcode,
   FaExclamationTriangle,
 } from 'react-icons/fa';
-import ConfirmDeleteModal from '@/components/modals/ConfirmDeleteModal';
 import { emitInventoryChange, emitItemAdded } from '@/utils/clientEvents';
-import EntityImageManager from '@/components/inventory/EntityImageManager';
 import ImageWithLoader from '@/components/ui/ImageWithLoader';
 import MobileSuggestionChips from '@/components/modals/MobileSuggestionChips';
 import MobileSheetCloseButton from '@/components/modals/MobileSheetCloseButton';
@@ -76,6 +74,14 @@ import { parseDate } from '@internationalized/date';
 const MoveItemsModal = dynamic(() => import('@/components/items/MoveItemsModal'), {
   ssr: false,
 });
+const EntityImageManager = dynamic(
+  () => import('@/components/inventory/EntityImageManager'),
+  { ssr: false }
+);
+const ConfirmDeleteModal = dynamic(
+  () => import('@/components/modals/ConfirmDeleteModal'),
+  { ssr: false }
+);
 
 const collapseVariants = {
   collapsed: { height: 0, opacity: 0, transition: { duration: 0.2 } },

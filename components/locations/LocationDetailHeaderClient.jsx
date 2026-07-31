@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -21,8 +22,6 @@ import {
   FaWarehouse,
 } from "react-icons/fa";
 import { deleteLocation, updateLocationName } from "@/app/actions/server";
-import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
-import EntityImageManager from "@/components/inventory/EntityImageManager";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
 import {
@@ -35,6 +34,15 @@ import {
   mobileSheetModalClassNames,
 } from "@/components/modals/modalTheme";
 import { emitInventoryChange } from "@/utils/clientEvents";
+
+const EntityImageManager = dynamic(
+  () => import("@/components/inventory/EntityImageManager"),
+  { ssr: false }
+);
+const ConfirmDeleteModal = dynamic(
+  () => import("@/components/modals/ConfirmDeleteModal"),
+  { ssr: false }
+);
 
 export default function LocationDetailHeaderClient({
   location,

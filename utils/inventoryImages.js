@@ -11,8 +11,9 @@ export const INVENTORY_IMAGE_ENTITY = {
 };
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
-const SIGNED_URL_CACHE_MS = 5 * 60 * 1000;
+const SIGNED_URL_CACHE_MS = 55 * 60 * 1000;
 const signedUrlCache = new Map();
+const signedUrlRequests = new Map();
 
 export const INVENTORY_IMAGE_VARIANT = {
   ORIGINAL: "original",
@@ -70,6 +71,28 @@ function setCachedSignedUrl(path, variant, url, now = Date.now()) {
   });
 }
 
+async function createTransformedSignedUrl(bucket, path, variant, transform, now) {
+  const key = cacheKeyForPath(path, variant);
+  const existingRequest = signedUrlRequests.get(key);
+  if (existingRequest) return existingRequest;
+
+  const request = bucket
+    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS, { transform })
+    .then(({ data, error }) => {
+      if (error) return { url: null, error };
+
+      const signedUrl = data?.signedUrl ?? null;
+      setCachedSignedUrl(path, variant, signedUrl, now);
+      return { url: signedUrl, error: null };
+    })
+    .finally(() => {
+      signedUrlRequests.delete(key);
+    });
+
+  signedUrlRequests.set(key, request);
+  return request;
+}
+
 export async function getInventoryImageUrls(paths = [], options = {}) {
   const variant = normalizeImageVariant(options?.variant);
   const uniquePaths = [...new Set((paths ?? []).filter(Boolean))];
@@ -100,10 +123,12 @@ export async function getInventoryImageUrls(paths = [], options = {}) {
 
       await Promise.all(
         missingPaths.map(async (path) => {
-          const { data, error } = await bucket.createSignedUrl(
+          const { url, error } = await createTransformedSignedUrl(
+            bucket,
             path,
-            SIGNED_URL_TTL_SECONDS,
-            { transform }
+            variant,
+            transform,
+            now
           );
 
           if (error) {
@@ -111,9 +136,7 @@ export async function getInventoryImageUrls(paths = [], options = {}) {
             return;
           }
 
-          const signedUrl = data?.signedUrl ?? null;
-          urlsByPath.set(path, signedUrl);
-          setCachedSignedUrl(path, variant, signedUrl, now);
+          urlsByPath.set(path, url);
         })
       );
 
