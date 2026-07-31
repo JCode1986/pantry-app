@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Button,
@@ -41,7 +42,6 @@ import {
 } from "@/app/actions/server";
 import AddShoppingListItemModal from "@/components/shopping-list/AddShoppingListItemModal";
 import EditShoppingListItemModal from "@/components/shopping-list/EditShoppingListItemModal";
-import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import { emitInventoryChange } from "@/utils/clientEvents";
 import {
   modalBodyClass,
@@ -55,6 +55,11 @@ import {
 } from "@/components/modals/modalTheme";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
+
+const ConfirmDeleteModal = dynamic(
+  () => import("@/components/modals/ConfirmDeleteModal"),
+  { ssr: false }
+);
 
 const FILTERS = [
   { value: "all", label: "All" },

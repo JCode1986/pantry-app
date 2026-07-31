@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import {
   Button,
   Dropdown,
@@ -41,9 +42,7 @@ import {
 } from 'react-icons/fa';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import ConfirmDeleteModal from '@/components/modals/ConfirmDeleteModal';
 import { emitInventoryChange } from '@/utils/clientEvents';
-import EntityImageManager from '@/components/inventory/EntityImageManager';
 import ImageWithLoader from '@/components/ui/ImageWithLoader';
 import MobileSuggestionChips from '@/components/modals/MobileSuggestionChips';
 import MobileSheetCloseButton from '@/components/modals/MobileSheetCloseButton';
@@ -51,6 +50,15 @@ import useDesktopAutoFocus from '@/components/modals/useDesktopAutoFocus';
 import PaginationControls from '@/components/ui/PaginationControls';
 import SearchResultsLoadingState from '@/components/ui/SearchResultsLoadingState';
 import { themedSelectClassNames } from '@/components/modals/modalTheme';
+
+const EntityImageManager = dynamic(
+  () => import('@/components/inventory/EntityImageManager'),
+  { ssr: false }
+);
+const ConfirmDeleteModal = dynamic(
+  () => import('@/components/modals/ConfirmDeleteModal'),
+  { ssr: false }
+);
 
 const modalContentStyle = {
   fontFamily: 'var(--stocksense-font-family)',

@@ -1,13 +1,12 @@
 import { createClient } from '@/utils/supabase/server';
-import { getSessionForLayout } from '@/app/actions/auth';
 import { redirect } from 'next/navigation';
 import MobileDashboardHome from '@/components/dashboard/MobileDashboardHome';
 import DesktopDashboardToolbar from '@/components/dashboard/DesktopDashboardToolbar';
 import AttentionItemsCard from '@/components/dashboard/AttentionItemsCard';
 import InventoryByLocation from '@/components/dashboard/InventoryByLocation';
+import { getAuthenticatedAppShellState } from '@/components/app-shell/authenticatedShellState';
 import { createPageMetadata, NO_INDEX_ROBOTS } from '@/utils/metadata';
 import {
-  getCanEditInventoryForUser,
   getHouseholdForUser,
 } from '@/utils/households';
 import {
@@ -62,40 +61,24 @@ function getPendingInviteToken(user) {
   return typeof token === 'string' && token.trim() ? token.trim() : null;
 }
 
-async function getExpirationNotifications(supabase, withinDays = 3) {
+async function getExpirationNotifications(
+  supabase,
+  withinDays = 3,
+  counts = {}
+) {
   const cutoff = toDateString(addDays(new Date(), withinDays));
   const today = toDateString(new Date());
 
-  const [
-    { data: itemsRaw = [], error: itemsError },
-    { count: expiredCount = 0, error: expiredCountError },
-    { count: expiringSoonCount = 0, error: expiringSoonCountError },
-  ] = await Promise.all([
-    supabase
-      .from('items')
-      .select('id, name, quantity, expiration_date, category_id')
-      .not('expiration_date', 'is', null)
-      .lte('expiration_date', cutoff)
-      .order('expiration_date', { ascending: true })
-      .limit(50),
-    supabase
-      .from('items')
-      .select('id', { count: 'exact', head: true })
-      .not('expiration_date', 'is', null)
-      .lt('expiration_date', today),
-    supabase
-      .from('items')
-      .select('id', { count: 'exact', head: true })
-      .gte('expiration_date', today)
-      .lte('expiration_date', cutoff),
-  ]);
+  const { data: itemsRaw = [], error: itemsError } = await supabase
+    .from('items')
+    .select('id, name, quantity, expiration_date, category_id')
+    .not('expiration_date', 'is', null)
+    .lte('expiration_date', cutoff)
+    .order('expiration_date', { ascending: true })
+    .limit(50);
 
-  if (itemsError || expiredCountError || expiringSoonCountError) {
-    console.error('expiration notifications error:', {
-      itemsError,
-      expiredCountError,
-      expiringSoonCountError,
-    });
+  if (itemsError) {
+    console.error('expiration notifications error:', { itemsError });
     return {
       items: [],
       expiredCount: 0,
@@ -107,8 +90,8 @@ async function getExpirationNotifications(supabase, withinDays = 3) {
   if (itemsRaw.length === 0) {
     return {
       items: [],
-      expiredCount: 0,
-      expiringSoonCount: 0,
+      expiredCount: counts.expiredCount ?? 0,
+      expiringSoonCount: counts.expiringSoonCount ?? 0,
       withinDays,
     };
   }
@@ -169,8 +152,8 @@ async function getExpirationNotifications(supabase, withinDays = 3) {
         locationName: location?.name ?? null,
       };
     }),
-    expiredCount: expiredCount ?? 0,
-    expiringSoonCount: expiringSoonCount ?? 0,
+    expiredCount: counts.expiredCount ?? 0,
+    expiringSoonCount: counts.expiringSoonCount ?? 0,
     withinDays,
   };
 }
@@ -242,9 +225,11 @@ async function hydrateDashboardItems(supabase, itemsRaw = []) {
   });
 }
 
-async function getDashboardAttentionItems(supabase, withinDays = 3) {
+async function getDashboardAttentionItems(supabase, withinDays = 3, counts = {}) {
   const today = toDateString(new Date());
   const cutoff = toDateString(addDays(new Date(), withinDays));
+  const hasLowStockCount =
+    counts.summaryCountsLoaded && Number.isFinite(Number(counts.lowStockCount));
 
   const [
     { data: expiredRaw = [], error: expiredError },
@@ -274,10 +259,12 @@ async function getDashboardAttentionItems(supabase, withinDays = 3) {
       .order('quantity', { ascending: true })
       .order('name', { ascending: true })
       .limit(3),
-    supabase
-      .from('items')
-      .select('id', { count: 'exact', head: true })
-      .lte('quantity', 1),
+    hasLowStockCount
+      ? Promise.resolve({ count: Number(counts.lowStockCount), error: null })
+      : supabase
+          .from('items')
+          .select('id', { count: 'exact', head: true })
+          .lte('quantity', 1),
   ]);
 
   const errors = [
@@ -297,21 +284,90 @@ async function getDashboardAttentionItems(supabase, withinDays = 3) {
     };
   }
 
-  const [expiredItems, expiringSoonItems, lowStockItems] = await Promise.all([
-    hydrateDashboardItems(supabase, expiredRaw),
-    hydrateDashboardItems(supabase, expiringSoonRaw),
-    hydrateDashboardItems(supabase, lowStockRaw),
+  const hydratedItems = await hydrateDashboardItems(supabase, [
+    ...expiredRaw,
+    ...expiringSoonRaw,
+    ...lowStockRaw,
   ]);
+  const hydratedById = new Map(
+    hydratedItems.map((item) => [String(item.id), item])
+  );
+  const pickHydratedItems = (rows = []) =>
+    rows
+      .map((item) => hydratedById.get(String(item.id)))
+      .filter(Boolean);
 
   return {
-    expiredItems,
-    expiringSoonItems,
-    lowStockItems,
+    expiredItems: pickHydratedItems(expiredRaw),
+    expiringSoonItems: pickHydratedItems(expiringSoonRaw),
+    lowStockItems: pickHydratedItems(lowStockRaw),
     lowStockCount: lowStockCount ?? 0,
   };
 }
 
 async function getInventoryByLocation(supabase) {
+  try {
+    const { data, error } = await supabase.rpc("wherekeep_inventory_by_location");
+    if (!error && Array.isArray(data)) {
+      return data.map((location) => ({
+        id: location.id,
+        name: location.name,
+        itemCount: Number(location.item_count ?? 0),
+      }));
+    }
+    if (error) {
+      console.error('inventory by location RPC unavailable:', error);
+    }
+  } catch (err) {
+    console.error('inventory by location RPC failed:', err);
+  }
+
+  const [
+    { data: joinedLocationsRaw = [], error: joinedLocationsError },
+    { data: joinedItemsRaw = [], error: joinedItemsError },
+  ] = await Promise.all([
+    supabase.from('locations').select('id, name').order('name', { ascending: true }),
+    supabase
+      .from('items')
+      .select(
+        `
+        id,
+        category:storage_categories!fk_items_category (
+          storage_area:storage_areas!fk_storage_area (
+            location_id
+          )
+        )
+      `
+      ),
+  ]);
+
+  if (!joinedLocationsError && !joinedItemsError) {
+    const itemCountByLocation = new Map();
+
+    for (const item of joinedItemsRaw ?? []) {
+      const locationId = item.category?.storage_area?.location_id;
+      if (!locationId) continue;
+      const key = String(locationId);
+      itemCountByLocation.set(key, (itemCountByLocation.get(key) ?? 0) + 1);
+    }
+
+    return (joinedLocationsRaw ?? [])
+      .map((location) => ({
+        id: location.id,
+        name: location.name,
+        itemCount: itemCountByLocation.get(String(location.id)) ?? 0,
+      }))
+      .sort(
+        (a, b) =>
+          b.itemCount - a.itemCount ||
+          String(a.name || '').localeCompare(String(b.name || ''))
+      );
+  }
+
+  if (joinedItemsError) {
+    console.error('inventory by location joined item error:', joinedItemsError);
+  }
+
   const [
     { data: locationsRaw = [], error: locationsError },
     { data: areasRaw = [], error: areasError },
@@ -362,22 +418,9 @@ async function getInventoryByLocation(supabase) {
 }
 
 export default async function HomePage() {
-  const session = await getSessionForLayout();
+  const shellState = await getAuthenticatedAppShellState();
   const supabase = await createClient();
-  let currentUser = session?.user?.user ?? null;
-
-  try {
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (!userError && user?.id) {
-      currentUser = user;
-    }
-  } catch (err) {
-    console.error("Dashboard Supabase user error:", err);
-  }
+  const currentUser = shellState.currentUser;
 
   if (!currentUser?.id) {
     redirect("/login?redirectTo=/dashboard");
@@ -406,35 +449,13 @@ export default async function HomePage() {
     import('@/app/actions/activity'),
   ]);
 
-  const getCount = async (table) => {
-    const { count } = await supabase.from(table).select('id', { count: 'exact', head: true });
-    return count ?? 0;
-  };
-
-  const getShoppingListNeededCount = async () => {
-    const { count } = await supabase
-      .from('shopping_list_items')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'needed');
-
-    return count ?? 0;
-  };
-
-  const [
-    locations,
-    areas,
-    categories,
-    items,
-    shoppingListItems,
-    shoppingListNeededItems,
-  ] = await Promise.all([
-    getCount('locations'),
-    getCount('storage_areas'),
-    getCount('storage_categories'),
-    getCount('items'),
-    getCount('shopping_list_items'),
-    getShoppingListNeededCount(),
-  ]);
+  const shoppingListItems = shellState.attentionCounts.summaryCountsLoaded
+    ? shellState.attentionCounts.shoppingListItemsCount
+    : (
+        await supabase
+          .from('shopping_list_items')
+          .select('id', { count: 'exact', head: true })
+      ).count ?? 0;
 
   const [activityResult, activityFiltersResult] = await Promise.all([
     getRecentActivityAction({ limit: 5 }),
@@ -445,21 +466,19 @@ export default async function HomePage() {
     expirationNotifications,
     dashboardAttentionItems,
     inventoryByLocation,
-    canEditInventory,
   ] = await Promise.all([
-    getExpirationNotifications(supabase, 3),
-    getDashboardAttentionItems(supabase, 3),
+    getExpirationNotifications(supabase, 3, shellState.attentionCounts),
+    getDashboardAttentionItems(supabase, 3, shellState.attentionCounts),
     getInventoryByLocation(supabase),
-    getCanEditInventoryForUser(currentUser),
   ]);
 
   const totals = {
-    locations,
-    areas,
-    categories,
-    items,
+    locations: shellState.attentionCounts.locationsCount,
+    areas: shellState.attentionCounts.storageAreasCount,
+    categories: shellState.attentionCounts.categoriesCount,
+    items: shellState.attentionCounts.itemsCount,
     shoppingListItems,
-    shoppingListNeededItems,
+    shoppingListNeededItems: shellState.attentionCounts.shoppingListNeededItems,
     expiringSoonItems: expirationNotifications.expiringSoonCount,
     lowStockItems: dashboardAttentionItems.lowStockCount,
   };
@@ -473,7 +492,7 @@ export default async function HomePage() {
           totals={totals}
           expirationNotifications={expirationNotifications}
           recentActivityItems={activityResult.data.items}
-          canEditInventory={canEditInventory}
+          canEditInventory={shellState.canEditInventory}
         />
       </div>
 

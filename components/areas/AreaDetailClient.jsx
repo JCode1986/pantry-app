@@ -51,8 +51,6 @@ import {
   updateStorageArea,
   uploadInventoryImage,
 } from "@/app/actions/server";
-import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
-import EntityImageManager from "@/components/inventory/EntityImageManager";
 import MobileSuggestionChips from "@/components/modals/MobileSuggestionChips";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import useDesktopAutoFocus from "@/components/modals/useDesktopAutoFocus";
@@ -79,6 +77,14 @@ const MoveItemsModal = dynamic(() => import("@/components/items/MoveItemsModal")
 const AreaItemEditModal = dynamic(() => import("@/components/areas/AreaItemEditModal"), {
   ssr: false,
 });
+const EntityImageManager = dynamic(
+  () => import("@/components/inventory/EntityImageManager"),
+  { ssr: false }
+);
+const ConfirmDeleteModal = dynamic(
+  () => import("@/components/modals/ConfirmDeleteModal"),
+  { ssr: false }
+);
 
 const CATEGORY_SUGGESTIONS = ["Food", "Documents", "Tools", "Medicine", "Clothes", "Electronics"];
 const AREA_DETAIL_PAGE_SIZE = 24;

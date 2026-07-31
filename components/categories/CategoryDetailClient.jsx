@@ -46,8 +46,6 @@ import {
   updateItemsLocation,
   updateItem,
 } from "@/app/actions/server";
-import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
-import EntityImageManager from "@/components/inventory/EntityImageManager";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
 import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
@@ -71,6 +69,14 @@ import SearchResultsLoadingState from "@/components/ui/SearchResultsLoadingState
 const MoveItemsModal = dynamic(() => import("@/components/items/MoveItemsModal"), {
   ssr: false,
 });
+const EntityImageManager = dynamic(
+  () => import("@/components/inventory/EntityImageManager"),
+  { ssr: false }
+);
+const ConfirmDeleteModal = dynamic(
+  () => import("@/components/modals/ConfirmDeleteModal"),
+  { ssr: false }
+);
 
 function formatExpiration(value) {
   if (!value) return "None";

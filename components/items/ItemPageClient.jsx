@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Input,
@@ -49,7 +50,6 @@ import {
   updateItemsLocation,
 } from "@/app/actions/server";
 import { deleteItemAndAddToShoppingListAction } from "@/app/actions/shoppingList";
-import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
 import {
   modalBodyClass,
   modalContentClass,
@@ -61,7 +61,6 @@ import {
   themedSelectClassNames,
 } from "@/components/modals/modalTheme";
 import { emitInventoryChange } from "@/utils/clientEvents";
-import EntityImageManager from "@/components/inventory/EntityImageManager";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
@@ -73,6 +72,15 @@ import {
   toPositiveInteger,
 } from "@/utils/pantry/date";
 import { normalizeMoveLocations } from "@/utils/pantry/moveLocations";
+
+const EntityImageManager = dynamic(
+  () => import("@/components/inventory/EntityImageManager"),
+  { ssr: false }
+);
+const ConfirmDeleteModal = dynamic(
+  () => import("@/components/modals/ConfirmDeleteModal"),
+  { ssr: false }
+);
 
 const pageSectionVariants = {
   hidden: { opacity: 0 },

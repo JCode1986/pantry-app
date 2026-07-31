@@ -129,6 +129,31 @@ function logNavigationWarning(message, details) {
 
 async function fetchAttentionCounts() {
   const supabase = createBrowserSupabaseClient();
+  try {
+    const { data, error } = await supabase.rpc(
+      "wherekeep_inventory_summary_counts",
+      { p_within_days: 3 }
+    );
+    const row = Array.isArray(data) ? data[0] : data;
+
+    if (!error && row) {
+      return {
+        expiredCount: Number(row.expired_count ?? 0),
+        expiringSoonCount: Number(row.expiring_soon_count ?? 0),
+        shoppingListNeededItems: Number(row.shopping_list_needed_items ?? 0),
+        shoppingListItemsCount: Number(row.shopping_list_items_count ?? 0),
+        locationsCount: Number(row.locations_count ?? 0),
+        storageAreasCount: Number(row.storage_areas_count ?? 0),
+        categoriesCount: Number(row.categories_count ?? 0),
+        itemsCount: Number(row.items_count ?? 0),
+        lowStockCount: Number(row.low_stock_count ?? 0),
+        summaryCountsLoaded: true,
+      };
+    }
+  } catch {
+    // Fall through to the existing count queries while the RPC is not installed.
+  }
+
   const today = toDateString(new Date());
   const cutoff = toDateString(addDays(new Date(), 3));
 
@@ -2054,8 +2079,7 @@ export default function Navigation({
 
   useEffect(() => {
     let cancelled = false;
-    let idleCallbackId = null;
-    let fallbackTimeoutId = null;
+    let refreshTimerId = null;
 
     const refreshAttentionCounts = async () => {
       const nextCounts = await fetchAttentionCounts();
@@ -2064,28 +2088,25 @@ export default function Navigation({
       }
     };
 
-    if (typeof window.requestIdleCallback === "function") {
-      idleCallbackId = window.requestIdleCallback(refreshAttentionCounts, {
-        timeout: 2500,
-      });
-    } else {
-      fallbackTimeoutId = window.setTimeout(refreshAttentionCounts, 1200);
-    }
+    const scheduleAttentionCountsRefresh = () => {
+      if (refreshTimerId !== null) window.clearTimeout(refreshTimerId);
+      refreshTimerId = window.setTimeout(() => {
+        refreshTimerId = null;
+        void refreshAttentionCounts();
+      }, 450);
+    };
 
-    window.addEventListener(INVENTORY_CHANGE_EVENT, refreshAttentionCounts);
+    window.addEventListener(INVENTORY_CHANGE_EVENT, scheduleAttentionCountsRefresh);
 
     return () => {
       cancelled = true;
-      if (
-        idleCallbackId !== null &&
-        typeof window.cancelIdleCallback === "function"
-      ) {
-        window.cancelIdleCallback(idleCallbackId);
+      if (refreshTimerId !== null) {
+        window.clearTimeout(refreshTimerId);
       }
-      if (fallbackTimeoutId !== null) {
-        window.clearTimeout(fallbackTimeoutId);
-      }
-      window.removeEventListener(INVENTORY_CHANGE_EVENT, refreshAttentionCounts);
+      window.removeEventListener(
+        INVENTORY_CHANGE_EVENT,
+        scheduleAttentionCountsRefresh
+      );
     };
   }, [pathname]);
 

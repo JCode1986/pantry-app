@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -62,7 +63,11 @@ import {
   updateUserPreferencesAction,
 } from "@/app/actions/preferences";
 import { themedSelectClassNames } from "@/components/modals/modalTheme";
-import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
+
+const ConfirmDeleteModal = dynamic(
+  () => import("@/components/modals/ConfirmDeleteModal"),
+  { ssr: false }
+);
 
 const sectionVariants = {
   hidden: { opacity: 0 },

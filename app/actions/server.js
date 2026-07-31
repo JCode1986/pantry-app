@@ -1515,6 +1515,74 @@ function uniqueIds(rows = [], key = 'id') {
   return [...new Set((rows ?? []).map((row) => row?.[key]).filter(Boolean).map(String))];
 }
 
+function uniqueRowsById(rows = []) {
+  const rowsById = new Map();
+
+  for (const row of rows ?? []) {
+    if (!row?.id) continue;
+    rowsById.set(String(row.id), row);
+  }
+
+  return Array.from(rowsById.values());
+}
+
+function normalizeJsonArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== 'string') return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function getLocationPageSummaries(supabase, locationIds = []) {
+  if (!locationIds.length) return null;
+
+  try {
+    const { data, error } = await supabase.rpc('wherekeep_location_page_summaries', {
+      p_location_ids: locationIds.map(String),
+    });
+
+    if (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('wherekeep_location_page_summaries unavailable:', error.message);
+      }
+      return null;
+    }
+
+    return new Map(
+      (data ?? []).map((row) => [
+        String(row.location_id),
+        {
+          areasCount: Number(row.areas_count ?? 0),
+          categoriesCount: Number(row.categories_count ?? 0),
+          itemsCount: Number(row.items_count ?? 0),
+          storageAreas: normalizeJsonArray(row.storage_areas).map((area) => ({
+            id: area.id,
+            name: area.name,
+            itemsCount: Number(area.itemsCount ?? area.items_count ?? 0),
+          })),
+          recentItems: normalizeJsonArray(row.recent_items).map((item) => ({
+            id: item.id,
+            name: item.name,
+            image_path: item.image_path ?? null,
+            created_at: item.created_at ?? null,
+            storagePath: item.storagePath ?? item.storage_path ?? '',
+          })),
+        },
+      ])
+    );
+  } catch (err) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('wherekeep_location_page_summaries failed:', err);
+    }
+    return null;
+  }
+}
+
 async function getCategoryIdsForAreaIds(supabase, areaIds = []) {
   if (!areaIds.length) return { ids: [], error: null };
 
@@ -1781,6 +1849,52 @@ export async function getLocationsPageAction({
   }
 
   const locationIds = uniqueIds(locationsRaw);
+  const locationSummaries = await getLocationPageSummaries(supabase, locationIds);
+
+  if (locationSummaries) {
+    const imagePaths = [
+      ...(locationsRaw ?? []).map((location) => location.image_path),
+      ...Array.from(locationSummaries.values()).flatMap((summary) =>
+        summary.recentItems.map((item) => item.image_path)
+      ),
+    ];
+    const [imageUrlsByPath, imageThumbUrlsByPath] = await getOriginalAndCardImageUrls(imagePaths);
+
+    return {
+      data: {
+        items: (locationsRaw ?? []).map((location) => {
+          const summary = locationSummaries.get(String(location.id)) ?? {
+            areasCount: 0,
+            categoriesCount: 0,
+            itemsCount: 0,
+            storageAreas: [],
+            recentItems: [],
+          };
+
+          return {
+            id: location.id,
+            name: location.name,
+            image_path: location.image_path ?? null,
+            imageUrl: imageUrlsByPath.get(location.image_path) ?? null,
+            imageThumbUrl: imageThumbUrlsByPath.get(location.image_path) ?? null,
+            created_at: location.created_at,
+            areasCount: summary.areasCount,
+            categoriesCount: summary.categoriesCount,
+            itemsCount: summary.itemsCount,
+            storageAreas: summary.storageAreas,
+            recentItems: summary.recentItems.map((item) => ({
+              ...item,
+              imageUrl: imageUrlsByPath.get(item.image_path) ?? null,
+              imageThumbUrl: imageThumbUrlsByPath.get(item.image_path) ?? null,
+            })),
+          };
+        }),
+        ...pageMetadata(safeOffset, safeLimit, count, locationsRaw?.length ?? 0),
+      },
+      error: null,
+    };
+  }
+
   const { data: areasRaw, error: areasError } = await fetchStorageAreasForLocations(
     supabase,
     locationIds
@@ -1790,15 +1904,6 @@ export async function getLocationsPageAction({
     return { data: emptyPageData(), error: areasError.message };
   }
 
-  const imagePaths = [
-    ...(locationsRaw ?? []).map((location) => location.image_path),
-    ...(areasRaw ?? []).flatMap((area) =>
-      (area.storage_categories ?? []).flatMap((category) =>
-        (category.items ?? []).map((item) => item.image_path)
-      )
-    ),
-  ];
-  const [imageUrlsByPath, imageThumbUrlsByPath] = await getOriginalAndCardImageUrls(imagePaths);
   const areasByLocation = new Map();
 
   for (const area of areasRaw ?? []) {
@@ -1806,6 +1911,38 @@ export async function getLocationsPageAction({
     if (!areasByLocation.has(key)) areasByLocation.set(key, []);
     areasByLocation.get(key).push(area);
   }
+
+  const recentItemsByLocation = new Map();
+  for (const location of locationsRaw ?? []) {
+    const areas = areasByLocation.get(String(location.id)) ?? [];
+    recentItemsByLocation.set(
+      String(location.id),
+      areas
+        .flatMap((area) =>
+          (area.storage_categories ?? []).flatMap((category) =>
+            (category.items ?? []).map((item) => ({
+              id: item.id,
+              name: item.name,
+              image_path: item.image_path ?? null,
+              created_at: item.created_at,
+              storagePath: [location.name, area.name, category.name]
+                .filter(Boolean)
+                .join(' > '),
+            }))
+          )
+        )
+        .sort((a, b) => new Date(b.created_at ?? 0) - new Date(a.created_at ?? 0))
+        .slice(0, 3)
+    );
+  }
+
+  const imagePaths = [
+    ...(locationsRaw ?? []).map((location) => location.image_path),
+    ...Array.from(recentItemsByLocation.values()).flatMap((items) =>
+      items.map((item) => item.image_path)
+    ),
+  ];
+  const [imageUrlsByPath, imageThumbUrlsByPath] = await getOriginalAndCardImageUrls(imagePaths);
 
   const items = (locationsRaw ?? []).map((location) => {
     const areas = areasByLocation.get(String(location.id)) ?? [];
@@ -1830,24 +1967,13 @@ export async function getLocationsPageAction({
         0
       ),
     }));
-    const recentItems = areas
-      .flatMap((area) =>
-        (area.storage_categories ?? []).flatMap((category) =>
-          (category.items ?? []).map((item) => ({
-            id: item.id,
-            name: item.name,
-            image_path: item.image_path ?? null,
-            imageUrl: imageUrlsByPath.get(item.image_path) ?? null,
-            imageThumbUrl: imageThumbUrlsByPath.get(item.image_path) ?? null,
-            created_at: item.created_at,
-            storagePath: [location.name, area.name, category.name]
-              .filter(Boolean)
-              .join(' > '),
-          }))
-        )
-      )
-      .sort((a, b) => new Date(b.created_at ?? 0) - new Date(a.created_at ?? 0))
-      .slice(0, 3);
+    const recentItems = (recentItemsByLocation.get(String(location.id)) ?? []).map(
+      (item) => ({
+        ...item,
+        imageUrl: imageUrlsByPath.get(item.image_path) ?? null,
+        imageThumbUrl: imageThumbUrlsByPath.get(item.image_path) ?? null,
+      })
+    );
 
     return {
       id: location.id,
@@ -2466,9 +2592,35 @@ export async function getItemsPageAction({
 
   let query = supabase
     .from('items')
-    .select('id, name, quantity, expiration_date, category_id, image_path, barcode', {
-      count: 'exact',
-    });
+    .select(
+      `
+      id,
+      name,
+      quantity,
+      expiration_date,
+      category_id,
+      image_path,
+      barcode,
+      category:storage_categories!fk_items_category (
+        id,
+        name,
+        storage_area_id,
+        image_path,
+        storage_area:storage_areas!fk_storage_area (
+          id,
+          name,
+          location_id,
+          image_path,
+          location:locations (
+            id,
+            name,
+            image_path
+          )
+        )
+      )
+    `,
+      { count: 'exact' }
+    );
 
   if (categoryFilter.shouldRestrict) {
     query = query.in('category_id', categoryFilter.ids);
@@ -2523,57 +2675,33 @@ export async function getItemsPageAction({
   }
 
   const items = itemsRaw ?? [];
-  const categoryIds = [
-    ...new Set(items.map((item) => item.category_id).filter(Boolean)),
-  ];
-
-  const { data: categoriesRaw, error: categoriesError } = categoryIds.length
-    ? await supabase
-        .from('storage_categories')
-        .select('id, name, storage_area_id, image_path')
-        .in('id', categoryIds)
-    : { data: [], error: null };
-
-  if (categoriesError) {
-    console.error('getItemsPageAction categories error:', categoriesError);
-    return {
-      data: { items: [], totalCount: count ?? 0, nextOffset: null, hasMore: false },
-      error: categoriesError.message,
-    };
-  }
-
-  const areaIds = [
-    ...new Set((categoriesRaw ?? []).map((category) => category.storage_area_id).filter(Boolean)),
-  ];
-  const { data: areasRaw, error: areasError } = areaIds.length
-    ? await supabase
-        .from('storage_areas')
-        .select('id, name, location_id, image_path')
-        .in('id', areaIds)
-    : { data: [], error: null };
-
-  if (areasError) {
-    console.error('getItemsPageAction areas error:', areasError);
-    return {
-      data: { items: [], totalCount: count ?? 0, nextOffset: null, hasMore: false },
-      error: areasError.message,
-    };
-  }
-
-  const locationIds = [
-    ...new Set((areasRaw ?? []).map((area) => area.location_id).filter(Boolean)),
-  ];
-  const { data: locationsRaw, error: locationsError } = locationIds.length
-    ? await supabase.from('locations').select('id, name, image_path').in('id', locationIds)
-    : { data: [], error: null };
-
-  if (locationsError) {
-    console.error('getItemsPageAction locations error:', locationsError);
-    return {
-      data: { items: [], totalCount: count ?? 0, nextOffset: null, hasMore: false },
-      error: locationsError.message,
-    };
-  }
+  const categoriesRaw = uniqueRowsById(
+    items
+      .map((item) => item.category)
+      .filter(Boolean)
+      .map((category) => ({
+        id: category.id,
+        name: category.name,
+        storage_area_id: category.storage_area_id,
+        image_path: category.image_path,
+      }))
+  );
+  const areasRaw = uniqueRowsById(
+    items
+      .map((item) => item.category?.storage_area)
+      .filter(Boolean)
+      .map((area) => ({
+        id: area.id,
+        name: area.name,
+        location_id: area.location_id,
+        image_path: area.image_path,
+      }))
+  );
+  const locationsRaw = uniqueRowsById(
+    items
+      .map((item) => item.category?.storage_area?.location)
+      .filter(Boolean)
+  );
 
   const totalCount = count ?? items.length;
   const nextOffset = safeOffset + items.length;
