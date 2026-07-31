@@ -451,20 +451,22 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
                       <p className="mt-1 text-sm leading-5 text-gray-600">
                         We couldn&apos;t find any items matching &quot;{trimmedQuery}&quot;
                       </p>
-                      <Button
-                        className="mt-4 min-h-11 rounded-2xl bg-[var(--stocksense-brand)] text-white"
-                        onPress={openAddFromSearch}
-                        startContent={<FaPlus />}
-                      >
-                        Add &quot;{trimmedQuery}&quot;
-                      </Button>
-                      <Button
-                        className="mt-2 min-h-11 rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
-                        variant="bordered"
-                        onPress={() => setQuery("")}
-                      >
-                        Clear search
-                      </Button>
+                      <div className="flex items-center gap-2 mt-4 ">
+                        <Button
+                          className="min-h-11 rounded-2xl bg-[var(--stocksense-brand)] text-white"
+                          onPress={openAddFromSearch}
+                          startContent={<FaPlus />}
+                        >
+                          Add &quot;{trimmedQuery}&quot;
+                        </Button>
+                        <Button
+                          className="min-h-11 rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
+                          variant="bordered"
+                          onPress={() => setQuery("")}
+                        >
+                          Clear search
+                        </Button>
+                      </div>
                     </div>
                   </motion.div>
                 )}
