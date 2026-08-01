@@ -2114,6 +2114,10 @@ export default function ItemsPageClient({
               <strong>{totals.expSoon}</strong>{" "}
               expiring soon
             </span>
+            <span className="px-2.5 py-1 rounded-full text-xs border border-rose-200 bg-rose-50 text-rose-700">
+              <strong>{totals.expired}</strong>{" "}
+              expired
+            </span>
 
             {isLoadingMoreItems && (
               <span className="px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-600 border border-gray-200">
@@ -2375,8 +2379,9 @@ export default function ItemsPageClient({
         <div className="grid grid-cols-1 gap-4 md:gap-5 max-md:hidden lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         <AnimatePresence initial={false}>
         {paginatedItems.map((it) => {
-          const soon = isExpiringSoon(it.expiration_date, expDays);
           const du = daysUntil(it.expiration_date);
+          const expired = du < 0;
+          const soon = isExpiringSoon(it.expiration_date, expDays);
           const selected = selectedIds.has(String(it.id));
 
           return (
@@ -2410,10 +2415,18 @@ export default function ItemsPageClient({
                 selected
                   ? "border-[var(--stocksense-brand-border)] ring-2 ring-[var(--stocksense-brand-border)]"
                   : "border-white/70 hover:border-[var(--stocksense-brand-border)]"
-              } cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]`}
-              whileHover={{ y: -1 }}
-            >
-              <div className={`absolute inset-x-0 top-0 h-1 ${soon ? "bg-[var(--entity-warning-accent)]" : "bg-[var(--entity-item-accent)]"}`} />
+                } cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]`}
+               whileHover={{ y: -1 }}
+             >
+               <div
+                 className={`absolute inset-x-0 top-0 h-1 ${
+                   expired
+                     ? "bg-rose-500"
+                     : soon
+                       ? "bg-[var(--entity-warning-accent)]"
+                       : "bg-[var(--entity-item-accent)]"
+                 }`}
+               />
               <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
                 {/* Left: item image and info */}
                 <div className="flex min-w-0 flex-1 items-start gap-2.5">
@@ -2454,9 +2467,15 @@ export default function ItemsPageClient({
                         {it.name}
                       </div>
 
-                      {soon && (
-                        <span className="shrink-0 rounded-full border border-[var(--entity-warning-border)] bg-[var(--entity-warning-soft)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--entity-warning-accent)]">
-                          {du < 0 ? "Expired" : "Soon"}
+                      {(expired || soon) && (
+                        <span
+                          className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+                            expired
+                              ? "border-rose-200 bg-rose-50 text-rose-700"
+                              : "border-[var(--entity-warning-border)] bg-[var(--entity-warning-soft)] text-[var(--entity-warning-accent)]"
+                          }`}
+                        >
+                          {expired ? "Expired" : "Expiring soon"}
                         </span>
                       )}
                     </div>
