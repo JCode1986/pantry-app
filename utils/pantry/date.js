@@ -3,8 +3,17 @@ const MS_PER_DAY = 1000 * 60 * 60 * 24;
 export function parsePantryDate(value) {
   if (!value) return null;
 
-  const date =
-    typeof value === "string" ? new Date(`${value}T00:00:00`) : new Date(value);
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    const datePart = trimmed.match(/^(\d{4}-\d{2}-\d{2})/)?.[1];
+    const date = datePart
+      ? new Date(`${datePart}T00:00:00`)
+      : new Date(trimmed);
+
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const date = new Date(value);
 
   return Number.isNaN(date.getTime()) ? null : date;
 }
@@ -21,7 +30,8 @@ export function daysUntil(value, today = new Date()) {
 
 export function isExpiringSoon(value, withinDays) {
   const normalizedDays = toPositiveInteger(withinDays, 7);
-  return daysUntil(value) <= normalizedDays;
+  const days = daysUntil(value);
+  return days >= 0 && days <= normalizedDays;
 }
 
 export function toNonNegativeInteger(value, fallback = 0) {

@@ -35,9 +35,11 @@ import {
   modalInputClassNames,
 } from "@/components/modals/modalTheme";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
+import { daysUntil, isExpiringSoon } from "@/utils/pantry/date";
 
 const RECENT_SEARCHES_KEY = "wherekeep:recent-item-searches";
 const MAX_RECENT_SEARCHES = 6;
+const EXPIRING_SOON_DAYS = 7;
 
 function isShoppingListResult(item) {
   return (
@@ -79,6 +81,28 @@ function formatExpirationDate(value) {
     day: "numeric",
     year: "numeric",
   }).format(date);
+}
+
+function getExpirationStatus(value) {
+  if (!value) return null;
+
+  const days = daysUntil(value);
+  if (days < 0) {
+    return {
+      label: "Expired",
+      className: "border-rose-200 bg-rose-50 text-rose-700",
+    };
+  }
+
+  if (isExpiringSoon(value, EXPIRING_SOON_DAYS)) {
+    return {
+      label: "Expiring soon",
+      className:
+        "border-[var(--entity-warning-border)] bg-[var(--entity-warning-soft)] text-[var(--entity-warning-accent)]",
+    };
+  }
+
+  return null;
 }
 
 function normalizeRecentSearch(value) {
@@ -343,6 +367,7 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
                   {results.map((item) => {
                     const imageUrl = item.imageThumbUrl || item.imageUrl;
                     const expirationLabel = formatExpirationDate(item.expirationDate);
+                    const expirationStatus = getExpirationStatus(item.expirationDate);
                     const isShoppingListItem = isShoppingListResult(item);
 
                     return (
@@ -389,6 +414,13 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
                                 {isShoppingListItem && (
                                   <span className="shrink-0 rounded-full border border-[var(--entity-shopping-border)] bg-[var(--entity-shopping-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--entity-shopping-accent)]">
                                     Shopping
+                                  </span>
+                                )}
+                                {expirationStatus && !isShoppingListItem && (
+                                  <span
+                                    className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${expirationStatus.className}`}
+                                  >
+                                    {expirationStatus.label}
                                   </span>
                                 )}
                               </div>
