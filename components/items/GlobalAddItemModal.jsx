@@ -14,8 +14,6 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-  Select,
-  SelectItem,
 } from "@heroui/react";
 import { parseDate } from "@internationalized/date";
 import {
@@ -50,10 +48,10 @@ import {
   modalContentStyle,
   modalHeaderClass,
   modalInputClassNames,
-  themedSelectClassNames,
 } from "@/components/modals/modalTheme";
 import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
+import NativeSelect from "@/components/ui/NativeSelect";
 
 const BarcodeScannerModal = dynamic(
   () => import("@/components/items/BarcodeScannerModal"),
@@ -106,7 +104,7 @@ const invalidInputWrapperClass =
   "data-[invalid=true]:border-rose-500 data-[invalid=true]:bg-rose-50/40 focus-within:data-[invalid=true]:border-rose-500";
 
 const invalidSelectTriggerClass =
-  "data-[invalid=true]:border-rose-500 data-[invalid=true]:bg-rose-50/40 data-[invalid=true]:text-rose-700";
+  "border-rose-500 bg-rose-50/40 text-rose-700";
 
 function getModalInputClassNames(isInvalid = false) {
   return {
@@ -117,13 +115,8 @@ function getModalInputClassNames(isInvalid = false) {
   };
 }
 
-function getThemedSelectClassNames(isInvalid = false) {
-  return {
-    ...themedSelectClassNames,
-    trigger: `${themedSelectClassNames.trigger} ${
-      isInvalid ? invalidSelectTriggerClass : ""
-    }`,
-  };
+function getNativeSelectTriggerClassName(isInvalid = false) {
+  return isInvalid ? invalidSelectTriggerClass : "";
 }
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -1290,28 +1283,25 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                       <motion.div layout className="grid grid-cols-1 gap-3 md:grid-cols-3">
                       <motion.div layout className="space-y-2">
                         {hasExistingLocations && (
-                          <Select
+                          <NativeSelect
                             label="Location"
-                            selectedKeys={new Set([String(locationId)])}
-                            onSelectionChange={(keys) => {
-                              const value = Array.from(keys)[0];
+                            aria-label="Item location"
+                            value={String(locationId)}
+                            onChange={(value) => {
                               if (value) selectLocation(value);
                             }}
-                            isDisabled={isSaving}
-                            isInvalid={Boolean(validationErrors.locationName)}
-                            variant="bordered"
-                            radius="lg"
-                            classNames={getThemedSelectClassNames(
+                            disabled={isSaving}
+                            triggerClassName={getNativeSelectTriggerClassName(
                               Boolean(validationErrors.locationName)
                             )}
-                          >
-                            {locations.map((location) => (
-                              <SelectItem key={String(location.id)}>
-                                {location.name}
-                              </SelectItem>
-                            ))}
-                            <SelectItem key={NEW_VALUE}>+ New location</SelectItem>
-                          </Select>
+                            options={[
+                              ...locations.map((location) => ({
+                                value: String(location.id),
+                                label: location.name,
+                              })),
+                              { value: NEW_VALUE, label: "+ New location" },
+                            ]}
+                          />
                         )}
                         <AnimatePresence initial={false}>
                           {locationId === NEW_VALUE && (
@@ -1332,28 +1322,25 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
 
                       <motion.div layout className="space-y-2">
                         {hasExistingStorageAreas && (
-                          <Select
+                          <NativeSelect
                             label="Storage area"
-                            selectedKeys={new Set([String(storageAreaId)])}
-                            onSelectionChange={(keys) => {
-                              const value = Array.from(keys)[0];
+                            aria-label="Item storage area"
+                            value={String(storageAreaId)}
+                            onChange={(value) => {
                               if (value) selectStorageArea(value);
                             }}
-                            isDisabled={isSaving || locationId === NEW_VALUE}
-                            isInvalid={Boolean(validationErrors.storageAreaName)}
-                            variant="bordered"
-                            radius="lg"
-                            classNames={getThemedSelectClassNames(
+                            disabled={isSaving || locationId === NEW_VALUE}
+                            triggerClassName={getNativeSelectTriggerClassName(
                               Boolean(validationErrors.storageAreaName)
                             )}
-                          >
-                            {storageAreas.map((area) => (
-                              <SelectItem key={String(area.id)}>
-                                {area.name}
-                              </SelectItem>
-                            ))}
-                            <SelectItem key={NEW_VALUE}>+ New storage area</SelectItem>
-                          </Select>
+                            options={[
+                              ...storageAreas.map((area) => ({
+                                value: String(area.id),
+                                label: area.name,
+                              })),
+                              { value: NEW_VALUE, label: "+ New storage area" },
+                            ]}
+                          />
                         )}
                         <AnimatePresence initial={false}>
                           {storageAreaId === NEW_VALUE && (
@@ -1374,11 +1361,11 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
 
                       <motion.div layout className="space-y-2">
                         {hasExistingCategories && (
-                          <Select
+                          <NativeSelect
                             label="Category"
-                            selectedKeys={new Set([String(categoryId)])}
-                            onSelectionChange={(keys) => {
-                              const value = Array.from(keys)[0];
+                            aria-label="Item category"
+                            value={String(categoryId)}
+                            onChange={(value) => {
                               if (value) {
                                 setCategoryId(String(value));
                                 setValidationErrors((prev) => ({
@@ -1387,21 +1374,18 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                                 }));
                               }
                             }}
-                            isDisabled={isSaving || storageAreaId === NEW_VALUE}
-                            isInvalid={Boolean(validationErrors.categoryName)}
-                            variant="bordered"
-                            radius="lg"
-                            classNames={getThemedSelectClassNames(
+                            disabled={isSaving || storageAreaId === NEW_VALUE}
+                            triggerClassName={getNativeSelectTriggerClassName(
                               Boolean(validationErrors.categoryName)
                             )}
-                          >
-                            {categories.map((category) => (
-                              <SelectItem key={String(category.id)}>
-                                {category.name}
-                              </SelectItem>
-                            ))}
-                            <SelectItem key={NEW_VALUE}>+ New category</SelectItem>
-                          </Select>
+                            options={[
+                              ...categories.map((category) => ({
+                                value: String(category.id),
+                                label: category.name,
+                              })),
+                              { value: NEW_VALUE, label: "+ New category" },
+                            ]}
+                          />
                         )}
                         <AnimatePresence initial={false}>
                           {categoryId === NEW_VALUE && (

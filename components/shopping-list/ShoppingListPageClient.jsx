@@ -2,25 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "@/components/ui/MotionLite";
 import {
   Button,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownTrigger,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Select,
-  SelectItem,
 } from "@heroui/react";
 import {
   FaCheck,
-  FaEllipsisV,
   FaExchangeAlt,
   FaImage,
   FaPlus,
@@ -40,22 +27,23 @@ import {
   addLocation,
   addStorageArea,
 } from "@/app/actions/server";
-import AddShoppingListItemModal from "@/components/shopping-list/AddShoppingListItemModal";
-import EditShoppingListItemModal from "@/components/shopping-list/EditShoppingListItemModal";
 import { emitInventoryChange } from "@/utils/clientEvents";
-import {
-  modalBodyClass,
-  modalContentClass,
-  modalContentStyle,
-  modalFooterClass,
-  modalHeaderClass,
-  modalInputClassNames,
-  mobileSheetModalClassNames,
-  themedSelectClassNames,
-} from "@/components/modals/modalTheme";
-import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
+import NativeDropdown from "@/components/ui/NativeDropdown";
+import NativeSelect from "@/components/ui/NativeSelect";
 
+const AddShoppingListItemModal = dynamic(
+  () => import("@/components/shopping-list/AddShoppingListItemModal"),
+  { ssr: false }
+);
+const EditShoppingListItemModal = dynamic(
+  () => import("@/components/shopping-list/EditShoppingListItemModal"),
+  { ssr: false }
+);
+const ShoppingListMoveDialog = dynamic(
+  () => import("@/components/shopping-list/ShoppingListMoveDialog"),
+  { ssr: false }
+);
 const ConfirmDeleteModal = dynamic(
   () => import("@/components/modals/ConfirmDeleteModal"),
   { ssr: false }
@@ -430,11 +418,6 @@ export default function ShoppingListPageClient({
     if (!canEditInventory) return;
     setMessage(null);
     setEditingItem(item);
-  }
-
-  function getSelectedValue(keys) {
-    const value = Array.from(keys)[0];
-    return value ? String(value) : "";
   }
 
   function openMoveDialog(item) {
@@ -994,34 +977,27 @@ export default function ShoppingListPageClient({
                 )}
               </div>
 
-              <Select
+              <NativeSelect
                 aria-label="Shopping list status filter"
                 label="Show"
-                selectedKeys={new Set([filter])}
-                onSelectionChange={(keys) => {
-                  const value = getSelectedValue(keys);
+                className="w-full"
+                triggerClassName="min-h-12 rounded-2xl border-gray-200 bg-white shadow-sm"
+                value={filter}
+                onChange={(value) => {
                   if (value) setFilter(value);
                 }}
-                variant="bordered"
-                radius="lg"
-                disallowEmptySelection
-                className="w-full"
-                classNames={{
-                  ...themedSelectClassNames,
-                  trigger: `${themedSelectClassNames.trigger} min-h-12 rounded-2xl border-gray-200 bg-white shadow-sm`,
-                }}
-              >
-                {FILTERS.map((option) => (
-                  <SelectItem key={option.value} textValue={option.label}>
+                options={FILTERS.map((option) => ({
+                  value: option.value,
+                  label: (
                     <span className="flex w-full items-center justify-between gap-3">
                       <span>{option.label}</span>
                       <span className="text-xs font-medium text-gray-500">
                         {counts[option.value] ?? 0}
                       </span>
                     </span>
-                  </SelectItem>
-                ))}
-              </Select>
+                  ),
+                }))}
+              />
 
               {message ? (
                 <p
@@ -1337,86 +1313,67 @@ export default function ShoppingListPageClient({
                               onClick={(event) => event.stopPropagation()}
                               onKeyDown={(event) => event.stopPropagation()}
                             >
-                              <Dropdown placement="bottom-end">
-                                <DropdownTrigger>
-                                  <Button
-                                    isIconOnly
-                                    variant="light"
-                                    radius="lg"
-                                    className="h-9 w-9 min-w-9 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-                                    aria-label={`${item.name} actions`}
-                                    isDisabled={isDisabled}
-                                  >
-                                    <FaEllipsisV className="h-4 w-4" />
-                                  </Button>
-                                </DropdownTrigger>
-                                <DropdownMenu aria-label={`${item.name} actions`}>
-                                  <DropdownItem
-                                    key="select"
-                                    onPress={() => toggleSelect(item.id)}
-                                  >
-                                    {isSelected
+                              <NativeDropdown
+                                ariaLabel={`${item.name} actions`}
+                                disabled={isDisabled}
+                                items={[
+                                  {
+                                    key: "select",
+                                    label: isSelected
                                       ? "Deselect for bulk action"
-                                      : "Select for bulk action"}
-                                  </DropdownItem>
-                                  {item.status === "needed" ? (
-                                    <DropdownItem
-                                      key="purchased"
-                                      onPress={() => updateItemStatus(item, "purchased")}
-                                    >
-                                      Mark purchased
-                                    </DropdownItem>
-                                  ) : (
-                                    <DropdownItem
-                                      key="needed"
-                                      onPress={() => updateItemStatus(item, "needed")}
-                                    >
-                                      Need again
-                                    </DropdownItem>
-                                  )}
-                                  {item.status !== "dismissed" ? (
-                                    <DropdownItem
-                                      key="dismiss"
-                                      onPress={() => updateItemStatus(item, "dismissed")}
-                                    >
-                                      Dismiss
-                                    </DropdownItem>
-                                  ) : (
-                                    <DropdownItem
-                                      key="restore"
-                                      onPress={() => updateItemStatus(item, "needed")}
-                                    >
-                                      Restore
-                                    </DropdownItem>
-                                  )}
-                                  <DropdownItem
-                                    key="move"
-                                    onPress={() => openMoveDialog(item)}
-                                  >
-                                    Move to inventory
-                                  </DropdownItem>
-                                  <DropdownItem
-                                    key="edit"
-                                    onPress={() => {
+                                      : "Select for bulk action",
+                                    onSelect: () => toggleSelect(item.id),
+                                  },
+                                  item.status === "needed"
+                                    ? {
+                                        key: "purchased",
+                                        label: "Mark purchased",
+                                        onSelect: () =>
+                                          updateItemStatus(item, "purchased"),
+                                      }
+                                    : {
+                                        key: "needed",
+                                        label: "Need again",
+                                        onSelect: () =>
+                                          updateItemStatus(item, "needed"),
+                                      },
+                                  item.status !== "dismissed"
+                                    ? {
+                                        key: "dismiss",
+                                        label: "Dismiss",
+                                        onSelect: () =>
+                                          updateItemStatus(item, "dismissed"),
+                                      }
+                                    : {
+                                        key: "restore",
+                                        label: "Restore",
+                                        onSelect: () =>
+                                          updateItemStatus(item, "needed"),
+                                      },
+                                  {
+                                    key: "move",
+                                    label: "Move to inventory",
+                                    onSelect: () => openMoveDialog(item),
+                                  },
+                                  {
+                                    key: "edit",
+                                    label: "Edit",
+                                    onSelect: () => {
                                       setMessage(null);
                                       setEditingItem(item);
-                                    }}
-                                  >
-                                    Edit
-                                  </DropdownItem>
-                                  <DropdownItem
-                                    key="delete"
-                                    className="text-danger"
-                                    color="danger"
-                                    onPress={() => {
+                                    },
+                                  },
+                                  {
+                                    key: "delete",
+                                    label: "Delete",
+                                    danger: true,
+                                    onSelect: () => {
                                       setMessage(null);
                                       setDeleteCandidate(item);
-                                    }}
-                                  >
-                                    Delete
-                                  </DropdownItem>
-                                </DropdownMenu>
-                              </Dropdown>
+                                    },
+                                  },
+                                ]}
+                              />
                             </div>
                           )}
                         </div>
@@ -1459,294 +1416,95 @@ export default function ShoppingListPageClient({
         ) : null}
       </section>
 
-      {canEditInventory && <AddShoppingListItemModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onAdded={handleAdded}
-      />}
-      {canEditInventory && <EditShoppingListItemModal
-        item={editingItem}
-        isOpen={Boolean(editingItem)}
-        onClose={() => setEditingItem(null)}
-        onUpdated={handleUpdated}
-        onMoveToInventory={(item) => {
-          setEditingItem(null);
-          openMoveDialog(item);
-        }}
-        isMovingToInventory={
-          Boolean(editingItem?.id) &&
-          moveDialog.isMoving &&
-          moveDialog.itemIds?.includes(String(editingItem.id))
-        }
-        onDelete={(item) => {
-          setEditingItem(null);
-          setMessage(null);
-          setDeleteCandidate(item);
-        }}
-      />}
-      {canEditInventory && <Modal
-        isOpen={moveDialog.open}
-        onOpenChange={(open) => {
-          if (!open) closeMoveDialog();
-        }}
-        hideCloseButton={moveDialog.isMoving}
-        isDismissable={!moveDialog.isMoving}
-        placement="center"
-        size="md"
-        scrollBehavior="inside"
-        classNames={mobileSheetModalClassNames}
-      >
-        <ModalContent className={modalContentClass} style={modalContentStyle}>
-          {() => (
-            <>
-              <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate">Move to inventory</span>
-                  {moveDialog.item?.name ? (
-                    <span className="block truncate text-sm font-normal text-gray-500">
-                      {moveDialog.item.name}
-                    </span>
-                  ) : moveDialog.itemIds?.length > 1 ? (
-                    <span className="block truncate text-sm font-normal text-gray-500">
-                      {moveDialog.itemIds.length} selected items
-                    </span>
-                  ) : null}
-                </span>
-                <MobileSheetCloseButton onPress={closeMoveDialog} />
-              </ModalHeader>
-
-              <ModalBody className={`space-y-4 ${modalBodyClass}`}>
-                {moveCreateMessage ? (
-                  <div
-                    className={`rounded-2xl border px-3 py-2 text-sm ${
-                      moveCreateMessage.type === "success"
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                        : "border-rose-200 bg-rose-50 text-rose-700"
-                    }`}
-                  >
-                    {moveCreateMessage.text}
-                  </div>
-                ) : null}
-
-                <Select
-                  label="Location"
-                  selectedKeys={
-                    moveDialog.locationId
-                      ? new Set([String(moveDialog.locationId)])
-                      : new Set()
-                  }
-                  onSelectionChange={(keys) =>
-                    handleMoveLocationChange(getSelectedValue(keys))
-                  }
-                  isDisabled={moveDialog.isMoving}
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  {safeMoveLocations.map((location) => (
-                    <SelectItem key={String(location.id)}>
-                      {location.name}
-                    </SelectItem>
-                  ))}
-                  <SelectItem key={NEW_LOCATION_VALUE}>+ New location</SelectItem>
-                </Select>
-                {moveDialog.locationId === NEW_LOCATION_VALUE ? (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                    <Input
-                      label="New location"
-                      value={moveCreateNames.location}
-                      onValueChange={(value) => updateMoveCreateName("location", value)}
-                      placeholder="Kitchen, garage, closet..."
-                      isDisabled={moveDialog.isMoving}
-                      variant="bordered"
-                      radius="lg"
-                      classNames={modalInputClassNames}
-                    />
-                    <Button
-                      className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
-                      isLoading={moveCreateAction === "location"}
-                      isDisabled={
-                        moveDialog.isMoving ||
-                        !moveCreateNames.location.trim() ||
-                        Boolean(moveCreateAction)
-                      }
-                      onPress={createMoveLocation}
-                    >
-                      Create
-                    </Button>
-                  </div>
-                ) : null}
-
-                <Select
-                  label="Storage area"
-                  placeholder="Select storage area"
-                  selectedKeys={
-                    moveDialog.areaId
-                      ? new Set([String(moveDialog.areaId)])
-                      : new Set()
-                  }
-                  onSelectionChange={(keys) =>
-                    handleMoveAreaChange(getSelectedValue(keys))
-                  }
-                  isDisabled={
-                    moveDialog.isMoving ||
-                    !selectedMoveLocation ||
-                    moveDialog.locationId === NEW_LOCATION_VALUE
-                  }
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  {moveAreas.map((area) => (
-                    <SelectItem key={String(area.id)}>{area.name}</SelectItem>
-                  ))}
-                  <SelectItem key={NEW_AREA_VALUE}>+ New storage area</SelectItem>
-                </Select>
-                {moveDialog.areaId === NEW_AREA_VALUE ? (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                    <Input
-                      label="New storage area"
-                      value={moveCreateNames.area}
-                      onValueChange={(value) => updateMoveCreateName("area", value)}
-                      placeholder="Pantry, shelf, drawer..."
-                      isDisabled={
-                        moveDialog.isMoving ||
-                        !moveDialog.locationId ||
-                        moveDialog.locationId === NEW_LOCATION_VALUE
-                      }
-                      variant="bordered"
-                      radius="lg"
-                      classNames={modalInputClassNames}
-                    />
-                    <Button
-                      className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
-                      isLoading={moveCreateAction === "area"}
-                      isDisabled={
-                        moveDialog.isMoving ||
-                        !moveCreateNames.area.trim() ||
-                        !moveDialog.locationId ||
-                        moveDialog.locationId === NEW_LOCATION_VALUE ||
-                        Boolean(moveCreateAction)
-                      }
-                      onPress={createMoveArea}
-                    >
-                      Create
-                    </Button>
-                  </div>
-                ) : null}
-
-                <Select
-                  label="Category"
-                  placeholder="Select category"
-                  selectedKeys={
-                    moveDialog.categoryId
-                      ? new Set([String(moveDialog.categoryId)])
-                      : new Set()
-                  }
-                  onSelectionChange={(keys) =>
-                    setMoveDialog((current) => ({
-                      ...current,
-                      categoryId: getSelectedValue(keys) || null,
-                    }))
-                  }
-                  isDisabled={
-                    moveDialog.isMoving ||
-                    !moveDialog.areaId ||
-                    moveDialog.areaId === NEW_AREA_VALUE
-                  }
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  {(selectedMoveArea?.categories ?? []).map((category) => (
-                    <SelectItem key={String(category.id)}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                  <SelectItem key={NEW_CATEGORY_VALUE}>+ New category</SelectItem>
-                </Select>
-                {moveDialog.categoryId === NEW_CATEGORY_VALUE ? (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                    <Input
-                      label="New category"
-                      value={moveCreateNames.category}
-                      onValueChange={(value) => updateMoveCreateName("category", value)}
-                      placeholder="Snacks, tools, cleaning..."
-                      isDisabled={
-                        moveDialog.isMoving ||
-                        !moveDialog.areaId ||
-                        moveDialog.areaId === NEW_AREA_VALUE
-                      }
-                      variant="bordered"
-                      radius="lg"
-                      classNames={modalInputClassNames}
-                    />
-                    <Button
-                      className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
-                      isLoading={moveCreateAction === "category"}
-                      isDisabled={
-                        moveDialog.isMoving ||
-                        !moveCreateNames.category.trim() ||
-                        !moveDialog.areaId ||
-                        moveDialog.areaId === NEW_AREA_VALUE ||
-                        Boolean(moveCreateAction)
-                      }
-                      onPress={createMoveCategory}
-                    >
-                      Create
-                    </Button>
-                  </div>
-                ) : null}
-              </ModalBody>
-
-              <ModalFooter className={modalFooterClass}>
-                <Button
-                  variant="light"
-                  className="rounded-xl max-md:hidden"
-                  isDisabled={moveDialog.isMoving}
-                  onPress={closeMoveDialog}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="rounded-xl bg-[var(--stocksense-brand)] text-white"
-                  isLoading={moveDialog.isMoving}
-                  isDisabled={!canMoveToInventory}
-                  onPress={confirmMoveToInventory}
-                >
-                  Move
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>}
-      {canEditInventory && <ConfirmDeleteModal
-        isOpen={Boolean(deleteCandidate)}
-        isDeleting={Boolean(deleteCandidate && pendingId === deleteCandidate.id)}
-        onCancel={() => setDeleteCandidate(null)}
-        onConfirm={confirmDeleteItem}
-        title={
-          deleteCandidate
-            ? `Delete "${deleteCandidate.name}"?`
-            : "Delete shopping list item?"
-        }
-        description={
-          deleteCandidate
-            ? `This will remove "${deleteCandidate.name}" from your shopping list.`
-            : ""
-        }
-      />}
-      {canEditInventory && <ConfirmDeleteModal
-        isOpen={isBulkDeleteOpen}
-        isDeleting={bulkAction === "delete"}
-        onCancel={() => setIsBulkDeleteOpen(false)}
-        onConfirm={confirmBulkDelete}
-        title={`Delete ${selectedCount} shopping list item${
-          selectedCount === 1 ? "" : "s"
-        }?`}
-        description="This will remove the selected items from your shopping list."
-      />}
+      {canEditInventory && isAddModalOpen && (
+        <AddShoppingListItemModal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          onAdded={handleAdded}
+        />
+      )}
+      {canEditInventory && editingItem && (
+        <EditShoppingListItemModal
+          item={editingItem}
+          isOpen={Boolean(editingItem)}
+          onClose={() => setEditingItem(null)}
+          onUpdated={handleUpdated}
+          onMoveToInventory={(item) => {
+            setEditingItem(null);
+            openMoveDialog(item);
+          }}
+          isMovingToInventory={
+            Boolean(editingItem?.id) &&
+            moveDialog.isMoving &&
+            moveDialog.itemIds?.includes(String(editingItem.id))
+          }
+          onDelete={(item) => {
+            setEditingItem(null);
+            setMessage(null);
+            setDeleteCandidate(item);
+          }}
+        />
+      )}
+      {canEditInventory && moveDialog.open && (
+        <ShoppingListMoveDialog
+          moveDialog={moveDialog}
+          closeMoveDialog={closeMoveDialog}
+          moveCreateMessage={moveCreateMessage}
+          safeMoveLocations={safeMoveLocations}
+          selectedMoveLocation={selectedMoveLocation}
+          moveAreas={moveAreas}
+          selectedMoveArea={selectedMoveArea}
+          moveCreateNames={moveCreateNames}
+          updateMoveCreateName={updateMoveCreateName}
+          moveCreateAction={moveCreateAction}
+          createMoveLocation={createMoveLocation}
+          createMoveArea={createMoveArea}
+          createMoveCategory={createMoveCategory}
+          canMoveToInventory={canMoveToInventory}
+          confirmMoveToInventory={confirmMoveToInventory}
+          onMoveLocationChange={handleMoveLocationChange}
+          onMoveAreaChange={handleMoveAreaChange}
+          onMoveCategoryChange={(value) =>
+            setMoveDialog((current) => ({
+              ...current,
+              categoryId: value || null,
+            }))
+          }
+          newLocationValue={NEW_LOCATION_VALUE}
+          newAreaValue={NEW_AREA_VALUE}
+          newCategoryValue={NEW_CATEGORY_VALUE}
+        />
+      )}
+      {canEditInventory && deleteCandidate && (
+        <ConfirmDeleteModal
+          isOpen={Boolean(deleteCandidate)}
+          isDeleting={Boolean(deleteCandidate && pendingId === deleteCandidate.id)}
+          onCancel={() => setDeleteCandidate(null)}
+          onConfirm={confirmDeleteItem}
+          title={
+            deleteCandidate
+              ? `Delete "${deleteCandidate.name}"?`
+              : "Delete shopping list item?"
+          }
+          description={
+            deleteCandidate
+              ? `This will remove "${deleteCandidate.name}" from your shopping list.`
+              : ""
+          }
+        />
+      )}
+      {canEditInventory && isBulkDeleteOpen && (
+        <ConfirmDeleteModal
+          isOpen={isBulkDeleteOpen}
+          isDeleting={bulkAction === "delete"}
+          onCancel={() => setIsBulkDeleteOpen(false)}
+          onConfirm={confirmBulkDelete}
+          title={`Delete ${selectedCount} shopping list item${
+            selectedCount === 1 ? "" : "s"
+          }?`}
+          description="This will remove the selected items from your shopping list."
+        />
+      )}
     </motion.div>
   );
 }

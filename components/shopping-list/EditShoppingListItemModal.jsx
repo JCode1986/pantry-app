@@ -9,8 +9,6 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-  Select,
-  SelectItem,
 } from "@heroui/react";
 import { FaEdit, FaExchangeAlt } from "react-icons/fa";
 import { updateShoppingListItemAction } from "@/app/actions/shoppingList";
@@ -24,9 +22,9 @@ import {
   modalHeaderClass,
   modalInputClassNames,
   mobileSheetModalClassNames,
-  themedSelectClassNames,
 } from "@/components/modals/modalTheme";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
+import NativeSelect from "@/components/ui/NativeSelect";
 import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
 import useDesktopAutoFocus from "@/components/modals/useDesktopAutoFocus";
 
@@ -194,22 +192,16 @@ export default function EditShoppingListItemModal({
                   classNames={modalInputClassNames}
                 />
 
-                <Select
+                <NativeSelect
                   label="Status"
-                  selectedKeys={new Set([form.status])}
-                  onSelectionChange={(keys) => {
-                    const value = Array.from(keys)[0];
+                  aria-label="Shopping list item status"
+                  value={form.status}
+                  onChange={(value) => {
                     if (value) updateForm("status", String(value));
                   }}
-                  variant="bordered"
-                  radius="lg"
-                  isDisabled={isSaving}
-                  classNames={themedSelectClassNames}
-                >
-                  {STATUS_OPTIONS.map((option) => (
-                    <SelectItem key={option.value}>{option.label}</SelectItem>
-                  ))}
-                </Select>
+                  disabled={isSaving}
+                  options={STATUS_OPTIONS}
+                />
               </div>
 
               <EntityImageManager

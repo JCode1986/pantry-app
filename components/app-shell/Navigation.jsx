@@ -4,39 +4,15 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { INVENTORY_CHANGE_EVENT } from "@/utils/clientEvents";
 import { createClient as createBrowserSupabaseClient } from "@/utils/supabase/client";
-import {
-  modalBodyClass,
-  modalContentClass,
-  modalContentStyle,
-  modalFooterClass,
-  modalHeaderClass,
-  themedSelectClassNames,
-} from "@/components/modals/modalTheme";
 import WhereKeepLogo from "@/components/ui/WhereKeepLogo";
 import {
   DEFAULT_PREFERENCES,
-  FONT_OPTIONS,
-  THEME_OPTIONS,
-  getFontById,
-  getThemeById,
   readStoredPreferences,
   saveStoredPreferences,
 } from "@/utils/appPreferences";
 import { clearBrowserLogoutStorage } from "@/utils/logoutStorage";
-import {
-  Button,
-  Input,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Select,
-  SelectItem,
-} from "@heroui/react";
 import {
   FaBell,
   FaMapMarkedAlt,
@@ -44,20 +20,13 @@ import {
   FaWarehouse,
   FaTags,
   FaBoxOpen,
-  FaCheckCircle,
-  FaSignOutAlt,
   FaSpinner,
   FaHome,
   FaPlus,
   FaSearch,
   FaShoppingBasket,
-  FaTimes,
   FaUserCircle,
   FaBars,
-  FaCopy,
-  FaEnvelope,
-  FaTimesCircle,
-  FaUserPlus,
 } from "react-icons/fa";
 import {
   LuActivity,
@@ -65,7 +34,6 @@ import {
   LuHouse,
   LuLifeBuoy,
   LuLogOut,
-  LuMail,
   LuMapPin,
   LuPackage,
   LuPalette,
@@ -89,6 +57,16 @@ const navItems = [
   { href: "/profile", label: "Profile", icon: FaUserCircle },
 ];
 
+const PRIMARY_PREFETCH_ROUTES = [
+  "/dashboard",
+  "/locations",
+  "/areas",
+  "/categories",
+  "/items",
+  "/shopping-list",
+  "/profile",
+];
+
 const GlobalAddItemModal = dynamic(
   () => import("@/components/items/GlobalAddItemModal"),
   { ssr: false }
@@ -96,6 +74,53 @@ const GlobalAddItemModal = dynamic(
 
 const GlobalItemSearchModal = dynamic(
   () => import("@/components/items/GlobalItemSearchModal"),
+  { ssr: false }
+);
+
+const NavigationAddActionSheet = dynamic(
+  () => import("@/components/app-shell/NavigationAddActionSheet"),
+  { ssr: false }
+);
+
+const NavigationRemoveMemberModal = dynamic(
+  () => import("@/components/app-shell/NavigationRemoveMemberModal"),
+  { ssr: false }
+);
+
+const NavigationLogoutModal = dynamic(
+  () => import("@/components/app-shell/NavigationLogoutModal"),
+  { ssr: false }
+);
+
+const HouseholdSharingPanel = dynamic(
+  () =>
+    import("@/components/app-shell/NavigationPanels").then(
+      (module) => module.HouseholdSharingPanel
+    ),
+  { ssr: false }
+);
+
+const PreferencesPanel = dynamic(
+  () =>
+    import("@/components/app-shell/NavigationPanels").then(
+      (module) => module.PreferencesPanel
+    ),
+  { ssr: false }
+);
+
+const MobileMenu = dynamic(
+  () =>
+    import("@/components/app-shell/NavigationOverlays").then(
+      (module) => module.MobileMenu
+    ),
+  { ssr: false }
+);
+
+const AttentionSheet = dynamic(
+  () =>
+    import("@/components/app-shell/NavigationOverlays").then(
+      (module) => module.AttentionSheet
+    ),
   { ssr: false }
 );
 
@@ -219,86 +244,6 @@ async function fetchAttentionCounts() {
   };
 }
 
-const menuBackdropVariants = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { duration: 0.18, ease: "easeOut" } },
-  exit: { opacity: 0, transition: { duration: 0.16, ease: "easeIn" } },
-};
-
-const menuPanelVariants = {
-  hidden: { opacity: 0, y: -14 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.28,
-      ease: [0.22, 1, 0.36, 1],
-      staggerChildren: 0.045,
-      delayChildren: 0.05,
-    },
-  },
-  exit: {
-    opacity: 0,
-    y: -10,
-    transition: { duration: 0.18, ease: "easeIn" },
-  },
-};
-
-const menuItemVariants = {
-  hidden: { opacity: 0, y: 10 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.22, ease: "easeOut" },
-  },
-};
-
-const sheetPanelVariants = {
-  hidden: { opacity: 0, y: -12, scale: 0.98 },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0.24, ease: [0.22, 1, 0.36, 1] },
-  },
-  exit: {
-    opacity: 0,
-    y: -8,
-    scale: 0.98,
-    transition: { duration: 0.16, ease: "easeIn" },
-  },
-};
-
-const iconTones = {
-  warning: {
-    accent: "var(--entity-warning-accent)",
-    soft: "var(--entity-warning-soft)",
-    border: "var(--entity-warning-border)",
-  },
-  brand: {
-    accent: "var(--stocksense-brand)",
-    soft: "var(--stocksense-brand-soft)",
-    border: "var(--stocksense-brand-border)",
-  },
-};
-
-function IconCircle({ icon: Icon, tone = "brand", className = "" }) {
-  const colors = iconTones[tone] || iconTones.brand;
-
-  return (
-    <span
-      className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl border ${className}`}
-      style={{
-        background: colors.soft,
-        borderColor: colors.border,
-        color: colors.accent,
-      }}
-    >
-      <Icon className="h-5 w-5" />
-    </span>
-  );
-}
-
 function MobileTopBar({ attentionCount, onOpenMenu, onOpenAttention }) {
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-gray-200 bg-white px-5 py-2 shadow-sm backdrop-blur lg:hidden">
@@ -390,45 +335,6 @@ function DesktopGlobalActions({
   );
 }
 
-const mobileMenuSections = [
-  {
-    title: "Dashboard",
-    items: [
-      { href: "/dashboard", label: "Overview", icon: FaHome },
-      { href: "/activity", label: "Recent Activity", icon: FaBolt },
-    ],
-  },
-  {
-    title: "Inventory",
-    items: [
-      { href: "/locations", label: "Locations", icon: FaMapMarkedAlt, countKey: "locationsCount" },
-      { href: "/areas", label: "Storage Areas", icon: FaWarehouse, countKey: "storageAreasCount" },
-      { href: "/categories", label: "Categories", icon: FaTags, countKey: "categoriesCount" },
-      { href: "/items", label: "Items", icon: FaBoxOpen, countKey: "itemsCount" },
-    ],
-  },
-  {
-    title: "Tools",
-    items: [
-      {
-        href: "/shopping-list",
-        label: "Shopping List",
-        icon: FaShoppingBasket,
-        countKey: "shoppingListNeededItems",
-      },
-      {
-        href: "/support/chat",
-        label: "Ask WhereKeep",
-        icon: LuLifeBuoy,
-      },
-    ],
-  },
-  {
-    title: "Account",
-    items: [{ href: "/profile", label: "Profile", icon: FaUserCircle }],
-  },
-];
-
 const desktopSidebarSections = [
   {
     title: "HOME",
@@ -463,20 +369,6 @@ const desktopSidebarSections = [
   },
 ];
 
-const HOUSEHOLD_ROLE_OPTIONS = [
-  { id: "editor", label: "Editor" },
-  { id: "viewer", label: "Viewer" },
-];
-
-function CountBadge({ value }) {
-  if (value === null || value === undefined || value <= 0) return null;
-
-  return (
-    <span className="ml-auto grid min-w-7 place-items-center rounded-full border border-gray-200 bg-white px-2 py-0.5 text-xs font-semibold leading-5 text-gray-500">
-      {value > 99 ? "99+" : value}
-    </span>
-  );
-}
 
 function SidebarCountBadge({ value }) {
   if (value === null || value === undefined || value <= 0) return null;
@@ -495,609 +387,6 @@ function formatHouseholdRole(role) {
   return "";
 }
 
-function formatPanelDate(value) {
-  if (!value) return null;
-
-  try {
-    return new Intl.DateTimeFormat("en", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(new Date(value));
-  } catch {
-    return null;
-  }
-}
-
-function HouseholdSharingPanel({
-  activePanel,
-  activeTab,
-  sharing,
-  loading,
-  actionLoading,
-  error,
-  message,
-  inviteEmail,
-  inviteRole,
-  copiedInviteId,
-  onClose,
-  onSelectTab,
-  onInviteEmailChange,
-  onInviteRoleChange,
-  onCreateInvite,
-  onCopyInvite,
-  onResendInvite,
-  onRevokeInvite,
-  onUpdateMemberRole,
-  onRequestRemoveMember,
-}) {
-  const members = sharing?.members ?? [];
-  const invites = sharing?.invites ?? [];
-  const pendingInviteCount = invites.filter((invite) => invite.status === "pending").length;
-  const isMembersTab = activeTab === "members";
-  const isFamily = sharing?.effectivePlanId === "family";
-  const isOwner = sharing?.currentUserRole === "owner";
-  const canInvite = Boolean(sharing?.canInvite);
-  const title = isMembersTab ? "Household members" : "Household invites";
-  const subtitle = isMembersTab
-    ? "People who can access this household inventory."
-    : "Pending and recent household invitations.";
-
-  return (
-    <AnimatePresence>
-      {activePanel === "members" && (
-        <motion.div
-          className="fixed bottom-0 right-0 top-0 z-[45] hidden transition-[left] duration-200 lg:block"
-          style={{ left: "var(--wherekeep-sidebar-offset)" }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
-        >
-          <button
-            type="button"
-            aria-label="Close household panel"
-            onClick={onClose}
-            className="absolute inset-0 cursor-default bg-slate-950/5"
-          />
-          <motion.aside
-            className="absolute bottom-4 left-4 top-4 flex flex-col overflow-hidden rounded-3xl border border-[var(--stocksense-brand-border)] bg-white shadow-2xl transition-[width] duration-200"
-            style={{
-              width: "min(420px, calc(100vw - var(--wherekeep-sidebar-offset) - 2rem))",
-            }}
-            initial={{ x: -24, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -24, opacity: 0 }}
-            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-            role="dialog"
-            aria-modal="true"
-            aria-label={title}
-          >
-            <div className="border-b border-gray-100 px-5 py-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--stocksense-brand)]">
-                    Household
-                  </p>
-                  <h2 className="mt-1 text-xl font-bold text-gray-950">
-                    {title}
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-500">{subtitle}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-gray-200 bg-white text-gray-500 transition hover:border-[var(--stocksense-brand-border)] hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-                  aria-label="Close panel"
-                >
-                  <FaTimes className="h-3.5 w-3.5" />
-                </button>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-gray-50 p-1">
-                <button
-                  type="button"
-                  onClick={() => onSelectTab("members")}
-                  className={cx(
-                    "rounded-xl px-3 py-2 text-sm font-semibold transition",
-                    isMembersTab
-                      ? "bg-white text-[var(--stocksense-brand)] shadow-sm"
-                      : "text-gray-500 hover:text-[var(--stocksense-brand)]"
-                  )}
-                >
-                  Members
-                  {members.length > 0 && (
-                    <span className="ml-2 text-xs text-gray-400">{members.length}</span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onSelectTab("invites")}
-                  className={cx(
-                    "rounded-xl px-3 py-2 text-sm font-semibold transition",
-                    !isMembersTab
-                      ? "bg-white text-[var(--stocksense-brand)] shadow-sm"
-                      : "text-gray-500 hover:text-[var(--stocksense-brand)]"
-                  )}
-                >
-                  Invites
-                  {pendingInviteCount > 0 && (
-                    <span className="ml-2 text-xs text-gray-400">
-                      {pendingInviteCount}
-                    </span>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-5 py-5">
-              {loading && (
-                <div className="grid min-h-48 place-items-center rounded-2xl border border-gray-100 bg-gray-50 text-sm font-medium text-gray-500">
-                  <span className="inline-flex items-center gap-2">
-                    <FaSpinner className="h-4 w-4 animate-spin text-[var(--stocksense-brand)]" />
-                    Loading household details
-                  </span>
-                </div>
-              )}
-
-              {!loading && error && (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  {error}
-                </div>
-              )}
-
-              {!loading && !error && message && (
-                <div
-                  className={cx(
-                    "mb-4 rounded-2xl border px-4 py-3 text-sm",
-                    message.type === "success"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                      : "border-rose-200 bg-rose-50 text-rose-700"
-                  )}
-                  role={message.type === "success" ? "status" : "alert"}
-                >
-                  {message.text}
-                </div>
-              )}
-
-              {!loading && !error && isMembersTab && (
-                <div className="space-y-3">
-                  {members.length > 0 ? (
-                    members.map((member) => {
-                      const memberLabel = member.displayName || member.email;
-                      const showEmail = Boolean(member.displayName && member.email);
-
-                      return (
-                        <div
-                          key={member.userId || member.email}
-                          className="flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white px-3 py-3 shadow-sm"
-                        >
-                          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-sm font-bold uppercase text-[var(--stocksense-brand)]">
-                            {(memberLabel || "?").slice(0, 1)}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-gray-950">
-                              {memberLabel}
-                            </p>
-                            {showEmail && (
-                              <p className="mt-0.5 truncate text-xs text-gray-500">
-                                {member.email}
-                              </p>
-                            )}
-                            <p className="mt-0.5 text-xs text-gray-500">
-                              Joined {formatPanelDate(member.joinedAt) ?? "recently"}
-                            </p>
-                            {isOwner && member.role !== "owner" && (
-                              <div className="mt-3 flex flex-wrap items-center gap-2">
-                                <Select
-                                  aria-label={`Role for ${memberLabel}`}
-                                  size="sm"
-                                  selectedKeys={new Set([member.role === "viewer" ? "viewer" : "editor"])}
-                                  onSelectionChange={(keys) => {
-                                    const value = Array.from(keys)[0];
-                                    if (value) onUpdateMemberRole(member, String(value));
-                                  }}
-                                  isDisabled={Boolean(actionLoading)}
-                                  variant="bordered"
-                                  radius="lg"
-                                  className="w-28"
-                                  classNames={themedSelectClassNames}
-                                >
-                                  {HOUSEHOLD_ROLE_OPTIONS.map((role) => (
-                                    <SelectItem key={role.id}>{role.label}</SelectItem>
-                                  ))}
-                                </Select>
-                                <Button
-                                  size="sm"
-                                  variant="flat"
-                                  className="rounded-lg border border-rose-200 bg-rose-50 px-2 text-rose-700"
-                                  onPress={() => onRequestRemoveMember(member)}
-                                  isDisabled={Boolean(actionLoading)}
-                                  startContent={<FaTimesCircle className="h-3.5 w-3.5" />}
-                                >
-                                  Remove
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                          <span className="rounded-full border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--stocksense-brand)]">
-                            {formatHouseholdRole(member.role)}
-                          </span>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-8 text-center">
-                      <p className="text-sm font-semibold text-gray-900">
-                        No members yet
-                      </p>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Household members will appear here once they join.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {!loading && !error && !isMembersTab && !isFamily && isOwner && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  Upgrade to Family to invite household members.{" "}
-                  <Link href="/profile#billing" className="font-semibold underline">
-                    View Family plan
-                  </Link>
-                </div>
-              )}
-
-              {!loading && !error && !isMembersTab && isFamily && !isOwner && (
-                <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-8 text-center">
-                  <p className="text-sm font-semibold text-gray-900">
-                    Owner access required
-                  </p>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Only the household owner can invite and manage members.
-                  </p>
-                </div>
-              )}
-
-              {!loading && !error && !isMembersTab && !isFamily && !isOwner && (
-                <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-8 text-center">
-                  <p className="text-sm font-semibold text-gray-900">
-                    Family plan required
-                  </p>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Household invites are available on the Family plan.
-                  </p>
-                </div>
-              )}
-
-              {!loading && !error && !isMembersTab && isFamily && isOwner && (
-                <div className="space-y-3">
-                  <form
-                    onSubmit={onCreateInvite}
-                    className="rounded-2xl border border-gray-100 bg-gray-50/70 p-3"
-                  >
-                    <div className="space-y-3">
-                      <Input
-                        label="Invite by email"
-                        type="email"
-                        value={inviteEmail}
-                        onValueChange={onInviteEmailChange}
-                        isDisabled={Boolean(actionLoading) || !canInvite}
-                        classNames={{
-                          inputWrapper: "rounded-xl border border-stocksense-gray bg-white shadow-none",
-                        }}
-                      />
-                      <div className="flex items-end gap-2">
-                        <Select
-                          label="Role"
-                          selectedKeys={new Set([inviteRole])}
-                          onSelectionChange={(keys) => {
-                            const value = Array.from(keys)[0];
-                            if (value) onInviteRoleChange(String(value));
-                          }}
-                          isDisabled={Boolean(actionLoading) || !canInvite}
-                          variant="bordered"
-                          radius="lg"
-                          className="min-w-0 flex-1"
-                          classNames={themedSelectClassNames}
-                        >
-                          {HOUSEHOLD_ROLE_OPTIONS.map((role) => (
-                            <SelectItem key={role.id}>{role.label}</SelectItem>
-                          ))}
-                        </Select>
-                        <Button
-                          type="submit"
-                          className="h-14 rounded-xl bg-[var(--stocksense-brand)] px-4 text-white"
-                          isLoading={actionLoading === "invite"}
-                          isDisabled={Boolean(actionLoading) || !canInvite}
-                          startContent={<FaUserPlus className="h-3.5 w-3.5" />}
-                        >
-                          Send
-                        </Button>
-                      </div>
-                      {!canInvite && (
-                        <p className="text-xs text-amber-700">
-                          This household is at the Family member limit.
-                        </p>
-                      )}
-                    </div>
-                  </form>
-
-                  {invites.length > 0 ? (
-                    invites.map((invite) => (
-                      <div
-                        key={invite.id}
-                        className="rounded-2xl border border-gray-100 bg-white px-3 py-3 shadow-sm"
-                      >
-                        <div className="flex items-start gap-3">
-                          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
-                            <LuMail className="h-5 w-5" />
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-gray-950">
-                              {invite.email}
-                            </p>
-                            <p className="mt-0.5 text-xs text-gray-500">
-                              {formatHouseholdRole(invite.role)} access
-                              {invite.expiresAt
-                                ? ` - Expires ${formatPanelDate(invite.expiresAt)}`
-                                : ""}
-                            </p>
-                          </div>
-                          <span
-                            className={cx(
-                              "rounded-full px-2.5 py-1 text-xs font-semibold capitalize",
-                              (invite.status ?? "pending") === "pending"
-                                ? "border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
-                                : "border border-gray-200 bg-gray-50 text-gray-500"
-                            )}
-                          >
-                            {invite.status ?? "pending"}
-                          </span>
-                        </div>
-                        {isOwner && (
-                          <div className="mt-3 flex flex-wrap justify-end gap-2">
-                            {invite.link && (
-                              <Button
-                                size="sm"
-                                variant="flat"
-                                className="rounded-lg border border-gray-200 bg-white text-gray-700"
-                                onPress={() => onCopyInvite(invite)}
-                                isDisabled={Boolean(actionLoading)}
-                                startContent={<FaCopy className="h-3.5 w-3.5" />}
-                              >
-                                {copiedInviteId === invite.id ? "Copied" : "Copy"}
-                              </Button>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="flat"
-                              className="rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
-                              onPress={() => onResendInvite(invite.id)}
-                              isLoading={actionLoading === `resend:${invite.id}`}
-                              isDisabled={
-                                Boolean(actionLoading) &&
-                                actionLoading !== `resend:${invite.id}`
-                              }
-                              startContent={<FaEnvelope className="h-3.5 w-3.5" />}
-                            >
-                              Resend
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="flat"
-                              className="rounded-lg border border-rose-200 bg-rose-50 text-rose-700"
-                              onPress={() => onRevokeInvite(invite.id)}
-                              isLoading={actionLoading === `revoke:${invite.id}`}
-                              isDisabled={
-                                Boolean(actionLoading) &&
-                                actionLoading !== `revoke:${invite.id}`
-                              }
-                              startContent={<FaTimesCircle className="h-3.5 w-3.5" />}
-                            >
-                              Revoke
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-8 text-center">
-                      <p className="text-sm font-semibold text-gray-900">
-                        No invites
-                      </p>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Pending household invites will appear here.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </motion.aside>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
-function PreferencesPanel({
-  isOpen,
-  preferences,
-  preferredName,
-  saving,
-  canCustomizeAppearance,
-  message,
-  onClose,
-  onThemeChange,
-  onFontChange,
-  onPreferredNameChange,
-  onSavePreferredName,
-}) {
-  const selectedTheme = getThemeById(preferences.themeId);
-  const selectedFont = getFontById(preferences.fontId);
-
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          className="fixed bottom-0 right-0 top-0 z-[45] hidden transition-[left] duration-200 lg:block"
-          style={{ left: "var(--wherekeep-sidebar-offset)" }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
-        >
-          <button
-            type="button"
-            aria-label="Close preferences panel"
-            onClick={onClose}
-            className="absolute inset-0 cursor-default bg-slate-950/5"
-          />
-          <motion.aside
-            className="absolute bottom-4 left-4 top-4 flex flex-col overflow-hidden rounded-3xl border border-[var(--stocksense-brand-border)] bg-white shadow-2xl transition-[width] duration-200"
-            style={{
-              width: "min(420px, calc(100vw - var(--wherekeep-sidebar-offset) - 2rem))",
-            }}
-            initial={{ x: -24, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -24, opacity: 0 }}
-            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Preferences"
-          >
-            <div className="border-b border-gray-100 px-5 py-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--stocksense-brand)]">
-                    Account
-                  </p>
-                  <h2 className="mt-1 text-xl font-bold text-gray-950">
-                    Preferences
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Set how WhereKeep looks and what it should call you.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-gray-200 bg-white text-gray-500 transition hover:border-[var(--stocksense-brand-border)] hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-                  aria-label="Close panel"
-                >
-                  <FaTimes className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
-              {message && (
-                <div
-                  className={cx(
-                    "rounded-2xl border px-4 py-3 text-sm",
-                    message.type === "success"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                      : "border-rose-200 bg-rose-50 text-rose-700"
-                  )}
-                  role={message.type === "success" ? "status" : "alert"}
-                >
-                  {message.text}
-                </div>
-              )}
-
-              <form
-                onSubmit={onSavePreferredName}
-                className="rounded-2xl border border-gray-100 bg-gray-50/70 p-3"
-              >
-                <Input
-                  label="What should we call you?"
-                  value={preferredName}
-                  onValueChange={onPreferredNameChange}
-                  placeholder="First name or nickname"
-                  classNames={{
-                    inputWrapper: "rounded-xl border border-stocksense-gray bg-white shadow-none",
-                  }}
-                />
-                <Button
-                  type="submit"
-                  className="mt-3 rounded-xl bg-[var(--stocksense-brand)] text-white"
-                  isDisabled={saving}
-                  isLoading={saving}
-                >
-                  Save name
-                </Button>
-              </form>
-
-              <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <span
-                    className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-sm font-bold text-white shadow-sm"
-                    style={{
-                      background: `linear-gradient(135deg, ${selectedTheme.swatch}, ${selectedTheme.border})`,
-                    }}
-                  >
-                    Aa
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-950">
-                      {selectedTheme.label} with {selectedFont.label}
-                    </p>
-                    <p className="mt-0.5 text-xs text-gray-500">
-                      Changes apply across this app when saved.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  {!canCustomizeAppearance && (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
-                      Theme and font customization is included with Plus and Family.{" "}
-                      <Link href="/profile#billing" className="font-semibold underline">
-                        View plans
-                      </Link>
-                    </div>
-                  )}
-
-                  <Select
-                    label="Color theme"
-                    selectedKeys={new Set([preferences.themeId])}
-                    onSelectionChange={onThemeChange}
-                    isDisabled={saving || !canCustomizeAppearance}
-                    variant="bordered"
-                    radius="lg"
-                    classNames={themedSelectClassNames}
-                  >
-                    {THEME_OPTIONS.map((theme) => (
-                      <SelectItem key={theme.id} textValue={theme.label}>
-                        {theme.label} - {theme.description}
-                      </SelectItem>
-                    ))}
-                  </Select>
-                  <Select
-                    label="Font"
-                    selectedKeys={new Set([preferences.fontId])}
-                    onSelectionChange={onFontChange}
-                    isDisabled={saving || !canCustomizeAppearance}
-                    variant="bordered"
-                    radius="lg"
-                    classNames={themedSelectClassNames}
-                  >
-                    {FONT_OPTIONS.map((font) => (
-                      <SelectItem key={font.id} textValue={font.label}>
-                        {font.label} - {font.description}
-                      </SelectItem>
-                    ))}
-                  </Select>
-                </div>
-              </div>
-            </div>
-          </motion.aside>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
 
 function DesktopSidebar({
   activeHref,
@@ -1302,310 +591,6 @@ function DesktopSidebar({
   );
 }
 
-function MobileMenu({
-  isOpen,
-  activeHref,
-  loggingOut,
-  onClose,
-  onLogout,
-  navigationSummary = {},
-  counts = {},
-}) {
-  const householdName = navigationSummary.householdName || "Household inventory";
-  const householdRole = navigationSummary.isFamilyPlan
-    ? formatHouseholdRole(navigationSummary.householdRole)
-    : "";
-  const accountName = navigationSummary.displayName || householdName;
-  const accountMeta = navigationSummary.displayName ? householdName : householdRole;
-  const itemCount = counts.itemsCount ?? 0;
-  const locationCount = counts.locationsCount ?? 0;
-
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          className="fixed inset-0 z-[70] bg-slate-950/20 lg:hidden"
-          variants={menuBackdropVariants}
-          initial="hidden"
-          animate="show"
-          exit="exit"
-        >
-          <motion.div
-            className="flex h-full w-full flex-col overflow-y-auto bg-white px-5 pt-5 shadow-2xl pb-[max(1.25rem,env(safe-area-inset-bottom))]"
-            variants={menuPanelVariants}
-            initial="hidden"
-            animate="show"
-            exit="exit"
-          >
-            <motion.div
-              variants={menuItemVariants}
-              className="mb-5 flex items-center justify-between gap-3"
-            >
-              <Link
-                href="/dashboard"
-                onClick={onClose}
-                className="flex min-w-0 items-center gap-2"
-              >
-                <WhereKeepLogo showWordmark={false} markClassName="h-9" />
-                <span className="truncate bg-gradient-to-r from-[var(--stocksense-brand-border)] via-[var(--stocksense-brand)] to-[var(--stocksense-brand-dark)] bg-clip-text text-lg font-bold text-transparent">
-                  WhereKeep
-                </span>
-              </Link>
-              <button
-                type="button"
-                aria-label="Close menu"
-                onClick={onClose}
-                className="grid h-11 w-11 place-items-center rounded-full border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-              >
-                <FaTimes className="h-4 w-4" />
-              </button>
-            </motion.div>
-
-            <motion.div
-              variants={menuItemVariants}
-              className="mb-5 rounded-2xl border border-gray-200 bg-gray-50 p-4"
-            >
-              <p className="truncate text-base font-semibold text-gray-950">
-                {accountName}
-              </p>
-              {accountMeta ? (
-                <p className="mt-2 inline-flex rounded-full border border-[var(--stocksense-brand-border)] bg-white px-2.5 py-1 text-xs font-semibold text-[var(--stocksense-brand)]">
-                  {accountMeta}
-                </p>
-              ) : null}
-              <p className="mt-1 text-sm text-gray-600">
-                {itemCount} item{itemCount === 1 ? "" : "s"} organized
-              </p>
-              <p className="mt-2 inline-flex rounded-full border border-[var(--stocksense-brand-border)] bg-white px-2.5 py-1 text-xs font-semibold text-[var(--stocksense-brand)]">
-                {locationCount} location{locationCount === 1 ? "" : "s"}
-              </p>
-            </motion.div>
-
-            <div className="grid flex-1 content-start gap-5">
-              {mobileMenuSections.map((section) => (
-                <motion.section key={section.title} variants={menuItemVariants}>
-                  <h2 className="px-1 pb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">
-                    {section.title}
-                  </h2>
-                  <div className="grid gap-1.5">
-                    {section.items.map((item) => {
-                      const Icon = item.icon;
-                      const isActive = activeHref === item.href;
-                      const count =
-                        item.countKey && counts[item.countKey] !== undefined
-                          ? counts[item.countKey]
-                          : null;
-
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          onClick={onClose}
-                          className={cx(
-                            "relative flex min-h-12 items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition",
-                            isActive
-                              ? "border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] shadow-sm"
-                              : "border border-transparent text-gray-700 hover:border-gray-200 hover:bg-gray-50 hover:text-[var(--stocksense-brand)]"
-                          )}
-                          aria-current={isActive ? "page" : undefined}
-                        >
-                          {isActive && (
-                            <span className="absolute left-0 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-[var(--stocksense-brand)]" />
-                          )}
-                          <span
-                            className={cx(
-                              "grid h-9 w-9 shrink-0 place-items-center rounded-xl border",
-                              isActive
-                                ? "border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
-                                : "border-gray-200 bg-white text-gray-500"
-                            )}
-                          >
-                            <Icon className="h-4 w-4" />
-                          </span>
-                          <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                          {count !== null && <CountBadge value={count} />}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </motion.section>
-              ))}
-            </div>
-
-            <motion.div
-              variants={menuItemVariants}
-              className="mt-6 border-t border-gray-200 pt-4"
-            >
-              <div className="mb-4 flex items-center justify-center gap-2 text-xs font-medium text-gray-400">
-                <Link
-                  href="/terms"
-                  onClick={onClose}
-                  className="transition hover:text-[var(--stocksense-brand)]"
-                >
-                  Terms
-                </Link>
-                <span>•</span>
-                <Link
-                  href="/privacy"
-                  onClick={onClose}
-                  className="transition hover:text-[var(--stocksense-brand)]"
-                >
-                  Privacy
-                </Link>
-              </div>
-              <button
-                type="button"
-                onClick={onLogout}
-                disabled={loggingOut}
-                className={cx(
-                  "mt-3 flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left text-sm font-medium transition",
-                  loggingOut
-                    ? "cursor-not-allowed border-rose-200 bg-rose-50 text-rose-700 opacity-70"
-                    : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
-                )}
-              >
-                {loggingOut ? (
-                  <FaSpinner className="h-4 w-4 animate-spin" />
-                ) : (
-                  <FaSignOutAlt className="h-4 w-4" />
-                )}
-                {loggingOut ? "Logging out..." : "Logout"}
-              </button>
-            </motion.div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
-function AttentionSheet({
-  isOpen,
-  onClose,
-  anchor,
-  expiredCount,
-  expiringSoonCount,
-  shoppingListItems,
-}) {
-  const hasAttention =
-    expiredCount > 0 || expiringSoonCount > 0 || shoppingListItems > 0;
-  const anchoredStyle = anchor
-    ? {
-        top: `${anchor.top}px`,
-        right: `${anchor.right}px`,
-        left: "auto",
-      }
-    : undefined;
-  const arrowStyle =
-    anchor?.arrowRight !== undefined
-      ? { right: `${anchor.arrowRight}px` }
-      : undefined;
-
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          className="fixed inset-0 z-50 bg-slate-950/25 md:bg-transparent"
-          variants={menuBackdropVariants}
-          initial="hidden"
-          animate="show"
-          exit="exit"
-          onClick={onClose}
-        >
-          <motion.div
-            className="absolute left-4 right-4 top-[4.25rem] ml-auto max-h-[calc(100svh-5.25rem)] max-w-md overflow-visible rounded-2xl border border-[var(--stocksense-brand-border)] bg-white shadow-2xl md:left-auto md:right-5 md:top-[4.5rem] md:w-[390px]"
-            style={anchoredStyle}
-            variants={sheetPanelVariants}
-            initial="hidden"
-            animate="show"
-            exit="exit"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div
-              className="absolute -top-2 right-5 h-4 w-4 rotate-45 border-l border-t border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]"
-              style={arrowStyle}
-            />
-            <div className="flex items-start justify-between gap-3 rounded-t-2xl border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-4">
-              <div className="flex items-start gap-3">
-                <IconCircle
-                  icon={hasAttention ? FaBell : FaCheckCircle}
-                  tone="warning"
-                  className="h-11 w-11"
-                />
-                <div>
-                  <h2 className="text-base font-semibold text-[var(--stocksense-brand)]">
-                    Notifications
-                  </h2>
-                  <p className="mt-1 text-sm leading-5 text-slate-500">
-                    {hasAttention
-                      ? "Items that need a quick look."
-                      : "Everything looks good."}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                aria-label="Close notifications"
-                onClick={onClose}
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] transition hover:bg-[var(--stocksense-brand-soft)]"
-              >
-                <FaTimes className="h-4 w-4" />
-              </button>
-            </div>
-
-            {hasAttention ? (
-              <div className="grid gap-2 p-4">
-                {expiringSoonCount > 0 && (
-                  <Link
-                    href="/items?expiration=soon&days=3"
-                    onClick={onClose}
-                    className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-[var(--entity-warning-border)] bg-[var(--entity-warning-soft)] px-3 py-2 text-sm font-medium text-[var(--entity-warning-accent)]"
-                  >
-                    <span>
-                      {expiringSoonCount} item{expiringSoonCount === 1 ? "" : "s"} expire soon
-                    </span>
-                    <span>View</span>
-                  </Link>
-                )}
-                {expiredCount > 0 && (
-                  <Link
-                    href="/items?expiration=expired"
-                    onClick={onClose}
-                    className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700"
-                  >
-                    <span>
-                      {expiredCount} expired item{expiredCount === 1 ? "" : "s"}
-                    </span>
-                    <span>View</span>
-                  </Link>
-                )}
-                {shoppingListItems > 0 && (
-                  <Link
-                    href="/shopping-list"
-                    onClick={onClose}
-                    className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700"
-                  >
-                    <span>
-                      {shoppingListItems} shopping item{shoppingListItems === 1 ? "" : "s"} needed
-                    </span>
-                    <span className="font-semibold text-[var(--stocksense-brand)]">Open</span>
-                  </Link>
-                )}
-              </div>
-            ) : (
-              <div className="p-4">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
-                  No expired items, urgent expirations, or needed shopping list items.
-                </div>
-              </div>
-            )}
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
 export default function Navigation({
   canEditInventory = true,
   attentionCounts = {},
@@ -1802,14 +787,14 @@ export default function Navigation({
     });
   };
 
-  const handleSidebarThemeChange = (keys) => {
-    const themeId = Array.from(keys)[0];
+  const handleSidebarThemeChange = (value) => {
+    const themeId = value;
     if (!themeId || themeId === preferences.themeId) return;
     updateSidebarPreferences({ themeId: String(themeId) });
   };
 
-  const handleSidebarFontChange = (keys) => {
-    const fontId = Array.from(keys)[0];
+  const handleSidebarFontChange = (value) => {
+    const fontId = value;
     if (!fontId || fontId === preferences.fontId) return;
     updateSidebarPreferences({ fontId: String(fontId) });
   };
@@ -2078,6 +1063,45 @@ export default function Navigation({
   }, [initialPreferredName]);
 
   useEffect(() => {
+    const connection = navigator?.connection;
+    if (connection?.saveData || connection?.effectiveType === "2g") return;
+
+    let cancelled = false;
+    let idleCallbackId = null;
+    let timeoutId = null;
+
+    const prefetchRoutes = () => {
+      if (cancelled) return;
+
+      for (const href of PRIMARY_PREFETCH_ROUTES) {
+        if (href === pathname) continue;
+        router.prefetch(href);
+      }
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      idleCallbackId = window.requestIdleCallback(prefetchRoutes, {
+        timeout: 3000,
+      });
+    } else {
+      timeoutId = window.setTimeout(prefetchRoutes, 1500);
+    }
+
+    return () => {
+      cancelled = true;
+      if (
+        idleCallbackId !== null &&
+        typeof window.cancelIdleCallback === "function"
+      ) {
+        window.cancelIdleCallback(idleCallbackId);
+      }
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [pathname, router]);
+
+  useEffect(() => {
     let cancelled = false;
     let refreshTimerId = null;
 
@@ -2242,64 +1266,72 @@ export default function Navigation({
         onOpenAttention={openAttentionSheet}
       />
 
-      <HouseholdSharingPanel
-        activePanel={sharingPanel}
-        activeTab={sharingTab}
-        sharing={sharingData}
-        loading={sharingLoading}
-        actionLoading={sharingActionLoading}
-        error={sharingError}
-        message={sharingMessage}
-        inviteEmail={inviteEmail}
-        inviteRole={inviteRole}
-        copiedInviteId={copiedInviteId}
-        onClose={() => setSharingPanel(null)}
-        onSelectTab={setSharingTab}
-        onInviteEmailChange={setInviteEmail}
-        onInviteRoleChange={setInviteRole}
-        onCreateInvite={handleCreateSidebarInvite}
-        onCopyInvite={handleCopySidebarInvite}
-        onResendInvite={handleResendSidebarInvite}
-        onRevokeInvite={handleRevokeSidebarInvite}
-        onUpdateMemberRole={handleUpdateSidebarMemberRole}
-        onRequestRemoveMember={handleRequestSidebarRemoveMember}
-      />
+      {sharingPanel === "members" && (
+        <HouseholdSharingPanel
+          activePanel={sharingPanel}
+          activeTab={sharingTab}
+          sharing={sharingData}
+          loading={sharingLoading}
+          actionLoading={sharingActionLoading}
+          error={sharingError}
+          message={sharingMessage}
+          inviteEmail={inviteEmail}
+          inviteRole={inviteRole}
+          copiedInviteId={copiedInviteId}
+          onClose={() => setSharingPanel(null)}
+          onSelectTab={setSharingTab}
+          onInviteEmailChange={setInviteEmail}
+          onInviteRoleChange={setInviteRole}
+          onCreateInvite={handleCreateSidebarInvite}
+          onCopyInvite={handleCopySidebarInvite}
+          onResendInvite={handleResendSidebarInvite}
+          onRevokeInvite={handleRevokeSidebarInvite}
+          onUpdateMemberRole={handleUpdateSidebarMemberRole}
+          onRequestRemoveMember={handleRequestSidebarRemoveMember}
+        />
+      )}
 
-      <PreferencesPanel
-        isOpen={sharingPanel === "preferences"}
-        preferences={preferences}
-        preferredName={preferredName}
-        saving={preferenceSaving}
-        canCustomizeAppearance={canCustomizeAppearance}
-        message={preferenceMessage}
-        onClose={() => setSharingPanel(null)}
-        onThemeChange={handleSidebarThemeChange}
-        onFontChange={handleSidebarFontChange}
-        onPreferredNameChange={setPreferredName}
-        onSavePreferredName={handleSavePreferredName}
-      />
+      {sharingPanel === "preferences" && (
+        <PreferencesPanel
+          isOpen={sharingPanel === "preferences"}
+          preferences={preferences}
+          preferredName={preferredName}
+          saving={preferenceSaving}
+          canCustomizeAppearance={canCustomizeAppearance}
+          message={preferenceMessage}
+          onClose={() => setSharingPanel(null)}
+          onThemeChange={handleSidebarThemeChange}
+          onFontChange={handleSidebarFontChange}
+          onPreferredNameChange={setPreferredName}
+          onSavePreferredName={handleSavePreferredName}
+        />
+      )}
 
-      <MobileMenu
-        isOpen={isMenuOpen}
-        activeHref={activeHref}
-        loggingOut={loggingOut}
-        navigationSummary={navigationSummary}
-        counts={liveAttentionCounts}
-        onClose={() => setIsMenuOpen(false)}
-        onLogout={() => {
-          setIsMenuOpen(false);
-          setShowLogoutModal(true);
-        }}
-      />
+      {isMenuOpen && (
+        <MobileMenu
+          isOpen={isMenuOpen}
+          activeHref={activeHref}
+          loggingOut={loggingOut}
+          navigationSummary={navigationSummary}
+          counts={liveAttentionCounts}
+          onClose={() => setIsMenuOpen(false)}
+          onLogout={() => {
+            setIsMenuOpen(false);
+            setShowLogoutModal(true);
+          }}
+        />
+      )}
 
-      <AttentionSheet
-        isOpen={isAttentionOpen}
-        onClose={() => setIsAttentionOpen(false)}
-        anchor={attentionAnchor}
-        expiredCount={expiredCount}
-        expiringSoonCount={expiringSoonCount}
-        shoppingListItems={shoppingListNeededItems}
-      />
+      {isAttentionOpen && (
+        <AttentionSheet
+          isOpen={isAttentionOpen}
+          onClose={() => setIsAttentionOpen(false)}
+          anchor={attentionAnchor}
+          expiredCount={expiredCount}
+          expiringSoonCount={expiringSoonCount}
+          shoppingListItems={shoppingListNeededItems}
+        />
+      )}
 
       <nav
         className={cx(
@@ -2365,7 +1397,7 @@ export default function Navigation({
         </div>
       </nav>
 
-      {canEditInventory && (
+      {canEditInventory && showAddItemModal && (
         <GlobalAddItemModal
           isOpen={showAddItemModal}
           initialContext={addItemContext}
@@ -2376,108 +1408,26 @@ export default function Navigation({
         />
       )}
 
-      <GlobalItemSearchModal
-        isOpen={showItemSearchModal}
-        onClose={() => setShowItemSearchModal(false)}
-      />
+      {showItemSearchModal && (
+        <GlobalItemSearchModal
+          isOpen={showItemSearchModal}
+          onClose={() => setShowItemSearchModal(false)}
+        />
+      )}
 
-      <Modal
-        isOpen={showAddActionSheet}
-        onOpenChange={setShowAddActionSheet}
-        placement="bottom"
-        classNames={{
-          wrapper: "max-md:items-end",
-          base: "mx-0 mb-0 max-md:w-screen max-md:max-w-none rounded-b-none rounded-t-2xl sm:mx-auto sm:mb-4 sm:rounded-2xl",
-        }}
-      >
-        <ModalContent
-          className={`${modalContentClass} max-md:h-auto max-md:max-h-[85svh] max-md:rounded-b-none max-md:rounded-t-2xl max-md:border max-md:border-gray-200 max-md:bg-white max-md:shadow-2xl`}
-          style={modalContentStyle}
-        >
-          {(onClose) => (
-            <>
-              <ModalHeader className={modalHeaderClass}>
-                Add to WhereKeep
-              </ModalHeader>
-              <ModalBody className={`${modalBodyClass} grid gap-2`}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    setAddItemContext(routeAddItemContext);
-                    setShowAddItemModal(true);
-                  }}
-                  className="flex min-h-14 items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2 text-left text-gray-700 shadow-sm transition hover:border-[var(--entity-item-border)] hover:bg-gray-50"
-                >
-                  <FaBoxOpen className="h-4 w-4 shrink-0 text-[var(--entity-item-accent)]" />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold">Add item</span>
-                    <span className="block text-xs text-gray-600">
-                      Scan, upload, or type item details.
-                    </span>
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    router.push("/locations?create=location");
-                  }}
-                  className="flex min-h-14 items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2 text-left text-gray-700 shadow-sm transition hover:border-[var(--entity-location-border)] hover:bg-gray-50"
-                >
-                  <FaMapMarkedAlt className="h-4 w-4 shrink-0 text-[var(--entity-location-accent)]" />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold">Add location</span>
-                    <span className="block text-xs text-gray-600">
-                      Create the place that holds storage areas.
-                    </span>
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    router.push("/locations");
-                  }}
-                  className="flex min-h-14 items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2 text-left text-gray-700 shadow-sm transition hover:border-[var(--entity-area-border)] hover:bg-gray-50"
-                >
-                  <FaWarehouse className="h-4 w-4 shrink-0 text-[var(--entity-area-accent)]" />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold">Add storage area</span>
-                    <span className="block text-xs text-gray-600">
-                      Choose a location, then add its room, shelf, or bin.
-                    </span>
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    router.push("/locations");
-                  }}
-                  className="flex min-h-14 items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2 text-left text-gray-700 shadow-sm transition hover:border-[var(--entity-category-border)] hover:bg-gray-50"
-                >
-                  <FaTags className="h-4 w-4 shrink-0 text-[var(--entity-category-accent)]" />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold">Add category</span>
-                    <span className="block text-xs text-gray-600">
-                      Choose a location and storage area, then add its category.
-                    </span>
-                  </span>
-                </button>
-              </ModalBody>
-              <ModalFooter className={modalFooterClass}>
-                <Button variant="light" className="rounded-xl" onPress={onClose}>
-                  Cancel
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+      {showAddActionSheet && (
+        <NavigationAddActionSheet
+          isOpen={showAddActionSheet}
+          onOpenChange={setShowAddActionSheet}
+          onAddItem={() => {
+            setAddItemContext(routeAddItemContext);
+            setShowAddItemModal(true);
+          }}
+          onAddLocation={() => router.push("/locations?create=location")}
+          onAddArea={() => router.push("/locations")}
+          onAddCategory={() => router.push("/locations")}
+        />
+      )}
 
       {addItemNotice && (
         <div className="fixed right-4 top-4 z-50 max-w-sm rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-lg">
@@ -2490,119 +1440,23 @@ export default function Navigation({
         </div>
       )}
 
-      <Modal
-        isOpen={Boolean(removeMemberCandidate)}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) handleCancelSidebarRemoveMember();
-        }}
-        placement="center"
-        classNames={{
-          wrapper: "max-md:items-end",
-          base: "max-md:m-0 max-md:w-screen max-md:max-w-none max-md:rounded-b-none max-md:rounded-t-2xl",
-        }}
-      >
-        <ModalContent
-          className={`${modalContentClass} max-md:h-auto max-md:max-h-[80svh] max-md:rounded-b-none max-md:rounded-t-2xl max-md:border max-md:border-gray-200 max-md:bg-white max-md:shadow-2xl`}
-          style={modalContentStyle}
-        >
-          {(onClose) => {
-            const memberLabel =
-              removeMemberCandidate?.displayName ||
-              removeMemberCandidate?.email ||
-              "this member";
-            const removing =
-              sharingActionLoading === `remove:${removeMemberCandidate?.userId}`;
+      {removeMemberCandidate && (
+        <NavigationRemoveMemberModal
+          candidate={removeMemberCandidate}
+          actionLoading={sharingActionLoading}
+          onCancel={handleCancelSidebarRemoveMember}
+          onConfirm={handleConfirmSidebarRemoveMember}
+        />
+      )}
 
-            return (
-              <>
-                <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
-                  Remove member
-                </ModalHeader>
-                <ModalBody className={modalBodyClass}>
-                  <p className="text-sm text-gray-600">
-                    Remove {memberLabel} from this household? They will lose access to this shared inventory.
-                  </p>
-                </ModalBody>
-                <ModalFooter className={modalFooterClass}>
-                  <Button
-                    variant="light"
-                    className="rounded-xl"
-                    onPress={onClose}
-                    isDisabled={removing}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="rounded-xl bg-rose-600 text-white"
-                    onPress={() => handleConfirmSidebarRemoveMember(removeMemberCandidate)}
-                    isLoading={removing}
-                    isDisabled={!removeMemberCandidate}
-                    startContent={!removing && <FaTimesCircle className="h-3.5 w-3.5" />}
-                  >
-                    Remove member
-                  </Button>
-                </ModalFooter>
-              </>
-            );
-          }}
-        </ModalContent>
-      </Modal>
-
-      {/* Logout confirmation modal */}
-      <Modal
-        isOpen={showLogoutModal}
-        onOpenChange={setShowLogoutModal}
-        placement="center"
-        classNames={{
-          wrapper: "max-md:items-end",
-          base: "max-md:m-0 max-md:w-screen max-md:max-w-none max-md:rounded-b-none max-md:rounded-t-2xl",
-        }}
-      >
-        <ModalContent
-          className={`${modalContentClass} max-md:h-auto max-md:max-h-[80svh] max-md:rounded-b-none max-md:rounded-t-2xl max-md:border max-md:border-gray-200 max-md:bg-white max-md:shadow-2xl`}
-          style={modalContentStyle}
-        >
-          {(onClose) => (
-            <>
-              <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
-                Confirm logout
-              </ModalHeader>
-              <ModalBody className={modalBodyClass}>
-                <p className="text-sm text-gray-600">
-                  Are you sure you want to log out?
-                </p>
-              </ModalBody>
-              <ModalFooter className={modalFooterClass}>
-                <Button
-                  variant="light"
-                  className="rounded-xl"
-                  onPress={onClose}
-                  isDisabled={loggingOut}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="rounded-xl bg-rose-600 text-white"
-                  onPress={async () => {
-                    onClose();
-                    await handleLogout();
-                  }}
-                  isDisabled={loggingOut}
-                  startContent={
-                    loggingOut ? (
-                      <FaSpinner className="animate-spin" />
-                    ) : (
-                      <FaSignOutAlt />
-                    )
-                  }
-                >
-                  {loggingOut ? "Logging out..." : "Logout"}
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+      {showLogoutModal && (
+        <NavigationLogoutModal
+          isOpen={showLogoutModal}
+          onOpenChange={setShowLogoutModal}
+          loggingOut={loggingOut}
+          onLogout={handleLogout}
+        />
+      )}
     </>
   );
 }

@@ -4,8 +4,8 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
-import { Button, Input, Select, SelectItem } from "@heroui/react";
+import { AnimatePresence, motion } from "@/components/ui/MotionLite";
+import { Button, Input } from "@heroui/react";
 import {
   FaBoxOpen,
   FaCheckCircle,
@@ -62,7 +62,7 @@ import {
   updatePreferredNameAction,
   updateUserPreferencesAction,
 } from "@/app/actions/preferences";
-import { themedSelectClassNames } from "@/components/modals/modalTheme";
+import NativeSelect from "@/components/ui/NativeSelect";
 
 const ConfirmDeleteModal = dynamic(
   () => import("@/components/modals/ConfirmDeleteModal"),
@@ -708,24 +708,19 @@ function SharingSection({
                     inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
                   }}
                 />
-                <Select
+                <NativeSelect
                   label="Role"
-                  selectedKeys={new Set([inviteRole])}
-                  onSelectionChange={(keys) => {
-                    const value = Array.from(keys)[0];
+                  aria-label="Invite role"
+                  value={inviteRole}
+                  onChange={(value) => {
                     if (value) onInviteRoleChange(String(value));
                   }}
-                  isDisabled={loading === "invite" || !sharing.canInvite}
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  {HOUSEHOLD_ROLE_OPTIONS.map((role) => (
-                    <SelectItem key={role.id} textValue={role.label}>
-                      {role.label} - {role.description}
-                    </SelectItem>
-                  ))}
-                </Select>
+                  disabled={loading === "invite" || !sharing.canInvite}
+                  options={HOUSEHOLD_ROLE_OPTIONS.map((role) => ({
+                    value: role.id,
+                    label: `${role.label} - ${role.description}`,
+                  }))}
+                />
                 <Button
                   type="submit"
                   className="h-14 rounded-xl bg-[var(--stocksense-brand)] px-5 text-white lg:self-end"
@@ -776,24 +771,20 @@ function SharingSection({
                   </div>
                   {isOwner && member.role !== "owner" ? (
                     <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
-                      <Select
+                      <NativeSelect
                         aria-label={`Role for ${member.email}`}
-                        size="sm"
-                        selectedKeys={new Set([member.role === "viewer" ? "viewer" : "editor"])}
-                        onSelectionChange={(keys) => {
-                          const value = Array.from(keys)[0];
+                        value={member.role === "viewer" ? "viewer" : "editor"}
+                        onChange={(value) => {
                           if (value) onUpdateMemberRole(member, String(value));
                         }}
-                        isDisabled={loading === `role:${member.userId}`}
-                        variant="bordered"
-                        radius="lg"
+                        disabled={loading === `role:${member.userId}`}
                         className="w-36"
-                        classNames={themedSelectClassNames}
-                      >
-                        {HOUSEHOLD_ROLE_OPTIONS.map((role) => (
-                          <SelectItem key={role.id}>{role.label}</SelectItem>
-                        ))}
-                      </Select>
+                        triggerClassName="h-9 text-xs"
+                        options={HOUSEHOLD_ROLE_OPTIONS.map((role) => ({
+                          value: role.id,
+                          label: role.label,
+                        }))}
+                      />
                       <Button
                         size="sm"
                         variant="flat"
@@ -1148,14 +1139,14 @@ export default function ProfileClient({
     });
   };
 
-  const handleThemeChange = (keys) => {
-    const themeId = Array.from(keys)[0];
+  const handleThemeChange = (value) => {
+    const themeId = value;
     if (!themeId || themeId === preferences.themeId) return;
     updatePreferences({ themeId: String(themeId) });
   };
 
-  const handleFontChange = (keys) => {
-    const fontId = Array.from(keys)[0];
+  const handleFontChange = (value) => {
+    const fontId = value;
     if (!fontId || fontId === preferences.fontId) return;
     updatePreferences({ fontId: String(fontId) });
   };
@@ -1462,39 +1453,39 @@ export default function ProfileClient({
               </div>
             )}
 
-            <Select
-              label="Color theme"
-              selectedKeys={new Set([preferences.themeId])}
-              onSelectionChange={handleThemeChange}
-              isDisabled={savingPreferences || !canCustomizeAppearance}
-              variant="bordered"
-              radius="lg"
-              startContent={<FaPalette className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />}
-              classNames={themedSelectClassNames}
-            >
-              {THEME_OPTIONS.map((theme) => (
-                <SelectItem key={theme.id} textValue={theme.label}>
-                  {theme.label} - {theme.description}
-                </SelectItem>
-              ))}
-            </Select>
+            <NativeSelect
+              label={
+                <span className="inline-flex items-center gap-1.5">
+                  <FaPalette className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+                  Color theme
+                </span>
+              }
+              aria-label="Color theme"
+              value={preferences.themeId}
+              onChange={handleThemeChange}
+              disabled={savingPreferences || !canCustomizeAppearance}
+              options={THEME_OPTIONS.map((theme) => ({
+                value: theme.id,
+                label: `${theme.label} - ${theme.description}`,
+              }))}
+            />
 
-            <Select
-              label="Font family"
-              selectedKeys={new Set([preferences.fontId])}
-              onSelectionChange={handleFontChange}
-              isDisabled={savingPreferences || !canCustomizeAppearance}
-              variant="bordered"
-              radius="lg"
-              startContent={<FaFont className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />}
-              classNames={themedSelectClassNames}
-            >
-              {FONT_OPTIONS.map((font) => (
-                <SelectItem key={font.id} textValue={font.label}>
-                  {font.label} - {font.description}
-                </SelectItem>
-              ))}
-            </Select>
+            <NativeSelect
+              label={
+                <span className="inline-flex items-center gap-1.5">
+                  <FaFont className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+                  Font family
+                </span>
+              }
+              aria-label="Font family"
+              value={preferences.fontId}
+              onChange={handleFontChange}
+              disabled={savingPreferences || !canCustomizeAppearance}
+              options={FONT_OPTIONS.map((font) => ({
+                value: font.id,
+                label: `${font.label} - ${font.description}`,
+              }))}
+            />
 
             <Button
               variant="flat"
@@ -1662,24 +1653,19 @@ export default function ProfileClient({
                         inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
                       }}
                     />
-                    <Select
+                    <NativeSelect
                       label="Role"
-                      selectedKeys={new Set([inviteRole])}
-                      onSelectionChange={(keys) => {
-                        const value = Array.from(keys)[0];
+                      aria-label="Invite role"
+                      value={inviteRole}
+                      onChange={(value) => {
                         if (value) setInviteRole(String(value));
                       }}
-                      isDisabled={sharingLoading === "invite" || !sharing.canInvite}
-                      variant="bordered"
-                      radius="lg"
-                      classNames={themedSelectClassNames}
-                    >
-                      {HOUSEHOLD_ROLE_OPTIONS.map((role) => (
-                        <SelectItem key={role.id} textValue={role.label}>
-                          {role.label} - {role.description}
-                        </SelectItem>
-                      ))}
-                    </Select>
+                      disabled={sharingLoading === "invite" || !sharing.canInvite}
+                      options={HOUSEHOLD_ROLE_OPTIONS.map((role) => ({
+                        value: role.id,
+                        label: `${role.label} - ${role.description}`,
+                      }))}
+                    />
                     <Button
                       type="submit"
                       className="h-12 w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
@@ -2058,39 +2044,39 @@ export default function ProfileClient({
               )}
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Select
-                  label="Color theme"
-                  selectedKeys={new Set([preferences.themeId])}
-                  onSelectionChange={handleThemeChange}
-                  isDisabled={savingPreferences || !canCustomizeAppearance}
-                  variant="bordered"
-                  radius="lg"
-                  startContent={<FaPalette className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />}
-                  classNames={themedSelectClassNames}
-                >
-                  {THEME_OPTIONS.map((theme) => (
-                    <SelectItem key={theme.id} textValue={theme.label}>
-                      {theme.label} - {theme.description}
-                    </SelectItem>
-                  ))}
-                </Select>
+                <NativeSelect
+                  label={
+                    <span className="inline-flex items-center gap-1.5">
+                      <FaPalette className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+                      Color theme
+                    </span>
+                  }
+                  aria-label="Color theme"
+                  value={preferences.themeId}
+                  onChange={handleThemeChange}
+                  disabled={savingPreferences || !canCustomizeAppearance}
+                  options={THEME_OPTIONS.map((theme) => ({
+                    value: theme.id,
+                    label: `${theme.label} - ${theme.description}`,
+                  }))}
+                />
 
-                <Select
-                  label="Font family"
-                  selectedKeys={new Set([preferences.fontId])}
-                  onSelectionChange={handleFontChange}
-                  isDisabled={savingPreferences || !canCustomizeAppearance}
-                  variant="bordered"
-                  radius="lg"
-                  startContent={<FaFont className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />}
-                  classNames={themedSelectClassNames}
-                >
-                  {FONT_OPTIONS.map((font) => (
-                    <SelectItem key={font.id} textValue={font.label}>
-                      {font.label} - {font.description}
-                    </SelectItem>
-                  ))}
-                </Select>
+                <NativeSelect
+                  label={
+                    <span className="inline-flex items-center gap-1.5">
+                      <FaFont className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+                      Font family
+                    </span>
+                  }
+                  aria-label="Font family"
+                  value={preferences.fontId}
+                  onChange={handleFontChange}
+                  disabled={savingPreferences || !canCustomizeAppearance}
+                  options={FONT_OPTIONS.map((font) => ({
+                    value: font.id,
+                    label: `${font.label} - ${font.description}`,
+                  }))}
+                />
               </div>
 
               <AppearancePreview theme={selectedTheme} font={selectedFont} />

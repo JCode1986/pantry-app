@@ -6,19 +6,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   Button,
-  DatePicker,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownTrigger,
   Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Select,
-  SelectItem,
 } from "@heroui/react";
 import {
   FaArrowsAlt,
@@ -26,7 +14,6 @@ import {
   FaBoxOpen,
   FaChevronRight,
   FaEdit,
-  FaEllipsisV,
   FaExclamationTriangle,
   FaMapMarkedAlt,
   FaPlus,
@@ -35,7 +22,6 @@ import {
   FaTrash,
   FaWarehouse,
 } from "react-icons/fa";
-import { parseDate } from "@internationalized/date";
 import {
   deleteCategory,
   deleteItem,
@@ -46,31 +32,26 @@ import {
   updateItemsLocation,
   updateItem,
 } from "@/app/actions/server";
-import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import OpenGlobalAddItemButton from "@/components/ui/OpenGlobalAddItemButton";
-import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
-import {
-  modalBodyClass,
-  modalContentClass,
-  modalContentStyle,
-  modalFooterClass,
-  modalHeaderClass,
-  modalInputClassNames,
-  mobileSheetModalClassNames,
-  themedSelectClassNames,
-} from "@/components/modals/modalTheme";
+import NativeDropdown from "@/components/ui/NativeDropdown";
+import NativeSelect from "@/components/ui/NativeSelect";
 import { emitInventoryChange, ITEM_ADDED_EVENT } from "@/utils/clientEvents";
 import { daysUntil, isExpiringSoon, toNonNegativeInteger } from "@/utils/pantry/date";
 import { normalizeMoveLocations } from "@/utils/pantry/moveLocations";
+import useDebouncedValue from "@/utils/useDebouncedValue";
 import PaginationControls from "@/components/ui/PaginationControls";
 import SearchResultsLoadingState from "@/components/ui/SearchResultsLoadingState";
 
 const MoveItemsModal = dynamic(() => import("@/components/items/MoveItemsModal"), {
   ssr: false,
 });
-const EntityImageManager = dynamic(
-  () => import("@/components/inventory/EntityImageManager"),
+const CategoryEditModal = dynamic(
+  () => import("@/components/categories/CategoryEditModal"),
+  { ssr: false }
+);
+const CategoryItemEditModal = dynamic(
+  () => import("@/components/categories/CategoryItemEditModal"),
   { ssr: false }
 );
 const ConfirmDeleteModal = dynamic(
@@ -195,18 +176,11 @@ export default function CategoryDetailClient({
   const [moveDestinationsError, setMoveDestinationsError] = useState("");
   const moveDestinationsRequestRef = useRef(null);
   const [selectedItemIds, setSelectedItemIds] = useState(() => new Set());
-  const itemModalExpirationDateValue = useMemo(() => {
-    if (!itemModal.expirationDate) return null;
-
-    try {
-      return parseDate(itemModal.expirationDate);
-    } catch {
-      return null;
-    }
-  }, [itemModal.expirationDate]);
   const selectedCount = selectedItemIds.size;
   const allItemsSelected = items.length > 0 && selectedCount === items.length;
+  const debouncedSearch = useDebouncedValue(search, 250);
   const normalizedSearch = search.trim().toLowerCase();
+  const requestSearch = debouncedSearch.trim().toLowerCase();
   const itemsLoadRequestIdRef = useRef(0);
   const requestExpirationFilter = [
     EXPIRATION_FILTERS.EXPIRED,
@@ -235,7 +209,7 @@ export default function CategoryDetailClient({
           limit: CATEGORY_ITEMS_PAGE_SIZE,
           filters: {
             categoryId: category?.id,
-            search: normalizedSearch,
+            search: requestSearch,
             expirationFilter: requestExpirationFilter,
             expirationDays: EXPIRING_SOON_DAYS,
             stockFilter: requestStockFilter,
@@ -272,7 +246,7 @@ export default function CategoryDetailClient({
         }
       }
     },
-    [category?.id, normalizedSearch, requestExpirationFilter, requestStockFilter, sortBy]
+    [category?.id, requestExpirationFilter, requestSearch, requestStockFilter, sortBy]
   );
 
   const initialLoadSkippedRef = useRef(false);
@@ -289,7 +263,7 @@ export default function CategoryDetailClient({
   useEffect(() => {
     setCurrentPage(1);
     clearSelection();
-  }, [normalizedSearch, sortBy, statusFilter]);
+  }, [requestSearch, sortBy, statusFilter]);
   const totalPages = Math.max(1, Math.ceil(totalItemCount / CATEGORY_ITEMS_PAGE_SIZE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const startItem =
@@ -427,7 +401,7 @@ export default function CategoryDetailClient({
         return false;
       }
 
-      if (!normalizedSearch) return true;
+      if (!requestSearch) return true;
 
       const searchable = [
         item.name,
@@ -440,9 +414,9 @@ export default function CategoryDetailClient({
         .join(" ")
         .toLowerCase();
 
-      return searchable.includes(normalizedSearch);
+      return searchable.includes(requestSearch);
     },
-    [normalizedSearch, requestExpirationFilter, requestStockFilter]
+    [requestExpirationFilter, requestSearch, requestStockFilter]
   );
 
   useEffect(() => {
@@ -1112,36 +1086,20 @@ export default function CategoryDetailClient({
             }}
           />
           <div className="flex w-full max-w-5xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <Select
+            <NativeSelect
               aria-label="Filter items by status"
-              selectedKeys={new Set([statusFilter])}
-              onSelectionChange={(keys) =>
-                setStatusFilter(String(Array.from(keys)[0] || FILTER_ALL))
-              }
-              variant="bordered"
-              radius="lg"
               className="w-full sm:w-44"
-              classNames={themedSelectClassNames}
-            >
-              {STATUS_OPTIONS.map(([value, label]) => (
-                <SelectItem key={value}>{label}</SelectItem>
-              ))}
-            </Select>
-            <Select
+              value={statusFilter}
+              onChange={(value) => setStatusFilter(value || FILTER_ALL)}
+              options={STATUS_OPTIONS.map(([value, label]) => ({ value, label }))}
+            />
+            <NativeSelect
               aria-label="Sort items"
-              selectedKeys={new Set([sortBy])}
-              onSelectionChange={(keys) =>
-                setSortBy(String(Array.from(keys)[0] || "name_asc"))
-              }
-              variant="bordered"
-              radius="lg"
               className="w-full sm:w-40"
-              classNames={themedSelectClassNames}
-            >
-              {SORT_OPTIONS.map(([value, label]) => (
-                <SelectItem key={value}>{label}</SelectItem>
-              ))}
-            </Select>
+              value={sortBy}
+              onChange={(value) => setSortBy(value || "name_asc")}
+              options={SORT_OPTIONS.map(([value, label]) => ({ value, label }))}
+            />
             <OpenGlobalAddItemButton
               context={{
                 locationId: location?.id,
@@ -1192,20 +1150,25 @@ export default function CategoryDetailClient({
               input: "text-sm text-gray-900 placeholder:text-gray-400",
             }}
           />
-          <Select
+          <NativeSelect
             aria-label="Sort items"
-            selectedKeys={new Set([sortBy])}
-            onSelectionChange={(keys) =>
-              setSortBy(String(Array.from(keys)[0] || "name_asc"))
-            }
-            variant="bordered"
-            radius="lg"
-            classNames={themedSelectClassNames}
-          >
-            {SORT_OPTIONS.map(([value, label]) => (
-              <SelectItem key={value}>{label}</SelectItem>
-            ))}
-          </Select>
+            value={sortBy}
+            onChange={(value) => setSortBy(value || "name_asc")}
+            options={SORT_OPTIONS.map(([value, label]) => ({ value, label }))}
+          />
+        </div>
+
+        <div className="mt-3">
+          <PaginationControls
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            startItem={startItem}
+            endItem={endItem}
+            totalItems={totalItemCount}
+            isLoading={isLoadingItems}
+            onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
+            onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+          />
         </div>
 
         {canEditInventory && selectedCount > 0 && (
@@ -1254,19 +1217,6 @@ export default function CategoryDetailClient({
             </div>
           </div>
         )}
-
-        <div className="mt-3">
-          <PaginationControls
-            currentPage={safeCurrentPage}
-            totalPages={totalPages}
-            startItem={startItem}
-            endItem={endItem}
-            totalItems={totalItemCount}
-            isLoading={isLoadingItems}
-            onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
-            onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-          />
-        </div>
 
         <div className="mt-3 grid gap-3">
           {items.map((item) => {
@@ -1334,48 +1284,34 @@ export default function CategoryDetailClient({
                     onClick={(event) => event.stopPropagation()}
                     onKeyDown={(event) => event.stopPropagation()}
                   >
-                    <Dropdown placement="bottom-end">
-                      <DropdownTrigger>
-                        <Button
-                          isIconOnly
-                          variant="light"
-                          radius="lg"
-                          className="h-9 w-9 min-w-9 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-                          aria-label={`${item.name} actions`}
-                        >
-                          <FaEllipsisV className="h-4 w-4" />
-                        </Button>
-                      </DropdownTrigger>
-                      <DropdownMenu aria-label={`${item.name} actions`}>
-                        <DropdownItem key="select" onPress={() => toggleSelectItem(item.id)}>
-                          {isSelected
+                    <NativeDropdown
+                      ariaLabel={`${item.name} actions`}
+                      items={[
+                        {
+                          key: "select",
+                          label: isSelected
                             ? "Deselect for bulk action"
-                            : "Select for bulk action"}
-                        </DropdownItem>
-                        <DropdownItem
-                          key="edit"
-                          onPress={() => openEditItem(item)}
-                        >
-                          Edit Item
-                        </DropdownItem>
-                        <DropdownItem
-                          key="move"
-                          startContent={<FaArrowsAlt className="h-3.5 w-3.5" />}
-                          onPress={() => openMoveItem(item)}
-                        >
-                          Move Item
-                        </DropdownItem>
-                        <DropdownItem
-                          key="delete"
-                          className="text-danger"
-                          color="danger"
-                          startContent={<FaTrash className="h-3.5 w-3.5" />}
-                          onPress={() => openDeleteItem(item)}
-                        >
-                          Delete Item
-                        </DropdownItem>
-                      </DropdownMenu>
-                    </Dropdown>
+                            : "Select for bulk action",
+                          onSelect: () => toggleSelectItem(item.id),
+                        },
+                        {
+                          key: "edit",
+                          label: "Edit Item",
+                          onSelect: () => openEditItem(item),
+                        },
+                        {
+                          key: "move",
+                          label: "Move Item",
+                          onSelect: () => openMoveItem(item),
+                        },
+                        {
+                          key: "delete",
+                          label: "Delete Item",
+                          danger: true,
+                          onSelect: () => openDeleteItem(item),
+                        },
+                      ]}
+                    />
                   </div>
                 )}
               </div>
@@ -1488,12 +1424,12 @@ export default function CategoryDetailClient({
             ) : null}
           </div>
 
-          {canEditInventory && items.length > 0 ? (
+          {canEditInventory && selectedCount > 0 ? (
             <div className="mt-4 rounded-[1.35rem] border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-[var(--stocksense-brand)]">
-                    {selectedCount} selected
+                    Bulk actions for {selectedCount} selected item{selectedCount === 1 ? "" : "s"}
                   </p>
                   <p className="text-xs text-[var(--stocksense-brand)]">
                     Select items to move or delete together.
@@ -1506,7 +1442,7 @@ export default function CategoryDetailClient({
                     className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
                     onPress={toggleSelectAllItems}
                   >
-                    {allItemsSelected ? "Deselect all" : "Select all"}
+                    {allItemsSelected ? "Deselect all" : "Select all visible"}
                   </Button>
                   <Button
                     size="sm"
@@ -1687,48 +1623,34 @@ export default function CategoryDetailClient({
                         </span>
                       ) : null}
                       {canEditInventory ? (
-                        <Dropdown placement="bottom-end">
-                          <DropdownTrigger>
-                            <Button
-                              isIconOnly
-                              variant="light"
-                              radius="lg"
-                              className="h-9 w-9 min-w-9 shrink-0 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-                              aria-label={`${item.name} actions`}
-                            >
-                              <FaEllipsisV className="h-4 w-4" />
-                            </Button>
-                          </DropdownTrigger>
-                          <DropdownMenu aria-label={`${item.name} actions`}>
-                            <DropdownItem key="edit" onPress={() => openEditItem(item)}>
-                              Edit Item
-                            </DropdownItem>
-                            <DropdownItem
-                              key="move"
-                              startContent={<FaArrowsAlt className="h-3.5 w-3.5" />}
-                              onPress={() => openMoveItem(item)}
-                            >
-                              Move Item
-                            </DropdownItem>
-                            <DropdownItem
-                              key="select"
-                              onPress={() => toggleSelectItem(item.id)}
-                            >
-                              {isSelected
+                        <NativeDropdown
+                          ariaLabel={`${item.name} actions`}
+                          items={[
+                            {
+                              key: "edit",
+                              label: "Edit Item",
+                              onSelect: () => openEditItem(item),
+                            },
+                            {
+                              key: "move",
+                              label: "Move Item",
+                              onSelect: () => openMoveItem(item),
+                            },
+                            {
+                              key: "select",
+                              label: isSelected
                                 ? "Deselect for bulk action"
-                                : "Select for bulk action"}
-                            </DropdownItem>
-                            <DropdownItem
-                              key="delete"
-                              className="text-danger"
-                              color="danger"
-                              startContent={<FaTrash className="h-3.5 w-3.5" />}
-                              onPress={() => openDeleteItem(item)}
-                            >
-                              Delete Item
-                            </DropdownItem>
-                          </DropdownMenu>
-                        </Dropdown>
+                                : "Select for bulk action",
+                              onSelect: () => toggleSelectItem(item.id),
+                            },
+                            {
+                              key: "delete",
+                              label: "Delete Item",
+                              danger: true,
+                              onSelect: () => openDeleteItem(item),
+                            },
+                          ]}
+                        />
                       ) : null}
                     </div>
                   </article>
@@ -1835,209 +1757,36 @@ export default function CategoryDetailClient({
         </div>
       </section>
 
-      {canEditInventory && (
-        <Modal
+      {canEditInventory && editCategoryOpen && (
+        <CategoryEditModal
           isOpen={editCategoryOpen}
           onOpenChange={setEditCategoryOpen}
-          placement="center"
-          scrollBehavior="inside"
-          classNames={mobileSheetModalClassNames}
-        >
-          <ModalContent className={modalContentClass} style={modalContentStyle}>
-            {(onClose) => (
-              <>
-                <ModalHeader className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}>
-                  <span className="min-w-0 flex-1 truncate">Edit category</span>
-                  <Button
-                    size="sm"
-                    className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
-                    onPress={saveCategoryName}
-                    isLoading={isSaving}
-                    isDisabled={!editCategoryName.trim()}
-                  >
-                    Save
-                  </Button>
-                  <MobileSheetCloseButton onPress={onClose} />
-                </ModalHeader>
-                <ModalBody className={`space-y-3 ${modalBodyClass}`}>
-                  <Input
-                    label="Category name"
-                    value={editCategoryName}
-                    onValueChange={setEditCategoryName}
-                    isDisabled={isSaving}
-                    variant="bordered"
-                    radius="lg"
-                    classNames={modalInputClassNames}
-                  />
-                  <EntityImageManager
-                    entityType="category"
-                    entityId={category.id}
-                    imageUrl={categoryImageUrl}
-                    label="Category photo"
-                    onChange={handleCategoryImageChange}
-                  />
-                  <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
-                    <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                    <Button
-                      className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
-                      onPress={() => {
-                        onClose();
-                        openDeleteCategory();
-                      }}
-                    >
-                      Delete category
-                    </Button>
-                  </div>
-                </ModalBody>
-                <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-                  <Button
-                    variant="light"
-                    onPress={onClose}
-                    isDisabled={isSaving}
-                    className="max-md:hidden"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
-                    onPress={saveCategoryName}
-                    isLoading={isSaving}
-                    isDisabled={!editCategoryName.trim()}
-                  >
-                    Save changes
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalContent>
-        </Modal>
+          categoryId={category.id}
+          categoryImageUrl={categoryImageUrl}
+          editCategoryName={editCategoryName}
+          isSaving={isSaving}
+          onEditCategoryNameChange={setEditCategoryName}
+          onSave={saveCategoryName}
+          onImageChange={handleCategoryImageChange}
+          onDelete={openDeleteCategory}
+        />
       )}
 
-      {canEditInventory && (
-        <Modal
+      {canEditInventory && itemModal.open && (
+        <CategoryItemEditModal
           isOpen={itemModal.open}
-          onOpenChange={(open) => {
-            if (!open) closeItemModal();
+          itemModal={itemModal}
+          categoryName={categoryName}
+          isSaving={isSaving}
+          onClose={closeItemModal}
+          onSave={saveItem}
+          onItemModalChange={setItemModal}
+          onImageChange={handleItemImageChange}
+          onDelete={(target) => {
+            closeItemModal();
+            openDeleteItem(target);
           }}
-          placement="center"
-          scrollBehavior="inside"
-          classNames={mobileSheetModalClassNames}
-        >
-          <ModalContent className={modalContentClass} style={modalContentStyle}>
-            {() => (
-              <>
-                <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate">Edit item</span>
-                    <span className="block truncate text-sm font-normal text-gray-500">
-                      {categoryName}
-                    </span>
-                  </span>
-                  <Button
-                    size="sm"
-                    className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
-                    onPress={saveItem}
-                    isLoading={isSaving}
-                    isDisabled={isSaving || !itemModal.name.trim()}
-                  >
-                    Save
-                  </Button>
-                  <MobileSheetCloseButton onPress={closeItemModal} />
-                </ModalHeader>
-                <ModalBody className={`space-y-3 ${modalBodyClass}`}>
-                  <Input
-                    label="Item name"
-                    value={itemModal.name}
-                    onValueChange={(value) =>
-                      setItemModal((prev) => ({ ...prev, name: value }))
-                    }
-                    variant="bordered"
-                    radius="lg"
-                    classNames={modalInputClassNames}
-                  />
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <QuantityStepperInput
-                      label="Quantity"
-                      min={0}
-                      value={itemModal.quantity}
-                      onValueChange={(value) =>
-                        setItemModal((prev) => ({ ...prev, quantity: value }))
-                      }
-                      classNames={modalInputClassNames}
-                    />
-                    <DatePicker
-                      label="Expiration date"
-                      labelPlacement="inside"
-                      value={itemModalExpirationDateValue}
-                      onChange={(date) =>
-                        setItemModal((prev) => ({
-                          ...prev,
-                          expirationDate: date ? date.toString() : "",
-                        }))
-                      }
-                      variant="bordered"
-                      radius="lg"
-                      classNames={modalInputClassNames}
-                      showMonthAndYearPickers
-                    />
-                  </div>
-                  <Input
-                    label="Barcode"
-                    value={itemModal.barcode}
-                    onValueChange={(value) =>
-                      setItemModal((prev) => ({ ...prev, barcode: value }))
-                    }
-                    variant="bordered"
-                    radius="lg"
-                    startContent={<FaBarcode className="text-gray-400" />}
-                    classNames={modalInputClassNames}
-                  />
-                  <EntityImageManager
-                    entityType="item"
-                    entityId={itemModal.itemId}
-                    imageUrl={itemModal.imageUrl}
-                    label="Item photo"
-                    onChange={handleItemImageChange}
-                  />
-                  <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
-                    <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                    <Button
-                      className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
-                      onPress={() => {
-                        const target = {
-                          id: itemModal.itemId,
-                          name: itemModal.name,
-                        };
-                        closeItemModal();
-                        openDeleteItem(target);
-                      }}
-                    >
-                      Delete item
-                    </Button>
-                  </div>
-                </ModalBody>
-                <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-                  <Button
-                    variant="light"
-                    onPress={closeItemModal}
-                    isDisabled={isSaving}
-                    className="max-md:hidden"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
-                    onPress={saveItem}
-                    isLoading={isSaving}
-                    isDisabled={!itemModal.name.trim()}
-                  >
-                    Save changes
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalContent>
-        </Modal>
+        />
       )}
 
       {canEditInventory && moveModal.open && (
@@ -2054,7 +1803,7 @@ export default function CategoryDetailClient({
         />
       )}
 
-      {canEditInventory && (
+      {canEditInventory && deleteDialog.open && (
         <ConfirmDeleteModal
           isOpen={deleteDialog.open}
           isDeleting={deleteDialog.isDeleting}

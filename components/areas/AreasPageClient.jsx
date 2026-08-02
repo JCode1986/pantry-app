@@ -3,27 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "@/components/ui/MotionLite";
 import {
   Input,
   Button,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownTrigger,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Select,
-  SelectItem,
 } from "@heroui/react";
 import {
   FaBoxOpen,
   FaChevronRight,
-  FaEllipsisV,
-  FaImage,
   FaMapMarkedAlt,
   FaPlus,
   FaSearch,
@@ -31,16 +18,8 @@ import {
   FaTrash,
   FaWarehouse,
 } from "react-icons/fa";
-import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
-import {
-  modalBodyClass,
-  modalContentClass,
-  modalContentStyle,
-  modalFooterClass,
-  modalHeaderClass,
-  modalInputClassNames,
-  themedSelectClassNames,
-} from "@/components/modals/modalTheme";
+import NativeDropdown from "@/components/ui/NativeDropdown";
+import NativeSelect from "@/components/ui/NativeSelect";
 import {
   addStorageArea,
   deleteStorageArea,
@@ -54,8 +33,12 @@ import PaginationControls from "@/components/ui/PaginationControls";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
 import SearchResultsLoadingState from "@/components/ui/SearchResultsLoadingState";
 
-const EntityImageManager = dynamic(
-  () => import("@/components/inventory/EntityImageManager"),
+const AreaCreateModal = dynamic(
+  () => import("@/components/areas/AreaCreateModal"),
+  { ssr: false }
+);
+const AreaDrawer = dynamic(
+  () => import("@/components/areas/AreaDrawer"),
   { ssr: false }
 );
 const ConfirmDeleteModal = dynamic(
@@ -754,35 +737,24 @@ export default function AreasPageClient({
           }}
         />
         <div className="mt-2 grid grid-cols-2 gap-2">
-          <Select
+          <NativeSelect
             aria-label="Filter storage areas by location"
-            selectedKeys={new Set([locationFilter])}
-            onSelectionChange={(keys) =>
-              setLocationFilter(String(Array.from(keys)[0] || ALL_FILTER_KEY))
-            }
-            variant="bordered"
-            radius="lg"
-            classNames={themedSelectClassNames}
-          >
-            <SelectItem key={ALL_FILTER_KEY}>All locations</SelectItem>
-            {filterLocations.map((location) => (
-              <SelectItem key={String(location.id)}>{location.name}</SelectItem>
-            ))}
-          </Select>
-          <Select
+            value={locationFilter}
+            onChange={(value) => setLocationFilter(value || ALL_FILTER_KEY)}
+            options={[
+              { value: ALL_FILTER_KEY, label: "All locations" },
+              ...filterLocations.map((location) => ({
+                value: String(location.id),
+                label: location.name,
+              })),
+            ]}
+          />
+          <NativeSelect
             aria-label="Sort storage areas"
-            selectedKeys={new Set([sortBy])}
-            onSelectionChange={(keys) =>
-              setSortBy(String(Array.from(keys)[0] || "name_asc"))
-            }
-            variant="bordered"
-            radius="lg"
-            classNames={themedSelectClassNames}
-          >
-            {SORT_OPTIONS.map(([value, label]) => (
-              <SelectItem key={value}>{label}</SelectItem>
-            ))}
-          </Select>
+            value={sortBy}
+            onChange={(value) => setSortBy(value || "name_asc")}
+            options={SORT_OPTIONS.map(([value, label]) => ({ value, label }))}
+          />
         </div>
       </motion.section>
 
@@ -965,38 +937,29 @@ export default function AreasPageClient({
                     onClick={(event) => event.stopPropagation()}
                     onKeyDown={(event) => event.stopPropagation()}
                   >
-                    <Dropdown placement="bottom-end">
-                      <DropdownTrigger>
-                        <Button
-                          isIconOnly
-                          variant="light"
-                          radius="lg"
-                          className="h-9 w-9 min-w-9 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-                          aria-label={`${area.name} actions`}
-                        >
-                          <FaEllipsisV className="h-4 w-4" />
-                        </Button>
-                      </DropdownTrigger>
-                      <DropdownMenu aria-label={`${area.name} actions`}>
-                        <DropdownItem key="select" onPress={() => toggleSelect(area.id)}>
-                          {selectedIds.has(String(area.id))
+                    <NativeDropdown
+                      ariaLabel={`${area.name} actions`}
+                      items={[
+                        {
+                          key: "select",
+                          label: selectedIds.has(String(area.id))
                             ? "Deselect for bulk action"
-                            : "Select for bulk action"}
-                        </DropdownItem>
-                        <DropdownItem key="edit" onPress={() => openDrawer(area)}>
-                          Edit Storage Area
-                        </DropdownItem>
-                        <DropdownItem
-                          key="delete"
-                          className="text-danger"
-                          color="danger"
-                          startContent={<FaTrash className="h-3.5 w-3.5" />}
-                          onPress={() => openDeleteForArea(area)}
-                        >
-                          Delete Storage Area
-                        </DropdownItem>
-                      </DropdownMenu>
-                    </Dropdown>
+                            : "Select for bulk action",
+                          onSelect: () => toggleSelect(area.id),
+                        },
+                        {
+                          key: "edit",
+                          label: "Edit Storage Area",
+                          onSelect: () => openDrawer(area),
+                        },
+                        {
+                          key: "delete",
+                          label: "Delete Storage Area",
+                          danger: true,
+                          onSelect: () => openDeleteForArea(area),
+                        },
+                      ]}
+                    />
                   </span>
                 ) : (
                   <FaChevronRight className="h-4 w-4 shrink-0 text-[var(--stocksense-brand)]" />
@@ -1046,37 +1009,26 @@ export default function AreasPageClient({
                 input: "text-sm text-gray-900 placeholder:text-gray-400",
               }}
             />
-            <Select
+            <NativeSelect
               aria-label="Filter storage areas by location"
-              selectedKeys={new Set([locationFilter])}
-              onSelectionChange={(keys) =>
-                setLocationFilter(String(Array.from(keys)[0] || ALL_FILTER_KEY))
-              }
-              variant="bordered"
-              radius="lg"
               className="w-full sm:w-48"
-              classNames={themedSelectClassNames}
-            >
-              <SelectItem key={ALL_FILTER_KEY}>All locations</SelectItem>
-              {filterLocations.map((location) => (
-                <SelectItem key={String(location.id)}>{location.name}</SelectItem>
-              ))}
-            </Select>
-            <Select
+              value={locationFilter}
+              onChange={(value) => setLocationFilter(value || ALL_FILTER_KEY)}
+              options={[
+                { value: ALL_FILTER_KEY, label: "All locations" },
+                ...filterLocations.map((location) => ({
+                  value: String(location.id),
+                  label: location.name,
+                })),
+              ]}
+            />
+            <NativeSelect
               aria-label="Sort storage areas"
-              selectedKeys={new Set([sortBy])}
-              onSelectionChange={(keys) =>
-                setSortBy(String(Array.from(keys)[0] || "name_asc"))
-              }
-              variant="bordered"
-              radius="lg"
               className="w-full sm:w-40"
-              classNames={themedSelectClassNames}
-            >
-              {SORT_OPTIONS.map(([value, label]) => (
-                <SelectItem key={value}>{label}</SelectItem>
-              ))}
-            </Select>
+              value={sortBy}
+              onChange={(value) => setSortBy(value || "name_asc")}
+              options={SORT_OPTIONS.map(([value, label]) => ({ value, label }))}
+            />
             {canEditInventory && (
               <Button
                 onPress={openCreateAreaModal}
@@ -1268,38 +1220,29 @@ export default function AreasPageClient({
                         </div>
 
                         {canEditInventory ? (
-                          <Dropdown placement="bottom-end">
-                            <DropdownTrigger>
-                              <Button
-                                isIconOnly
-                                variant="light"
-                                radius="lg"
-                                className="h-9 w-9 min-w-9 shrink-0 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-                                aria-label={`${a.name} actions`}
-                              >
-                                <FaEllipsisV className="h-4 w-4" />
-                              </Button>
-                            </DropdownTrigger>
-                            <DropdownMenu aria-label={`${a.name} actions`}>
-                              <DropdownItem key="edit" onPress={() => openDrawer(a)}>
-                                Edit Storage Area
-                              </DropdownItem>
-                              <DropdownItem key="select" onPress={() => toggleSelect(a.id)}>
-                                {selectedIds.has(String(a.id))
+                          <NativeDropdown
+                            ariaLabel={`${a.name} actions`}
+                            items={[
+                              {
+                                key: "edit",
+                                label: "Edit Storage Area",
+                                onSelect: () => openDrawer(a),
+                              },
+                              {
+                                key: "select",
+                                label: selectedIds.has(String(a.id))
                                   ? "Deselect for bulk action"
-                                  : "Select for bulk action"}
-                              </DropdownItem>
-                              <DropdownItem
-                                key="delete"
-                                className="text-danger"
-                                color="danger"
-                                startContent={<FaTrash className="h-3.5 w-3.5" />}
-                                onPress={() => openDeleteForArea(a)}
-                              >
-                                Delete Storage Area
-                              </DropdownItem>
-                            </DropdownMenu>
-                          </Dropdown>
+                                  : "Select for bulk action",
+                                onSelect: () => toggleSelect(a.id),
+                              },
+                              {
+                                key: "delete",
+                                label: "Delete Storage Area",
+                                danger: true,
+                                onSelect: () => openDeleteForArea(a),
+                              },
+                            ]}
+                          />
                         ) : null}
                       </div>
 
@@ -1519,315 +1462,42 @@ export default function AreasPageClient({
         )}
       </motion.section>
 
-      {canEditInventory && (
-        <Modal
+      {canEditInventory && createAreaOpen && (
+        <AreaCreateModal
           isOpen={createAreaOpen}
-          onOpenChange={(open) => {
-            if (open) setCreateAreaOpen(true);
-            else closeCreateAreaModal();
-          }}
-          placement="center"
-          scrollBehavior="inside"
-        >
-          <ModalContent className={modalContentClass} style={modalContentStyle}>
-            {(onClose) => (
-              <>
-                <ModalHeader className={modalHeaderClass}>
-                  Add Storage Area
-                </ModalHeader>
-                <ModalBody className={`space-y-4 ${modalBodyClass}`}>
-                  <Select
-                    label="Location"
-                    aria-label="Storage area location"
-                    selectedKeys={
-                      createAreaLocationId ? new Set([String(createAreaLocationId)]) : new Set()
-                    }
-                    onSelectionChange={(keys) =>
-                      setCreateAreaLocationId(String(Array.from(keys)[0] || ""))
-                    }
-                    variant="bordered"
-                    radius="lg"
-                    isDisabled={isCreatingArea || filterLocations.length === 0}
-                    classNames={themedSelectClassNames}
-                  >
-                    {filterLocations.map((location) => (
-                      <SelectItem key={String(location.id)}>{location.name}</SelectItem>
-                    ))}
-                  </Select>
-                  <Input
-                    label="Storage area name"
-                    value={createAreaName}
-                    onValueChange={setCreateAreaName}
-                    placeholder="e.g., Pantry, drawer, cabinet, shelf"
-                    radius="lg"
-                    variant="bordered"
-                    isDisabled={isCreatingArea || filterLocations.length === 0}
-                    classNames={modalInputClassNames}
-                    autoFocus
-                  />
-                  <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-3">
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
-                        <FaImage className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
-                        Storage area photo
-                      </div>
-                      {createAreaImageFile ? (
-                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-[var(--stocksense-brand)]">
-                          Ready to upload
-                        </span>
-                      ) : null}
-                    </div>
-
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                      <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:h-28 sm:w-40">
-                        {createAreaImagePreview ? (
-                          <ImageWithLoader
-                            src={createAreaImagePreview}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="grid h-full w-full place-items-center text-xs text-gray-400">
-                            Optional photo
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex flex-1 flex-col gap-2">
-                        <div className="flex flex-wrap gap-2">
-                          <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 text-sm font-semibold text-[var(--stocksense-brand)]">
-                            <FaImage className="h-3.5 w-3.5" />
-                            {createAreaImageFile ? "Change photo" : "Add photo"}
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              disabled={isCreatingArea || filterLocations.length === 0}
-                              onChange={(event) => {
-                                const file = event.target.files?.[0];
-                                event.target.value = "";
-                                selectCreateAreaImageFile(file);
-                              }}
-                            />
-                          </label>
-                          {createAreaImageFile ? (
-                            <Button
-                              variant="flat"
-                              className="rounded-xl border border-gray-200 bg-white text-gray-600"
-                              onPress={clearCreateAreaImageFile}
-                              isDisabled={isCreatingArea}
-                            >
-                              Remove
-                            </Button>
-                          ) : null}
-                        </div>
-                        <p className="text-xs leading-5 text-gray-500">
-                          {createAreaImageFile
-                            ? createAreaImageFile.name
-                            : "Choose a photo now, or add one later from edit."}
-                        </p>
-                        {createAreaImageMessage ? (
-                          <p className="text-xs text-[var(--stocksense-brand)]">
-                            {createAreaImageMessage}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                  {filterLocations.length === 0 ? (
-                    <p className="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-2 text-sm text-[var(--stocksense-brand)]">
-                      Create a location first, then add a storage area inside it.
-                    </p>
-                  ) : null}
-                </ModalBody>
-                <ModalFooter className={modalFooterClass}>
-                  <Button
-                    variant="light"
-                    onPress={onClose}
-                    isDisabled={isCreatingArea}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="rounded-xl bg-[var(--stocksense-brand)] text-white"
-                    onPress={handleCreateArea}
-                    isLoading={isCreatingArea}
-                    isDisabled={
-                      isCreatingArea ||
-                      !createAreaName.trim() ||
-                      !createAreaLocationId ||
-                      filterLocations.length === 0
-                    }
-                    startContent={!isCreatingArea ? <FaPlus /> : null}
-                  >
-                    Add Storage Area
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalContent>
-        </Modal>
+          onOpen={() => setCreateAreaOpen(true)}
+          onClose={closeCreateAreaModal}
+          locationId={createAreaLocationId}
+          setLocationId={setCreateAreaLocationId}
+          filterLocations={filterLocations}
+          areaName={createAreaName}
+          setAreaName={setCreateAreaName}
+          imageFile={createAreaImageFile}
+          imagePreview={createAreaImagePreview}
+          imageMessage={createAreaImageMessage}
+          onSelectImageFile={selectCreateAreaImageFile}
+          onClearImageFile={clearCreateAreaImageFile}
+          isCreating={isCreatingArea}
+          onCreate={handleCreateArea}
+        />
       )}
 
-      {/* Drawer */}
-      <Modal
-        isOpen={drawerOpen}
-        onOpenChange={(open) => (open ? null : closeDrawer())}
-        placement="right"
-        size="lg"
-        classNames={{
-          base: "rounded-none md:rounded-l-2xl h-full md:h-[calc(100vh-24px)] md:my-3",
-          wrapper: "items-stretch justify-end",
-        }}
-      >
-        <ModalContent className={modalContentClass} style={modalContentStyle}>
-          {() => (
-            <>
-              <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
-                <div className="min-w-0 flex-1">
-                  <div
-                    className="truncate text-lg font-semibold text-[var(--stocksense-brand)]"
-                    title={activeArea?.name || "Storage Area"}
-                  >
-                    {activeArea?.name || "Storage Area"}
-                  </div>
-                  <div
-                    className="truncate text-sm text-gray-500"
-                    title={activeArea?.location?.name || ""}
-                  >
-                    {activeArea?.location?.name}
-                  </div>
-                </div>
-                {canEditInventory && (
-                  <Button
-                    size="sm"
-                    className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
-                    onClick={handleRename}
-                    isDisabled={!renameValue.trim()}
-                  >
-                    Save
-                  </Button>
-                )}
-                <MobileSheetCloseButton onPress={closeDrawer} />
-              </ModalHeader>
-
-              <ModalBody className={`space-y-5 ${modalBodyClass}`}>
-                {canEditInventory && (
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-gray-600">Area name</div>
-                    <Input
-                      value={renameValue}
-                      onValueChange={setRenameValue}
-                      variant="bordered"
-                      radius="lg"
-                      classNames={modalInputClassNames}
-                    />
-                    <Button
-                      onClick={handleRename}
-                      isDisabled={!renameValue.trim()}
-                      className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
-                    >
-                      Save name
-                    </Button>
-                  </div>
-                )}
-
-                {canEditInventory && activeArea?.id && (
-                  <EntityImageManager
-                    entityType="storage_area"
-                    entityId={activeArea.id}
-                    imageUrl={activeArea.imageUrl}
-                    label="Storage area photo"
-                    onChange={handleAreaImageChange}
-                  />
-                )}
-
-                {canEditInventory && activeArea?.id && (
-                  <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
-                    <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                    <Button
-                      className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
-                      onClick={openDelete}
-                    >
-                      Delete storage area
-                    </Button>
-                  </div>
-                )}
-
-                {/* Stats */}
-                <div className="flex gap-2 flex-wrap">
-                  <span className="px-2.5 py-1 rounded-full text-xs bg-gray-50 text-gray-600 border border-gray-200">
-                    {activeArea?.categoriesCount ?? 0}{" "}
-                    {(activeArea?.categoriesCount ?? 0) === 1 ? "category" : "categories"}
-                  </span>
-                  <span className="px-2.5 py-1 rounded-full text-xs bg-gray-50 text-gray-600 border border-gray-200">
-                    {activeArea?.itemsCount ?? 0}{" "}
-                    {(activeArea?.itemsCount ?? 0) === 1 ? "item" : "items"}
-                  </span>
-                </div>
-
-                {/* Categories preview */}
-                <div>
-                  <div className="mb-2 text-sm font-semibold text-gray-950">
-                    Categories
-                  </div>
-
-                  <div className="space-y-2">
-                    {(activeArea?.categories || []).slice(0, 10).map((c) => (
-                      <div
-                        key={c.id}
-                        className="rounded-xl border border-stocksense-gray bg-white p-3 flex items-start justify-between gap-3"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div
-                            className="truncate font-medium text-gray-950"
-                            title={c.name}
-                          >
-                            {c.name}
-                          </div>
-                          <div
-                            className="truncate text-sm text-gray-500"
-                            title={`${c.itemsCount} ${c.itemsCount === 1 ? "item" : "items"}`}
-                          >
-                            {c.itemsCount} {c.itemsCount === 1 ? "item" : "items"}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-
-                    {(activeArea?.categories || []).length === 0 && (
-                      <div className="text-sm text-gray-500">
-                        No categories in this area yet.
-                      </div>
-                    )}
-
-                    {(activeArea?.categories || []).length > 10 && (
-                      <div className="text-xs text-gray-400">Showing first 10 categories…</div>
-                    )}
-                  </div>
-                </div>
-              </ModalBody>
-
-              <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-                <Button variant="light" className="rounded-xl max-md:hidden" onClick={closeDrawer}>
-                  Close
-                </Button>
-                {canEditInventory && (
-                  <Button
-                    className="rounded-xl bg-rose-600 text-white max-md:hidden"
-                    onClick={openDelete}
-                  >
-                    Delete area
-                  </Button>
-                )}
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+      {drawerOpen && (
+        <AreaDrawer
+          isOpen={drawerOpen}
+          onClose={closeDrawer}
+          activeArea={activeArea}
+          canEditInventory={canEditInventory}
+          renameValue={renameValue}
+          setRenameValue={setRenameValue}
+          onRename={handleRename}
+          onImageChange={handleAreaImageChange}
+          onDelete={openDelete}
+        />
+      )}
 
       {/* Delete confirmation */}
-      {canEditInventory && <ConfirmDeleteModal
+      {canEditInventory && deleteDialog.open && <ConfirmDeleteModal
         isOpen={deleteDialog.open}
         isDeleting={deleteDialog.isDeleting}
         onCancel={closeDelete}

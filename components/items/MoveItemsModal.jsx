@@ -9,8 +9,6 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-  Select,
-  SelectItem,
 } from "@heroui/react";
 import {
   modalBodyClass,
@@ -20,9 +18,9 @@ import {
   modalHeaderClass,
   modalInputClassNames,
   mobileSheetModalClassNames,
-  themedSelectClassNames,
 } from "@/components/modals/modalTheme";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
+import NativeSelect from "@/components/ui/NativeSelect";
 import {
   addCategory,
   addLocation,
@@ -205,11 +203,6 @@ export default function MoveItemsModal({
       targetAreaId: nextArea?.id ?? null,
       targetCategoryId: firstCategory?.id ?? null,
     }));
-  };
-
-  const getSelectedValue = (keys) => {
-    const value = Array.from(keys)[0];
-    return value ? String(value) : "";
   };
 
   const showCreateMessage = (type, text) => {
@@ -414,26 +407,25 @@ export default function MoveItemsModal({
                 </div>
               ) : null}
               <div className="space-y-1">
-                <Select
+                <NativeSelect
                   label="Location"
-                  selectedKeys={
+                  aria-label="Move location"
+                  value={
                     moveModal.targetLocationId
-                      ? new Set([String(moveModal.targetLocationId)])
-                      : new Set()
+                      ? String(moveModal.targetLocationId)
+                      : ""
                   }
-                  onSelectionChange={(keys) => handleLocationChange(getSelectedValue(keys))}
-                  isDisabled={isLoadingDestinations}
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  {safeLocations.map((location) => (
-                    <SelectItem key={String(location.id)}>
-                      {location.name}
-                    </SelectItem>
-                  ))}
-                  <SelectItem key={NEW_LOCATION_VALUE}>+ New location</SelectItem>
-                </Select>
+                  onChange={(value) => handleLocationChange(value || "")}
+                  disabled={isLoadingDestinations}
+                  placeholder="Select location"
+                  options={[
+                    ...safeLocations.map((location) => ({
+                      value: String(location.id),
+                      label: location.name,
+                    })),
+                    { value: NEW_LOCATION_VALUE, label: "+ New location" },
+                  ]}
+                />
                 {moveModal.targetLocationId === NEW_LOCATION_VALUE ? (
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
                     <Input
@@ -458,29 +450,25 @@ export default function MoveItemsModal({
               </div>
 
               <div className="space-y-1">
-                <Select
+                <NativeSelect
                   label="Storage area"
                   placeholder="Select area..."
-                  selectedKeys={
-                    moveModal.targetAreaId
-                      ? new Set([String(moveModal.targetAreaId)])
-                      : new Set()
-                  }
-                  onSelectionChange={(keys) => handleAreaChange(getSelectedValue(keys))}
-                  isDisabled={
+                  aria-label="Move storage area"
+                  value={moveModal.targetAreaId ? String(moveModal.targetAreaId) : ""}
+                  onChange={(value) => handleAreaChange(value || "")}
+                  disabled={
                     isLoadingDestinations ||
                     !moveModal.targetLocationId ||
                     moveModal.targetLocationId === NEW_LOCATION_VALUE
                   }
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  {areasForSelectedLocation.map((area) => (
-                    <SelectItem key={String(area.id)}>{area.name}</SelectItem>
-                  ))}
-                  <SelectItem key={NEW_AREA_VALUE}>+ New storage area</SelectItem>
-                </Select>
+                  options={[
+                    ...areasForSelectedLocation.map((area) => ({
+                      value: String(area.id),
+                      label: area.name,
+                    })),
+                    { value: NEW_AREA_VALUE, label: "+ New storage area" },
+                  ]}
+                />
                 {moveModal.targetAreaId === NEW_AREA_VALUE ? (
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
                     <Input
@@ -514,36 +502,34 @@ export default function MoveItemsModal({
               </div>
 
               <div className="space-y-1">
-                <Select
+                <NativeSelect
                   label="Category"
                   placeholder="Select category..."
-                  selectedKeys={
+                  aria-label="Move category"
+                  value={
                     moveModal.targetCategoryId
-                      ? new Set([String(moveModal.targetCategoryId)])
-                      : new Set()
+                      ? String(moveModal.targetCategoryId)
+                      : ""
                   }
-                  onSelectionChange={(keys) =>
+                  onChange={(value) =>
                     setMoveModal((prev) => ({
                       ...prev,
-                      targetCategoryId: getSelectedValue(keys) || null,
+                      targetCategoryId: value || null,
                     }))
                   }
-                  isDisabled={
+                  disabled={
                     isLoadingDestinations ||
                     !moveModal.targetAreaId ||
                     moveModal.targetAreaId === NEW_AREA_VALUE
                   }
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  {selectedArea?.categories?.map((category) => (
-                    <SelectItem key={String(category.id)}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                  <SelectItem key={NEW_CATEGORY_VALUE}>+ New category</SelectItem>
-                </Select>
+                  options={[
+                    ...(selectedArea?.categories ?? []).map((category) => ({
+                      value: String(category.id),
+                      label: category.name,
+                    })),
+                    { value: NEW_CATEGORY_VALUE, label: "+ New category" },
+                  ]}
+                />
                 {moveModal.targetCategoryId === NEW_CATEGORY_VALUE ? (
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
                     <Input

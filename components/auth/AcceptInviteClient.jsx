@@ -11,7 +11,7 @@ import {
   ModalFooter,
   ModalHeader,
 } from "@heroui/react";
-import { motion } from "framer-motion";
+import { motion } from "@/components/ui/MotionLite";
 import {
   FaCheckCircle,
   FaEnvelopeOpenText,

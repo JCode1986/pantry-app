@@ -3,37 +3,20 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  Button,
-  Input,
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Select,
-  SelectItem,
-} from "@heroui/react";
+import { motion, AnimatePresence } from "@/components/ui/MotionLite";
 import {
   FaArrowsAlt,
   FaBoxOpen,
-  FaCamera,
   FaChevronRight,
   FaEdit,
   FaEllipsisV,
-  FaImage,
   FaPlus,
   FaSearch,
   FaTag,
   FaTags,
   FaTrash,
-  FaUpload,
   FaWarehouse,
 } from "react-icons/fa";
 
@@ -51,22 +34,10 @@ import {
   updateStorageArea,
   uploadInventoryImage,
 } from "@/app/actions/server";
-import MobileSuggestionChips from "@/components/modals/MobileSuggestionChips";
-import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
-import useDesktopAutoFocus from "@/components/modals/useDesktopAutoFocus";
-import {
-  modalBodyClass,
-  modalContentClass,
-  modalContentStyle,
-  modalFooterClass,
-  modalHeaderClass,
-  modalInputClassNames,
-  mobileSheetModalClassNames,
-  themedSelectClassNames,
-} from "@/components/modals/modalTheme";
 import { emitInventoryChange } from "@/utils/clientEvents";
 import PaginationControls from "@/components/ui/PaginationControls";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
+import NativeSelect from "@/components/ui/NativeSelect";
 import SearchResultsLoadingState from "@/components/ui/SearchResultsLoadingState";
 import { daysUntil, isExpiringSoon, toNonNegativeInteger } from "@/utils/pantry/date";
 import { normalizeMoveLocations } from "@/utils/pantry/moveLocations";
@@ -77,8 +48,8 @@ const MoveItemsModal = dynamic(() => import("@/components/items/MoveItemsModal")
 const AreaItemEditModal = dynamic(() => import("@/components/areas/AreaItemEditModal"), {
   ssr: false,
 });
-const EntityImageManager = dynamic(
-  () => import("@/components/inventory/EntityImageManager"),
+const AreaDetailModals = dynamic(
+  () => import("@/components/areas/AreaDetailModals"),
   { ssr: false }
 );
 const ConfirmDeleteModal = dynamic(
@@ -86,7 +57,6 @@ const ConfirmDeleteModal = dynamic(
   { ssr: false }
 );
 
-const CATEGORY_SUGGESTIONS = ["Food", "Documents", "Tools", "Medicine", "Clothes", "Electronics"];
 const AREA_DETAIL_PAGE_SIZE = 24;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
@@ -96,6 +66,164 @@ const SORT_OPTIONS = [
   ["newest", "Newest"],
   ["oldest", "Oldest"],
 ];
+const SORT_SELECT_OPTIONS = SORT_OPTIONS.map(([value, label]) => ({
+  value,
+  label,
+}));
+
+const buttonBaseClass =
+  "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
+
+function InlineButton({
+  children,
+  className = "",
+  disabled = false,
+  onClick,
+  type = "button",
+}) {
+  return (
+    <button
+      type={type}
+      disabled={disabled}
+      onClick={onClick}
+      className={`${buttonBaseClass} ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SearchInput({ value, onChange, placeholder, className = "" }) {
+  return (
+    <label
+      className={`flex min-h-10 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 shadow-sm transition focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)] ${className}`}
+    >
+      <FaSearch className="h-4 w-4 shrink-0 text-gray-400" />
+      <input
+        type="search"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
+      />
+    </label>
+  );
+}
+
+function TextInput({
+  id,
+  value,
+  onChange,
+  placeholder,
+  disabled = false,
+  className = "",
+}) {
+  return (
+    <input
+      id={id}
+      type="text"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder={placeholder}
+      disabled={disabled}
+      className={`min-h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-[var(--stocksense-brand)] focus:ring-1 focus:ring-[var(--stocksense-brand-border)] disabled:bg-gray-50 disabled:text-gray-400 ${className}`}
+    />
+  );
+}
+
+function ActionMenu({ ariaLabel, items, disabled = false }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState(null);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const closeOnOutsideClick = (event) => {
+      const target = event.target;
+      if (
+        buttonRef.current?.contains(target) ||
+        menuRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setIsOpen(false);
+    };
+
+    const closeMenu = () => setIsOpen(false);
+
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    window.addEventListener("scroll", closeMenu, true);
+    window.addEventListener("resize", closeMenu);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      window.removeEventListener("scroll", closeMenu, true);
+      window.removeEventListener("resize", closeMenu);
+    };
+  }, [isOpen]);
+
+  const menu =
+    isOpen && menuPosition
+      ? createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            aria-label={ariaLabel}
+            style={{
+              top: `${menuPosition.top}px`,
+              right: `${menuPosition.right}px`,
+            }}
+            className="fixed z-[120] min-w-48 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 text-sm shadow-xl"
+          >
+            {items.filter(Boolean).map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setIsOpen(false);
+                  item.onSelect();
+                }}
+                className={`block w-full px-3 py-2 text-left font-medium transition hover:bg-gray-50 ${
+                  item.danger ? "text-rose-700" : "text-gray-700"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>,
+          document.body
+        )
+      : null;
+
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label={ariaLabel}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        disabled={disabled}
+        onClick={() => {
+          const rect = buttonRef.current?.getBoundingClientRect();
+          if (rect) {
+            setMenuPosition({
+              top: rect.bottom + 8,
+              right: Math.max(12, window.innerWidth - rect.right),
+            });
+          }
+          setIsOpen((current) => !current);
+        }}
+        className="grid h-9 w-9 min-w-9 shrink-0 place-items-center rounded-xl text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <FaEllipsisV className="h-4 w-4" />
+      </button>
+      {menu}
+    </div>
+  );
+}
 
 function getSortTimestamp(entry) {
   const time = new Date(
@@ -225,9 +353,6 @@ export default function AreaDetailClient({
     name: "",
     imageUrl: null,
   });
-  const shouldAutoFocus = useDesktopAutoFocus(
-    mobileAddOpen || editAreaOpen || renameModal.open || itemModal.open
-  );
   const [deleteModal, setDeleteModal] = useState({
     open: false,
     mode: "single",
@@ -1359,25 +1484,23 @@ export default function AreaDetailClient({
 
             {canEditInventory && (
               <div className="mt-4 grid grid-cols-2 gap-2">
-                <Button
-                  variant="flat"
-                  className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
-                  onPress={() => {
+                <InlineButton
+                  className="min-h-10 border border-[var(--stocksense-brand-border)] bg-white px-3 text-[var(--stocksense-brand)]"
+                  onClick={() => {
                     setEditAreaName(areaName);
                     setEditAreaOpen(true);
                   }}
-                  startContent={<FaEdit />}
                 >
+                  <FaEdit className="h-3.5 w-3.5" />
                   Edit area
-                </Button>
-                <Button
-                  variant="flat"
-                  className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
-                  onPress={() => setDeleteAreaOpen(true)}
-                  startContent={<FaTrash />}
+                </InlineButton>
+                <InlineButton
+                  className="min-h-10 border border-rose-200 bg-rose-50 px-3 text-rose-700"
+                  onClick={() => setDeleteAreaOpen(true)}
                 >
+                  <FaTrash className="h-3.5 w-3.5" />
                   Delete
-                </Button>
+                </InlineButton>
               </div>
             )}
           </div>
@@ -1445,26 +1568,23 @@ export default function AreaDetailClient({
 
           {canEditInventory && (
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-              <Button
-                variant="flat"
-                className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
-                onPress={() => {
+              <InlineButton
+                className="min-h-10 border border-[var(--stocksense-brand-border)] bg-white px-3 text-[var(--stocksense-brand)]"
+                onClick={() => {
                   setEditAreaName(areaName);
                   setEditAreaOpen(true);
                 }}
-                startContent={<FaEdit />}
               >
+                <FaEdit className="h-3.5 w-3.5" />
                 Edit
-              </Button>
-              <Button
-                variant="flat"
-                color="danger"
-                className="rounded-xl"
-                onPress={() => setDeleteAreaOpen(true)}
-                startContent={<FaTrash />}
+              </InlineButton>
+              <InlineButton
+                className="min-h-10 border border-rose-200 bg-rose-50 px-3 text-rose-700"
+                onClick={() => setDeleteAreaOpen(true)}
               >
+                <FaTrash className="h-3.5 w-3.5" />
                 Delete
-              </Button>
+              </InlineButton>
             </div>
           )}
         </header>
@@ -1509,45 +1629,28 @@ export default function AreaDetailClient({
         className="rounded-[1.5rem] border border-white/70 bg-white p-4 shadow-sm max-md:hidden"
       >
         <div className="flex flex-col gap-3">
-          <Input
+          <SearchInput
             value={search}
-            onValueChange={handleSearchChange}
+            onChange={handleSearchChange}
             placeholder="Search categories or items..."
-            startContent={<FaSearch className="h-4 w-4 text-gray-400" />}
             className="w-full max-w-md"
-            radius="lg"
-            variant="bordered"
-            classNames={{
-              inputWrapper:
-                "min-h-10 border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]",
-              input: "text-sm text-gray-900 placeholder:text-gray-400",
-            }}
           />
           <div className="flex w-full max-w-3xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <Select
+            <NativeSelect
               aria-label="Sort categories"
-              selectedKeys={new Set([sortBy])}
-              onSelectionChange={(keys) =>
-                setSortBy(String(Array.from(keys)[0] || "name_asc"))
-              }
-              variant="bordered"
-              radius="lg"
+              value={sortBy}
+              onChange={(value) => setSortBy(value || "name_asc")}
+              options={SORT_SELECT_OPTIONS}
               className="w-full sm:w-40"
-              classNames={themedSelectClassNames}
-            >
-              {SORT_OPTIONS.map(([value, label]) => (
-                <SelectItem key={value}>{label}</SelectItem>
-              ))}
-            </Select>
+            />
             {canEditInventory && (
-              <Button
-                variant="flat"
-                className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
-                onPress={focusDesktopAddCategory}
-                startContent={<FaPlus />}
+              <InlineButton
+                className="min-h-10 border border-[var(--stocksense-brand-border)] bg-white px-3 text-[var(--stocksense-brand)]"
+                onClick={focusDesktopAddCategory}
               >
+                <FaPlus className="h-3.5 w-3.5" />
                 Add Category
-              </Button>
+              </InlineButton>
             )}
           </div>
         </div>
@@ -1573,35 +1676,19 @@ export default function AreaDetailClient({
             </button>
           )}
         </div>
-        <Input
+        <SearchInput
           value={search}
-          onValueChange={handleSearchChange}
+          onChange={handleSearchChange}
           placeholder="Search categories"
-          radius="lg"
-          variant="bordered"
-          className="mt-3"
-          startContent={<FaSearch className="h-4 w-4 text-gray-400" />}
-          classNames={{
-            inputWrapper:
-              "min-h-11 border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]",
-            input: "text-sm text-gray-900 placeholder:text-gray-400",
-          }}
+          className="mt-3 min-h-11"
         />
-        <Select
+        <NativeSelect
           aria-label="Sort categories"
-          selectedKeys={new Set([sortBy])}
-          onSelectionChange={(keys) =>
-            setSortBy(String(Array.from(keys)[0] || "name_asc"))
-          }
-          variant="bordered"
-          radius="lg"
+          value={sortBy}
+          onChange={(value) => setSortBy(value || "name_asc")}
+          options={SORT_SELECT_OPTIONS}
           className="mt-3"
-          classNames={themedSelectClassNames}
-        >
-          {SORT_OPTIONS.map(([value, label]) => (
-            <SelectItem key={value}>{label}</SelectItem>
-          ))}
-        </Select>
+        />
       </motion.section>
 
       {categoriesError ? (
@@ -1653,13 +1740,13 @@ export default function AreaDetailClient({
                 </span>
               </div>
 
-              <Button
-                className="mt-2 min-h-11 w-full rounded-xl bg-rose-600 text-sm font-semibold text-white"
-                onPress={openBulkDelete}
-                isDisabled={selectedCount === 0 || deleteModal.busy}
+              <InlineButton
+                className="mt-2 min-h-11 w-full bg-rose-600 px-3 text-white"
+                onClick={openBulkDelete}
+                disabled={selectedCount === 0 || deleteModal.busy}
               >
                 Delete
-              </Button>
+              </InlineButton>
             </motion.div>
           ) : null}
         </AnimatePresence>
@@ -1718,45 +1805,32 @@ export default function AreaDetailClient({
               </button>
 
               {canEditInventory && (
-                <Dropdown placement="bottom-end">
-                  <DropdownTrigger>
-                    <Button
-                      isIconOnly
-                      variant="light"
-                      radius="lg"
-                      className="h-9 w-9 min-w-9 shrink-0 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-                      aria-label={`${cat.name} actions`}
-                    >
-                      <FaEllipsisV className="h-4 w-4" />
-                    </Button>
-                  </DropdownTrigger>
-                  <DropdownMenu aria-label={`${cat.name} actions`}>
-                    <DropdownItem
-                      key="select"
-                      onPress={() => toggleSelectCategory(cat.id)}
-                    >
-                      {selected
+                <ActionMenu
+                  ariaLabel={`${cat.name} actions`}
+                  items={[
+                    {
+                      key: "select",
+                      label: selected
                         ? "Deselect for bulk action"
-                        : "Select for bulk action"}
-                    </DropdownItem>
-                    <DropdownItem
-                      key="edit"
-                      onPress={() =>
+                        : "Select for bulk action",
+                      onSelect: () => toggleSelectCategory(cat.id),
+                    },
+                    {
+                      key: "edit",
+                      label: "Edit Category",
+                      onSelect: () =>
                         setRenameModal({
                           open: true,
                           id: cat.id,
                           name: cat.name,
                           imageUrl: cat.imageUrl ?? null,
-                        })
-                      }
-                    >
-                      Edit Category
-                    </DropdownItem>
-                    <DropdownItem
-                      key="delete"
-                      className="text-danger"
-                      color="danger"
-                      onPress={() =>
+                        }),
+                    },
+                    {
+                      key: "delete",
+                      label: "Delete Category",
+                      danger: true,
+                      onSelect: () =>
                         setDeleteModal({
                           open: true,
                           mode: "single",
@@ -1765,13 +1839,10 @@ export default function AreaDetailClient({
                           categoryIds: [],
                           count: 0,
                           busy: false,
-                        })
-                      }
-                    >
-                      Delete Category
-                    </DropdownItem>
-                  </DropdownMenu>
-                </Dropdown>
+                        }),
+                    },
+                  ]}
+                />
               )}
             </div>
           </article>
@@ -1812,14 +1883,12 @@ export default function AreaDetailClient({
                   : "No categories are available."}
             </p>
             {hasActiveSearch ? (
-              <Button
-                onPress={clearSearch}
-                radius="lg"
-                variant="bordered"
-                className="mt-5 w-full border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] font-semibold text-[var(--stocksense-brand)]"
+              <InlineButton
+                className="mt-5 min-h-10 w-full border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 text-[var(--stocksense-brand)]"
+                onClick={clearSearch}
               >
                 Clear search
-              </Button>
+              </InlineButton>
             ) : null}
           </div>
           )
@@ -1862,29 +1931,27 @@ export default function AreaDetailClient({
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="bordered"
-                  className="rounded-xl border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
-                  onPress={toggleSelectAllVisible}
-                  isDisabled={filtered.length === 0 || deleteModal.busy}
+                <InlineButton
+                  className="min-h-10 border border-[var(--stocksense-brand-border)] bg-white px-3 text-[var(--stocksense-brand)]"
+                  onClick={toggleSelectAllVisible}
+                  disabled={filtered.length === 0 || deleteModal.busy}
                 >
                   {allVisibleSelected ? "Deselect visible" : "Select visible"}
-                </Button>
-                <Button
-                  variant="light"
-                  className="rounded-xl bg-white text-gray-700"
-                  onPress={clearSelection}
-                  isDisabled={deleteModal.busy}
+                </InlineButton>
+                <InlineButton
+                  className="min-h-10 bg-white px-3 text-gray-700"
+                  onClick={clearSelection}
+                  disabled={deleteModal.busy}
                 >
                   Cancel
-                </Button>
-                <Button
-                  className="rounded-xl bg-rose-600 text-white"
-                  onPress={openBulkDelete}
-                  isDisabled={selectedCount === 0 || deleteModal.busy}
+                </InlineButton>
+                <InlineButton
+                  className="min-h-10 bg-rose-600 px-3 text-white"
+                  onClick={openBulkDelete}
+                  disabled={selectedCount === 0 || deleteModal.busy}
                 >
                   Delete selected
-                </Button>
+                </InlineButton>
               </div>
             </div>
           </div>
@@ -1914,39 +1981,30 @@ export default function AreaDetailClient({
                 : "Create categories to organize the items stored here."}
             </p>
             {hasActiveSearch ? (
-              <Button
-                onPress={clearSearch}
-                radius="lg"
-                variant="bordered"
-                className="mt-7 border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-5 text-sm font-semibold text-[var(--stocksense-brand)] shadow-sm"
+              <InlineButton
+                className="mt-7 min-h-10 border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-5 text-[var(--stocksense-brand)] shadow-sm"
+                onClick={clearSearch}
               >
                 Clear search
-              </Button>
+              </InlineButton>
             ) : canEditInventory ? (
               <div className="mx-auto mt-7 flex max-w-xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-center">
-                <Input
+                <TextInput
                   id="area-detail-new-category"
                   value={newCategory}
-                  onValueChange={setNewCategory}
+                  onChange={setNewCategory}
                   placeholder="Category name"
-                  radius="lg"
-                  variant="bordered"
                   className="sm:max-w-xs"
-                  isDisabled={isSaving}
-                  classNames={{
-                    inputWrapper:
-                      "border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]",
-                  }}
+                  disabled={isSaving}
                 />
-                <Button
-                  className="rounded-xl bg-[var(--stocksense-brand)] px-5 text-white shadow-sm"
-                  onPress={handleAddCategory}
-                  isDisabled={isSaving || !newCategory.trim()}
-                  isLoading={isSaving}
-                  startContent={!isSaving ? <FaPlus /> : null}
+                <InlineButton
+                  className="min-h-10 bg-[var(--stocksense-brand)] px-5 text-white shadow-sm"
+                  onClick={handleAddCategory}
+                  disabled={isSaving || !newCategory.trim()}
                 >
-                  Add Category
-                </Button>
+                  {!isSaving ? <FaPlus className="h-3.5 w-3.5" /> : null}
+                  {isSaving ? "Adding..." : "Add Category"}
+                </InlineButton>
               </div>
             ) : null}
           </div>
@@ -2036,73 +2094,56 @@ export default function AreaDetailClient({
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                        <Dropdown placement="bottom-end">
-                          <DropdownTrigger>
-                            <Button
-                              isIconOnly
-                              variant="light"
-                              radius="lg"
-                              isDisabled={isSaving}
-                              className="h-10 w-10 min-w-10 shrink-0 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-                              aria-label={`${cat.name} actions`}
-                            >
-                              <FaEllipsisV className="h-4 w-4" />
-                            </Button>
-                          </DropdownTrigger>
-                          <DropdownMenu aria-label={`${cat.name} actions`}>
-                            <DropdownItem
-                              key="view"
-                              onPress={() => router.push(`/categories/${cat.id}`)}
-                            >
-                              View Items
-                            </DropdownItem>
-                            {canEditInventory ? (
-                              <DropdownItem
-                                key="select"
-                                onPress={() => toggleSelectCategory(cat.id)}
-                              >
-                                {selected
-                                  ? "Deselect for bulk action"
-                                  : "Select for bulk action"}
-                              </DropdownItem>
-                            ) : null}
-                            {canEditInventory ? (
-                              <DropdownItem
-                                key="edit"
-                                onPress={() =>
-                                  setRenameModal({
-                                    open: true,
-                                    id: cat.id,
-                                    name: cat.name,
-                                    imageUrl: cat.imageUrl ?? null,
-                                  })
+                        <ActionMenu
+                          ariaLabel={`${cat.name} actions`}
+                          disabled={isSaving}
+                          items={[
+                            {
+                              key: "view",
+                              label: "View Items",
+                              onSelect: () => router.push(`/categories/${cat.id}`),
+                            },
+                            canEditInventory
+                              ? {
+                                  key: "select",
+                                  label: selected
+                                    ? "Deselect for bulk action"
+                                    : "Select for bulk action",
+                                  onSelect: () => toggleSelectCategory(cat.id),
                                 }
-                              >
-                                Edit Category
-                              </DropdownItem>
-                            ) : null}
-                            {canEditInventory ? (
-                              <DropdownItem
-                                key="delete"
-                                className="text-danger"
-                                color="danger"
-                                onPress={() =>
-                                  setDeleteModal({
-                                    open: true,
-                                    mode: "single",
-                                    id: cat.id,
-                                    name: cat.name,
-                                    categoryIds: [],
-                                    count: 0,
-                                    busy: false,
-                                  })
+                              : null,
+                            canEditInventory
+                              ? {
+                                  key: "edit",
+                                  label: "Edit Category",
+                                  onSelect: () =>
+                                    setRenameModal({
+                                      open: true,
+                                      id: cat.id,
+                                      name: cat.name,
+                                      imageUrl: cat.imageUrl ?? null,
+                                    }),
                                 }
-                              >
-                                Delete Category
-                              </DropdownItem>
-                            ) : null}
-                          </DropdownMenu>
-                        </Dropdown>
+                              : null,
+                            canEditInventory
+                              ? {
+                                  key: "delete",
+                                  label: "Delete Category",
+                                  danger: true,
+                                  onSelect: () =>
+                                    setDeleteModal({
+                                      open: true,
+                                      mode: "single",
+                                      id: cat.id,
+                                      name: cat.name,
+                                      categoryIds: [],
+                                      count: 0,
+                                      busy: false,
+                                    }),
+                                }
+                              : null,
+                          ]}
+                        />
                       </div>
                     </div>
                   </div>
@@ -2153,52 +2194,50 @@ export default function AreaDetailClient({
                                   </p>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
-                                  <Button
-                                    variant="bordered"
-                                    className="rounded-xl border-[var(--entity-item-border)] bg-white text-[var(--entity-item-accent)]"
-                                    onPress={() =>
+                                  <InlineButton
+                                    className="min-h-10 border border-[var(--entity-item-border)] bg-white px-3 text-[var(--entity-item-accent)]"
+                                    onClick={() =>
                                       setVisibleItemsSelected(
                                         categoryItemIds,
                                         !allCategoryItemsSelected
                                       )
                                     }
-                                    isDisabled={categoryItemIds.length === 0}
+                                    disabled={categoryItemIds.length === 0}
                                   >
                                     {allCategoryItemsSelected
                                       ? "Deselect all visible"
                                       : "Select all visible"}
-                                  </Button>
-                                  <Button
-                                    variant="light"
-                                    className="rounded-xl bg-white text-gray-700"
-                                    onPress={clearItemSelection}
+                                  </InlineButton>
+                                  <InlineButton
+                                    className="min-h-10 bg-white px-3 text-gray-700"
+                                    onClick={clearItemSelection}
                                   >
                                     Clear
-                                  </Button>
-                                  <Button
-                                    className="rounded-xl bg-[var(--stocksense-brand)] text-white"
-                                    onPress={() =>
+                                  </InlineButton>
+                                  <InlineButton
+                                    className="min-h-10 bg-[var(--stocksense-brand)] px-3 text-white"
+                                    onClick={() =>
                                       openMoveSelectedItems(
                                         cat,
                                         selectedCategoryItemIds
                                       )
                                     }
-                                    isDisabled={selectedCategoryItemCount === 0}
+                                    disabled={selectedCategoryItemCount === 0}
                                   >
                                     Move
-                                  </Button>
-                                  <Button
-                                    className="rounded-xl bg-rose-600 text-white"
-                                    onPress={() =>
+                                  </InlineButton>
+                                  <InlineButton
+                                    className="min-h-10 bg-rose-600 px-3 text-white"
+                                    onClick={() =>
                                       openDeleteSelectedItems(
                                         cat,
                                         selectedCategoryItemIds
                                       )
                                     }
-                                    isDisabled={selectedCategoryItemCount === 0}
+                                    disabled={selectedCategoryItemCount === 0}
                                   >
                                     Delete
-                                  </Button>
+                                  </InlineButton>
                                 </div>
                               </div>
                             </div>
@@ -2291,51 +2330,34 @@ export default function AreaDetailClient({
                                     <span>No expiration</span>
                                   )}
                                   {canEditInventory ? (
-                                    <Dropdown placement="bottom-end">
-                                      <DropdownTrigger>
-                                        <Button
-                                          isIconOnly
-                                          variant="light"
-                                          radius="lg"
-                                          className="h-9 w-9 min-w-9 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-                                          aria-label={`${item.name} actions`}
-                                        >
-                                          <FaEllipsisV className="h-4 w-4" />
-                                        </Button>
-                                      </DropdownTrigger>
-                                      <DropdownMenu aria-label={`${item.name} actions`}>
-                                        <DropdownItem
-                                          key="edit"
-                                          onPress={() => openEditItem(item, cat)}
-                                        >
-                                          Edit Item
-                                        </DropdownItem>
-                                        <DropdownItem
-                                          key="move"
-                                          startContent={<FaArrowsAlt className="h-3.5 w-3.5" />}
-                                          onPress={() => openMoveItem(item, cat)}
-                                        >
-                                          Move Item
-                                        </DropdownItem>
-                                        <DropdownItem
-                                          key="select"
-                                          onPress={() => toggleSelectItem(item.id)}
-                                        >
-                                          {itemSelected
+                                    <ActionMenu
+                                      ariaLabel={`${item.name} actions`}
+                                      items={[
+                                        {
+                                          key: "edit",
+                                          label: "Edit Item",
+                                          onSelect: () => openEditItem(item, cat),
+                                        },
+                                        {
+                                          key: "move",
+                                          label: "Move Item",
+                                          onSelect: () => openMoveItem(item, cat),
+                                        },
+                                        {
+                                          key: "select",
+                                          label: itemSelected
                                             ? "Deselect for bulk action"
-                                            : "Select for bulk action"}
-                                        </DropdownItem>
-                                        <DropdownItem
-                                          key="delete"
-                                          className="text-danger"
-                                          color="danger"
-                                          startContent={<FaTrash className="h-3.5 w-3.5" />}
-                                          onPress={() => openDeleteItem(item, cat)}
-                                        >
-                                          Delete Item
-                                        </DropdownItem>
-                                      </DropdownMenu>
-                                    </Dropdown>
+                                            : "Select for bulk action",
+                                          onSelect: () => toggleSelectItem(item.id),
+                                        },
+                                        {
+                                          key: "delete",
+                                          label: "Delete Item",
+                                          danger: true,
+                                          onSelect: () => openDeleteItem(item, cat),
+                                        },
+                                      ]}
+                                    />
                                   ) : null}
                                 </div>
                               </div>
@@ -2370,29 +2392,22 @@ export default function AreaDetailClient({
                 </div>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <Input
+                <TextInput
                   id="area-detail-new-category"
                   value={newCategory}
-                  onValueChange={setNewCategory}
+                  onChange={setNewCategory}
                   placeholder="Category name"
-                  radius="lg"
-                  variant="bordered"
                   className="w-full sm:w-72"
-                  isDisabled={isSaving}
-                  classNames={{
-                    inputWrapper:
-                      "border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]",
-                  }}
+                  disabled={isSaving}
                 />
-                <Button
-                  className="rounded-xl bg-[var(--stocksense-brand)] px-5 text-white shadow-sm"
-                  onPress={handleAddCategory}
-                  isDisabled={isSaving || !newCategory.trim()}
-                  isLoading={isSaving}
-                  startContent={!isSaving ? <FaPlus /> : null}
+                <InlineButton
+                  className="min-h-10 bg-[var(--stocksense-brand)] px-5 text-white shadow-sm"
+                  onClick={handleAddCategory}
+                  disabled={isSaving || !newCategory.trim()}
                 >
-                  Add Category
-                </Button>
+                  {!isSaving ? <FaPlus className="h-3.5 w-3.5" /> : null}
+                  {isSaving ? "Adding..." : "Add Category"}
+                </InlineButton>
               </div>
             </div>
           </div>
@@ -2433,227 +2448,46 @@ export default function AreaDetailClient({
         ) : null}
       </motion.section>
 
-      {canEditInventory && (
-        <Modal
-          isOpen={mobileAddOpen}
-          onOpenChange={(open) => {
-            if (!open && !isSaving) setMobileAddOpen(false);
-          }}
-          placement="center"
-          scrollBehavior="inside"
-          classNames={mobileSheetModalClassNames}
-        >
-          <ModalContent className={modalContentClass} style={modalContentStyle}>
-            {() => (
-              <>
-                <ModalHeader className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}>
-                  <span className="min-w-0 flex-1 truncate">Create Category</span>
-                  <Button
-                    size="sm"
-                    className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
-                    onPress={handleAddCategory}
-                    isDisabled={isSaving || !newCategory.trim()}
-                    isLoading={isSaving}
-                    startContent={!isSaving ? <FaPlus className="h-3.5 w-3.5" /> : null}
-                  >
-                    Create
-                  </Button>
-                  <MobileSheetCloseButton onPress={() => setMobileAddOpen(false)} />
-                </ModalHeader>
-                <ModalBody className={`space-y-4 ${modalBodyClass}`}>
-                  <Input
-                    label="Category name"
-                    value={newCategory}
-                    onValueChange={setNewCategory}
-                    placeholder={`Category in ${areaName}`}
-                    radius="lg"
-                    variant="bordered"
-                    isDisabled={isSaving}
-                    classNames={modalInputClassNames}
-                    autoFocus={shouldAutoFocus}
-                  />
-                  <MobileSuggestionChips
-                    suggestions={CATEGORY_SUGGESTIONS}
-                    onSelect={setNewCategory}
-                  />
-                  <div className="rounded-2xl border border-gray-200 bg-white p-3">
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
-                        <FaImage className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
-                        Category photo optional
-                      </div>
-                      {newCategoryImageFile ? (
-                        <span className="rounded-full bg-[var(--stocksense-brand-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--stocksense-brand)]">
-                          Ready to upload
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                      <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:h-28 sm:w-40">
-                        {newCategoryImagePreview ? (
-                          <ImageWithLoader
-                            src={newCategoryImagePreview}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="grid h-full w-full place-items-center text-xs text-gray-400">
-                            Optional photo
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-1 flex-col gap-2">
-                        <div className="flex flex-wrap gap-2">
-                          <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 text-sm font-semibold text-[var(--stocksense-brand)] sm:hidden">
-                            <FaCamera className="h-3.5 w-3.5" />
-                            Take photo
-                            <input
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              className="hidden"
-                              onChange={(event) => {
-                                const file = event.target.files?.[0];
-                                event.target.value = "";
-                                selectNewCategoryImageFile(file);
-                              }}
-                            />
-                          </label>
-                          <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 text-sm font-semibold text-[var(--stocksense-brand)]">
-                            <FaUpload className="h-3.5 w-3.5" />
-                            {newCategoryImageFile ? "Change photo" : "Add photo"}
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(event) => {
-                                const file = event.target.files?.[0];
-                                event.target.value = "";
-                                selectNewCategoryImageFile(file);
-                              }}
-                            />
-                          </label>
-                          {newCategoryImageFile ? (
-                            <Button
-                              size="sm"
-                              variant="flat"
-                              className="min-h-10 rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
-                              isDisabled={isSaving}
-                              onPress={clearNewCategoryImageFile}
-                              startContent={<FaTrash className="h-3.5 w-3.5" />}
-                            >
-                              Remove photo
-                            </Button>
-                          ) : null}
-                        </div>
-                        <p className="text-xs leading-5 text-gray-500 max-md:hidden">
-                          {newCategoryImageFile
-                            ? newCategoryImageFile.name
-                            : "Take a photo or choose one from your camera roll. Max 5 MB."}
-                        </p>
-                        {newCategoryImageMessage ? (
-                          <p className="text-xs text-rose-700">
-                            {newCategoryImageMessage}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                </ModalBody>
-                <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-                  <Button
-                    className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
-                    onPress={handleAddCategory}
-                    isDisabled={isSaving || !newCategory.trim()}
-                    isLoading={isSaving}
-                    startContent={!isSaving ? <FaPlus /> : null}
-                  >
-                    Create Category
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalContent>
-        </Modal>
-      )}
-
-      {canEditInventory && (
-        <Modal
-          isOpen={editAreaOpen}
-          onOpenChange={setEditAreaOpen}
-          placement="center"
-          scrollBehavior="inside"
-          classNames={mobileSheetModalClassNames}
-        >
-          <ModalContent className={modalContentClass} style={modalContentStyle}>
-            {(onClose) => (
-              <>
-                <ModalHeader className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}>
-                  <span className="min-w-0 flex-1 truncate">Edit storage area</span>
-                  <Button
-                    size="sm"
-                    className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
-                    onPress={handleRenameArea}
-                    isLoading={isSaving}
-                    isDisabled={!editAreaName.trim()}
-                  >
-                    Save
-                  </Button>
-                  <MobileSheetCloseButton onPress={onClose} />
-                </ModalHeader>
-                <ModalBody className={`space-y-3 ${modalBodyClass}`}>
-                  <Input
-                    label="Storage area name"
-                    value={editAreaName}
-                    onValueChange={setEditAreaName}
-                    variant="bordered"
-                    radius="lg"
-                    isDisabled={isSaving}
-                    classNames={modalInputClassNames}
-                  />
-                  <EntityImageManager
-                    entityType="storage_area"
-                    entityId={area?.id}
-                    imageUrl={areaImageUrl}
-                    label="Storage area photo"
-                    onChange={handleAreaImageChange}
-                  />
-                  <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
-                    <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                    <Button
-                      className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
-                      onPress={() => {
-                        onClose();
-                        setDeleteAreaOpen(true);
-                      }}
-                    >
-                      Delete storage area
-                    </Button>
-                  </div>
-                </ModalBody>
-                <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-                  <Button
-                    variant="light"
-                    onPress={onClose}
-                    isDisabled={isSaving}
-                    className="max-md:hidden"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
-                    onPress={handleRenameArea}
-                    isLoading={isSaving}
-                    isDisabled={!editAreaName.trim()}
-                  >
-                    Save changes
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalContent>
-        </Modal>
-      )}
+      {canEditInventory &&
+        (mobileAddOpen || editAreaOpen || renameModal.open) && (
+          <AreaDetailModals
+            mobileAddOpen={mobileAddOpen}
+            setMobileAddOpen={setMobileAddOpen}
+            editAreaOpen={editAreaOpen}
+            setEditAreaOpen={setEditAreaOpen}
+            renameModal={renameModal}
+            setRenameModal={setRenameModal}
+            isSaving={isSaving}
+            newCategory={newCategory}
+            setNewCategory={setNewCategory}
+            areaName={areaName}
+            newCategoryImageFile={newCategoryImageFile}
+            newCategoryImagePreview={newCategoryImagePreview}
+            newCategoryImageMessage={newCategoryImageMessage}
+            onSelectNewCategoryImageFile={selectNewCategoryImageFile}
+            onClearNewCategoryImageFile={clearNewCategoryImageFile}
+            onAddCategory={handleAddCategory}
+            editAreaName={editAreaName}
+            setEditAreaName={setEditAreaName}
+            areaId={area?.id}
+            areaImageUrl={areaImageUrl}
+            onRenameArea={handleRenameArea}
+            onAreaImageChange={handleAreaImageChange}
+            onRequestDeleteArea={() => setDeleteAreaOpen(true)}
+            onRenameCategory={handleRename}
+            onCategoryImageChange={handleCategoryImageChange}
+            onRequestDeleteCategory={(target) =>
+              setDeleteModal({
+                open: true,
+                mode: "single",
+                ...target,
+                categoryIds: [],
+                count: 0,
+                busy: false,
+              })
+            }
+          />
+        )}
 
       {canEditInventory && (
         <ConfirmDeleteModal
@@ -2665,93 +2499,6 @@ export default function AreaDetailClient({
           description={`This will delete "${areaName}" and all categories and items inside it. This cannot be undone.`}
         />
       )}
-
-      {/* Edit Category Modal */}
-      {canEditInventory && <Modal
-        isOpen={renameModal.open}
-        onOpenChange={(open) => setRenameModal((p) => ({ ...p, open }))}
-        placement="center"
-        scrollBehavior="inside"
-        classNames={mobileSheetModalClassNames}
-      >
-        <ModalContent className={modalContentClass} style={modalContentStyle}>
-          {(onClose) => (
-            <>
-              <ModalHeader className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}>
-                <span className="min-w-0 flex-1 truncate">Edit category</span>
-                <Button
-                  size="sm"
-                  className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
-                  onPress={handleRename}
-                  isDisabled={isSaving || !renameModal.name.trim()}
-                >
-                  Save
-                </Button>
-                <MobileSheetCloseButton onPress={onClose} />
-              </ModalHeader>
-              <ModalBody className={`space-y-3 ${modalBodyClass}`}>
-                <Input
-                  value={renameModal.name}
-                  onValueChange={(v) => setRenameModal((p) => ({ ...p, name: v }))}
-                  variant="bordered"
-                  radius="lg"
-                  label="Category name"
-                  isDisabled={isSaving}
-                  classNames={modalInputClassNames}
-                />
-                <EntityImageManager
-                  entityType="category"
-                  entityId={renameModal.id}
-                  imageUrl={renameModal.imageUrl}
-                  label="Category photo"
-                  onChange={handleCategoryImageChange}
-                />
-                <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
-                  <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                  <Button
-                    className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
-                    onPress={() => {
-                      const target = {
-                        id: renameModal.id,
-                        name: renameModal.name,
-                        busy: false,
-                      };
-                      onClose();
-                      setDeleteModal({
-                        open: true,
-                        mode: "single",
-                        ...target,
-                        categoryIds: [],
-                        count: 0,
-                        busy: false,
-                      });
-                    }}
-                  >
-                    Delete category
-                  </Button>
-                </div>
-              </ModalBody>
-              <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-                <Button
-                  variant="light"
-                  onPress={onClose}
-                  isDisabled={isSaving}
-                  className="max-md:hidden"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="bg-[var(--stocksense-brand)] text-white max-md:hidden"
-                  onPress={handleRename}
-                  isDisabled={isSaving || !renameModal.name.trim()}
-                >
-                  Save changes
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>}
 
       {canEditInventory && itemModal.open && (
         <AreaItemEditModal

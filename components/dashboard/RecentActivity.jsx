@@ -2,8 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
-import { Select, SelectItem } from '@heroui/react';
+import { motion } from '@/components/ui/MotionLite';
 import {
   FaBolt,
   FaBoxOpen,
@@ -14,9 +13,9 @@ import {
   FaWarehouse,
 } from 'react-icons/fa';
 import { getRecentActivityAction } from '@/app/actions/activity';
-import { themedSelectClassNames } from '@/components/modals/modalTheme';
 import { INVENTORY_CHANGE_EVENT } from '@/utils/clientEvents';
 import ImageWithLoader from '@/components/ui/ImageWithLoader';
+import NativeSelect from '@/components/ui/NativeSelect';
 
 const PAGE_SIZE = 12;
 const DASHBOARD_ACTIVITY_LIMIT = 5;
@@ -458,11 +457,6 @@ function memberLabel(member) {
   return member.email || `User ${String(member.userId).slice(0, 8)}`;
 }
 
-function selectedKey(keys) {
-  if (!keys || keys === ALL_FILTER) return null;
-  return Array.from(keys)[0] ?? null;
-}
-
 export default function RecentActivity({
   items = [],
   members = [],
@@ -578,14 +572,14 @@ export default function RecentActivity({
     }
   }, [action, actorUserId, cursor, isFullView]);
 
-  function handleActorChange(keys) {
-    const nextActorUserId = String(selectedKey(keys) || ALL_FILTER);
+  function handleActorChange(value) {
+    const nextActorUserId = String(value || ALL_FILTER);
     setActorUserId(nextActorUserId);
     void loadActivity({ nextActorUserId, mode: 'replace' });
   }
 
-  function handleActionChange(keys) {
-    const nextAction = String(selectedKey(keys) || ALL_FILTER);
+  function handleActionChange(value) {
+    const nextAction = String(value || ALL_FILTER);
     setAction(nextAction);
     void loadActivity({ nextAction, mode: 'replace' });
   }
@@ -630,7 +624,7 @@ export default function RecentActivity({
             }`}
           >
             {showUserFilter ? (
-              <Select
+              <NativeSelect
                 aria-label="Filter recent activity by user"
                 label={
                   <span className="inline-flex items-center gap-1.5">
@@ -638,23 +632,20 @@ export default function RecentActivity({
                     User
                   </span>
                 }
-                selectedKeys={new Set([actorUserId])}
-                onSelectionChange={handleActorChange}
-                isDisabled={isRefreshing}
-                variant="bordered"
-                radius="lg"
-                classNames={themedSelectClassNames}
-              >
-                <SelectItem key={ALL_FILTER}>All users</SelectItem>
-                {memberOptions.map((member) => (
-                  <SelectItem key={member.value} textValue={member.label}>
-                    {member.label}
-                  </SelectItem>
-                ))}
-              </Select>
+                value={actorUserId}
+                onChange={handleActorChange}
+                disabled={isRefreshing}
+                options={[
+                  { value: ALL_FILTER, label: 'All users' },
+                  ...memberOptions.map((member) => ({
+                    value: member.value,
+                    label: member.label,
+                  })),
+                ]}
+              />
             ) : null}
 
-            <Select
+            <NativeSelect
               aria-label="Filter recent activity by action"
               label={
                 <span className="inline-flex items-center gap-1.5">
@@ -662,19 +653,11 @@ export default function RecentActivity({
                   Action
                 </span>
               }
-              selectedKeys={new Set([action])}
-              onSelectionChange={handleActionChange}
-              isDisabled={isRefreshing}
-              variant="bordered"
-              radius="lg"
-              classNames={themedSelectClassNames}
-            >
-              {ACTION_OPTIONS.map((option) => (
-                <SelectItem key={option.value} textValue={option.label}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </Select>
+              value={action}
+              onChange={handleActionChange}
+              disabled={isRefreshing}
+              options={ACTION_OPTIONS}
+            />
           </div>
         ) : null}
 

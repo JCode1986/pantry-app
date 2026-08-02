@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from '@/components/ui/MotionLite';
 import { supabase } from '@/lib/supabaseClient';
 import SiteFooter from '@/components/app-shell/SiteFooter';
 

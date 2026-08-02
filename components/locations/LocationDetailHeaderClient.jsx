@@ -6,12 +6,6 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   Button,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
 } from "@heroui/react";
 import {
   FaBoxOpen,
@@ -22,25 +16,11 @@ import {
   FaWarehouse,
 } from "react-icons/fa";
 import { deleteLocation, updateLocationName } from "@/app/actions/server";
-import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
-import {
-  modalBodyClass,
-  modalContentClass,
-  modalContentStyle,
-  modalFooterClass,
-  modalHeaderClass,
-  modalInputClassNames,
-  mobileSheetModalClassNames,
-} from "@/components/modals/modalTheme";
 import { emitInventoryChange } from "@/utils/clientEvents";
 
-const EntityImageManager = dynamic(
-  () => import("@/components/inventory/EntityImageManager"),
-  { ssr: false }
-);
-const ConfirmDeleteModal = dynamic(
-  () => import("@/components/modals/ConfirmDeleteModal"),
+const LocationDetailHeaderModals = dynamic(
+  () => import("@/components/locations/LocationDetailHeaderModals"),
   { ssr: false }
 );
 
@@ -273,94 +253,24 @@ export default function LocationDetailHeaderClient({
         </div>
       </header>
 
-      {canEditInventory && (
-        <Modal
-          isOpen={editOpen}
-          onOpenChange={setEditOpen}
-          placement="center"
-          scrollBehavior="inside"
-          classNames={mobileSheetModalClassNames}
-        >
-          <ModalContent className={modalContentClass} style={modalContentStyle}>
-            {(onClose) => (
-              <>
-                <ModalHeader className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}>
-                  <span className="min-w-0 flex-1 truncate">Edit location</span>
-                  <Button
-                    size="sm"
-                    className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
-                    onPress={saveLocation}
-                    isLoading={isSaving}
-                    isDisabled={!editName.trim()}
-                  >
-                    Save
-                  </Button>
-                  <MobileSheetCloseButton onPress={onClose} />
-                </ModalHeader>
-                <ModalBody className={`space-y-3 ${modalBodyClass}`}>
-                  <Input
-                    label="Location name"
-                    value={editName}
-                    onValueChange={setEditName}
-                    variant="bordered"
-                    radius="lg"
-                    isDisabled={isSaving}
-                    classNames={modalInputClassNames}
-                  />
-                  <EntityImageManager
-                    entityType="location"
-                    entityId={location.id}
-                    imageUrl={currentImageUrl}
-                    label="Location photo"
-                    onChange={({ imageUrl: nextImageUrl }) => {
-                      setCurrentImageUrl(nextImageUrl ?? null);
-                    }}
-                  />
-                  <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
-                    <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                    <Button
-                      className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
-                      onPress={() => {
-                        onClose();
-                        setDeleteOpen(true);
-                      }}
-                    >
-                      Delete location
-                    </Button>
-                  </div>
-                </ModalBody>
-                <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-                  <Button
-                    variant="light"
-                    onPress={onClose}
-                    isDisabled={isSaving}
-                    className="max-md:hidden"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
-                    onPress={saveLocation}
-                    isLoading={isSaving}
-                    isDisabled={!editName.trim()}
-                  >
-                    Save changes
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalContent>
-        </Modal>
-      )}
-
-      {canEditInventory && (
-        <ConfirmDeleteModal
-          isOpen={deleteOpen}
+      {canEditInventory && (editOpen || deleteOpen) && (
+        <LocationDetailHeaderModals
+          locationId={location.id}
+          locationName={name}
+          currentImageUrl={currentImageUrl}
+          editOpen={editOpen}
+          setEditOpen={setEditOpen}
+          editName={editName}
+          setEditName={setEditName}
+          isSaving={isSaving}
+          onSave={saveLocation}
+          onImageChange={({ imageUrl: nextImageUrl }) => {
+            setCurrentImageUrl(nextImageUrl ?? null);
+          }}
+          deleteOpen={deleteOpen}
+          setDeleteOpen={setDeleteOpen}
           isDeleting={isDeleting}
-          onCancel={() => setDeleteOpen(false)}
-          onConfirm={confirmDelete}
-          title={`Delete location "${name}"?`}
-          description={`This will delete "${name}" and everything stored inside it. This cannot be undone.`}
+          onDelete={confirmDelete}
         />
       )}
     </>
