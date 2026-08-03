@@ -1,14 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import NativeInput from "@/components/ui/NativeInput";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
+import NativeButton from "@/components/ui/NativeButton";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "@/components/ui/MotionLite";
-import {
-  Input,
-  Button,
-} from "@heroui/react";
+import { AnimatePresence,
+  motion } from "@/components/ui/MotionLite";
 import {
   FaBoxOpen,
   FaChevronRight,
@@ -765,7 +770,7 @@ export default function CategoriesPageClient({
           </div>
         </div>
 
-        <Input
+        <NativeInput
           value={search}
           onValueChange={handleSearchChange}
           placeholder="Search categories"
@@ -864,13 +869,13 @@ export default function CategoriesPageClient({
               </span>
             </div>
 
-            <Button
+            <NativeButton
               className="mt-2 min-h-11 w-full rounded-xl bg-rose-600 text-sm font-semibold text-white"
               onPress={openBulkDelete}
               isDisabled={selectedCount === 0 || deleteDialog.isDeleting}
             >
               Delete
-            </Button>
+            </NativeButton>
           </motion.div>
         )}
         {showSearchRestoreLoader ? (
@@ -911,23 +916,23 @@ export default function CategoriesPageClient({
                 : "Try a different filter or add an item to create a category."}
             </p>
             {normalizedSearch ? (
-              <Button
+              <NativeButton
                 onPress={clearSearch}
                 radius="lg"
                 variant="bordered"
                 className="mt-5 w-full border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] font-semibold text-[var(--stocksense-brand)]"
               >
                 Clear search
-              </Button>
+              </NativeButton>
             ) : canEditInventory ? (
               <div className="mt-5 flex justify-center">
-                <Button
+                <NativeButton
                   onPress={openCreateCategoryModal}
                   className="rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white"
                   startContent={<FaPlus />}
                 >
                   Add Category
-                </Button>
+                </NativeButton>
               </div>
             ) : null}
           </motion.div>
@@ -1061,7 +1066,7 @@ export default function CategoriesPageClient({
           </div>
 
           <div className="flex w-full max-w-6xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <Input
+            <NativeInput
               value={search}
               onValueChange={handleSearchChange}
               placeholder="Search categories"
@@ -1112,13 +1117,13 @@ export default function CategoriesPageClient({
               options={SORT_OPTIONS.map(([value, label]) => ({ value, label }))}
             />
             {canEditInventory && (
-              <Button
+              <NativeButton
                 onPress={openCreateCategoryModal}
                 className="min-h-10 w-full whitespace-nowrap rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm sm:w-auto"
                 startContent={<FaPlus />}
               >
                 Add Category
-              </Button>
+              </NativeButton>
             )}
           </div>
         </header>
@@ -1151,7 +1156,7 @@ export default function CategoriesPageClient({
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button
+                    <NativeButton
                       size="sm"
                       variant="flat"
                       className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
@@ -1159,8 +1164,8 @@ export default function CategoriesPageClient({
                       onPress={clearSelection}
                     >
                       Clear selection
-                    </Button>
-                    <Button
+                    </NativeButton>
+                    <NativeButton
                       size="sm"
                       color="danger"
                       variant="flat"
@@ -1170,7 +1175,7 @@ export default function CategoriesPageClient({
                       startContent={<FaTrash />}
                     >
                       Delete selected
-                    </Button>
+                    </NativeButton>
                   </div>
                 </div>
               </motion.div>
@@ -1403,13 +1408,13 @@ export default function CategoriesPageClient({
                         )}
                       </div>
 
-                      <Button
+                      <NativeButton
                         as={Link}
                         href={`/categories/${c.id}`}
                         className="mt-auto min-h-10 w-full rounded-xl bg-[var(--stocksense-brand)] text-sm font-semibold text-white shadow-sm"
                       >
                         View Category
-                      </Button>
+                      </NativeButton>
                     </motion.article>
                   );
                 })}
@@ -1428,13 +1433,13 @@ export default function CategoriesPageClient({
                     <p className="mt-3 max-w-sm text-sm leading-6 text-gray-600">
                       Create a new group inside one of your storage areas.
                     </p>
-                    <Button
+                    <NativeButton
                       onPress={openCreateCategoryModal}
                       className="mt-6 min-h-10 rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm"
                       startContent={<FaPlus />}
                     >
                       Add Category
-                    </Button>
+                    </NativeButton>
                   </motion.div>
                 ) : null}
               </motion.div>
@@ -1478,22 +1483,22 @@ export default function CategoriesPageClient({
                 : "Create the first category for your household."}
             </p>
             {normalizedSearch ? (
-              <Button
+              <NativeButton
                 onPress={clearSearch}
                 radius="lg"
                 variant="bordered"
                 className="mt-7 border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-5 text-sm font-semibold text-[var(--stocksense-brand)] shadow-sm"
               >
                 Clear search
-              </Button>
+              </NativeButton>
             ) : canEditInventory ? (
-              <Button
+              <NativeButton
                 onPress={openCreateCategoryModal}
                 className="mt-7 min-h-10 rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm"
                 startContent={<FaPlus />}
               >
                 Add Category
-              </Button>
+              </NativeButton>
             ) : null}
           </motion.div>
         )}

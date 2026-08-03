@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+
+import NativeButton from "@/components/ui/NativeButton";
+import {
+  useEffect,
+  useRef,
+  useState } from "react";
+import NativeInput from "@/components/ui/NativeInput";
 import { useRouter } from "next/navigation";
 import {
-  Button,
-  Input,
   Modal,
   ModalBody,
   ModalContent,
@@ -260,7 +264,7 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
   };
 
   const renderSearchInput = ({ autoFocus = false, className = "" } = {}) => (
-    <Input
+    <NativeInput
       autoFocus={autoFocus}
       value={query}
       onValueChange={setQuery}
@@ -484,20 +488,20 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
                         We couldn&apos;t find any items matching &quot;{trimmedQuery}&quot;
                       </p>
                       <div className="flex items-center gap-2 mt-4 ">
-                        <Button
+                        <NativeButton
                           className="min-h-11 rounded-2xl bg-[var(--stocksense-brand)] text-white"
                           onPress={openAddFromSearch}
                           startContent={<FaPlus />}
                         >
                           Add &quot;{trimmedQuery}&quot;
-                        </Button>
-                        <Button
+                        </NativeButton>
+                        <NativeButton
                           className="min-h-11 rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
                           variant="bordered"
                           onPress={() => setQuery("")}
                         >
                           Clear search
-                        </Button>
+                        </NativeButton>
                       </div>
                     </div>
                   </motion.div>
@@ -506,9 +510,9 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
             </ModalBody>
 
             <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-              <Button variant="light" className="rounded-xl" onPress={onClose}>
+              <NativeButton variant="light" className="rounded-xl" onPress={onClose}>
                 Close
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </>
         )}

@@ -19,10 +19,7 @@ import {
 } from "react-icons/fa";
 import { LuLifeBuoy } from "react-icons/lu";
 import WhereKeepLogo from "@/components/ui/WhereKeepLogo";
-
-function cx(...classes) {
-  return classes.filter(Boolean).join(" ");
-}
+import { cx } from "@/components/ui/classNames";
 
 function CountBadge({ value }) {
   if (value === null || value === undefined || value <= 0) return null;

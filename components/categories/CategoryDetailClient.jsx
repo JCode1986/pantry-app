@@ -1,13 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import NativeButton from "@/components/ui/NativeButton";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
+import NativeInput from "@/components/ui/NativeInput";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import {
-  Button,
-  Input,
-} from "@heroui/react";
 import {
   FaArrowsAlt,
   FaBarcode,
@@ -918,7 +922,7 @@ export default function CategoryDetailClient({
 
             {canEditInventory && (
               <div className="mt-4 grid grid-cols-2 gap-2">
-                <Button
+                <NativeButton
                   variant="flat"
                   className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
                   onPress={() => {
@@ -928,15 +932,15 @@ export default function CategoryDetailClient({
                   startContent={<FaEdit />}
                 >
                   Edit category
-                </Button>
-                <Button
+                </NativeButton>
+                <NativeButton
                   variant="flat"
                   className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
                   onPress={openDeleteCategory}
                   startContent={<FaTrash />}
                 >
                   Delete
-                </Button>
+                </NativeButton>
               </div>
             )}
           </div>
@@ -1013,7 +1017,7 @@ export default function CategoryDetailClient({
 
           {canEditInventory && (
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-              <Button
+              <NativeButton
                 variant="flat"
                 className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
                 onPress={() => {
@@ -1023,8 +1027,8 @@ export default function CategoryDetailClient({
                 startContent={<FaEdit />}
               >
                 Edit
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 variant="flat"
                 color="danger"
                 className="rounded-xl"
@@ -1032,7 +1036,7 @@ export default function CategoryDetailClient({
                 startContent={<FaTrash />}
               >
                 Delete
-              </Button>
+              </NativeButton>
             </div>
           )}
         </header>
@@ -1071,7 +1075,7 @@ export default function CategoryDetailClient({
 
       <section className="rounded-[1.5rem] border border-white/70 bg-white p-4 shadow-sm max-md:hidden">
         <div className="flex flex-col gap-3">
-          <Input
+          <NativeInput
             value={search}
             onValueChange={handleSearchChange}
             placeholder={`Search items in ${categoryName}...`}
@@ -1137,7 +1141,7 @@ export default function CategoryDetailClient({
         </div>
 
         <div className="mt-3 grid gap-2">
-          <Input
+          <NativeInput
             value={search}
             onValueChange={handleSearchChange}
             placeholder="Search items"
@@ -1351,14 +1355,14 @@ export default function CategoryDetailClient({
                   : "Add an item to start filling this category."}
               </p>
               {normalizedSearch ? (
-                <Button
+                <NativeButton
                   onPress={clearSearch}
                   radius="lg"
                   variant="bordered"
                   className="mt-5 w-full border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] font-semibold text-[var(--stocksense-brand)]"
                 >
                   Clear search
-                </Button>
+                </NativeButton>
               ) : canEditInventory ? (
                 <div className="mt-5 flex justify-center">
                   <OpenGlobalAddItemButton
@@ -1436,15 +1440,15 @@ export default function CategoryDetailClient({
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button
+                  <NativeButton
                     size="sm"
                     variant="flat"
                     className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
                     onPress={toggleSelectAllItems}
                   >
                     {allItemsSelected ? "Deselect all" : "Select all visible"}
-                  </Button>
-                  <Button
+                  </NativeButton>
+                  <NativeButton
                     size="sm"
                     variant="flat"
                     className="rounded-xl border border-gray-200 bg-white text-gray-700"
@@ -1452,16 +1456,16 @@ export default function CategoryDetailClient({
                     isDisabled={selectedCount === 0}
                   >
                     Clear
-                  </Button>
-                  <Button
+                  </NativeButton>
+                  <NativeButton
                     size="sm"
                     className="rounded-xl bg-[var(--stocksense-brand)] text-white"
                     onPress={openMoveSelected}
                     isDisabled={selectedCount === 0}
                   >
                     Move
-                  </Button>
-                  <Button
+                  </NativeButton>
+                  <NativeButton
                     size="sm"
                     color="danger"
                     variant="flat"
@@ -1470,7 +1474,7 @@ export default function CategoryDetailClient({
                     isDisabled={selectedCount === 0}
                   >
                     Delete
-                  </Button>
+                  </NativeButton>
                 </div>
               </div>
             </div>
@@ -1500,14 +1504,14 @@ export default function CategoryDetailClient({
                   : "Add the first item and keep everything in this group easy to find."}
               </p>
               {normalizedSearch ? (
-                <Button
+                <NativeButton
                   onPress={clearSearch}
                   radius="lg"
                   variant="bordered"
                   className="mt-7 border-[var(--stocksense-brand-border)] bg-white px-5 text-sm font-semibold text-[var(--stocksense-brand)] shadow-sm"
                 >
                   Clear search
-                </Button>
+                </NativeButton>
               ) : canEditInventory ? (
                 <OpenGlobalAddItemButton
                   context={{

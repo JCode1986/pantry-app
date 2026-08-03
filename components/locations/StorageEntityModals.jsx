@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import NativeButton from "@/components/ui/NativeButton";
+import {
+  useEffect,
+  useMemo } from "react";
+import NativeInput from "@/components/ui/NativeInput";
 import { parseDate } from "@internationalized/date";
 import {
-  Button,
   DatePicker,
-  Input,
   Modal,
   ModalBody,
   ModalContent,
@@ -250,7 +252,7 @@ export default function StorageEntityModals({
                   ? `Edit storage area in ${areaModal.locationName || locationName}`
                   : `Create new storage in ${areaModal.locationName || locationName}`}
               </span>
-              <Button
+              <NativeButton
                 size="sm"
                 radius="full"
                 onPress={onSubmitAreaModal}
@@ -258,11 +260,11 @@ export default function StorageEntityModals({
                 className={`${modalPrimaryButtonClass} h-10 shrink-0 px-4 text-sm font-semibold md:hidden`}
               >
                 {areaModal.mode === "edit" ? "Save" : "Create"}
-              </Button>
+              </NativeButton>
               <MobileSheetCloseButton onPress={onCloseAreaModal} />
             </ModalHeader>
             <ModalBody className={modalBodyClass}>
-              <Input
+              <NativeInput
                 label="Storage area name"
                 value={areaModal.name}
                 onValueChange={(name) => setAreaModal((prev) => ({ ...prev, name }))}
@@ -299,7 +301,7 @@ export default function StorageEntityModals({
               {areaModal.mode === "edit" && (
                 <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
                   <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                  <Button
+                  <NativeButton
                     className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
                     onPress={() => {
                       onCloseAreaModal();
@@ -310,20 +312,20 @@ export default function StorageEntityModals({
                     }}
                   >
                     Delete storage area
-                  </Button>
+                  </NativeButton>
                 </div>
               )}
             </ModalBody>
             <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-              <Button
+              <NativeButton
                 variant="light"
                 radius="lg"
                 onPress={onCloseAreaModal}
                 className="max-md:hidden"
               >
                 Cancel
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 color="primary"
                 radius="lg"
                 onPress={onSubmitAreaModal}
@@ -331,7 +333,7 @@ export default function StorageEntityModals({
                 className={`${modalPrimaryButtonClass} max-md:hidden`}
               >
                 {areaModal.mode === "edit" ? "Save changes" : "Add area"}
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </ModalContent>
         </Modal>
@@ -353,7 +355,7 @@ export default function StorageEntityModals({
                   ? `Edit category in ${categoryModal.areaName || "storage area"}`
                   : `Create new category in ${categoryModal.areaName || "storage area"}`}
               </span>
-              <Button
+              <NativeButton
                 size="sm"
                 radius="full"
                 onPress={onSubmitCategoryModal}
@@ -361,11 +363,11 @@ export default function StorageEntityModals({
                 className={`${modalPrimaryButtonClass} h-10 shrink-0 px-4 text-sm font-semibold md:hidden`}
               >
                 {categoryModal.mode === "edit" ? "Save" : "Create"}
-              </Button>
+              </NativeButton>
               <MobileSheetCloseButton onPress={onCloseCategoryModal} />
             </ModalHeader>
             <ModalBody className={modalBodyClass}>
-              <Input
+              <NativeInput
                 label="Category name"
                 value={categoryModal.name}
                 onValueChange={(name) => setCategoryModal((prev) => ({ ...prev, name }))}
@@ -402,7 +404,7 @@ export default function StorageEntityModals({
               {categoryModal.mode === "edit" && (
                 <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
                   <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                  <Button
+                  <NativeButton
                     className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
                     onPress={() => {
                       onCloseCategoryModal();
@@ -415,20 +417,20 @@ export default function StorageEntityModals({
                     }}
                   >
                     Delete category
-                  </Button>
+                  </NativeButton>
                 </div>
               )}
             </ModalBody>
             <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-              <Button
+              <NativeButton
                 variant="light"
                 radius="lg"
                 onPress={onCloseCategoryModal}
                 className="max-md:hidden"
               >
                 Cancel
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 color="primary"
                 radius="lg"
                 onPress={onSubmitCategoryModal}
@@ -436,7 +438,7 @@ export default function StorageEntityModals({
                 className={`${modalPrimaryButtonClass} max-md:hidden`}
               >
                 {categoryModal.mode === "edit" ? "Save changes" : "Add category"}
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </ModalContent>
         </Modal>
@@ -458,7 +460,7 @@ export default function StorageEntityModals({
                   ? `Edit item in ${itemModal.categoryName || "category"}`
                   : `Create new item in ${itemModal.categoryName || "category"}`}
               </span>
-              <Button
+              <NativeButton
                 size="sm"
                 radius="full"
                 onPress={onSubmitItemModal}
@@ -466,11 +468,11 @@ export default function StorageEntityModals({
                 className={`${modalPrimaryButtonClass} h-10 shrink-0 px-4 text-sm font-semibold md:hidden`}
               >
                 {itemModal.mode === "edit" ? "Save" : "Add"}
-              </Button>
+              </NativeButton>
               <MobileSheetCloseButton onPress={onCloseItemModal} />
             </ModalHeader>
             <ModalBody className={`space-y-3 ${modalBodyClass}`}>
-              <Input
+              <NativeInput
                 label="Item name"
                 value={itemModal.name}
                 onValueChange={(name) => setItemModal((prev) => ({ ...prev, name }))}
@@ -527,7 +529,7 @@ export default function StorageEntityModals({
               {itemModal.mode === "edit" && (
                 <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
                   <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                  <Button
+                  <NativeButton
                     className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
                     onPress={() => {
                       onCloseItemModal();
@@ -545,20 +547,20 @@ export default function StorageEntityModals({
                     }}
                   >
                     Delete item
-                  </Button>
+                  </NativeButton>
                 </div>
               )}
             </ModalBody>
             <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-              <Button
+              <NativeButton
                 variant="light"
                 radius="lg"
                 onPress={onCloseItemModal}
                 className="max-md:hidden"
               >
                 Cancel
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 color="primary"
                 radius="lg"
                 onPress={onSubmitItemModal}
@@ -566,7 +568,7 @@ export default function StorageEntityModals({
                 className={`${modalPrimaryButtonClass} max-md:hidden`}
               >
                 {itemModal.mode === "edit" ? "Save changes" : "Add item"}
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </ModalContent>
         </Modal>

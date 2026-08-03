@@ -1,10 +1,13 @@
 "use client";
 
+
+import NativeButton from "@/components/ui/NativeButton";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 import {
-  Button,
+  useRouter } from "next/navigation";
+import { useEffect,
+  useState } from "react";
+import {
   Modal,
   ModalBody,
   ModalContent,
@@ -168,7 +171,7 @@ export default function AcceptInviteClient({
               </div>
 
               {isAuthenticated ? (
-                <Button
+                <NativeButton
                   className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
                   onPress={() => handleAccept()}
                   isLoading={loading}
@@ -176,25 +179,25 @@ export default function AcceptInviteClient({
                   startContent={<FaCheckCircle className="h-4 w-4" />}
                 >
                   {inviteAlreadyAccepted ? "Invite accepted" : "Accept invite"}
-                </Button>
+                </NativeButton>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <Button
+                  <NativeButton
                     as={Link}
                     href={`/signup?redirectTo=/invite/${token}`}
                     className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
                     startContent={<FaUserFriends className="h-4 w-4" />}
                   >
                     Create account
-                  </Button>
-                  <Button
+                  </NativeButton>
+                  <NativeButton
                     as={Link}
                     href={`/login?redirectTo=/invite/${token}`}
                     className="w-full rounded-xl border border-gray-200 bg-white text-gray-700"
                     startContent={<FaSignInAlt className="h-4 w-4" />}
                   >
                     Log in
-                  </Button>
+                  </NativeButton>
                 </div>
               )}
           </>
@@ -238,14 +241,14 @@ export default function AcceptInviteClient({
           ) : null}
         </ModalBody>
         <ModalFooter className="flex flex-col-reverse gap-2 border-t border-gray-200 px-5 py-4 sm:flex-row sm:justify-end">
-          <Button
+          <NativeButton
             className="min-h-11 rounded-xl border border-gray-200 bg-white text-gray-700"
             onPress={() => setMergePrompt(null)}
             isDisabled={loading}
           >
             Cancel
-          </Button>
-          <Button
+          </NativeButton>
+          <NativeButton
             className="min-h-11 rounded-xl bg-[var(--stocksense-brand)] text-white"
             onPress={() => handleAccept({ mergeExistingData: true })}
             isLoading={loading}
@@ -253,7 +256,7 @@ export default function AcceptInviteClient({
             startContent={!loading ? <FaCheckCircle className="h-4 w-4" /> : null}
           >
             Join and merge data
-          </Button>
+          </NativeButton>
         </ModalFooter>
       </ModalContent>
     </Modal>

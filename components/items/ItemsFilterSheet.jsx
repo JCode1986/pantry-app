@@ -1,13 +1,13 @@
 "use client";
 
 import {
-  Button,
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
 } from "@heroui/react";
+import NativeButton from "@/components/ui/NativeButton";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import { modalContentStyle } from "@/components/modals/modalTheme";
 import NativeSelect from "@/components/ui/NativeSelect";
@@ -92,7 +92,7 @@ export default function ItemsFilterSheet({
               {hierarchyError ? (
                 <div className="flex flex-col gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
                   <span>{hierarchyError}</span>
-                  <Button
+                  <NativeButton
                     size="sm"
                     color="danger"
                     variant="flat"
@@ -100,7 +100,7 @@ export default function ItemsFilterSheet({
                     onPress={() => onLoadHierarchy({ force: true })}
                   >
                     Retry
-                  </Button>
+                  </NativeButton>
                 </div>
               ) : null}
 
@@ -225,12 +225,12 @@ export default function ItemsFilterSheet({
             </ModalBody>
 
             <ModalFooter className="wherekeep-modal-footer sticky bottom-0 z-20 border-t border-gray-200 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)]">
-              <Button
+              <NativeButton
                 className="min-h-12 w-full rounded-xl bg-[var(--stocksense-brand)] text-base font-semibold text-white"
                 onPress={() => onOpenChange(false)}
               >
                 Apply filters
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </>
         )}

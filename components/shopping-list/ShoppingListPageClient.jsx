@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import dynamic from "next/dynamic";
-import { AnimatePresence, motion } from "@/components/ui/MotionLite";
+
+import NativeButton from "@/components/ui/NativeButton";
 import {
-  Button,
-} from "@heroui/react";
+  useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
+import dynamic from "next/dynamic";
+import { AnimatePresence,
+  motion } from "@/components/ui/MotionLite";
 import {
   FaCheck,
   FaExchangeAlt,
@@ -883,7 +887,7 @@ export default function ShoppingListPageClient({
             </div>
 
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <Button
+              <NativeButton
                 className="min-h-11 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-sm font-semibold text-[var(--stocksense-brand)]"
                 isLoading={moveDialog.isMoving}
                 isDisabled={
@@ -893,8 +897,8 @@ export default function ShoppingListPageClient({
                 startContent={!moveDialog.isMoving ? <FaExchangeAlt /> : null}
               >
                 Move
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 className="min-h-11 rounded-xl bg-emerald-600 text-sm font-semibold text-white"
                 isLoading={bulkAction === "purchased"}
                 isDisabled={
@@ -903,8 +907,8 @@ export default function ShoppingListPageClient({
                 onPress={() => bulkUpdateStatus("purchased")}
               >
                 Purchased
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 className="min-h-11 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-sm font-semibold text-[var(--stocksense-brand)]"
                 isLoading={bulkAction === "needed"}
                 isDisabled={
@@ -913,8 +917,8 @@ export default function ShoppingListPageClient({
                 onPress={() => bulkUpdateStatus("needed")}
               >
                 Need again
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 variant="flat"
                 className="min-h-11 rounded-xl text-sm font-semibold"
                 isLoading={bulkAction === "dismissed"}
@@ -924,8 +928,8 @@ export default function ShoppingListPageClient({
                 onPress={() => bulkUpdateStatus("dismissed")}
               >
                 Dismiss
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 color="danger"
                 variant="flat"
                 className="min-h-11 rounded-xl text-sm font-semibold"
@@ -933,7 +937,7 @@ export default function ShoppingListPageClient({
                 onPress={() => setIsBulkDeleteOpen(true)}
               >
                 Delete
-              </Button>
+              </NativeButton>
             </div>
           </motion.div>
         ) : (
@@ -963,7 +967,7 @@ export default function ShoppingListPageClient({
                         Select
                       </button>
                     )}
-                    <Button
+                    <NativeButton
                       className="min-h-10 rounded-xl bg-[var(--stocksense-brand)] px-3 text-sm font-semibold text-white"
                       onPress={() => {
                         setMessage(null);
@@ -972,7 +976,7 @@ export default function ShoppingListPageClient({
                       startContent={<FaPlus />}
                     >
                       Add
-                    </Button>
+                    </NativeButton>
                   </div>
                 )}
               </div>
@@ -1048,7 +1052,7 @@ export default function ShoppingListPageClient({
 
             {canEditInventory && (
               <div className="flex gap-2">
-                <Button
+                <NativeButton
                   className="rounded-xl bg-[var(--stocksense-brand)] text-white"
                   onPress={() => {
                     setMessage(null);
@@ -1057,7 +1061,7 @@ export default function ShoppingListPageClient({
                   startContent={<FaPlus />}
                 >
                   Add item
-                </Button>
+                </NativeButton>
               </div>
             )}
           </div>
@@ -1093,7 +1097,7 @@ export default function ShoppingListPageClient({
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Button
+                  <NativeButton
                     size="sm"
                     variant="flat"
                     className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
@@ -1101,8 +1105,8 @@ export default function ShoppingListPageClient({
                     onPress={clearSelection}
                   >
                     Clear selection
-                  </Button>
-                  <Button
+                  </NativeButton>
+                  <NativeButton
                     size="sm"
                     className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
                     isLoading={moveDialog.isMoving}
@@ -1111,8 +1115,8 @@ export default function ShoppingListPageClient({
                     startContent={!moveDialog.isMoving ? <FaExchangeAlt /> : null}
                   >
                     Move to inventory
-                  </Button>
-                  <Button
+                  </NativeButton>
+                  <NativeButton
                     size="sm"
                     className="rounded-xl bg-emerald-600 text-white"
                     isLoading={bulkAction === "purchased"}
@@ -1121,8 +1125,8 @@ export default function ShoppingListPageClient({
                     startContent={bulkAction !== "purchased" ? <FaCheck /> : null}
                   >
                     Mark purchased
-                  </Button>
-                  <Button
+                  </NativeButton>
+                  <NativeButton
                     size="sm"
                     className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
                     isLoading={bulkAction === "needed"}
@@ -1131,8 +1135,8 @@ export default function ShoppingListPageClient({
                     startContent={bulkAction !== "needed" ? <FaUndo /> : null}
                   >
                     Need again
-                  </Button>
-                  <Button
+                  </NativeButton>
+                  <NativeButton
                     size="sm"
                     variant="flat"
                     className="rounded-xl"
@@ -1141,8 +1145,8 @@ export default function ShoppingListPageClient({
                     onPress={() => bulkUpdateStatus("dismissed")}
                   >
                     Dismiss
-                  </Button>
-                  <Button
+                  </NativeButton>
+                  <NativeButton
                     size="sm"
                     color="danger"
                     variant="flat"
@@ -1152,7 +1156,7 @@ export default function ShoppingListPageClient({
                     startContent={<FaTrash />}
                   >
                     Delete selected
-                  </Button>
+                  </NativeButton>
                 </div>
               </div>
             </motion.div>
@@ -1401,7 +1405,7 @@ export default function ShoppingListPageClient({
                 : `No ${filter} shopping list items.`}
             </p>
             {canEditInventory && (
-              <Button
+              <NativeButton
                 className="mt-4 rounded-xl bg-[var(--stocksense-brand)] text-white"
                 onPress={() => {
                   setMessage(null);
@@ -1410,7 +1414,7 @@ export default function ShoppingListPageClient({
                 startContent={<FaPlus />}
               >
                 Add item
-              </Button>
+              </NativeButton>
             )}
           </div>
         ) : null}

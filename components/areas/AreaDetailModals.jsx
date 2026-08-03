@@ -1,14 +1,14 @@
 "use client";
 
 import {
-  Button,
-  Input,
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
 } from "@heroui/react";
+import NativeInput from "@/components/ui/NativeInput";
+import NativeButton from "@/components/ui/NativeButton";
 import { FaCamera, FaImage, FaPlus, FaTrash, FaUpload } from "react-icons/fa";
 import EntityImageManager from "@/components/inventory/EntityImageManager";
 import MobileSuggestionChips from "@/components/modals/MobileSuggestionChips";
@@ -84,7 +84,7 @@ export default function AreaDetailModals({
                 className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}
               >
                 <span className="min-w-0 flex-1 truncate">Create Category</span>
-                <Button
+                <NativeButton
                   size="sm"
                   className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
                   onPress={onAddCategory}
@@ -93,11 +93,11 @@ export default function AreaDetailModals({
                   startContent={!isSaving ? <FaPlus className="h-3.5 w-3.5" /> : null}
                 >
                   Create
-                </Button>
+                </NativeButton>
                 <MobileSheetCloseButton onPress={() => setMobileAddOpen(false)} />
               </ModalHeader>
               <ModalBody className={`space-y-4 ${modalBodyClass}`}>
-                <Input
+                <NativeInput
                   label="Category name"
                   value={newCategory}
                   onValueChange={setNewCategory}
@@ -170,7 +170,7 @@ export default function AreaDetailModals({
                           />
                         </label>
                         {newCategoryImageFile ? (
-                          <Button
+                          <NativeButton
                             size="sm"
                             variant="flat"
                             className="min-h-10 rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
@@ -179,7 +179,7 @@ export default function AreaDetailModals({
                             startContent={<FaTrash className="h-3.5 w-3.5" />}
                           >
                             Remove photo
-                          </Button>
+                          </NativeButton>
                         ) : null}
                       </div>
                       <p className="text-xs leading-5 text-gray-500 max-md:hidden">
@@ -197,7 +197,7 @@ export default function AreaDetailModals({
                 </div>
               </ModalBody>
               <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-                <Button
+                <NativeButton
                   className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                   onPress={onAddCategory}
                   isDisabled={isSaving || !newCategory.trim()}
@@ -205,7 +205,7 @@ export default function AreaDetailModals({
                   startContent={!isSaving ? <FaPlus /> : null}
                 >
                   Create Category
-                </Button>
+                </NativeButton>
               </ModalFooter>
             </>
           )}
@@ -226,7 +226,7 @@ export default function AreaDetailModals({
                 className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}
               >
                 <span className="min-w-0 flex-1 truncate">Edit storage area</span>
-                <Button
+                <NativeButton
                   size="sm"
                   className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
                   onPress={onRenameArea}
@@ -234,11 +234,11 @@ export default function AreaDetailModals({
                   isDisabled={!editAreaName.trim()}
                 >
                   Save
-                </Button>
+                </NativeButton>
                 <MobileSheetCloseButton onPress={onClose} />
               </ModalHeader>
               <ModalBody className={`space-y-3 ${modalBodyClass}`}>
-                <Input
+                <NativeInput
                   label="Storage area name"
                   value={editAreaName}
                   onValueChange={setEditAreaName}
@@ -256,7 +256,7 @@ export default function AreaDetailModals({
                 />
                 <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
                   <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                  <Button
+                  <NativeButton
                     className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
                     onPress={() => {
                       onClose();
@@ -264,26 +264,26 @@ export default function AreaDetailModals({
                     }}
                   >
                     Delete storage area
-                  </Button>
+                  </NativeButton>
                 </div>
               </ModalBody>
               <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-                <Button
+                <NativeButton
                   variant="light"
                   onPress={onClose}
                   isDisabled={isSaving}
                   className="max-md:hidden"
                 >
                   Cancel
-                </Button>
-                <Button
+                </NativeButton>
+                <NativeButton
                   className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                   onPress={onRenameArea}
                   isLoading={isSaving}
                   isDisabled={!editAreaName.trim()}
                 >
                   Save changes
-                </Button>
+                </NativeButton>
               </ModalFooter>
             </>
           )}
@@ -304,18 +304,18 @@ export default function AreaDetailModals({
                 className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}
               >
                 <span className="min-w-0 flex-1 truncate">Edit category</span>
-                <Button
+                <NativeButton
                   size="sm"
                   className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
                   onPress={onRenameCategory}
                   isDisabled={isSaving || !renameModal.name.trim()}
                 >
                   Save
-                </Button>
+                </NativeButton>
                 <MobileSheetCloseButton onPress={onClose} />
               </ModalHeader>
               <ModalBody className={`space-y-3 ${modalBodyClass}`}>
-                <Input
+                <NativeInput
                   value={renameModal.name}
                   onValueChange={(v) => setRenameModal((p) => ({ ...p, name: v }))}
                   variant="bordered"
@@ -333,7 +333,7 @@ export default function AreaDetailModals({
                 />
                 <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
                   <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                  <Button
+                  <NativeButton
                     className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
                     onPress={() => {
                       const target = {
@@ -346,25 +346,25 @@ export default function AreaDetailModals({
                     }}
                   >
                     Delete category
-                  </Button>
+                  </NativeButton>
                 </div>
               </ModalBody>
               <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-                <Button
+                <NativeButton
                   variant="light"
                   onPress={onClose}
                   isDisabled={isSaving}
                   className="max-md:hidden"
                 >
                   Cancel
-                </Button>
-                <Button
+                </NativeButton>
+                <NativeButton
                   className="bg-[var(--stocksense-brand)] text-white max-md:hidden"
                   onPress={onRenameCategory}
                   isDisabled={isSaving || !renameModal.name.trim()}
                 >
                   Save changes
-                </Button>
+                </NativeButton>
               </ModalFooter>
             </>
           )}

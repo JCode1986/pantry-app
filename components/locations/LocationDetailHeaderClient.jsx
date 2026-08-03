@@ -1,12 +1,11 @@
 "use client";
 
+
+import NativeButton from "@/components/ui/NativeButton";
 import { useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import {
-  Button,
-} from "@heroui/react";
 import {
   FaBoxOpen,
   FaEdit,
@@ -156,7 +155,7 @@ export default function LocationDetailHeaderClient({
 
             {canEditInventory && (
               <div className="mt-4 grid grid-cols-2 gap-2">
-                <Button
+                <NativeButton
                   variant="flat"
                   className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
                   onPress={() => {
@@ -166,15 +165,15 @@ export default function LocationDetailHeaderClient({
                   startContent={<FaEdit />}
                 >
                   Edit location
-                </Button>
-                <Button
+                </NativeButton>
+                <NativeButton
                   variant="flat"
                   className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
                   onPress={() => setDeleteOpen(true)}
                   startContent={<FaTrash />}
                 >
                   Delete
-                </Button>
+                </NativeButton>
               </div>
             )}
           </div>
@@ -226,7 +225,7 @@ export default function LocationDetailHeaderClient({
 
           {canEditInventory && (
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-              <Button
+              <NativeButton
                 size="sm"
                 variant="flat"
                 className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] shadow-sm"
@@ -237,8 +236,8 @@ export default function LocationDetailHeaderClient({
                 startContent={<FaEdit />}
               >
                 Edit
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 size="sm"
                 variant="flat"
                 color="danger"
@@ -247,7 +246,7 @@ export default function LocationDetailHeaderClient({
                 startContent={<FaTrash />}
               >
                 Delete
-              </Button>
+              </NativeButton>
             </div>
           )}
         </div>

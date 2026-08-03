@@ -1,15 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+
+import NativeButton from "@/components/ui/NativeButton";
 import {
-  Button,
-  Input,
+  useEffect,
+  useMemo,
+  useState } from "react";
+import {
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
 } from "@heroui/react";
+import NativeInput from "@/components/ui/NativeInput";
 import { FaEdit, FaExchangeAlt } from "react-icons/fa";
 import { updateShoppingListItemAction } from "@/app/actions/shoppingList";
 import { toNonNegativeInteger } from "@/utils/pantry/date";
@@ -152,7 +156,7 @@ export default function EditShoppingListItemModal({
                 <FaEdit className="h-4 w-4 shrink-0" />
                 <span className="truncate">Edit shopping list item</span>
               </span>
-              <Button
+              <NativeButton
                 size="sm"
                 className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
                 onPress={handleSave}
@@ -160,7 +164,7 @@ export default function EditShoppingListItemModal({
                 isDisabled={!hasChanges}
               >
                 Save
-              </Button>
+              </NativeButton>
               <MobileSheetCloseButton onPress={handleClose} />
             </ModalHeader>
 
@@ -171,7 +175,7 @@ export default function EditShoppingListItemModal({
                 </p>
               ) : null}
 
-              <Input
+              <NativeInput
                 label="Item"
                 value={form.name}
                 onValueChange={(value) => updateForm("name", value)}
@@ -215,7 +219,7 @@ export default function EditShoppingListItemModal({
               {onMoveToInventory && item ? (
                 <div className="rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3">
                   <p className="text-sm font-semibold text-gray-950">Inventory</p>
-                  <Button
+                  <NativeButton
                     className="mt-3 min-h-11 w-full rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
                     onPress={() => onMoveToInventory(item)}
                     isLoading={isMovingToInventory}
@@ -223,14 +227,14 @@ export default function EditShoppingListItemModal({
                     startContent={!isMovingToInventory ? <FaExchangeAlt /> : null}
                   >
                     Move to inventory
-                  </Button>
+                  </NativeButton>
                 </div>
               ) : null}
 
               {onDelete && item ? (
                 <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
                   <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                  <Button
+                  <NativeButton
                     className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
                     onPress={() => {
                       handleClose();
@@ -238,28 +242,28 @@ export default function EditShoppingListItemModal({
                     }}
                   >
                     Delete shopping list item
-                  </Button>
+                  </NativeButton>
                 </div>
               ) : null}
             </ModalBody>
 
             <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-              <Button
+              <NativeButton
                 variant="light"
                 className="rounded-xl max-md:hidden"
                 onPress={handleClose}
                 isDisabled={isSaving}
               >
                 Cancel
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                 onPress={handleSave}
                 isLoading={isSaving}
                 isDisabled={!hasChanges}
               >
                 Save changes
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </>
         )}

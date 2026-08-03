@@ -13,6 +13,7 @@ import {
   saveStoredPreferences,
 } from "@/utils/appPreferences";
 import { clearBrowserLogoutStorage } from "@/utils/logoutStorage";
+import { cx } from "@/components/ui/classNames";
 import {
   FaBell,
   FaMapMarkedAlt,
@@ -123,10 +124,6 @@ const AttentionSheet = dynamic(
     ),
   { ssr: false }
 );
-
-function cx(...classes) {
-  return classes.filter(Boolean).join(" ");
-}
 
 function addDays(date, days) {
   const next = new Date(date);
@@ -386,7 +383,6 @@ function formatHouseholdRole(role) {
   if (role === "editor") return "Editor";
   return "";
 }
-
 
 function DesktopSidebar({
   activeHref,

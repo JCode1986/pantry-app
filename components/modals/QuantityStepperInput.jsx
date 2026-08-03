@@ -1,6 +1,7 @@
 "use client";
 
-import { Input } from "@heroui/react";
+
+import NativeInput from "@/components/ui/NativeInput";
 import { FaMinus, FaPlus } from "react-icons/fa";
 
 function toInteger(value, fallback = 0) {
@@ -85,7 +86,7 @@ export default function QuantityStepperInput({
           </button>
         </div>
       </div>
-      <Input
+      <NativeInput
         label={label}
         value={value}
         onValueChange={onValueChange}

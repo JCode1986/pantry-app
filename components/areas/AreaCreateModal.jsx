@@ -1,14 +1,14 @@
 "use client";
 
 import {
-  Button,
-  Input,
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
 } from "@heroui/react";
+import NativeInput from "@/components/ui/NativeInput";
+import NativeButton from "@/components/ui/NativeButton";
 import { FaImage, FaPlus } from "react-icons/fa";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
 import NativeSelect from "@/components/ui/NativeSelect";
@@ -65,7 +65,7 @@ export default function AreaCreateModal({
                   label: location.name,
                 }))}
               />
-              <Input
+              <NativeInput
                 label="Storage area name"
                 value={areaName}
                 onValueChange={setAreaName}
@@ -122,14 +122,14 @@ export default function AreaCreateModal({
                         />
                       </label>
                       {imageFile ? (
-                        <Button
+                        <NativeButton
                           variant="flat"
                           className="rounded-xl border border-gray-200 bg-white text-gray-600"
                           onPress={onClearImageFile}
                           isDisabled={isCreating}
                         >
                           Remove
-                        </Button>
+                        </NativeButton>
                       ) : null}
                     </div>
                     <p className="text-xs leading-5 text-gray-500">
@@ -152,10 +152,10 @@ export default function AreaCreateModal({
               ) : null}
             </ModalBody>
             <ModalFooter className={modalFooterClass}>
-              <Button variant="light" onPress={onCloseFromModal} isDisabled={isCreating}>
+              <NativeButton variant="light" onPress={onCloseFromModal} isDisabled={isCreating}>
                 Cancel
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 className="rounded-xl bg-[var(--stocksense-brand)] text-white"
                 onPress={onCreate}
                 isLoading={isCreating}
@@ -168,7 +168,7 @@ export default function AreaCreateModal({
                 startContent={!isCreating ? <FaPlus /> : null}
               >
                 Add Storage Area
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </>
         )}

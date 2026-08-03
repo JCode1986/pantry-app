@@ -1,13 +1,13 @@
 "use client";
 
 import {
-  Button,
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
 } from "@heroui/react";
+import NativeButton from "@/components/ui/NativeButton";
 import { FaBoxOpen, FaMapMarkedAlt, FaTags, FaWarehouse } from "react-icons/fa";
 import {
   modalBodyClass,
@@ -112,9 +112,9 @@ export default function NavigationAddActionSheet({
               </button>
             </ModalBody>
             <ModalFooter className={modalFooterClass}>
-              <Button variant="light" className="rounded-xl" onPress={onClose}>
+              <NativeButton variant="light" className="rounded-xl" onPress={onClose}>
                 Cancel
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </>
         )}

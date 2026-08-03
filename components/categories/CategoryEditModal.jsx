@@ -1,14 +1,14 @@
 "use client";
 
 import {
-  Button,
-  Input,
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
 } from "@heroui/react";
+import NativeInput from "@/components/ui/NativeInput";
+import NativeButton from "@/components/ui/NativeButton";
 import EntityImageManager from "@/components/inventory/EntityImageManager";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import {
@@ -48,7 +48,7 @@ export default function CategoryEditModal({
               className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}
             >
               <span className="min-w-0 flex-1 truncate">Edit category</span>
-              <Button
+              <NativeButton
                 size="sm"
                 className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
                 onPress={onSave}
@@ -56,11 +56,11 @@ export default function CategoryEditModal({
                 isDisabled={!editCategoryName.trim()}
               >
                 Save
-              </Button>
+              </NativeButton>
               <MobileSheetCloseButton onPress={onClose} />
             </ModalHeader>
             <ModalBody className={`space-y-3 ${modalBodyClass}`}>
-              <Input
+              <NativeInput
                 label="Category name"
                 value={editCategoryName}
                 onValueChange={onEditCategoryNameChange}
@@ -78,7 +78,7 @@ export default function CategoryEditModal({
               />
               <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
                 <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                <Button
+                <NativeButton
                   className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
                   onPress={() => {
                     onClose();
@@ -86,26 +86,26 @@ export default function CategoryEditModal({
                   }}
                 >
                   Delete category
-                </Button>
+                </NativeButton>
               </div>
             </ModalBody>
             <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-              <Button
+              <NativeButton
                 variant="light"
                 onPress={onClose}
                 isDisabled={isSaving}
                 className="max-md:hidden"
               >
                 Cancel
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                 onPress={onSave}
                 isLoading={isSaving}
                 isDisabled={!editCategoryName.trim()}
               >
                 Save changes
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </>
         )}

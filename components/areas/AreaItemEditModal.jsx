@@ -1,16 +1,18 @@
 "use client";
 
-import { useMemo } from "react";
+
+import NativeButton from "@/components/ui/NativeButton";
 import {
-  Button,
+  useMemo } from "react";
+import {
   DatePicker,
-  Input,
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
 } from "@heroui/react";
+import NativeInput from "@/components/ui/NativeInput";
 import { parseDate } from "@internationalized/date";
 import { FaBarcode } from "react-icons/fa";
 
@@ -66,7 +68,7 @@ export default function AreaItemEditModal({
                   {itemModal.categoryName || "Category"}
                 </span>
               </span>
-              <Button
+              <NativeButton
                 size="sm"
                 className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
                 onPress={onSave}
@@ -74,11 +76,11 @@ export default function AreaItemEditModal({
                 isDisabled={isSaving || !itemModal.name.trim()}
               >
                 Save
-              </Button>
+              </NativeButton>
               <MobileSheetCloseButton onPress={onClose} />
             </ModalHeader>
             <ModalBody className={`space-y-3 ${modalBodyClass}`}>
-              <Input
+              <NativeInput
                 label="Item name"
                 value={itemModal.name}
                 onValueChange={(value) =>
@@ -114,7 +116,7 @@ export default function AreaItemEditModal({
                   showMonthAndYearPickers
                 />
               </div>
-              <Input
+              <NativeInput
                 label="Barcode"
                 value={itemModal.barcode}
                 onValueChange={(value) =>
@@ -134,31 +136,31 @@ export default function AreaItemEditModal({
               />
               <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
                 <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                <Button
+                <NativeButton
                   className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
                   onPress={onDelete}
                 >
                   Delete item
-                </Button>
+                </NativeButton>
               </div>
             </ModalBody>
             <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-              <Button
+              <NativeButton
                 variant="light"
                 onPress={onClose}
                 isDisabled={isSaving}
                 className="max-md:hidden"
               >
                 Cancel
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                 onPress={onSave}
                 isLoading={isSaving}
                 isDisabled={!itemModal.name.trim()}
               >
                 Save changes
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </>
         )}

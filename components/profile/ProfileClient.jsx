@@ -1,11 +1,18 @@
 "use client";
 
+
+import NativeButton from "@/components/ui/NativeButton";
+import NativeInput from "@/components/ui/NativeInput";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AnimatePresence, motion } from "@/components/ui/MotionLite";
-import { Button, Input } from "@heroui/react";
+import { AnimatePresence,
+  motion } from "@/components/ui/MotionLite";
 import {
   FaBoxOpen,
   FaCheckCircle,
@@ -350,7 +357,7 @@ function DisplayNameForm({
 }) {
   return (
     <form onSubmit={onSubmit} className={`space-y-3 ${className}`}>
-      <Input
+      <NativeInput
         label="Display name"
         value={value}
         onValueChange={onValueChange}
@@ -360,7 +367,7 @@ function DisplayNameForm({
           inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
         }}
       />
-      <Button
+      <NativeButton
         type="submit"
         className="h-11 w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
         isLoading={isSaving}
@@ -368,7 +375,7 @@ function DisplayNameForm({
         startContent={<FaIdBadge className="h-3.5 w-3.5" />}
       >
         Save display name
-      </Button>
+      </NativeButton>
       {message && (
         <div
           className={`rounded-xl border px-3 py-2 text-sm ${
@@ -447,7 +454,7 @@ function BillingPlanButton({
   const label = interval === BILLING_INTERVALS.yearly ? "yearly" : "monthly";
 
   return (
-    <Button
+    <NativeButton
       variant={isCurrent ? "flat" : "solid"}
       className={`rounded-xl ${
         isCurrent
@@ -459,7 +466,7 @@ function BillingPlanButton({
       onPress={() => onCheckout(plan.id, interval)}
     >
       {isCurrent ? "Current plan" : `${price} ${label}`}
-    </Button>
+    </NativeButton>
   );
 }
 
@@ -554,7 +561,7 @@ function BillingSection({ billing, billingError, billingLoading, onCheckout, onP
           </div>
         ))}
 
-        <Button
+        <NativeButton
           variant="flat"
           className="w-full rounded-xl border border-stocksense-gray bg-white text-gray-700"
           onPress={onPortal}
@@ -563,7 +570,7 @@ function BillingSection({ billing, billingError, billingLoading, onCheckout, onP
           startContent={<FaExternalLinkAlt className="h-3.5 w-3.5" />}
         >
           {billing.hasStripeCustomer ? "Manage billing" : "Billing portal available after checkout"}
-        </Button>
+        </NativeButton>
       </div>
     </motion.section>
   );
@@ -698,7 +705,7 @@ function SharingSection({
               className="scroll-mt-6 space-y-3"
             >
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_220px_auto]">
-                <Input
+                <NativeInput
                   label="Invite by email"
                   type="email"
                   value={inviteEmail}
@@ -721,7 +728,7 @@ function SharingSection({
                     label: `${role.label} - ${role.description}`,
                   }))}
                 />
-                <Button
+                <NativeButton
                   type="submit"
                   className="h-14 rounded-xl bg-[var(--stocksense-brand)] px-5 text-white lg:self-end"
                   isLoading={loading === "invite"}
@@ -729,7 +736,7 @@ function SharingSection({
                   startContent={<FaUserPlus className="h-3.5 w-3.5" />}
                 >
                   Send invite
-                </Button>
+                </NativeButton>
               </div>
 
               {!sharing.canInvite && (
@@ -785,7 +792,7 @@ function SharingSection({
                           label: role.label,
                         }))}
                       />
-                      <Button
+                      <NativeButton
                         size="sm"
                         variant="flat"
                         className="rounded-lg border border-rose-200 bg-rose-50 text-rose-700"
@@ -794,7 +801,7 @@ function SharingSection({
                         startContent={<FaTimesCircle className="h-3.5 w-3.5" />}
                       >
                         Remove
-                      </Button>
+                      </NativeButton>
                     </div>
                   ) : (
                     <FaCheckCircle className="h-4 w-4 shrink-0 text-[var(--stocksense-brand)]" />
@@ -825,7 +832,7 @@ function SharingSection({
                         </div>
                       </div>
                       <div className="flex shrink-0 gap-2">
-                        <Button
+                        <NativeButton
                           size="sm"
                           variant="flat"
                           className="rounded-lg border border-stocksense-gray bg-white text-gray-700"
@@ -833,8 +840,8 @@ function SharingSection({
                           startContent={<FaCopy className="h-3.5 w-3.5" />}
                         >
                           {copiedInviteId === invite.id ? "Copied" : "Copy"}
-                        </Button>
-                        <Button
+                        </NativeButton>
+                        <NativeButton
                           size="sm"
                           variant="flat"
                           className="rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
@@ -843,8 +850,8 @@ function SharingSection({
                           startContent={<FaEnvelope className="h-3.5 w-3.5" />}
                         >
                           Resend
-                        </Button>
-                        <Button
+                        </NativeButton>
+                        <NativeButton
                           size="sm"
                           variant="flat"
                           className="rounded-lg border border-rose-200 bg-rose-50 text-rose-700"
@@ -853,7 +860,7 @@ function SharingSection({
                           startContent={<FaTimesCircle className="h-3.5 w-3.5" />}
                         >
                           Revoke
-                        </Button>
+                        </NativeButton>
                       </div>
                     </div>
                   </div>
@@ -1487,7 +1494,7 @@ export default function ProfileClient({
               }))}
             />
 
-            <Button
+            <NativeButton
               variant="flat"
               className="w-full rounded-xl border border-stocksense-gray bg-white text-gray-700"
               onPress={() => updatePreferences(DEFAULT_PREFERENCES)}
@@ -1496,7 +1503,7 @@ export default function ProfileClient({
               startContent={<FaRedo className="h-3.5 w-3.5" />}
             >
               Reset appearance
-            </Button>
+            </NativeButton>
 
             {appearanceMessage && (
               <div
@@ -1542,7 +1549,7 @@ export default function ProfileClient({
               </div>
             )}
 
-            <Button
+            <NativeButton
               variant="flat"
               className="w-full rounded-xl border border-stocksense-gray bg-white text-gray-700"
               onPress={handleBillingPortal}
@@ -1551,7 +1558,7 @@ export default function ProfileClient({
               startContent={<FaExternalLinkAlt className="h-3.5 w-3.5" />}
             >
               {billing.hasStripeCustomer ? "Manage billing" : "Billing portal available after checkout"}
-            </Button>
+            </NativeButton>
 
             <div className="grid gap-2">
               {paidPlans.map((plan) => (
@@ -1643,7 +1650,7 @@ export default function ProfileClient({
 
                 {sharingIsFamily && sharingIsOwner && (
                   <form onSubmit={handleCreateInvite} className="space-y-3">
-                    <Input
+                    <NativeInput
                       label="Invite by email"
                       type="email"
                       value={inviteEmail}
@@ -1666,7 +1673,7 @@ export default function ProfileClient({
                         label: `${role.label} - ${role.description}`,
                       }))}
                     />
-                    <Button
+                    <NativeButton
                       type="submit"
                       className="h-12 w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
                       isLoading={sharingLoading === "invite"}
@@ -1674,7 +1681,7 @@ export default function ProfileClient({
                       startContent={<FaUserPlus className="h-3.5 w-3.5" />}
                     >
                       Send invite
-                    </Button>
+                    </NativeButton>
                   </form>
                 )}
 
@@ -1730,7 +1737,7 @@ export default function ProfileClient({
                             </p>
                           </div>
                           <div className="mt-3 grid grid-cols-3 gap-2">
-                            <Button
+                            <NativeButton
                               size="sm"
                               variant="flat"
                               className="rounded-lg border border-stocksense-gray bg-white px-2 text-gray-700"
@@ -1738,8 +1745,8 @@ export default function ProfileClient({
                               startContent={<FaCopy className="h-3.5 w-3.5" />}
                             >
                               {copiedInviteId === invite.id ? "Copied" : "Copy"}
-                            </Button>
-                            <Button
+                            </NativeButton>
+                            <NativeButton
                               size="sm"
                               variant="flat"
                               className="rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-2 text-[var(--stocksense-brand)]"
@@ -1748,8 +1755,8 @@ export default function ProfileClient({
                               startContent={<FaEnvelope className="h-3.5 w-3.5" />}
                             >
                               Resend
-                            </Button>
-                            <Button
+                            </NativeButton>
+                            <NativeButton
                               size="sm"
                               variant="flat"
                               className="rounded-lg border border-rose-200 bg-rose-50 px-2 text-rose-700"
@@ -1758,7 +1765,7 @@ export default function ProfileClient({
                               startContent={<FaTimesCircle className="h-3.5 w-3.5" />}
                             >
                               Revoke
-                            </Button>
+                            </NativeButton>
                           </div>
                         </div>
                       ))}
@@ -1791,7 +1798,7 @@ export default function ProfileClient({
               )}
             </AnimatePresence>
 
-            <Input
+            <NativeInput
               label="New password"
               type={showPassword ? "text" : "password"}
               value={password}
@@ -1814,7 +1821,7 @@ export default function ProfileClient({
               }}
             />
 
-            <Input
+            <NativeInput
               label="Confirm password"
               type={showPassword ? "text" : "password"}
               value={confirmPassword}
@@ -1827,14 +1834,14 @@ export default function ProfileClient({
               }}
             />
 
-            <Button
+            <NativeButton
               type="submit"
               className="h-12 w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
               isLoading={savingPassword}
               isDisabled={savingPassword}
             >
               {savingPassword ? "Updating..." : "Update password"}
-            </Button>
+            </NativeButton>
           </form>
         </MobileProfileCard>
 
@@ -1856,14 +1863,14 @@ export default function ProfileClient({
             <MobileInfoRow label="Last sign in" value={user.lastSignInLabel} />
           </div>
           {user.id && (
-            <Button
+            <NativeButton
               variant="flat"
               className="mt-3 w-full rounded-xl border border-stocksense-gray bg-white text-gray-700"
               onPress={handleCopyUserId}
               startContent={<FaClipboard />}
             >
               {copiedUserId ? "Copied user ID" : "Copy user ID"}
-            </Button>
+            </NativeButton>
           )}
         </MobileAccordionCard>
 
@@ -1959,7 +1966,7 @@ export default function ProfileClient({
                 )}
               </AnimatePresence>
 
-              <Input
+              <NativeInput
                 label="New password"
                 type={showPassword ? "text" : "password"}
                 value={password}
@@ -1986,7 +1993,7 @@ export default function ProfileClient({
                 }}
               />
 
-              <Input
+              <NativeInput
                 label="Confirm password"
                 type={showPassword ? "text" : "password"}
                 value={confirmPassword}
@@ -2004,14 +2011,14 @@ export default function ProfileClient({
                   <FaShieldAlt className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
                   Password changes apply to future logins.
                 </div>
-                <Button
+                <NativeButton
                   type="submit"
                   className="rounded-xl bg-[var(--stocksense-brand)] px-5 text-white"
                   isLoading={savingPassword}
                   isDisabled={savingPassword}
                 >
                   {savingPassword ? "Updating..." : "Update password"}
-                </Button>
+                </NativeButton>
               </div>
             </form>
           </motion.section>
@@ -2081,7 +2088,7 @@ export default function ProfileClient({
 
               <AppearancePreview theme={selectedTheme} font={selectedFont} />
 
-              <Button
+              <NativeButton
                 variant="flat"
                 className="rounded-xl border border-stocksense-gray bg-white text-gray-700"
                 onPress={() => updatePreferences(DEFAULT_PREFERENCES)}
@@ -2090,7 +2097,7 @@ export default function ProfileClient({
                 startContent={<FaRedo className="h-3.5 w-3.5" />}
               >
                 Reset appearance
-              </Button>
+              </NativeButton>
 
               {appearanceMessage && (
                 <div
@@ -2157,14 +2164,14 @@ export default function ProfileClient({
             </div>
 
             {user.id && (
-              <Button
+              <NativeButton
                 variant="flat"
                 className="mt-4 w-full rounded-xl border border-stocksense-gray bg-white text-gray-700"
                 onPress={handleCopyUserId}
                 startContent={<FaClipboard />}
               >
                 {copiedUserId ? "Copied user ID" : "Copy user ID"}
-              </Button>
+              </NativeButton>
             )}
           </section>
 

@@ -5,16 +5,13 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "@/components/ui/MotionLite";
 import {
-  Input,
-  Button,
-} from "@heroui/react";
-import {
   FaBoxOpen,
   FaChevronRight,
   FaMapMarkedAlt,
   FaPlus,
   FaSearch,
   FaTags,
+  FaTimes,
   FaTrash,
   FaWarehouse,
 } from "react-icons/fa";
@@ -722,20 +719,26 @@ export default function AreasPageClient({
           </div>
         </div>
 
-        <Input
-          value={search}
-          onValueChange={handleSearchChange}
-          placeholder="Search storage areas"
-          radius="lg"
-          variant="bordered"
-          className="mt-4"
-          startContent={<FaSearch className="h-4 w-4 text-gray-400" />}
-          classNames={{
-            inputWrapper:
-              "min-h-11 border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]",
-            input: "text-sm text-gray-900 placeholder:text-gray-400",
-          }}
-        />
+        <label className="mt-4 flex min-h-11 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 shadow-sm transition focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]">
+          <FaSearch className="h-4 w-4 shrink-0 text-gray-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(event) => handleSearchChange(event.target.value)}
+            placeholder="Search storage areas"
+            className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
+          />
+          {search ? (
+            <button
+              type="button"
+              aria-label="Clear storage area search"
+              onClick={clearSearch}
+              className="grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 active:scale-95"
+            >
+              <FaTimes className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </label>
         <div className="mt-2 grid grid-cols-2 gap-2">
           <NativeSelect
             aria-label="Filter storage areas by location"
@@ -785,7 +788,7 @@ export default function AreasPageClient({
               <button
                 type="button"
                 onClick={clearSelection}
-                className="min-h-10 shrink-0 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700"
+                className="min-h-10 shrink-0 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 active:scale-[0.99]"
               >
                 Cancel
               </button>
@@ -796,7 +799,7 @@ export default function AreasPageClient({
                 type="button"
                 onClick={toggleSelectAllVisible}
                 disabled={filtered.length === 0 || deleteDialog.isDeleting}
-                className="min-h-11 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 text-sm font-semibold text-[var(--stocksense-brand)] disabled:opacity-50"
+                className="min-h-11 rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 text-sm font-semibold text-[var(--stocksense-brand)] transition hover:opacity-85 active:scale-[0.99] disabled:opacity-50"
               >
                 {allVisibleSelected ? "Deselect visible" : "Select visible"}
               </button>
@@ -805,13 +808,14 @@ export default function AreasPageClient({
               </span>
             </div>
 
-            <Button
-              className="mt-2 min-h-11 w-full rounded-xl bg-rose-600 text-sm font-semibold text-white"
-              onPress={openBulkDelete}
-              isDisabled={selectedCount === 0 || deleteDialog.isDeleting}
+            <button
+              type="button"
+              className="mt-2 min-h-11 w-full rounded-xl bg-rose-600 text-sm font-semibold text-white transition hover:opacity-85 active:scale-[0.99] disabled:opacity-50"
+              onClick={openBulkDelete}
+              disabled={selectedCount === 0 || deleteDialog.isDeleting}
             >
               Delete
-            </Button>
+            </button>
           </motion.div>
         )}
         {showSearchRestoreLoader ? (
@@ -852,14 +856,13 @@ export default function AreasPageClient({
                 : "Try a different filter or add an item to create a storage area."}
             </p>
             {normalizedSearch ? (
-              <Button
-                onPress={clearSearch}
-                radius="lg"
-                variant="bordered"
-                className="mt-5 w-full border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] font-semibold text-[var(--stocksense-brand)]"
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="mt-5 inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 text-sm font-semibold text-[var(--stocksense-brand)] transition hover:opacity-85 active:scale-[0.99]"
               >
                 Clear search
-              </Button>
+              </button>
             ) : canEditInventory ? (
               <div className="mt-5 flex justify-center">
                 <OpenGlobalAddItemButton canEditInventory={canEditInventory} />
@@ -995,20 +998,26 @@ export default function AreasPageClient({
           </div>
 
           <div className="flex w-full max-w-5xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <Input
-              value={search}
-              onValueChange={handleSearchChange}
-              placeholder="Search storage areas"
-              radius="lg"
-              variant="bordered"
-              className="w-full sm:w-72"
-              startContent={<FaSearch className="h-4 w-4 text-gray-400" />}
-              classNames={{
-                inputWrapper:
-                  "min-h-10 border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]",
-                input: "text-sm text-gray-900 placeholder:text-gray-400",
-              }}
-            />
+            <label className="flex min-h-10 w-full items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 shadow-sm transition focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)] sm:w-72">
+              <FaSearch className="h-4 w-4 shrink-0 text-gray-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => handleSearchChange(event.target.value)}
+                placeholder="Search storage areas"
+                className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
+              />
+              {search ? (
+                <button
+                  type="button"
+                  aria-label="Clear storage area search"
+                  onClick={clearSearch}
+                  className="grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 active:scale-95"
+                >
+                  <FaTimes className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+            </label>
             <NativeSelect
               aria-label="Filter storage areas by location"
               className="w-full sm:w-48"
@@ -1030,13 +1039,14 @@ export default function AreasPageClient({
               options={SORT_OPTIONS.map(([value, label]) => ({ value, label }))}
             />
             {canEditInventory && (
-              <Button
-                onPress={openCreateAreaModal}
-                className="min-h-10 w-full whitespace-nowrap rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm sm:w-auto"
-                startContent={<FaPlus />}
+              <button
+                type="button"
+                onClick={openCreateAreaModal}
+                className="inline-flex min-h-10 w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm transition hover:opacity-85 active:scale-[0.99] sm:w-auto"
               >
+                <FaPlus className="h-3.5 w-3.5" />
                 Add Storage Area
-              </Button>
+              </button>
             )}
           </div>
         </header>
@@ -1067,26 +1077,23 @@ export default function AreasPageClient({
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant="flat"
-                    className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
-                    isDisabled={deleteDialog.isDeleting}
-                    onPress={clearSelection}
+                  <button
+                    type="button"
+                    className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 py-1.5 text-sm font-medium text-[var(--stocksense-brand)] transition hover:bg-[var(--stocksense-brand-soft)] active:scale-[0.99] disabled:opacity-50"
+                    disabled={deleteDialog.isDeleting}
+                    onClick={clearSelection}
                   >
                     Clear selection
-                  </Button>
-                  <Button
-                    size="sm"
-                    color="danger"
-                    variant="flat"
-                    className="rounded-xl"
-                    isDisabled={deleteDialog.isDeleting}
-                    onPress={openBulkDelete}
-                    startContent={<FaTrash />}
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-50 px-3 py-1.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 active:scale-[0.99] disabled:opacity-50"
+                    disabled={deleteDialog.isDeleting}
+                    onClick={openBulkDelete}
                   >
+                    <FaTrash className="h-3.5 w-3.5" />
                     Delete selected
-                  </Button>
+                  </button>
                 </div>
               </div>
             </motion.div>
@@ -1346,14 +1353,14 @@ export default function AreasPageClient({
                             <span className="text-gray-500">Updated {updatedLabel}</span>
                           ) : null}
                         </div>
-                        <Button
-                          radius="lg"
-                          className="w-full bg-[var(--stocksense-brand)] text-sm font-semibold text-white shadow-sm"
-                          endContent={<FaChevronRight className="h-3.5 w-3.5" />}
-                          onPress={() => router.push(`/areas/${a.id}`)}
+                        <button
+                          type="button"
+                          className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-85 active:scale-[0.99]"
+                          onClick={() => router.push(`/areas/${a.id}`)}
                         >
                           View Storage Area
-                        </Button>
+                          <FaChevronRight className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </motion.article>
                   );
@@ -1373,13 +1380,14 @@ export default function AreasPageClient({
                     <p className="mt-3 max-w-sm text-sm leading-6 text-gray-600">
                       Create a pantry, drawer, closet, cabinet, or shelf.
                     </p>
-                    <Button
-                      onPress={openCreateAreaModal}
-                      className="mt-6 min-h-10 rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm"
-                      startContent={<FaPlus />}
+                    <button
+                      type="button"
+                      onClick={openCreateAreaModal}
+                      className="mt-6 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm transition hover:opacity-85 active:scale-[0.99]"
                     >
+                      <FaPlus className="h-3.5 w-3.5" />
                       Add Storage Area
-                    </Button>
+                    </button>
                   </motion.div>
                 ) : null}
               </motion.div>
@@ -1441,22 +1449,22 @@ export default function AreasPageClient({
                 : "Create a pantry, shelf, closet, drawer, cabinet, or bin to start organizing your home."}
             </p>
             {normalizedSearch ? (
-              <Button
-                onPress={clearSearch}
-                radius="lg"
-                variant="bordered"
-                className="mt-7 border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-5 text-sm font-semibold text-[var(--stocksense-brand)] shadow-sm"
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="mt-7 inline-flex min-h-10 items-center justify-center rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-5 text-sm font-semibold text-[var(--stocksense-brand)] shadow-sm transition hover:opacity-85 active:scale-[0.99]"
               >
                 Clear search
-              </Button>
+              </button>
             ) : canEditInventory && !hasActiveFilters ? (
-              <Button
-                onPress={openCreateAreaModal}
-                className="mt-7 min-h-10 rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm"
-                startContent={<FaPlus />}
+              <button
+                type="button"
+                onClick={openCreateAreaModal}
+                className="mt-7 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm transition hover:opacity-85 active:scale-[0.99]"
               >
+                <FaPlus className="h-3.5 w-3.5" />
                 Add Storage Area
-              </Button>
+              </button>
             ) : null}
           </div>
         )}

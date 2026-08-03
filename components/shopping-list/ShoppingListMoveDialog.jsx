@@ -1,8 +1,6 @@
 "use client";
 
 import {
-  Button,
-  Input,
   Modal,
   ModalBody,
   ModalContent,
@@ -18,6 +16,8 @@ import {
   modalInputClassNames,
   mobileSheetModalClassNames,
 } from "@/components/modals/modalTheme";
+import NativeInput from "@/components/ui/NativeInput";
+import NativeButton from "@/components/ui/NativeButton";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import NativeSelect from "@/components/ui/NativeSelect";
 
@@ -106,7 +106,7 @@ export default function ShoppingListMoveDialog({
               />
               {moveDialog.locationId === newLocationValue ? (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                  <Input
+                  <NativeInput
                     label="New location"
                     value={moveCreateNames.location}
                     onValueChange={(value) => updateMoveCreateName("location", value)}
@@ -116,7 +116,7 @@ export default function ShoppingListMoveDialog({
                     radius="lg"
                     classNames={modalInputClassNames}
                   />
-                  <Button
+                  <NativeButton
                     className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
                     isLoading={moveCreateAction === "location"}
                     isDisabled={
@@ -127,7 +127,7 @@ export default function ShoppingListMoveDialog({
                     onPress={createMoveLocation}
                   >
                     Create
-                  </Button>
+                  </NativeButton>
                 </div>
               ) : null}
 
@@ -152,7 +152,7 @@ export default function ShoppingListMoveDialog({
               />
               {moveDialog.areaId === newAreaValue ? (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                  <Input
+                  <NativeInput
                     label="New storage area"
                     value={moveCreateNames.area}
                     onValueChange={(value) => updateMoveCreateName("area", value)}
@@ -166,7 +166,7 @@ export default function ShoppingListMoveDialog({
                     radius="lg"
                     classNames={modalInputClassNames}
                   />
-                  <Button
+                  <NativeButton
                     className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
                     isLoading={moveCreateAction === "area"}
                     isDisabled={
@@ -179,7 +179,7 @@ export default function ShoppingListMoveDialog({
                     onPress={createMoveArea}
                   >
                     Create
-                  </Button>
+                  </NativeButton>
                 </div>
               ) : null}
 
@@ -204,7 +204,7 @@ export default function ShoppingListMoveDialog({
               />
               {moveDialog.categoryId === newCategoryValue ? (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                  <Input
+                  <NativeInput
                     label="New category"
                     value={moveCreateNames.category}
                     onValueChange={(value) => updateMoveCreateName("category", value)}
@@ -218,7 +218,7 @@ export default function ShoppingListMoveDialog({
                     radius="lg"
                     classNames={modalInputClassNames}
                   />
-                  <Button
+                  <NativeButton
                     className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
                     isLoading={moveCreateAction === "category"}
                     isDisabled={
@@ -231,28 +231,28 @@ export default function ShoppingListMoveDialog({
                     onPress={createMoveCategory}
                   >
                     Create
-                  </Button>
+                  </NativeButton>
                 </div>
               ) : null}
             </ModalBody>
 
             <ModalFooter className={modalFooterClass}>
-              <Button
+              <NativeButton
                 variant="light"
                 className="rounded-xl max-md:hidden"
                 isDisabled={moveDialog.isMoving}
                 onPress={closeMoveDialog}
               >
                 Cancel
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 className="rounded-xl bg-[var(--stocksense-brand)] text-white"
                 isLoading={moveDialog.isMoving}
                 isDisabled={!canMoveToInventory}
                 onPress={confirmMoveToInventory}
               >
                 Move
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </>
         )}

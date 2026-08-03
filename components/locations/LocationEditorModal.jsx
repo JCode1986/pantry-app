@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef } from "react";
+import NativeButton from "@/components/ui/NativeButton";
+import {
+  useRef } from "react";
+import NativeInput from "@/components/ui/NativeInput";
 import dynamic from "next/dynamic";
 import {
-  Button,
-  Input,
   Modal,
   ModalBody,
   ModalContent,
@@ -73,7 +74,7 @@ export default function LocationEditorModal({
               ? `Edit location ${locationModal.name || ""}`
               : "Create Location"}
           </span>
-          <Button
+          <NativeButton
             size="sm"
             radius="full"
             onPress={onSubmit}
@@ -82,11 +83,11 @@ export default function LocationEditorModal({
             className="h-10 shrink-0 bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
           >
             {locationModal.mode === "edit" ? "Save" : "Create"}
-          </Button>
+          </NativeButton>
           <MobileSheetCloseButton onPress={onClose} />
         </ModalHeader>
         <ModalBody className={`space-y-4 ${modalBodyClass}`}>
-          <Input
+          <NativeInput
             label="Location name"
             value={locationModal.name}
             onValueChange={(name) => setLocationModal((prev) => ({ ...prev, name }))}
@@ -157,7 +158,7 @@ export default function LocationEditorModal({
 
                 <div className="flex flex-1 flex-col gap-2">
                   <div className="flex flex-wrap gap-2">
-                    <Button
+                    <NativeButton
                       size="sm"
                       variant="flat"
                       className="min-h-10 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] sm:hidden"
@@ -166,8 +167,8 @@ export default function LocationEditorModal({
                       startContent={<FaCamera className="h-3.5 w-3.5" />}
                     >
                       Take photo
-                    </Button>
-                    <Button
+                    </NativeButton>
+                    <NativeButton
                       size="sm"
                       variant="flat"
                       className="min-h-10 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
@@ -176,9 +177,9 @@ export default function LocationEditorModal({
                       startContent={<FaUpload className="h-3.5 w-3.5" />}
                     >
                       {locationModal.imageFile ? "Change photo" : "Add photo"}
-                    </Button>
+                    </NativeButton>
                     {locationModal.imageFile && (
-                      <Button
+                      <NativeButton
                         size="sm"
                         variant="flat"
                         className="min-h-10 rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
@@ -187,7 +188,7 @@ export default function LocationEditorModal({
                         startContent={<FaTrash className="h-3.5 w-3.5" />}
                       >
                         Remove photo
-                      </Button>
+                      </NativeButton>
                     )}
                   </div>
                   <p className="text-xs leading-5 text-gray-500 max-md:hidden">
@@ -214,7 +215,7 @@ export default function LocationEditorModal({
           {locationModal.mode === "edit" && (
             <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
               <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-              <Button
+              <NativeButton
                 className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
                 onPress={() => {
                   const target = {
@@ -226,12 +227,12 @@ export default function LocationEditorModal({
                 }}
               >
                 Delete location
-              </Button>
+              </NativeButton>
             </div>
           )}
         </ModalBody>
         <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-          <Button
+          <NativeButton
             variant="light"
             radius="lg"
             onPress={onClose}
@@ -239,8 +240,8 @@ export default function LocationEditorModal({
             className="max-md:hidden"
           >
             Cancel
-          </Button>
-          <Button
+          </NativeButton>
+          <NativeButton
             radius="lg"
             onPress={onSubmit}
             isDisabled={!locationModal.name.trim() || isSavingLocation}
@@ -255,7 +256,7 @@ export default function LocationEditorModal({
                 <span className="max-md:hidden">Add location</span>
               </>
             )}
-          </Button>
+          </NativeButton>
         </ModalFooter>
       </ModalContent>
     </Modal>

@@ -1,8 +1,10 @@
 "use client";
 
+import NativeButton from "@/components/ui/NativeButton";
+import NativeInput from "@/components/ui/NativeInput";
+import { cx } from "@/components/ui/classNames";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { Button, Input } from "@heroui/react";
 import {
   FaCopy,
   FaEnvelope,
@@ -19,10 +21,6 @@ import {
   getFontById,
   getThemeById,
 } from "@/utils/appPreferences";
-
-function cx(...classes) {
-  return classes.filter(Boolean).join(" ");
-}
 
 const HOUSEHOLD_ROLE_OPTIONS = [
   { id: "editor", label: "Editor" },
@@ -244,7 +242,7 @@ export function HouseholdSharingPanel({
                                     label: role.label,
                                   }))}
                                 />
-                                <Button
+                                <NativeButton
                                   size="sm"
                                   variant="flat"
                                   className="rounded-lg border border-rose-200 bg-rose-50 px-2 text-rose-700"
@@ -253,7 +251,7 @@ export function HouseholdSharingPanel({
                                   startContent={<FaTimesCircle className="h-3.5 w-3.5" />}
                                 >
                                   Remove
-                                </Button>
+                                </NativeButton>
                               </div>
                             )}
                           </div>
@@ -314,7 +312,7 @@ export function HouseholdSharingPanel({
                     className="rounded-2xl border border-gray-100 bg-gray-50/70 p-3"
                   >
                     <div className="space-y-3">
-                      <Input
+                      <NativeInput
                         label="Invite by email"
                         type="email"
                         value={inviteEmail}
@@ -340,7 +338,7 @@ export function HouseholdSharingPanel({
                             label: role.label,
                           }))}
                         />
-                        <Button
+                        <NativeButton
                           type="submit"
                           className="h-14 rounded-xl bg-[var(--stocksense-brand)] px-4 text-white"
                           isLoading={actionLoading === "invite"}
@@ -348,7 +346,7 @@ export function HouseholdSharingPanel({
                           startContent={<FaUserPlus className="h-3.5 w-3.5" />}
                         >
                           Send
-                        </Button>
+                        </NativeButton>
                       </div>
                       {!canInvite && (
                         <p className="text-xs text-amber-700">
@@ -393,7 +391,7 @@ export function HouseholdSharingPanel({
                         {isOwner && (
                           <div className="mt-3 flex flex-wrap justify-end gap-2">
                             {invite.link && (
-                              <Button
+                              <NativeButton
                                 size="sm"
                                 variant="flat"
                                 className="rounded-lg border border-gray-200 bg-white text-gray-700"
@@ -402,9 +400,9 @@ export function HouseholdSharingPanel({
                                 startContent={<FaCopy className="h-3.5 w-3.5" />}
                               >
                                 {copiedInviteId === invite.id ? "Copied" : "Copy"}
-                              </Button>
+                              </NativeButton>
                             )}
-                            <Button
+                            <NativeButton
                               size="sm"
                               variant="flat"
                               className="rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
@@ -417,8 +415,8 @@ export function HouseholdSharingPanel({
                               startContent={<FaEnvelope className="h-3.5 w-3.5" />}
                             >
                               Resend
-                            </Button>
-                            <Button
+                            </NativeButton>
+                            <NativeButton
                               size="sm"
                               variant="flat"
                               className="rounded-lg border border-rose-200 bg-rose-50 text-rose-700"
@@ -431,7 +429,7 @@ export function HouseholdSharingPanel({
                               startContent={<FaTimesCircle className="h-3.5 w-3.5" />}
                             >
                               Revoke
-                            </Button>
+                            </NativeButton>
                           </div>
                         )}
                       </div>
@@ -545,7 +543,7 @@ export function PreferencesPanel({
                 onSubmit={onSavePreferredName}
                 className="rounded-2xl border border-gray-100 bg-gray-50/70 p-3"
               >
-                <Input
+                <NativeInput
                   label="What should we call you?"
                   value={preferredName}
                   onValueChange={onPreferredNameChange}
@@ -554,14 +552,14 @@ export function PreferencesPanel({
                     inputWrapper: "rounded-xl border border-stocksense-gray bg-white shadow-none",
                   }}
                 />
-                <Button
+                <NativeButton
                   type="submit"
                   className="mt-3 rounded-xl bg-[var(--stocksense-brand)] text-white"
                   isDisabled={saving}
                   isLoading={saving}
                 >
                   Save name
-                </Button>
+                </NativeButton>
               </form>
 
               <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">

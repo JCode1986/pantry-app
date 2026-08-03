@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+
+import NativeButton from "@/components/ui/NativeButton";
 import {
-  Button,
-  Input,
+  useEffect,
+  useMemo,
+  useState } from "react";
+import {
   Modal,
   ModalBody,
   ModalContent,
@@ -19,6 +22,7 @@ import {
   modalInputClassNames,
   mobileSheetModalClassNames,
 } from "@/components/modals/modalTheme";
+import NativeInput from "@/components/ui/NativeInput";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import NativeSelect from "@/components/ui/NativeSelect";
 import {
@@ -394,7 +398,7 @@ export default function MoveItemsModal({
                 <div className="flex flex-col gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between">
                   <span>{destinationsError}</span>
                   {onRetryLoadDestinations ? (
-                    <Button
+                    <NativeButton
                       size="sm"
                       variant="flat"
                       color="danger"
@@ -402,7 +406,7 @@ export default function MoveItemsModal({
                       onPress={onRetryLoadDestinations}
                     >
                       Retry
-                    </Button>
+                    </NativeButton>
                   ) : null}
                 </div>
               ) : null}
@@ -428,7 +432,7 @@ export default function MoveItemsModal({
                 />
                 {moveModal.targetLocationId === NEW_LOCATION_VALUE ? (
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                    <Input
+                    <NativeInput
                       label="New location"
                       value={newLocationName}
                       onValueChange={setNewLocationName}
@@ -437,14 +441,14 @@ export default function MoveItemsModal({
                       radius="lg"
                       classNames={modalInputClassNames}
                     />
-                    <Button
+                    <NativeButton
                       className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
                       isLoading={creating === "location"}
                       isDisabled={!newLocationName.trim() || Boolean(creating)}
                       onPress={createLocation}
                     >
                       Create
-                    </Button>
+                    </NativeButton>
                   </div>
                 ) : null}
               </div>
@@ -471,7 +475,7 @@ export default function MoveItemsModal({
                 />
                 {moveModal.targetAreaId === NEW_AREA_VALUE ? (
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                    <Input
+                    <NativeInput
                       label="New storage area"
                       value={newAreaName}
                       onValueChange={setNewAreaName}
@@ -484,7 +488,7 @@ export default function MoveItemsModal({
                       radius="lg"
                       classNames={modalInputClassNames}
                     />
-                    <Button
+                    <NativeButton
                       className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
                       isLoading={creating === "area"}
                       isDisabled={
@@ -496,7 +500,7 @@ export default function MoveItemsModal({
                       onPress={createStorageArea}
                     >
                       Create
-                    </Button>
+                    </NativeButton>
                   </div>
                 ) : null}
               </div>
@@ -532,7 +536,7 @@ export default function MoveItemsModal({
                 />
                 {moveModal.targetCategoryId === NEW_CATEGORY_VALUE ? (
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                    <Input
+                    <NativeInput
                       label="New category"
                       value={newCategoryName}
                       onValueChange={setNewCategoryName}
@@ -545,7 +549,7 @@ export default function MoveItemsModal({
                       radius="lg"
                       classNames={modalInputClassNames}
                     />
-                    <Button
+                    <NativeButton
                       className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
                       isLoading={creating === "category"}
                       isDisabled={
@@ -557,7 +561,7 @@ export default function MoveItemsModal({
                       onPress={createCategory}
                     >
                       Create
-                    </Button>
+                    </NativeButton>
                   </div>
                 ) : null}
               </div>

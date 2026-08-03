@@ -1,7 +1,8 @@
 'use client';
 
+import NativeButton from "@/components/ui/NativeButton";
 import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/modal";
-import { Button } from "@heroui/button";
+
 import {
   modalBodyClass,
   modalContentClass,
@@ -10,16 +11,6 @@ import {
   modalHeaderClass,
 } from "@/components/modals/modalTheme";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
-
-
-// import {
-//   Modal,
-//   ModalContent,
-//   ModalHeader,
-//   ModalBody,
-//   ModalFooter,
-//   Button,
-// } from '@heroui/modal';
 
 export default function ConfirmDeleteModal({
   isOpen,
@@ -76,7 +67,7 @@ export default function ConfirmDeleteModal({
             <ModalFooter
               className={`${modalFooterClass} flex flex-col-reverse gap-2 sm:flex-row sm:justify-end max-md:static`}
             >
-              <Button
+              <NativeButton
                 variant="flat"
                 color="default"
                 className="min-h-11 rounded-xl"
@@ -89,18 +80,18 @@ export default function ConfirmDeleteModal({
                 isDisabled={isBusy}
               >
                 {cancelLabel}
-              </Button>
+              </NativeButton>
               {secondaryConfirmLabel && onSecondaryConfirm ? (
-                <Button
+                <NativeButton
                   className={`min-h-11 rounded-xl ${secondaryConfirmClassName}`}
                   onPress={onSecondaryConfirm}
                   isLoading={isSecondaryConfirming}
                   isDisabled={isDeleting}
                 >
                   {secondaryConfirmLabel}
-                </Button>
+                </NativeButton>
               ) : null}
-              <Button
+              <NativeButton
                 color="danger"
                 className="min-h-11 rounded-xl"
                 onPress={onConfirm}
@@ -108,7 +99,7 @@ export default function ConfirmDeleteModal({
                 isDisabled={isSecondaryConfirming}
               >
                 {confirmLabel}
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </>
         )}

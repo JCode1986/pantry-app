@@ -1,13 +1,13 @@
 "use client";
 
 import {
-  Button,
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
 } from "@heroui/react";
+import NativeButton from "@/components/ui/NativeButton";
 import { FaSignOutAlt, FaSpinner } from "react-icons/fa";
 import {
   modalBodyClass,
@@ -48,15 +48,15 @@ export default function NavigationLogoutModal({
               </p>
             </ModalBody>
             <ModalFooter className={modalFooterClass}>
-              <Button
+              <NativeButton
                 variant="light"
                 className="rounded-xl"
                 onPress={onClose}
                 isDisabled={loggingOut}
               >
                 Cancel
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 className="rounded-xl bg-rose-600 text-white"
                 onPress={async () => {
                   onClose();
@@ -72,7 +72,7 @@ export default function NavigationLogoutModal({
                 }
               >
                 {loggingOut ? "Logging out..." : "Logout"}
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </>
         )}

@@ -1,13 +1,13 @@
 "use client";
 
 import {
-  Button,
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
 } from "@heroui/react";
+import NativeButton from "@/components/ui/NativeButton";
 import { FaTimesCircle } from "react-icons/fa";
 import {
   modalBodyClass,
@@ -55,15 +55,15 @@ export default function NavigationRemoveMemberModal({
               </p>
             </ModalBody>
             <ModalFooter className={modalFooterClass}>
-              <Button
+              <NativeButton
                 variant="light"
                 className="rounded-xl"
                 onPress={onClose}
                 isDisabled={removing}
               >
                 Cancel
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 className="rounded-xl bg-rose-600 text-white"
                 onPress={() => onConfirm(candidate)}
                 isLoading={removing}
@@ -73,7 +73,7 @@ export default function NavigationRemoveMemberModal({
                 }
               >
                 Remove member
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </>
         )}

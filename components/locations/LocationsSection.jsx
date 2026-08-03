@@ -1,12 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+
+import NativeButton from "@/components/ui/NativeButton";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState } from 'react';
+import NativeInput from "@/components/ui/NativeInput";
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import {
-  Button,
-  Input,
-} from '@heroui/react';
 import {
   addLocation,
   deleteLocation,
@@ -748,7 +751,7 @@ export default function LocationsSection({
           </div>
 
           {canEditInventory && (
-            <Button
+            <NativeButton
               onPress={openCreateLocationModal}
               radius="full"
               size="sm"
@@ -756,7 +759,7 @@ export default function LocationsSection({
               startContent={<FaPlus className="h-3.5 w-3.5" />}
             >
               Add
-            </Button>
+            </NativeButton>
           )}
         </div>
       </motion.section>
@@ -776,7 +779,7 @@ export default function LocationsSection({
           </div>
 
           <div className="flex w-full max-w-3xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <Input
+            <NativeInput
               value={search}
               onValueChange={handleSearchChange}
               placeholder="Search locations"
@@ -798,14 +801,14 @@ export default function LocationsSection({
               options={SORT_OPTIONS.map(([value, label]) => ({ value, label }))}
             />
             {canEditInventory && (
-              <Button
+              <NativeButton
                 onPress={openCreateLocationModal}
                 radius="lg"
                 className="min-h-10 w-full whitespace-nowrap bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm sm:w-auto"
                 startContent={<FaPlus />}
               >
                 Add Location
-              </Button>
+              </NativeButton>
             )}
           </div>
         </header>
@@ -836,7 +839,7 @@ export default function LocationsSection({
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button
+                  <NativeButton
                     size="sm"
                     variant="flat"
                     className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
@@ -844,8 +847,8 @@ export default function LocationsSection({
                     onPress={clearSelection}
                   >
                     Clear selection
-                  </Button>
-                  <Button
+                  </NativeButton>
+                  <NativeButton
                     size="sm"
                     color="danger"
                     variant="flat"
@@ -855,7 +858,7 @@ export default function LocationsSection({
                     startContent={<FaTrash />}
                   >
                     Delete selected
-                  </Button>
+                  </NativeButton>
                 </div>
               </div>
             </motion.div>
@@ -925,7 +928,7 @@ export default function LocationsSection({
           Your locations
         </h2>
         <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-          <Input
+          <NativeInput
             value={search}
             onValueChange={handleSearchChange}
             placeholder="Search locations"
@@ -985,13 +988,13 @@ export default function LocationsSection({
               </span>
             </div>
 
-            <Button
+            <NativeButton
               className="mt-2 min-h-11 w-full rounded-xl bg-rose-600 text-sm font-semibold text-white"
               onPress={openBulkDeleteDialog}
               isDisabled={selectedCount === 0 || deleteDialog.isDeleting}
             >
               Delete
-            </Button>
+            </NativeButton>
           </motion.div>
         )}
         {showSearchRestoreLoader ? (
@@ -1029,23 +1032,23 @@ export default function LocationsSection({
                 : 'Create your first place to start organizing your items.'}
             </p>
             {normalizedSearch ? (
-              <Button
+              <NativeButton
                 onPress={clearSearch}
                 radius="lg"
                 variant="bordered"
                 className="mt-5 w-full border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] font-semibold text-[var(--stocksense-brand)]"
               >
                 Clear search
-              </Button>
+              </NativeButton>
             ) : canEditInventory ? (
-              <Button
+              <NativeButton
                 onPress={openCreateLocationModal}
                 radius="lg"
                 className="mt-5 w-full bg-[var(--stocksense-brand)] text-white"
                 startContent={<FaPlus />}
               >
                 Add location
-              </Button>
+              </NativeButton>
             ) : null}
           </div>
         ) : (
@@ -1226,23 +1229,23 @@ export default function LocationsSection({
                 : 'Create your first location like a kitchen, garage, closet, or office.'}
             </p>
             {normalizedSearch ? (
-              <Button
+              <NativeButton
                 onPress={clearSearch}
                 radius="lg"
                 variant="bordered"
                 className="mt-7 border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-5 text-sm font-semibold text-[var(--stocksense-brand)] shadow-sm"
               >
                 Clear search
-              </Button>
+              </NativeButton>
             ) : canEditInventory ? (
-              <Button
+              <NativeButton
                 onPress={openCreateLocationModal}
                 radius="lg"
                 className="mt-7 bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm"
                 startContent={<FaPlus />}
               >
                 Add Location
-              </Button>
+              </NativeButton>
             ) : null}
           </div>
         ) : (
@@ -1470,14 +1473,14 @@ export default function LocationsSection({
                     <p className="mt-3 max-w-sm text-sm leading-6 text-gray-600">
                       Create a new location like a room, closet, or garage.
                     </p>
-                    <Button
+                    <NativeButton
                       onPress={openCreateLocationModal}
                       radius="lg"
                       className="mt-6 bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm"
                       startContent={<FaPlus />}
                     >
                       Add Location
-                    </Button>
+                    </NativeButton>
                   </motion.li>
                 ) : null}
               </motion.ul>

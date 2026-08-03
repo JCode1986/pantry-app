@@ -1,15 +1,16 @@
 "use client";
 
-import { useRef } from "react";
+import NativeButton from "@/components/ui/NativeButton";
 import {
-  Button,
-  Input,
+  useRef } from "react";
+import {
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
 } from "@heroui/react";
+import NativeInput from "@/components/ui/NativeInput";
 import { FaCamera, FaImage, FaTrash, FaUpload } from "react-icons/fa";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
@@ -69,7 +70,7 @@ export default function CategoryCreateModal({
               className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}
             >
               <span className="min-w-0 flex-1 truncate">Add category</span>
-              <Button
+              <NativeButton
                 size="sm"
                 className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
                 onPress={onCreate}
@@ -77,11 +78,11 @@ export default function CategoryCreateModal({
                 isDisabled={isCreating || !categoryName.trim() || !areaId}
               >
                 Add
-              </Button>
+              </NativeButton>
               <MobileSheetCloseButton onPress={onCloseFromModal} />
             </ModalHeader>
             <ModalBody className={`space-y-3 ${modalBodyClass}`}>
-              <Input
+              <NativeInput
                 label="Category name"
                 value={categoryName}
                 onValueChange={setCategoryName}
@@ -142,7 +143,7 @@ export default function CategoryCreateModal({
                   </div>
                   <div className="flex flex-1 flex-col gap-2">
                     <div className="flex flex-wrap gap-2">
-                      <Button
+                      <NativeButton
                         size="sm"
                         variant="flat"
                         className="min-h-10 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] sm:hidden"
@@ -151,8 +152,8 @@ export default function CategoryCreateModal({
                         startContent={<FaCamera className="h-3.5 w-3.5" />}
                       >
                         Take photo
-                      </Button>
-                      <Button
+                      </NativeButton>
+                      <NativeButton
                         size="sm"
                         variant="flat"
                         className="min-h-10 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
@@ -161,9 +162,9 @@ export default function CategoryCreateModal({
                         startContent={<FaUpload className="h-3.5 w-3.5" />}
                       >
                         {imageFile ? "Change photo" : "Add photo"}
-                      </Button>
+                      </NativeButton>
                       {imageFile ? (
-                        <Button
+                        <NativeButton
                           size="sm"
                           variant="flat"
                           className="min-h-10 rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
@@ -172,7 +173,7 @@ export default function CategoryCreateModal({
                           startContent={<FaTrash className="h-3.5 w-3.5" />}
                         >
                           Remove photo
-                        </Button>
+                        </NativeButton>
                       ) : null}
                     </div>
                     <input
@@ -221,22 +222,22 @@ export default function CategoryCreateModal({
               ) : null}
             </ModalBody>
             <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-              <Button
+              <NativeButton
                 variant="light"
                 onPress={onCloseFromModal}
                 isDisabled={isCreating}
                 className="max-md:hidden"
               >
                 Cancel
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                 onPress={onCreate}
                 isLoading={isCreating}
                 isDisabled={isCreating || !categoryName.trim() || !areaId}
               >
                 Add Category
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </>
         )}

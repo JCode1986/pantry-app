@@ -1,9 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import NativeButton from "@/components/ui/NativeButton";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Button,
   Modal,
   ModalBody,
   ModalContent,
@@ -323,7 +329,7 @@ export default function InactivityLogout({ isAuthenticated: serverAuthenticated 
           </div>
         </ModalBody>
         <ModalFooter className={modalFooterClass}>
-          <Button
+          <NativeButton
             variant="light"
             className="rounded-xl text-rose-700"
             onPress={performLogout}
@@ -337,8 +343,8 @@ export default function InactivityLogout({ isAuthenticated: serverAuthenticated 
             }
           >
             {isLoggingOut ? "Logging out..." : "Log out"}
-          </Button>
-          <Button
+          </NativeButton>
+          <NativeButton
             className="rounded-xl bg-[var(--stocksense-brand)] text-white"
             onPress={staySignedIn}
             isDisabled={isLoggingOut || isStayingSignedIn}
@@ -347,7 +353,7 @@ export default function InactivityLogout({ isAuthenticated: serverAuthenticated 
             }
           >
             {isStayingSignedIn ? "Staying signed in..." : "Stay signed in"}
-          </Button>
+          </NativeButton>
         </ModalFooter>
       </ModalContent>
     </Modal>

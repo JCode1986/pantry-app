@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import NativeButton from "@/components/ui/NativeButton";
+import {
+  useMemo } from "react";
+import NativeInput from "@/components/ui/NativeInput";
 import Link from "next/link";
 import { parseDate } from "@internationalized/date";
 import {
-  Button,
   DatePicker,
-  Input,
   Modal,
   ModalBody,
   ModalContent,
@@ -184,14 +185,14 @@ export default function ItemDetailDrawer({
                 <div className="truncate text-sm text-gray-500">Item details</div>
               </div>
               {canEditInventory ? (
-                <Button
+                <NativeButton
                   size="sm"
                   className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
                   onPress={onSave}
                   isDisabled={!hasItemEditChanges}
                 >
                   Save
-                </Button>
+                </NativeButton>
               ) : null}
               <MobileSheetCloseButton onPress={onClose} />
             </ModalHeader>
@@ -203,7 +204,7 @@ export default function ItemDetailDrawer({
                 <>
                   <div className="space-y-2">
                     <div className="text-xs font-medium text-gray-600">Item name</div>
-                    <Input
+                    <NativeInput
                       value={editName}
                       onValueChange={onEditNameChange}
                       variant="bordered"
@@ -235,7 +236,7 @@ export default function ItemDetailDrawer({
 
                   <div className="space-y-2 max-md:hidden">
                     <div className="text-xs font-medium text-gray-600">Barcode</div>
-                    <Input
+                    <NativeInput
                       value={editBarcode}
                       onValueChange={onEditBarcodeChange}
                       placeholder="e.g., 012345678905"
@@ -270,28 +271,28 @@ export default function ItemDetailDrawer({
                   )}
 
                   <div className="flex gap-2 max-md:flex-col">
-                    <Button
+                    <NativeButton
                       onPress={onSave}
                       isDisabled={!hasItemEditChanges}
                       className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                     >
                       Save changes
-                    </Button>
-                    <Button
+                    </NativeButton>
+                    <NativeButton
                       onPress={onMove}
                       className="w-full rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
                     >
                       Move
-                    </Button>
+                    </NativeButton>
                   </div>
                   <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
                     <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                    <Button
+                    <NativeButton
                       className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
                       onPress={onDelete}
                     >
                       Delete item
-                    </Button>
+                    </NativeButton>
                   </div>
                 </>
               ) : (
@@ -321,20 +322,20 @@ export default function ItemDetailDrawer({
             </ModalBody>
 
             <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-              <Button
+              <NativeButton
                 variant="light"
                 className="rounded-xl max-md:hidden"
                 onPress={onClose}
               >
                 Close
-              </Button>
+              </NativeButton>
               {canEditInventory && (
-                <Button
+                <NativeButton
                   className="rounded-xl bg-rose-600 text-white max-md:hidden"
                   onPress={onDelete}
                 >
                   Delete
-                </Button>
+                </NativeButton>
               )}
             </ModalFooter>
           </>

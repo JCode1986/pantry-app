@@ -1,14 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import NativeButton from "@/components/ui/NativeButton";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
+import NativeInput from "@/components/ui/NativeInput";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence,
+  motion } from "framer-motion";
 import {
-  Button,
   DatePicker,
-  Input,
   Modal,
   ModalBody,
   ModalContent,
@@ -225,7 +232,7 @@ function NewPathField({
         </span>
         <span className="text-sm font-semibold text-gray-900">{title}</span>
       </div>
-      <Input
+      <NativeInput
         label={label}
         value={value}
         onValueChange={onValueChange}
@@ -1131,7 +1138,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[var(--stocksense-brand)]">Add item</span>
                 <div className="flex shrink-0 items-center gap-2 md:hidden">
-                  <Button
+                  <NativeButton
                     size="sm"
                     className="h-10 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white"
                     onPress={() => handleSubmit()}
@@ -1141,7 +1148,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                     }
                   >
                     {isSaving ? "Adding" : "Add"}
-                  </Button>
+                  </NativeButton>
                   <button
                     type="button"
                     aria-label="Close add item"
@@ -1455,7 +1462,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                       </div>
 
                       <div className={`${isBarcodeExpanded ? "block" : "hidden"} border-t border-gray-100 p-3 md:block md:border-t-0 md:p-0`}>
-                      <Button
+                      <NativeButton
                         className="mb-3 min-h-12 w-full rounded-2xl bg-[var(--stocksense-brand)] text-base font-semibold text-white md:hidden"
                         onPress={() => {
                           openBarcodeScanner(true);
@@ -1464,9 +1471,9 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                         startContent={<FaBarcode />}
                       >
                         Scan barcode
-                      </Button>
+                      </NativeButton>
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_190px]">
-                        <Input
+                        <NativeInput
                           label="Barcode (optional)"
                           value={form.barcode}
                           onValueChange={updateBarcode}
@@ -1478,7 +1485,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                           classNames={modalInputClassNames}
                         />
                         <div className="grid grid-cols-1 gap-2 md:grid-cols-1">
-                          <Button
+                          <NativeButton
                             className="hidden rounded-xl bg-[var(--stocksense-brand)] text-white md:inline-flex"
                             onPress={() => {
                               openBarcodeScanner(false);
@@ -1487,8 +1494,8 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                             startContent={<FaBarcode />}
                           >
                             Scan
-                          </Button>
-                          <Button
+                          </NativeButton>
+                          <NativeButton
                             variant="flat"
                             className="min-h-11 rounded-xl"
                             onPress={() => lookupBarcode()}
@@ -1502,7 +1509,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                             }
                           >
                             Lookup
-                          </Button>
+                          </NativeButton>
                         </div>
                       </div>
 
@@ -1559,7 +1566,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                       </div>
 
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_140px_180px]">
-                        <Input
+                        <NativeInput
                           label="Item name"
                           value={form.itemName}
                           onValueChange={(value) => {
@@ -1653,7 +1660,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
 
                           <div className="flex flex-1 flex-col gap-2">
                             <div className="flex flex-wrap gap-2">
-                              <Button
+                              <NativeButton
                                 size="sm"
                                 variant="flat"
                                 className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] sm:hidden"
@@ -1662,8 +1669,8 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                                 startContent={<FaCamera className="h-3.5 w-3.5" />}
                               >
                                 Take photo
-                              </Button>
-                              <Button
+                              </NativeButton>
+                              <NativeButton
                                 size="sm"
                                 variant="flat"
                                 className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
@@ -1672,9 +1679,9 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                                 startContent={<FaUpload className="h-3.5 w-3.5" />}
                               >
                                 {selectedImageFile ? "Choose different" : "Choose image"}
-                              </Button>
+                              </NativeButton>
                               {selectedImageFile && (
-                                <Button
+                                <NativeButton
                                   size="sm"
                                   variant="flat"
                                   className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
@@ -1683,7 +1690,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                                   startContent={<FaTrash className="h-3.5 w-3.5" />}
                                 >
                                   Remove
-                                </Button>
+                                </NativeButton>
                               )}
                             </div>
                             <p className="text-xs leading-5 text-gray-500">
@@ -1723,7 +1730,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                       {mobileAddedToast.destinationName}.
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2">
-                      <Button
+                      <NativeButton
                         size="sm"
                         variant="flat"
                         className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
@@ -1732,8 +1739,8 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                         }}
                       >
                         Done
-                      </Button>
-                      <Button
+                      </NativeButton>
+                      <NativeButton
                         size="sm"
                         className="rounded-xl bg-[var(--stocksense-brand)] text-white"
                         onPress={() => {
@@ -1753,7 +1760,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                           : addMethod === "voice"
                           ? "Voice next"
                           : "Add another"}
-                      </Button>
+                      </NativeButton>
                     </div>
                   </motion.div>
                 )}
@@ -1769,18 +1776,18 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
               </AnimatePresence>
 
               <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:justify-end">
-                <Button variant="light" className="hidden rounded-xl md:inline-flex" onPress={handleClose} isDisabled={isSaving}>
+                <NativeButton variant="light" className="hidden rounded-xl md:inline-flex" onPress={handleClose} isDisabled={isSaving}>
                   Cancel
-                </Button>
-                <Button
+                </NativeButton>
+                <NativeButton
                   variant="flat"
                   className="hidden rounded-xl md:inline-flex"
                   onPress={() => handleSubmit({ closeAfterAdd: true })}
                   isDisabled={isSaving || isLoading || isQuickAdding}
                 >
                   Add & close
-                </Button>
-                <Button
+                </NativeButton>
+                <NativeButton
                   className="hidden min-h-12 rounded-2xl bg-[var(--stocksense-brand)] text-white md:inline-flex md:min-h-10 md:rounded-xl"
                   onPress={() => handleSubmit()}
                   isDisabled={isSaving || isLoading || isQuickAdding}
@@ -1796,7 +1803,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                       <span className="hidden md:inline">Add another</span>
                     </>
                   )}
-                </Button>
+                </NativeButton>
               </div>
             </ModalFooter>
             </>

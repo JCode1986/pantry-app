@@ -1,8 +1,10 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import NativeButton from "@/components/ui/NativeButton";
 import {
-  Button,
+  AnimatePresence,
+  motion } from "framer-motion";
+import {
   Modal,
   ModalBody,
   ModalContent,
@@ -134,7 +136,7 @@ export default function StorageMobileCategorySheet({
                       </div>
 
                       <div className="mt-2 grid grid-cols-2 gap-2">
-                        <Button
+                        <NativeButton
                           className="min-h-11 rounded-xl bg-[var(--stocksense-brand)] text-sm font-semibold text-white"
                           onPress={() =>
                             openMoveModal(
@@ -145,8 +147,8 @@ export default function StorageMobileCategorySheet({
                           isDisabled={activeMobileSelectionContext.itemIds.length === 0}
                         >
                           Move
-                        </Button>
-                        <Button
+                        </NativeButton>
+                        <NativeButton
                           className="min-h-11 rounded-xl bg-rose-600 text-sm font-semibold text-white"
                           onPress={() =>
                             openDeleteDialog("bulk-items", {
@@ -161,7 +163,7 @@ export default function StorageMobileCategorySheet({
                           isDisabled={activeMobileSelectionContext.itemIds.length === 0}
                         >
                           Delete
-                        </Button>
+                        </NativeButton>
                       </div>
                     </motion.div>
                   ) : (
@@ -209,7 +211,7 @@ export default function StorageMobileCategorySheet({
               ) : activeMobileCategory?.category?.itemsError ? (
                 <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-5 text-center text-sm text-rose-700">
                   <p>{activeMobileCategory.category.itemsError}</p>
-                  <Button
+                  <NativeButton
                     size="sm"
                     color="danger"
                     variant="flat"
@@ -221,7 +223,7 @@ export default function StorageMobileCategorySheet({
                     }
                   >
                     Retry
-                  </Button>
+                  </NativeButton>
                 </div>
               ) : activeMobileCategory?.items?.length ? (
                 activeMobileCategory.items.map((item) => {

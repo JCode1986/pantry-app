@@ -1,15 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+
+import NativeButton from "@/components/ui/NativeButton";
 import {
-  Button,
-  Input,
+  useEffect,
+  useRef,
+  useState } from "react";
+import {
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
 } from "@heroui/react";
+import NativeInput from "@/components/ui/NativeInput";
 import { FaBarcode, FaCamera, FaImage, FaSpinner, FaStop } from "react-icons/fa";
 import {
   modalBodyClass,
@@ -285,7 +289,7 @@ export default function BarcodeScannerModal({
               </div>
 
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                <Button
+                <NativeButton
                   className="rounded-xl bg-[var(--stocksense-brand)] text-white"
                   onPress={isScanning ? stopCamera : startCamera}
                   startContent={
@@ -303,16 +307,16 @@ export default function BarcodeScannerModal({
                     : isScanning
                     ? "Stop camera"
                     : "Start camera"}
-                </Button>
+                </NativeButton>
 
-                <Button
+                <NativeButton
                   variant="flat"
                   className="rounded-xl"
                   onPress={() => photoInputRef.current?.click()}
                   startContent={<FaImage />}
                 >
                   Choose photo
-                </Button>
+                </NativeButton>
 
                 <input
                   ref={photoInputRef}
@@ -324,7 +328,7 @@ export default function BarcodeScannerModal({
               </div>
 
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                <Input
+                <NativeInput
                   label="Barcode"
                   value={manualBarcode}
                   onValueChange={setManualBarcode}
@@ -333,22 +337,22 @@ export default function BarcodeScannerModal({
                   radius="lg"
                   classNames={modalInputClassNames}
                 />
-                <Button
+                <NativeButton
                   className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] sm:self-end"
                   onPress={submitManualBarcode}
                   startContent={<FaBarcode />}
                 >
                   Use barcode
-                </Button>
+                </NativeButton>
               </div>
             </ModalBody>
 
             <ModalFooter className="wherekeep-modal-footer flex shrink-0 flex-col gap-2 border-t border-[var(--stocksense-brand-border)] bg-white max-md:sticky max-md:bottom-0 max-md:z-20 max-md:px-4 max-md:pb-[max(1rem,env(safe-area-inset-bottom))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)] sm:flex-row sm:justify-end">
               <ScannerMessage message={message} className="w-full sm:hidden" />
               <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:justify-end">
-                <Button variant="light" className="rounded-xl" onPress={() => onOpenChange?.(false)}>
+                <NativeButton variant="light" className="rounded-xl" onPress={() => onOpenChange?.(false)}>
                   Close
-                </Button>
+                </NativeButton>
               </div>
             </ModalFooter>
           </>
