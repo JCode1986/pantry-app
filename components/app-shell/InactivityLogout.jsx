@@ -15,7 +15,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import { FaClock, FaSignOutAlt, FaSpinner } from "react-icons/fa";
 import { refreshTokenIfNeeded } from "@/app/actions/auth";
 import { clearBrowserLogoutStorage } from "@/utils/logoutStorage";

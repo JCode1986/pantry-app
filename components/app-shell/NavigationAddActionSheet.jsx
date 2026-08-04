@@ -6,7 +6,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import NativeButton from "@/components/ui/NativeButton";
 import { FaBoxOpen, FaMapMarkedAlt, FaTags, FaWarehouse } from "react-icons/fa";
 import {
