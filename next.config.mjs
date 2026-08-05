@@ -21,7 +21,6 @@ const nextConfig = {
   },
   experimental: {
     optimizePackageImports: [
-      "@heroui/react",
       "framer-motion",
       "react-icons/fa",
       "react-icons/lu",

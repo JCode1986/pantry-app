@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   FaCalendarAlt,
+  FaChevronDown,
   FaChevronLeft,
   FaChevronRight,
   FaTimes,
@@ -24,6 +25,11 @@ const MONTHS = [
   "November",
   "December",
 ];
+
+const MONTH_OPTIONS = MONTHS.map((month, index) => ({
+  value: String(index),
+  label: month.slice(0, 3),
+}));
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -113,6 +119,78 @@ function getCalendarDays(displayDate) {
   return days;
 }
 
+function CalendarDropdown({
+  ariaLabel,
+  className = "",
+  isOpen,
+  onChange,
+  onToggle,
+  options,
+  value,
+}) {
+  const selectedValue = String(value);
+  const selectedOption =
+    options.find((option) => String(option.value) === selectedValue) ?? options[0];
+
+  return (
+    <div className={cx("relative min-w-0", className)}>
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        onClick={onToggle}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onToggle();
+          }
+        }}
+        className="flex min-h-9 w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 text-left text-sm font-semibold text-gray-900 shadow-sm outline-none transition hover:border-[var(--stocksense-brand-border)] focus:border-[var(--stocksense-brand)] focus:ring-1 focus:ring-[var(--stocksense-brand-border)]"
+      >
+        <span className="min-w-0 truncate">{selectedOption?.label}</span>
+        <FaChevronDown
+          className={cx(
+            "h-3 w-3 shrink-0 text-[var(--stocksense-brand)] transition",
+            isOpen ? "rotate-180" : ""
+          )}
+        />
+      </button>
+
+      {isOpen ? (
+        <div
+          role="listbox"
+          aria-label={ariaLabel}
+          className="absolute left-0 top-[calc(100%+0.375rem)] z-[160] max-h-56 w-full overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-gray-200 bg-white p-1 text-sm shadow-xl"
+        >
+          {options.map((option) => {
+            const optionValue = String(option.value);
+            const selected = optionValue === selectedValue;
+
+            return (
+              <button
+                key={optionValue}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                onClick={() => onChange(optionValue)}
+                className={cx(
+                  "flex min-h-9 w-full min-w-0 items-center rounded-lg px-3 text-left font-semibold transition",
+                  selected
+                    ? "bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
+                    : "text-gray-700 hover:bg-gray-50"
+                )}
+              >
+                <span className="min-w-0 truncate">{option.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function NativeDatePicker({
   className = "",
   classNames = {},
@@ -131,6 +209,7 @@ function NativeDatePicker({
 }) {
   const selectedDate = useMemo(() => parseDateString(value), [value]);
   const [isOpen, setIsOpen] = useState(false);
+  const [openCalendarDropdown, setOpenCalendarDropdown] = useState(null);
   const [displayDate, setDisplayDate] = useState(() => selectedDate ?? new Date());
   const [popoverPosition, setPopoverPosition] = useState(null);
   const triggerRef = useRef(null);
@@ -176,11 +255,17 @@ function NativeDatePicker({
       ) {
         return;
       }
+      setOpenCalendarDropdown(null);
       setIsOpen(false);
     };
 
     const closeOnEscape = (event) => {
-      if (event.key === "Escape") setIsOpen(false);
+      if (event.key !== "Escape") return;
+      if (openCalendarDropdown) {
+        setOpenCalendarDropdown(null);
+        return;
+      }
+      setIsOpen(false);
     };
 
     updatePosition();
@@ -195,9 +280,9 @@ function NativeDatePicker({
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [isOpen]);
+  }, [isOpen, openCalendarDropdown]);
 
-  const years = useMemo(() => {
+  const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
     const displayYear = displayDate.getFullYear();
     const firstYear = Math.min(currentYear - 5, displayYear - 2);
@@ -205,41 +290,51 @@ function NativeDatePicker({
 
     return Array.from(
       { length: lastYear - firstYear + 1 },
-      (_, index) => firstYear + index
+      (_, index) => {
+        const year = String(firstYear + index);
+        return { value: year, label: year };
+      }
     );
   }, [displayDate]);
 
   const calendarDays = useMemo(() => getCalendarDays(displayDate), [displayDate]);
+  const todayString = useMemo(() => toDateString(new Date()), []);
 
   const openCalendar = () => {
     if (resolvedDisabled) return;
     setDisplayDate(selectedDate ?? new Date());
+    setOpenCalendarDropdown(null);
     setIsOpen((current) => !current);
   };
 
   const selectDate = (date) => {
     const nextValue = toDateString(date);
     onChange?.(createCalendarDate(nextValue));
+    setOpenCalendarDropdown(null);
     setIsOpen(false);
   };
 
   const clearDate = (event) => {
     event.stopPropagation();
     onChange?.(null);
+    setOpenCalendarDropdown(null);
     setIsOpen(false);
   };
 
   const moveMonth = (amount) => {
+    setOpenCalendarDropdown(null);
     setDisplayDate(
       (current) => new Date(current.getFullYear(), current.getMonth() + amount, 1)
     );
   };
 
   const changeMonth = (month) => {
+    setOpenCalendarDropdown(null);
     setDisplayDate((current) => new Date(current.getFullYear(), month, 1));
   };
 
   const changeYear = (year) => {
+    setOpenCalendarDropdown(null);
     setDisplayDate((current) => new Date(year, current.getMonth(), 1));
   };
 
@@ -267,30 +362,31 @@ function NativeDatePicker({
 
               {showMonthAndYearPickers ? (
                 <div className="grid min-w-0 flex-1 grid-cols-[1fr_auto] gap-2">
-                  <select
-                    aria-label="Month"
+                  <CalendarDropdown
+                    ariaLabel="Month"
+                    isOpen={openCalendarDropdown === "month"}
                     value={displayDate.getMonth()}
-                    onChange={(event) => changeMonth(Number(event.target.value))}
-                    className="min-h-9 min-w-0 rounded-xl border border-gray-200 bg-white px-2 text-sm font-semibold text-gray-900 outline-none transition focus:border-[var(--stocksense-brand)] focus:ring-1 focus:ring-[var(--stocksense-brand-border)]"
-                  >
-                    {MONTHS.map((month, index) => (
-                      <option key={month} value={index}>
-                        {month}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    aria-label="Year"
+                    onToggle={() =>
+                      setOpenCalendarDropdown((current) =>
+                        current === "month" ? null : "month"
+                      )
+                    }
+                    onChange={(nextValue) => changeMonth(Number(nextValue))}
+                    options={MONTH_OPTIONS}
+                  />
+                  <CalendarDropdown
+                    ariaLabel="Year"
+                    className="w-24"
+                    isOpen={openCalendarDropdown === "year"}
                     value={displayDate.getFullYear()}
-                    onChange={(event) => changeYear(Number(event.target.value))}
-                    className="min-h-9 rounded-xl border border-gray-200 bg-white px-2 text-sm font-semibold text-gray-900 outline-none transition focus:border-[var(--stocksense-brand)] focus:ring-1 focus:ring-[var(--stocksense-brand-border)]"
-                  >
-                    {years.map((year) => (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    ))}
-                  </select>
+                    onToggle={() =>
+                      setOpenCalendarDropdown((current) =>
+                        current === "year" ? null : "year"
+                      )
+                    }
+                    onChange={(nextValue) => changeYear(Number(nextValue))}
+                    options={yearOptions}
+                  />
                 </div>
               ) : (
                 <div className="min-w-0 flex-1 text-center text-sm font-semibold text-gray-950">
@@ -320,7 +416,7 @@ function NativeDatePicker({
               {calendarDays.map((date, index) => {
                 const dateString = date ? toDateString(date) : "";
                 const isSelected = dateString && dateString === selectedDateString;
-                const isToday = dateString === toDateString(new Date());
+                const isToday = dateString === todayString;
 
                 return date ? (
                   <button

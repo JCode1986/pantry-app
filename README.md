@@ -8,7 +8,7 @@ WhereKeep is a household inventory app for tracking what you have, where it is s
 - React 19
 - JavaScript
 - Tailwind CSS 4
-- HeroUI
+- Local native UI components
 - Supabase Auth, database, and storage
 - Iron Session for the app session cookie
 - Stripe for billing and webhooks
@@ -92,7 +92,7 @@ Protected routes include:
 - Public pages such as `/`, `/terms`, `/privacy`, `/contact`, and `/support` are static after build.
 - Public image assets get long-lived immutable cache headers from `next.config.mjs`.
 - Next Image is configured to emit AVIF/WebP variants and cache optimized images.
-- Package import optimization is enabled for HeroUI, Framer Motion, and the icon packages used by the app.
+- Package import optimization is enabled for Framer Motion and the icon packages used by the app.
 - The support chatbot, bulk move modal, and barcode scanner are lazy-loaded so they do not ship in initial route bundles until needed.
 - App image helpers default to lazy loading and async decoding.
 
