@@ -12,7 +12,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import NativeInput from "@/components/ui/NativeInput";
 import { FaEdit, FaExchangeAlt } from "react-icons/fa";
 import { updateShoppingListItemAction } from "@/app/actions/shoppingList";

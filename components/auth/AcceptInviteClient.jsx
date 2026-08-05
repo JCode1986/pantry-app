@@ -13,7 +13,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import { motion } from "@/components/ui/MotionLite";
 import {
   FaCheckCircle,

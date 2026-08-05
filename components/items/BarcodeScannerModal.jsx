@@ -12,7 +12,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import NativeInput from "@/components/ui/NativeInput";
 import { FaBarcode, FaCamera, FaImage, FaSpinner, FaStop } from "react-icons/fa";
 import {

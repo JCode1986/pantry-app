@@ -68,6 +68,8 @@ const PRIMARY_PREFETCH_ROUTES = [
   "/profile",
 ];
 
+const NATIVE_MODAL_EXIT_MS = 240;
+
 const GlobalAddItemModal = dynamic(
   () => import("@/components/items/GlobalAddItemModal"),
   { ssr: false }
@@ -599,8 +601,10 @@ export default function Navigation({
 
   const [loggingOut, setLoggingOut] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [renderLogoutModal, setRenderLogoutModal] = useState(false);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [showAddActionSheet, setShowAddActionSheet] = useState(false);
+  const [renderAddActionSheet, setRenderAddActionSheet] = useState(false);
   const [showItemSearchModal, setShowItemSearchModal] = useState(false);
   const [isAttentionOpen, setIsAttentionOpen] = useState(false);
   const [attentionAnchor, setAttentionAnchor] = useState(null);
@@ -622,6 +626,8 @@ export default function Navigation({
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("editor");
   const [removeMemberCandidate, setRemoveMemberCandidate] = useState(null);
+  const [renderRemoveMemberModal, setRenderRemoveMemberModal] = useState(false);
+  const [lastRemoveMemberCandidate, setLastRemoveMemberCandidate] = useState(null);
   const [copiedInviteId, setCopiedInviteId] = useState(null);
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
   const [preferredName, setPreferredName] = useState(initialPreferredName);
@@ -629,6 +635,47 @@ export default function Navigation({
   const [preferenceMessage, setPreferenceMessage] = useState(null);
   const canCustomizeAppearance =
     (navigationSummary?.effectivePlanId || "free") !== "free";
+
+  useEffect(() => {
+    if (showLogoutModal) {
+      setRenderLogoutModal(true);
+      return undefined;
+    }
+
+    const closeTimer = window.setTimeout(() => {
+      setRenderLogoutModal(false);
+    }, NATIVE_MODAL_EXIT_MS);
+
+    return () => window.clearTimeout(closeTimer);
+  }, [showLogoutModal]);
+
+  useEffect(() => {
+    if (showAddActionSheet) {
+      setRenderAddActionSheet(true);
+      return undefined;
+    }
+
+    const closeTimer = window.setTimeout(() => {
+      setRenderAddActionSheet(false);
+    }, NATIVE_MODAL_EXIT_MS);
+
+    return () => window.clearTimeout(closeTimer);
+  }, [showAddActionSheet]);
+
+  useEffect(() => {
+    if (removeMemberCandidate) {
+      setLastRemoveMemberCandidate(removeMemberCandidate);
+      setRenderRemoveMemberModal(true);
+      return undefined;
+    }
+
+    const closeTimer = window.setTimeout(() => {
+      setRenderRemoveMemberModal(false);
+      setLastRemoveMemberCandidate(null);
+    }, NATIVE_MODAL_EXIT_MS);
+
+    return () => window.clearTimeout(closeTimer);
+  }, [removeMemberCandidate]);
 
   const activeHref = useMemo(() => {
     const desktopItems = desktopSidebarSections.flatMap((section) => section.items);
@@ -1411,7 +1458,7 @@ export default function Navigation({
         />
       )}
 
-      {showAddActionSheet && (
+      {(showAddActionSheet || renderAddActionSheet) && (
         <NavigationAddActionSheet
           isOpen={showAddActionSheet}
           onOpenChange={setShowAddActionSheet}
@@ -1436,16 +1483,17 @@ export default function Navigation({
         </div>
       )}
 
-      {removeMemberCandidate && (
+      {(removeMemberCandidate || renderRemoveMemberModal) && (
         <NavigationRemoveMemberModal
           candidate={removeMemberCandidate}
+          displayCandidate={removeMemberCandidate || lastRemoveMemberCandidate}
           actionLoading={sharingActionLoading}
           onCancel={handleCancelSidebarRemoveMember}
           onConfirm={handleConfirmSidebarRemoveMember}
         />
       )}
 
-      {showLogoutModal && (
+      {(showLogoutModal || renderLogoutModal) && (
         <NavigationLogoutModal
           isOpen={showLogoutModal}
           onOpenChange={setShowLogoutModal}

@@ -1,7 +1,7 @@
 'use client';
 
 import NativeButton from "@/components/ui/NativeButton";
-import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/modal";
+import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@/components/ui/NativeModal";
 
 import {
   modalBodyClass,

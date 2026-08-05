@@ -14,7 +14,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   FaBoxOpen,

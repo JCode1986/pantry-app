@@ -19,13 +19,15 @@ import {
 
 export default function NavigationRemoveMemberModal({
   candidate,
+  displayCandidate = candidate,
   actionLoading,
   onCancel,
   onConfirm,
 }) {
   const memberLabel =
-    candidate?.displayName || candidate?.email || "this member";
-  const removing = actionLoading === `remove:${candidate?.userId}`;
+    displayCandidate?.displayName || displayCandidate?.email || "this member";
+  const removing =
+    actionLoading === `remove:${candidate?.userId || displayCandidate?.userId}`;
 
   return (
     <Modal

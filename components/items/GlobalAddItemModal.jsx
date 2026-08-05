@@ -14,15 +14,14 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { AnimatePresence,
   motion } from "framer-motion";
+import DatePicker from "@/components/ui/NativeDatePicker";
 import {
-  DatePicker,
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
-import { parseDate } from "@internationalized/date";
+} from "@/components/ui/NativeModal";
 import {
   FaBarcode,
   FaCamera,
@@ -368,15 +367,6 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
       manual: "order-30",
     };
   }, [addMethod]);
-  const formExpirationDateValue = useMemo(() => {
-    if (!form.expirationDate) return null;
-    try {
-      return parseDate(form.expirationDate);
-    } catch {
-      return null;
-    }
-  }, [form.expirationDate]);
-
   useEffect(() => {
     setAddMethod(readStoredAddMethod());
     setKeepAdding(readStoredKeepAdding());
@@ -1594,7 +1584,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                         <DatePicker
                           label="Expiration"
                           labelPlacement="inside"
-                          value={formExpirationDateValue}
+                          value={form.expirationDate || null}
                           onChange={(date) =>
                             updateForm("expirationDate", date ? date.toString() : "")
                           }

@@ -9,7 +9,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import {
   modalBodyClass,

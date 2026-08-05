@@ -13,7 +13,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import NativeInput from "@/components/ui/NativeInput";
 import { FaCheckCircle, FaEye, FaEyeSlash, FaKey } from "react-icons/fa";
 import { updatePasswordAction } from "@/app/actions/auth";

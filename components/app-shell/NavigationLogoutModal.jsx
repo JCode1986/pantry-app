@@ -28,10 +28,6 @@ export default function NavigationLogoutModal({
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       placement="center"
-      classNames={{
-        wrapper: "max-md:items-end",
-        base: "max-md:m-0 max-md:w-screen max-md:max-w-none max-md:rounded-b-none max-md:rounded-t-2xl",
-      }}
     >
       <ModalContent
         className={`${modalContentClass} max-md:h-auto max-md:max-h-[80svh] max-md:!w-[calc(100vw-2rem)] max-md:!max-w-md max-md:rounded-b-2xl max-md:rounded-t-2xl max-md:border max-md:border-gray-200 max-md:bg-white max-md:shadow-2xl`}
@@ -42,7 +38,7 @@ export default function NavigationLogoutModal({
             <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass}`}>
               Confirm logout
             </ModalHeader>
-            <ModalBody className={modalBodyClass}>
+            <ModalBody className={`${modalBodyClass} pb-7`}>
               <p className="text-sm text-gray-600">
                 Are you sure you want to log out?
               </p>
@@ -60,6 +56,9 @@ export default function NavigationLogoutModal({
                 className="rounded-xl bg-rose-600 text-white"
                 onPress={async () => {
                   onClose();
+                  await new Promise((resolve) => {
+                    window.setTimeout(resolve, 180);
+                  });
                   await onLogout();
                 }}
                 isDisabled={loggingOut}

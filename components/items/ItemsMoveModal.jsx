@@ -9,7 +9,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import { FaShoppingBasket } from "react-icons/fa";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import {

@@ -1,18 +1,15 @@
 "use client";
 
 import NativeButton from "@/components/ui/NativeButton";
-import {
-  useMemo } from "react";
 import NativeInput from "@/components/ui/NativeInput";
-import { parseDate } from "@internationalized/date";
+import DatePicker from "@/components/ui/NativeDatePicker";
 import {
-  DatePicker,
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import { FaBarcode } from "react-icons/fa";
 import EntityImageManager from "@/components/inventory/EntityImageManager";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
@@ -38,16 +35,6 @@ export default function CategoryItemEditModal({
   onImageChange,
   onDelete,
 }) {
-  const itemModalExpirationDateValue = useMemo(() => {
-    if (!itemModal.expirationDate) return null;
-
-    try {
-      return parseDate(itemModal.expirationDate);
-    } catch {
-      return null;
-    }
-  }, [itemModal.expirationDate]);
-
   return (
     <Modal
       isOpen={isOpen}
@@ -103,7 +90,7 @@ export default function CategoryItemEditModal({
                 <DatePicker
                   label="Expiration date"
                   labelPlacement="inside"
-                  value={itemModalExpirationDateValue}
+                  value={itemModal.expirationDate || null}
                   onChange={(date) =>
                     onItemModalChange((prev) => ({
                       ...prev,

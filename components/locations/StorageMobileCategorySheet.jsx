@@ -9,7 +9,7 @@ import {
   ModalBody,
   ModalContent,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import {
   FaBarcode,
   FaBoxOpen,

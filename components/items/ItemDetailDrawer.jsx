@@ -1,19 +1,16 @@
 "use client";
 
 import NativeButton from "@/components/ui/NativeButton";
-import {
-  useMemo } from "react";
 import NativeInput from "@/components/ui/NativeInput";
 import Link from "next/link";
-import { parseDate } from "@internationalized/date";
+import DatePicker from "@/components/ui/NativeDatePicker";
 import {
-  DatePicker,
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import {
   FaBarcode,
   FaMapMarkedAlt,
@@ -150,16 +147,6 @@ export default function ItemDetailDrawer({
   onEditBarcodeChange,
   onImageChange,
 }) {
-  const editExpirationDateValue = useMemo(() => {
-    if (!editExp) return null;
-
-    try {
-      return parseDate(editExp);
-    } catch {
-      return null;
-    }
-  }, [editExp]);
-
   return (
     <Modal
       isOpen={isOpen}
@@ -167,7 +154,7 @@ export default function ItemDetailDrawer({
       placement="right"
       size="lg"
       classNames={{
-        base: "rounded-none md:rounded-l-2xl h-full md:h-[calc(100vh-24px)] md:my-3",
+        base: "h-full rounded-none md:rounded-l-2xl",
         wrapper: "items-stretch justify-end",
       }}
     >
@@ -225,7 +212,7 @@ export default function ItemDetailDrawer({
                     <DatePicker
                       label="Expiration date"
                       labelPlacement="inside"
-                      value={editExpirationDateValue}
+                      value={editExp || null}
                       onChange={(date) => onEditExpChange(date ? date.toString() : "")}
                       variant="bordered"
                       radius="lg"

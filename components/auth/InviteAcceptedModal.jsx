@@ -14,7 +14,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import { FaCheckCircle } from "react-icons/fa";
 
 function getCleanUrl(pathname, search) {

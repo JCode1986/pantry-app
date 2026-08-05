@@ -2,18 +2,15 @@
 
 
 import NativeButton from "@/components/ui/NativeButton";
+import DatePicker from "@/components/ui/NativeDatePicker";
 import {
-  useMemo } from "react";
-import {
-  DatePicker,
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import NativeInput from "@/components/ui/NativeInput";
-import { parseDate } from "@internationalized/date";
 import { FaBarcode } from "react-icons/fa";
 
 import EntityImageManager from "@/components/inventory/EntityImageManager";
@@ -38,16 +35,6 @@ export default function AreaItemEditModal({
   onDelete,
   onImageChange,
 }) {
-  const expirationDateValue = useMemo(() => {
-    if (!itemModal.expirationDate) return null;
-
-    try {
-      return parseDate(itemModal.expirationDate);
-    } catch {
-      return null;
-    }
-  }, [itemModal.expirationDate]);
-
   return (
     <Modal
       isOpen={itemModal.open}
@@ -103,7 +90,7 @@ export default function AreaItemEditModal({
                 <DatePicker
                   label="Expiration date"
                   labelPlacement="inside"
-                  value={expirationDateValue}
+                  value={itemModal.expirationDate || null}
                   onChange={(date) =>
                     setItemModal((prev) => ({
                       ...prev,

@@ -11,7 +11,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import { FaCamera, FaImage, FaTrash, FaUpload } from "react-icons/fa";
 import MobileSuggestionChips from "@/components/modals/MobileSuggestionChips";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";

@@ -6,7 +6,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import NativeButton from "@/components/ui/NativeButton";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import { modalContentStyle } from "@/components/modals/modalTheme";

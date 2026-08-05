@@ -5,15 +5,14 @@ import {
   useEffect,
   useMemo } from "react";
 import NativeInput from "@/components/ui/NativeInput";
-import { parseDate } from "@internationalized/date";
+import DatePicker from "@/components/ui/NativeDatePicker";
 import {
-  DatePicker,
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import { FaCamera, FaImage } from "react-icons/fa";
 import EntityImageManager from "@/components/inventory/EntityImageManager";
 import MobileSuggestionChips from "@/components/modals/MobileSuggestionChips";
@@ -183,15 +182,6 @@ export default function StorageEntityModals({
     () => areaModal.open || categoryModal.open || itemModal.open,
     [areaModal.open, categoryModal.open, itemModal.open]
   );
-  const itemModalExpirationDateValue = useMemo(() => {
-    if (!itemModal.expirationDate) return null;
-    try {
-      return parseDate(itemModal.expirationDate);
-    } catch {
-      return null;
-    }
-  }, [itemModal.expirationDate]);
-
   useEffect(() => {
     const previews = [
       areaModal.imagePreview,
@@ -494,7 +484,7 @@ export default function StorageEntityModals({
                 <DatePicker
                   label="Expiration date"
                   labelPlacement="inside"
-                  value={itemModalExpirationDateValue}
+                  value={itemModal.expirationDate || null}
                   onChange={(date) =>
                     setItemModal((prev) => ({
                       ...prev,

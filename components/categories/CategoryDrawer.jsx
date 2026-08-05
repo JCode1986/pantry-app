@@ -6,7 +6,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import NativeInput from "@/components/ui/NativeInput";
 import NativeButton from "@/components/ui/NativeButton";
 import EntityImageManager from "@/components/inventory/EntityImageManager";
@@ -38,7 +38,7 @@ export default function CategoryDrawer({
       placement="right"
       size="lg"
       classNames={{
-        base: "rounded-none md:rounded-l-2xl h-full md:h-[calc(100vh-24px)] md:my-3",
+        base: "h-full rounded-none md:rounded-l-2xl",
         wrapper: "items-stretch justify-end",
       }}
     >
