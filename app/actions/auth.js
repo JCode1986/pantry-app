@@ -8,9 +8,19 @@ export async function login({ email, password, redirectTo = "/dashboard" }) {
   const supa = await createClient();
   const session = await getSession();
 
-  const { data, error } = await supa.auth.signInWithPassword({ email, password });
+  let signInResult;
+  try {
+    signInResult = await supa.auth.signInWithPassword({ email, password });
+  } catch {
+    return {
+      success: false,
+      error: "Could not log in right now. Please try again.",
+    };
+  }
 
-  if (error) {
+  const { data, error } = signInResult;
+
+  if (error || !data?.session) {
     return {
       success: false,
       error: error.message || "Invalid login credentials.",

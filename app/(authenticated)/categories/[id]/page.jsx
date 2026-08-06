@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
-import CategoryDetailClient from "@/components/categories/CategoryDetailClient";
+import { LazyCategoryDetailClient } from "@/components/app-shell/LazyPageClients";
 import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
 import { getCanEditInventoryForUser } from "@/utils/households";
 import {
@@ -117,7 +117,7 @@ export default async function CategoryDetailPage({ params }) {
   const location = area?.location;
 
   return (
-    <CategoryDetailClient
+    <LazyCategoryDetailClient
       category={{
         id: category.id,
         name: category.name,

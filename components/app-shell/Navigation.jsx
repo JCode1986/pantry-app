@@ -58,16 +58,6 @@ const navItems = [
   { href: "/profile", label: "Profile", icon: FaUserCircle },
 ];
 
-const PRIMARY_PREFETCH_ROUTES = [
-  "/dashboard",
-  "/locations",
-  "/areas",
-  "/categories",
-  "/items",
-  "/shopping-list",
-  "/profile",
-];
-
 const NATIVE_MODAL_EXIT_MS = 240;
 
 const GlobalAddItemModal = dynamic(
@@ -1101,45 +1091,6 @@ export default function Navigation({
     setPreferences(readStoredPreferences());
     setPreferredName(initialPreferredName || "");
   }, [initialPreferredName]);
-
-  useEffect(() => {
-    const connection = navigator?.connection;
-    if (connection?.saveData || connection?.effectiveType === "2g") return;
-
-    let cancelled = false;
-    let idleCallbackId = null;
-    let timeoutId = null;
-
-    const prefetchRoutes = () => {
-      if (cancelled) return;
-
-      for (const href of PRIMARY_PREFETCH_ROUTES) {
-        if (href === pathname) continue;
-        router.prefetch(href);
-      }
-    };
-
-    if (typeof window.requestIdleCallback === "function") {
-      idleCallbackId = window.requestIdleCallback(prefetchRoutes, {
-        timeout: 3000,
-      });
-    } else {
-      timeoutId = window.setTimeout(prefetchRoutes, 1500);
-    }
-
-    return () => {
-      cancelled = true;
-      if (
-        idleCallbackId !== null &&
-        typeof window.cancelIdleCallback === "function"
-      ) {
-        window.cancelIdleCallback(idleCallbackId);
-      }
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
-    };
-  }, [pathname, router]);
 
   useEffect(() => {
     let cancelled = false;

@@ -40,10 +40,12 @@ import {
 import {
   addItemWithPath,
   getInventoryHierarchy,
-  lookupProductByBarcode,
-  parseQuickAddVoiceText,
   uploadInventoryImage,
 } from "@/app/actions/server";
+import {
+  lookupProductByBarcode,
+  parseQuickAddVoiceText,
+} from "@/app/actions/quickAdd";
 import { toNonNegativeInteger } from "@/utils/pantry/date";
 import { emitItemAdded } from "@/utils/clientEvents";
 import {
