@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
 import WhereKeepLoader from '@/components/ui/WhereKeepLoader';
 
 export default function MagicLinkSyncPage() {
@@ -43,6 +42,7 @@ export default function MagicLinkSyncPage() {
 
     const syncSession = async () => {
       try {
+        const { supabase } = await import('@/lib/supabaseClient');
         let activeSession = null;
         let sessionError = null;
 

@@ -8,11 +8,8 @@
     "start": "next start"
   },
   "dependencies": {
-    "@heroui/react": "^2.8.5",
-    "@heroui/theme": "^2.4.23",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.50.5",
-    "framer-motion": "^12.23.26",
     "iron-session": "^8.0.4",
     "next": "^15.5.7",
     "react": "^19.0.0",

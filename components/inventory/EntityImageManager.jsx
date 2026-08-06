@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Button } from "@heroui/react";
+
+import NativeButton from "@/components/ui/NativeButton";
+import {
+  useEffect,
+  useRef,
+  useState } from "react";
 import { FaCamera, FaCheck, FaImage, FaSpinner, FaTrash, FaUpload } from "react-icons/fa";
 import {
   removeInventoryImage,
@@ -166,7 +170,7 @@ export default function EntityImageManager({
             }}
           />
           <div className="flex flex-wrap gap-2">
-            <Button
+            <NativeButton
               size="sm"
               variant="flat"
               className="min-h-10 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] sm:hidden"
@@ -175,8 +179,8 @@ export default function EntityImageManager({
               startContent={<FaCamera className="h-3.5 w-3.5" />}
             >
               Take photo
-            </Button>
-            <Button
+            </NativeButton>
+            <NativeButton
               size="sm"
               variant="flat"
               className="min-h-10 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
@@ -185,9 +189,9 @@ export default function EntityImageManager({
               startContent={<FaUpload className="h-3.5 w-3.5" />}
             >
               {visibleImageUrl ? "Change photo" : "Add photo"}
-            </Button>
+            </NativeButton>
             {(imageUrl || pendingFile) && (
-              <Button
+              <NativeButton
                 size="sm"
                 variant="flat"
                 className="min-h-10 rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
@@ -196,10 +200,10 @@ export default function EntityImageManager({
                 startContent={<FaTrash className="h-3.5 w-3.5" />}
               >
                 {pendingFile ? "Clear photo" : "Remove photo"}
-              </Button>
+              </NativeButton>
             )}
             {hasPendingChange && (
-              <Button
+              <NativeButton
                 size="sm"
                 className="min-h-10 rounded-xl bg-[var(--stocksense-brand)] text-white"
                 isDisabled={isWorking || !entityId}
@@ -213,10 +217,10 @@ export default function EntityImageManager({
                 }
               >
                 Save photo
-              </Button>
+              </NativeButton>
             )}
             {hasPendingChange && (
-              <Button
+              <NativeButton
                 size="sm"
                 variant="flat"
                 className="min-h-10 rounded-xl border border-gray-200 bg-white text-gray-700"
@@ -224,7 +228,7 @@ export default function EntityImageManager({
                 onPress={clearPendingChange}
               >
                 Cancel change
-              </Button>
+              </NativeButton>
             )}
           </div>
           <p className="text-xs leading-5 text-gray-500 max-md:hidden">

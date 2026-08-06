@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+
+import NativeButton from "@/components/ui/NativeButton";
 import {
-  Button,
-  Input,
+  useEffect,
+  useState } from "react";
+import { usePathname,
+  useRouter } from "next/navigation";
+import {
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
+import NativeInput from "@/components/ui/NativeInput";
 import { FaCheckCircle, FaEye, FaEyeSlash, FaKey } from "react-icons/fa";
 import { updatePasswordAction } from "@/app/actions/auth";
 
@@ -134,7 +138,7 @@ export default function InvitePasswordSetupModal({ requiresPasswordSetup }) {
               </div>
             ) : null}
 
-            <Input
+            <NativeInput
               label="New password"
               type={showPassword ? "text" : "password"}
               value={password}
@@ -157,7 +161,7 @@ export default function InvitePasswordSetupModal({ requiresPasswordSetup }) {
               }}
             />
 
-            <Input
+            <NativeInput
               label="Confirm password"
               type={showPassword ? "text" : "password"}
               value={confirmPassword}
@@ -171,7 +175,7 @@ export default function InvitePasswordSetupModal({ requiresPasswordSetup }) {
             />
           </ModalBody>
           <ModalFooter className="border-t border-gray-200 px-5 py-4">
-            <Button
+            <NativeButton
               type="submit"
               className="min-h-11 w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
               isLoading={saving}
@@ -179,7 +183,7 @@ export default function InvitePasswordSetupModal({ requiresPasswordSetup }) {
               startContent={!saving ? <FaCheckCircle className="h-4 w-4" /> : null}
             >
               Save password
-            </Button>
+            </NativeButton>
           </ModalFooter>
         </form>
       </ModalContent>

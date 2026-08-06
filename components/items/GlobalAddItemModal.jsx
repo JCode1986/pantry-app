@@ -1,23 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import NativeButton from "@/components/ui/NativeButton";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
+import NativeInput from "@/components/ui/NativeInput";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import DatePicker from "@/components/ui/NativeDatePicker";
 import {
-  Button,
-  DatePicker,
-  Input,
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
-  Select,
-  SelectItem,
-} from "@heroui/react";
-import { parseDate } from "@internationalized/date";
+} from "@/components/ui/NativeModal";
 import {
   FaBarcode,
   FaCamera,
@@ -50,10 +52,10 @@ import {
   modalContentStyle,
   modalHeaderClass,
   modalInputClassNames,
-  themedSelectClassNames,
 } from "@/components/modals/modalTheme";
 import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
+import NativeSelect from "@/components/ui/NativeSelect";
 
 const BarcodeScannerModal = dynamic(
   () => import("@/components/items/BarcodeScannerModal"),
@@ -70,14 +72,6 @@ const ADD_METHODS = [
   { id: "voice", label: "Voice", icon: FaMicrophone },
   { id: "manual", label: "Manual", icon: FaPlus },
 ];
-const revealTransition = { duration: 0.2, ease: "easeOut" };
-const revealMotion = {
-  initial: { opacity: 0, height: 0, y: -6 },
-  animate: { opacity: 1, height: "auto", y: 0 },
-  exit: { opacity: 0, height: 0, y: -6 },
-  transition: revealTransition,
-};
-
 const emptyForm = {
   locationName: "",
   storageAreaName: "",
@@ -106,7 +100,7 @@ const invalidInputWrapperClass =
   "data-[invalid=true]:border-rose-500 data-[invalid=true]:bg-rose-50/40 focus-within:data-[invalid=true]:border-rose-500";
 
 const invalidSelectTriggerClass =
-  "data-[invalid=true]:border-rose-500 data-[invalid=true]:bg-rose-50/40 data-[invalid=true]:text-rose-700";
+  "border-rose-500 bg-rose-50/40 text-rose-700";
 
 function getModalInputClassNames(isInvalid = false) {
   return {
@@ -117,13 +111,8 @@ function getModalInputClassNames(isInvalid = false) {
   };
 }
 
-function getThemedSelectClassNames(isInvalid = false) {
-  return {
-    ...themedSelectClassNames,
-    trigger: `${themedSelectClassNames.trigger} ${
-      isInvalid ? invalidSelectTriggerClass : ""
-    }`,
-  };
+function getNativeSelectTriggerClassName(isInvalid = false) {
+  return isInvalid ? invalidSelectTriggerClass : "";
 }
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -184,9 +173,7 @@ function AddItemMessage({ message, upgradeHref, onLinkClick, className = "" }) {
   if (!message) return null;
 
   return (
-    <motion.div
-      layout
-      {...revealMotion}
+    <div
       role="alert"
       aria-live="polite"
       className={`overflow-hidden rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 ${className}`}
@@ -201,7 +188,7 @@ function AddItemMessage({ message, upgradeHref, onLinkClick, className = "" }) {
           View plans
         </Link>
       )}
-    </motion.div>
+    </div>
   );
 }
 
@@ -217,9 +204,7 @@ function NewPathField({
   errorMessage = "",
 }) {
   return (
-    <motion.div
-      layout
-      {...revealMotion}
+    <div
       className={`overflow-hidden rounded-xl border p-3 shadow-sm ${
         isInvalid
           ? "border-rose-200 bg-rose-50/60"
@@ -232,7 +217,7 @@ function NewPathField({
         </span>
         <span className="text-sm font-semibold text-gray-900">{title}</span>
       </div>
-      <Input
+      <NativeInput
         label={label}
         value={value}
         onValueChange={onValueChange}
@@ -250,7 +235,7 @@ function NewPathField({
             }`,
         }}
       />
-    </motion.div>
+    </div>
   );
 }
 
@@ -368,15 +353,6 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
       manual: "order-30",
     };
   }, [addMethod]);
-  const formExpirationDateValue = useMemo(() => {
-    if (!form.expirationDate) return null;
-    try {
-      return parseDate(form.expirationDate);
-    } catch {
-      return null;
-    }
-  }, [form.expirationDate]);
-
   useEffect(() => {
     setAddMethod(readStoredAddMethod());
     setKeepAdding(readStoredKeepAdding());
@@ -1138,7 +1114,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[var(--stocksense-brand)]">Add item</span>
                 <div className="flex shrink-0 items-center gap-2 md:hidden">
-                  <Button
+                  <NativeButton
                     size="sm"
                     className="h-10 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white"
                     onPress={() => handleSubmit()}
@@ -1148,7 +1124,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                     }
                   >
                     {isSaving ? "Adding" : "Add"}
-                  </Button>
+                  </NativeButton>
                   <button
                     type="button"
                     aria-label="Close add item"
@@ -1166,36 +1142,42 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
             </ModalHeader>
 
             <ModalBody className={`min-h-[150px] space-y-4 pb-3 max-md:bg-gray-50 max-md:px-4 max-md:pb-5 max-md:pt-4 ${modalBodyClass}`}>
-              <AnimatePresence initial={false}>
-                <AddItemMessage
-                  message={message}
-                  upgradeHref={upgradeHref}
-                  onLinkClick={handleClose}
-                  className="hidden md:block"
-                />
-              </AnimatePresence>
+              <AddItemMessage
+                message={message}
+                upgradeHref={upgradeHref}
+                onLinkClick={handleClose}
+                className="hidden md:block"
+              />
+              {mobileAddedToast && (
+                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-3 shadow-sm md:hidden">
+                  <div className="text-sm font-semibold text-gray-950">
+                    Item added
+                  </div>
+                  <div className="mt-0.5 text-xs text-gray-600">
+                    {mobileAddedToast.itemName} was added to{" "}
+                    {mobileAddedToast.destinationName}.
+                  </div>
+                </div>
+              )}
+              <AddItemMessage
+                message={message}
+                upgradeHref={upgradeHref}
+                onLinkClick={handleClose}
+                className="md:hidden"
+              />
 
-              <AnimatePresence mode="wait" initial={false}>
+              <>
                 {isLoading ? (
-                  <motion.div
+                  <div
                     key="loading"
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={revealTransition}
                     className="flex min-h-[150px] items-center justify-center rounded-2xl border border-dashed border-stocksense-gray bg-gray-50 text-sm text-gray-500"
                   >
                     <FaSpinner className="mr-2 animate-spin" />
                     Loading inventory...
-                  </motion.div>
+                  </div>
                 ) : (
-                  <motion.div
+                  <div
                     key="form"
-                    layout
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={revealTransition}
                     className="flex min-w-0 flex-col gap-3 sm:gap-4"
                   >
                     <div className="order-0 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm md:hidden">
@@ -1287,98 +1269,88 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                         </div>
                       </div>
 
-                      <motion.div layout className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                      <motion.div layout className="space-y-2">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                      <div className="space-y-2">
                         {hasExistingLocations && (
-                          <Select
+                          <NativeSelect
                             label="Location"
-                            selectedKeys={new Set([String(locationId)])}
-                            onSelectionChange={(keys) => {
-                              const value = Array.from(keys)[0];
+                            aria-label="Item location"
+                            value={String(locationId)}
+                            onChange={(value) => {
                               if (value) selectLocation(value);
                             }}
-                            isDisabled={isSaving}
-                            isInvalid={Boolean(validationErrors.locationName)}
-                            variant="bordered"
-                            radius="lg"
-                            classNames={getThemedSelectClassNames(
+                            disabled={isSaving}
+                            triggerClassName={getNativeSelectTriggerClassName(
                               Boolean(validationErrors.locationName)
                             )}
-                          >
-                            {locations.map((location) => (
-                              <SelectItem key={String(location.id)}>
-                                {location.name}
-                              </SelectItem>
-                            ))}
-                            <SelectItem key={NEW_VALUE}>+ New location</SelectItem>
-                          </Select>
+                            options={[
+                              ...locations.map((location) => ({
+                                value: String(location.id),
+                                label: location.name,
+                              })),
+                              { value: NEW_VALUE, label: "+ New location" },
+                            ]}
+                          />
                         )}
-                        <AnimatePresence initial={false}>
-                          {locationId === NEW_VALUE && (
-                            <NewPathField
-                              icon={FaMapMarkerAlt}
-                              title="Create location"
-                              label="Location name"
-                              value={form.locationName}
-                              onValueChange={(value) => updateForm("locationName", value)}
-                              placeholder="e.g., Home"
-                              isDisabled={isSaving}
-                              isInvalid={Boolean(validationErrors.locationName)}
-                              errorMessage={validationErrors.locationName}
-                            />
-                          )}
-                        </AnimatePresence>
-                      </motion.div>
+                        {locationId === NEW_VALUE && (
+                          <NewPathField
+                            icon={FaMapMarkerAlt}
+                            title="Create location"
+                            label="Location name"
+                            value={form.locationName}
+                            onValueChange={(value) => updateForm("locationName", value)}
+                            placeholder="e.g., Home"
+                            isDisabled={isSaving}
+                            isInvalid={Boolean(validationErrors.locationName)}
+                            errorMessage={validationErrors.locationName}
+                          />
+                        )}
+                      </div>
 
-                      <motion.div layout className="space-y-2">
+                      <div className="space-y-2">
                         {hasExistingStorageAreas && (
-                          <Select
+                          <NativeSelect
                             label="Storage area"
-                            selectedKeys={new Set([String(storageAreaId)])}
-                            onSelectionChange={(keys) => {
-                              const value = Array.from(keys)[0];
+                            aria-label="Item storage area"
+                            value={String(storageAreaId)}
+                            onChange={(value) => {
                               if (value) selectStorageArea(value);
                             }}
-                            isDisabled={isSaving || locationId === NEW_VALUE}
-                            isInvalid={Boolean(validationErrors.storageAreaName)}
-                            variant="bordered"
-                            radius="lg"
-                            classNames={getThemedSelectClassNames(
+                            disabled={isSaving || locationId === NEW_VALUE}
+                            triggerClassName={getNativeSelectTriggerClassName(
                               Boolean(validationErrors.storageAreaName)
                             )}
-                          >
-                            {storageAreas.map((area) => (
-                              <SelectItem key={String(area.id)}>
-                                {area.name}
-                              </SelectItem>
-                            ))}
-                            <SelectItem key={NEW_VALUE}>+ New storage area</SelectItem>
-                          </Select>
+                            options={[
+                              ...storageAreas.map((area) => ({
+                                value: String(area.id),
+                                label: area.name,
+                              })),
+                              { value: NEW_VALUE, label: "+ New storage area" },
+                            ]}
+                          />
                         )}
-                        <AnimatePresence initial={false}>
-                          {storageAreaId === NEW_VALUE && (
-                            <NewPathField
-                              icon={FaWarehouse}
-                              title="Create storage area"
-                              label="Storage area name"
-                              value={form.storageAreaName}
-                              onValueChange={(value) => updateForm("storageAreaName", value)}
-                              placeholder="e.g., Kitchen pantry"
-                              isDisabled={isSaving}
-                              isInvalid={Boolean(validationErrors.storageAreaName)}
-                              errorMessage={validationErrors.storageAreaName}
-                            />
-                          )}
-                        </AnimatePresence>
-                      </motion.div>
+                        {storageAreaId === NEW_VALUE && (
+                          <NewPathField
+                            icon={FaWarehouse}
+                            title="Create storage area"
+                            label="Storage area name"
+                            value={form.storageAreaName}
+                            onValueChange={(value) => updateForm("storageAreaName", value)}
+                            placeholder="e.g., Kitchen pantry"
+                            isDisabled={isSaving}
+                            isInvalid={Boolean(validationErrors.storageAreaName)}
+                            errorMessage={validationErrors.storageAreaName}
+                          />
+                        )}
+                      </div>
 
-                      <motion.div layout className="space-y-2">
+                      <div className="space-y-2">
                         {hasExistingCategories && (
-                          <Select
+                          <NativeSelect
                             label="Category"
-                            selectedKeys={new Set([String(categoryId)])}
-                            onSelectionChange={(keys) => {
-                              const value = Array.from(keys)[0];
+                            aria-label="Item category"
+                            value={String(categoryId)}
+                            onChange={(value) => {
                               if (value) {
                                 setCategoryId(String(value));
                                 setValidationErrors((prev) => ({
@@ -1387,39 +1359,34 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                                 }));
                               }
                             }}
-                            isDisabled={isSaving || storageAreaId === NEW_VALUE}
-                            isInvalid={Boolean(validationErrors.categoryName)}
-                            variant="bordered"
-                            radius="lg"
-                            classNames={getThemedSelectClassNames(
+                            disabled={isSaving || storageAreaId === NEW_VALUE}
+                            triggerClassName={getNativeSelectTriggerClassName(
                               Boolean(validationErrors.categoryName)
                             )}
-                          >
-                            {categories.map((category) => (
-                              <SelectItem key={String(category.id)}>
-                                {category.name}
-                              </SelectItem>
-                            ))}
-                            <SelectItem key={NEW_VALUE}>+ New category</SelectItem>
-                          </Select>
+                            options={[
+                              ...categories.map((category) => ({
+                                value: String(category.id),
+                                label: category.name,
+                              })),
+                              { value: NEW_VALUE, label: "+ New category" },
+                            ]}
+                          />
                         )}
-                        <AnimatePresence initial={false}>
-                          {categoryId === NEW_VALUE && (
-                            <NewPathField
-                              icon={FaTags}
-                              title="Create category"
-                              label="Category name"
-                              value={form.categoryName}
-                              onValueChange={(value) => updateForm("categoryName", value)}
-                              placeholder="e.g., Snacks or Shelf 1"
-                              isDisabled={isSaving}
-                              isInvalid={Boolean(validationErrors.categoryName)}
-                              errorMessage={validationErrors.categoryName}
-                            />
-                          )}
-                        </AnimatePresence>
-                      </motion.div>
-                      </motion.div>
+                        {categoryId === NEW_VALUE && (
+                          <NewPathField
+                            icon={FaTags}
+                            title="Create category"
+                            label="Category name"
+                            value={form.categoryName}
+                            onValueChange={(value) => updateForm("categoryName", value)}
+                            placeholder="e.g., Snacks or Shelf 1"
+                            isDisabled={isSaving}
+                            isInvalid={Boolean(validationErrors.categoryName)}
+                            errorMessage={validationErrors.categoryName}
+                          />
+                        )}
+                      </div>
+                      </div>
                     </div>
 
                     <label className="order-[45] flex min-h-14 w-full cursor-pointer items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm md:hidden">
@@ -1471,7 +1438,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                       </div>
 
                       <div className={`${isBarcodeExpanded ? "block" : "hidden"} border-t border-gray-100 p-3 md:block md:border-t-0 md:p-0`}>
-                      <Button
+                      <NativeButton
                         className="mb-3 min-h-12 w-full rounded-2xl bg-[var(--stocksense-brand)] text-base font-semibold text-white md:hidden"
                         onPress={() => {
                           openBarcodeScanner(true);
@@ -1480,9 +1447,9 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                         startContent={<FaBarcode />}
                       >
                         Scan barcode
-                      </Button>
+                      </NativeButton>
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_190px]">
-                        <Input
+                        <NativeInput
                           label="Barcode (optional)"
                           value={form.barcode}
                           onValueChange={updateBarcode}
@@ -1493,8 +1460,8 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                           startContent={<FaBarcode className="text-gray-400" />}
                           classNames={modalInputClassNames}
                         />
-                        <div className="grid grid-cols-1 gap-2 md:grid-cols-1">
-                          <Button
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                          <NativeButton
                             className="hidden rounded-xl bg-[var(--stocksense-brand)] text-white md:inline-flex"
                             onPress={() => {
                               openBarcodeScanner(false);
@@ -1503,8 +1470,8 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                             startContent={<FaBarcode />}
                           >
                             Scan
-                          </Button>
-                          <Button
+                          </NativeButton>
+                          <NativeButton
                             variant="flat"
                             className="min-h-11 rounded-xl"
                             onPress={() => lookupBarcode()}
@@ -1518,7 +1485,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                             }
                           >
                             Lookup
-                          </Button>
+                          </NativeButton>
                         </div>
                       </div>
 
@@ -1575,7 +1542,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                       </div>
 
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_140px_180px]">
-                        <Input
+                        <NativeInput
                           label="Item name"
                           value={form.itemName}
                           onValueChange={(value) => {
@@ -1603,7 +1570,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                         <DatePicker
                           label="Expiration"
                           labelPlacement="inside"
-                          value={formExpirationDateValue}
+                          value={form.expirationDate || null}
                           onChange={(date) =>
                             updateForm("expirationDate", date ? date.toString() : "")
                           }
@@ -1669,7 +1636,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
 
                           <div className="flex flex-1 flex-col gap-2">
                             <div className="flex flex-wrap gap-2">
-                              <Button
+                              <NativeButton
                                 size="sm"
                                 variant="flat"
                                 className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] sm:hidden"
@@ -1678,8 +1645,8 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                                 startContent={<FaCamera className="h-3.5 w-3.5" />}
                               >
                                 Take photo
-                              </Button>
-                              <Button
+                              </NativeButton>
+                              <NativeButton
                                 size="sm"
                                 variant="flat"
                                 className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
@@ -1688,9 +1655,9 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                                 startContent={<FaUpload className="h-3.5 w-3.5" />}
                               >
                                 {selectedImageFile ? "Choose different" : "Choose image"}
-                              </Button>
+                              </NativeButton>
                               {selectedImageFile && (
-                                <Button
+                                <NativeButton
                                   size="sm"
                                   variant="flat"
                                   className="rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
@@ -1699,7 +1666,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                                   startContent={<FaTrash className="h-3.5 w-3.5" />}
                                 >
                                   Remove
-                                </Button>
+                                </NativeButton>
                               )}
                             </div>
                             <p className="text-xs leading-5 text-gray-500">
@@ -1716,103 +1683,34 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                         </div>
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 )}
-              </AnimatePresence>
+              </>
             </ModalBody>
 
             <ModalFooter
-              className="wherekeep-modal-footer flex shrink-0 flex-col gap-2 border-t border-gray-200 bg-white max-md:sticky max-md:bottom-0 max-md:z-20 max-md:px-4 max-md:pb-[max(4.5rem,calc(env(safe-area-inset-bottom)+1rem))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)] sm:flex-row sm:items-center sm:justify-end"
+              className="wherekeep-modal-footer hidden shrink-0 gap-2 border-t border-gray-200 bg-white md:flex md:flex-row md:items-center md:justify-end"
             >
-              <AnimatePresence initial={false}>
-                {mobileAddedToast && (
-                  <motion.div
-                    layout
-                    {...revealMotion}
-                    className="w-full overflow-hidden rounded-2xl border border-gray-200 bg-white p-3 shadow-sm md:hidden"
-                  >
-                    <div className="text-sm font-semibold text-gray-950">
-                      Item added
-                    </div>
-                    <div className="mt-0.5 truncate text-xs text-gray-600">
-                      {mobileAddedToast.itemName} was added to{" "}
-                      {mobileAddedToast.destinationName}.
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <Button
-                        size="sm"
-                        variant="flat"
-                        className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
-                        onPress={() => {
-                          handleClose();
-                        }}
-                      >
-                        Done
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="rounded-xl bg-[var(--stocksense-brand)] text-white"
-                        onPress={() => {
-                          setMobileAddedToast(null);
-                          setMessage("");
-                          if (addMethod === "barcode") {
-                            setIsBarcodeExpanded(true);
-                            openBarcodeScanner(true);
-                          }
-                          if (addMethod === "voice") {
-                            handleVoiceQuickAdd();
-                          }
-                        }}
-                      >
-                        {addMethod === "barcode"
-                          ? "Scan next"
-                          : addMethod === "voice"
-                          ? "Voice next"
-                          : "Add another"}
-                      </Button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <AnimatePresence initial={false}>
-                <AddItemMessage
-                  message={message}
-                  upgradeHref={upgradeHref}
-                  onLinkClick={handleClose}
-                  className="w-full md:hidden"
-                />
-              </AnimatePresence>
-
               <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:justify-end">
-                <Button variant="light" className="hidden rounded-xl md:inline-flex" onPress={handleClose} isDisabled={isSaving}>
+                <NativeButton variant="light" className="hidden rounded-xl md:inline-flex" onPress={handleClose} isDisabled={isSaving}>
                   Cancel
-                </Button>
-                <Button
+                </NativeButton>
+                <NativeButton
                   variant="flat"
                   className="hidden rounded-xl md:inline-flex"
                   onPress={() => handleSubmit({ closeAfterAdd: true })}
                   isDisabled={isSaving || isLoading || isQuickAdding}
                 >
                   Add & close
-                </Button>
-                <Button
+                </NativeButton>
+                <NativeButton
                   className="hidden min-h-12 rounded-2xl bg-[var(--stocksense-brand)] text-white md:inline-flex md:min-h-10 md:rounded-xl"
                   onPress={() => handleSubmit()}
                   isDisabled={isSaving || isLoading || isQuickAdding}
                   startContent={isSaving ? <FaSpinner className="animate-spin" /> : <FaPlus />}
                 >
-                  {isSaving ? (
-                    "Adding..."
-                  ) : (
-                    <>
-                      <span className="md:hidden">
-                        {keepAdding ? "Add item" : "Add item & done"}
-                      </span>
-                      <span className="hidden md:inline">Add another</span>
-                    </>
-                  )}
-                </Button>
+                  {isSaving ? "Adding..." : "Add another"}
+                </NativeButton>
               </div>
             </ModalFooter>
             </>

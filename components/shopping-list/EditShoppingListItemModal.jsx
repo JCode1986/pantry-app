@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+
+import NativeButton from "@/components/ui/NativeButton";
 import {
-  Button,
-  Input,
+  useEffect,
+  useMemo,
+  useState } from "react";
+import {
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
-  Select,
-  SelectItem,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
+import NativeInput from "@/components/ui/NativeInput";
 import { FaEdit, FaExchangeAlt } from "react-icons/fa";
 import { updateShoppingListItemAction } from "@/app/actions/shoppingList";
 import { toNonNegativeInteger } from "@/utils/pantry/date";
@@ -23,10 +25,11 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  modalTitleClass,
   mobileSheetModalClassNames,
-  themedSelectClassNames,
 } from "@/components/modals/modalTheme";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
+import NativeSelect from "@/components/ui/NativeSelect";
 import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
 import useDesktopAutoFocus from "@/components/modals/useDesktopAutoFocus";
 
@@ -149,12 +152,12 @@ export default function EditShoppingListItemModal({
       <ModalContent className={modalContentClass} style={modalContentStyle}>
         {() => (
           <>
-            <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
-              <span className="inline-flex min-w-0 flex-1 items-center gap-2 truncate">
+            <ModalHeader className={`flex items-center gap-3 ${modalHeaderClass}`}>
+              <span className="inline-flex min-w-0 flex-1 items-center gap-2">
                 <FaEdit className="h-4 w-4 shrink-0" />
-                <span className="truncate">Edit shopping list item</span>
+                <span className={modalTitleClass}>Edit shopping list item</span>
               </span>
-              <Button
+              <NativeButton
                 size="sm"
                 className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
                 onPress={handleSave}
@@ -162,7 +165,7 @@ export default function EditShoppingListItemModal({
                 isDisabled={!hasChanges}
               >
                 Save
-              </Button>
+              </NativeButton>
               <MobileSheetCloseButton onPress={handleClose} />
             </ModalHeader>
 
@@ -173,7 +176,7 @@ export default function EditShoppingListItemModal({
                 </p>
               ) : null}
 
-              <Input
+              <NativeInput
                 label="Item"
                 value={form.name}
                 onValueChange={(value) => updateForm("name", value)}
@@ -194,22 +197,16 @@ export default function EditShoppingListItemModal({
                   classNames={modalInputClassNames}
                 />
 
-                <Select
+                <NativeSelect
                   label="Status"
-                  selectedKeys={new Set([form.status])}
-                  onSelectionChange={(keys) => {
-                    const value = Array.from(keys)[0];
+                  aria-label="Shopping list item status"
+                  value={form.status}
+                  onChange={(value) => {
                     if (value) updateForm("status", String(value));
                   }}
-                  variant="bordered"
-                  radius="lg"
-                  isDisabled={isSaving}
-                  classNames={themedSelectClassNames}
-                >
-                  {STATUS_OPTIONS.map((option) => (
-                    <SelectItem key={option.value}>{option.label}</SelectItem>
-                  ))}
-                </Select>
+                  disabled={isSaving}
+                  options={STATUS_OPTIONS}
+                />
               </div>
 
               <EntityImageManager
@@ -223,7 +220,7 @@ export default function EditShoppingListItemModal({
               {onMoveToInventory && item ? (
                 <div className="rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3">
                   <p className="text-sm font-semibold text-gray-950">Inventory</p>
-                  <Button
+                  <NativeButton
                     className="mt-3 min-h-11 w-full rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
                     onPress={() => onMoveToInventory(item)}
                     isLoading={isMovingToInventory}
@@ -231,14 +228,14 @@ export default function EditShoppingListItemModal({
                     startContent={!isMovingToInventory ? <FaExchangeAlt /> : null}
                   >
                     Move to inventory
-                  </Button>
+                  </NativeButton>
                 </div>
               ) : null}
 
               {onDelete && item ? (
                 <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
                   <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                  <Button
+                  <NativeButton
                     className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
                     onPress={() => {
                       handleClose();
@@ -246,28 +243,28 @@ export default function EditShoppingListItemModal({
                     }}
                   >
                     Delete shopping list item
-                  </Button>
+                  </NativeButton>
                 </div>
               ) : null}
             </ModalBody>
 
             <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-              <Button
+              <NativeButton
                 variant="light"
                 className="rounded-xl max-md:hidden"
                 onPress={handleClose}
                 isDisabled={isSaving}
               >
                 Cancel
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                 onPress={handleSave}
                 isLoading={isSaving}
                 isDisabled={!hasChanges}
               >
                 Save changes
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </>
         )}

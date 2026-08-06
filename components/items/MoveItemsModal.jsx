@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+
+import NativeButton from "@/components/ui/NativeButton";
 import {
-  Button,
-  Input,
+  useEffect,
+  useMemo,
+  useState } from "react";
+import {
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
-  Select,
-  SelectItem,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import {
   modalBodyClass,
   modalContentStyle,
@@ -19,10 +20,13 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  modalSubtitleClass,
+  modalTitleClass,
   mobileSheetModalClassNames,
-  themedSelectClassNames,
 } from "@/components/modals/modalTheme";
+import NativeInput from "@/components/ui/NativeInput";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
+import NativeSelect from "@/components/ui/NativeSelect";
 import {
   addCategory,
   addLocation,
@@ -207,11 +211,6 @@ export default function MoveItemsModal({
     }));
   };
 
-  const getSelectedValue = (keys) => {
-    const value = Array.from(keys)[0];
-    return value ? String(value) : "";
-  };
-
   const showCreateMessage = (type, text) => {
     setCreateMessage({ type, text });
     window.setTimeout(() => setCreateMessage(null), 3500);
@@ -355,13 +354,13 @@ export default function MoveItemsModal({
       <ModalContent className={modalContentClass} style={modalContentStyle}>
         {() => (
           <>
-            <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
+            <ModalHeader className={`flex items-center gap-3 ${modalHeaderClass}`}>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-lg font-semibold text-[var(--stocksense-brand)]">
+                <div className={modalTitleClass}>
                   Move {moveModal.itemIds.length} item
                   {moveModal.itemIds.length > 1 ? "s" : ""}
                 </div>
-                <div className="truncate text-sm text-gray-500">
+                <div className={modalSubtitleClass}>
                   Choose where you want to move the selected item
                   {moveModal.itemIds.length > 1 ? "s" : ""}.
                 </div>
@@ -401,7 +400,7 @@ export default function MoveItemsModal({
                 <div className="flex flex-col gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between">
                   <span>{destinationsError}</span>
                   {onRetryLoadDestinations ? (
-                    <Button
+                    <NativeButton
                       size="sm"
                       variant="flat"
                       color="danger"
@@ -409,34 +408,33 @@ export default function MoveItemsModal({
                       onPress={onRetryLoadDestinations}
                     >
                       Retry
-                    </Button>
+                    </NativeButton>
                   ) : null}
                 </div>
               ) : null}
               <div className="space-y-1">
-                <Select
+                <NativeSelect
                   label="Location"
-                  selectedKeys={
+                  aria-label="Move location"
+                  value={
                     moveModal.targetLocationId
-                      ? new Set([String(moveModal.targetLocationId)])
-                      : new Set()
+                      ? String(moveModal.targetLocationId)
+                      : ""
                   }
-                  onSelectionChange={(keys) => handleLocationChange(getSelectedValue(keys))}
-                  isDisabled={isLoadingDestinations}
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  {safeLocations.map((location) => (
-                    <SelectItem key={String(location.id)}>
-                      {location.name}
-                    </SelectItem>
-                  ))}
-                  <SelectItem key={NEW_LOCATION_VALUE}>+ New location</SelectItem>
-                </Select>
+                  onChange={(value) => handleLocationChange(value || "")}
+                  disabled={isLoadingDestinations}
+                  placeholder="Select location"
+                  options={[
+                    ...safeLocations.map((location) => ({
+                      value: String(location.id),
+                      label: location.name,
+                    })),
+                    { value: NEW_LOCATION_VALUE, label: "+ New location" },
+                  ]}
+                />
                 {moveModal.targetLocationId === NEW_LOCATION_VALUE ? (
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                    <Input
+                    <NativeInput
                       label="New location"
                       value={newLocationName}
                       onValueChange={setNewLocationName}
@@ -445,45 +443,41 @@ export default function MoveItemsModal({
                       radius="lg"
                       classNames={modalInputClassNames}
                     />
-                    <Button
+                    <NativeButton
                       className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
                       isLoading={creating === "location"}
                       isDisabled={!newLocationName.trim() || Boolean(creating)}
                       onPress={createLocation}
                     >
                       Create
-                    </Button>
+                    </NativeButton>
                   </div>
                 ) : null}
               </div>
 
               <div className="space-y-1">
-                <Select
+                <NativeSelect
                   label="Storage area"
                   placeholder="Select area..."
-                  selectedKeys={
-                    moveModal.targetAreaId
-                      ? new Set([String(moveModal.targetAreaId)])
-                      : new Set()
-                  }
-                  onSelectionChange={(keys) => handleAreaChange(getSelectedValue(keys))}
-                  isDisabled={
+                  aria-label="Move storage area"
+                  value={moveModal.targetAreaId ? String(moveModal.targetAreaId) : ""}
+                  onChange={(value) => handleAreaChange(value || "")}
+                  disabled={
                     isLoadingDestinations ||
                     !moveModal.targetLocationId ||
                     moveModal.targetLocationId === NEW_LOCATION_VALUE
                   }
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  {areasForSelectedLocation.map((area) => (
-                    <SelectItem key={String(area.id)}>{area.name}</SelectItem>
-                  ))}
-                  <SelectItem key={NEW_AREA_VALUE}>+ New storage area</SelectItem>
-                </Select>
+                  options={[
+                    ...areasForSelectedLocation.map((area) => ({
+                      value: String(area.id),
+                      label: area.name,
+                    })),
+                    { value: NEW_AREA_VALUE, label: "+ New storage area" },
+                  ]}
+                />
                 {moveModal.targetAreaId === NEW_AREA_VALUE ? (
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                    <Input
+                    <NativeInput
                       label="New storage area"
                       value={newAreaName}
                       onValueChange={setNewAreaName}
@@ -496,7 +490,7 @@ export default function MoveItemsModal({
                       radius="lg"
                       classNames={modalInputClassNames}
                     />
-                    <Button
+                    <NativeButton
                       className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
                       isLoading={creating === "area"}
                       isDisabled={
@@ -508,45 +502,43 @@ export default function MoveItemsModal({
                       onPress={createStorageArea}
                     >
                       Create
-                    </Button>
+                    </NativeButton>
                   </div>
                 ) : null}
               </div>
 
               <div className="space-y-1">
-                <Select
+                <NativeSelect
                   label="Category"
                   placeholder="Select category..."
-                  selectedKeys={
+                  aria-label="Move category"
+                  value={
                     moveModal.targetCategoryId
-                      ? new Set([String(moveModal.targetCategoryId)])
-                      : new Set()
+                      ? String(moveModal.targetCategoryId)
+                      : ""
                   }
-                  onSelectionChange={(keys) =>
+                  onChange={(value) =>
                     setMoveModal((prev) => ({
                       ...prev,
-                      targetCategoryId: getSelectedValue(keys) || null,
+                      targetCategoryId: value || null,
                     }))
                   }
-                  isDisabled={
+                  disabled={
                     isLoadingDestinations ||
                     !moveModal.targetAreaId ||
                     moveModal.targetAreaId === NEW_AREA_VALUE
                   }
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  {selectedArea?.categories?.map((category) => (
-                    <SelectItem key={String(category.id)}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                  <SelectItem key={NEW_CATEGORY_VALUE}>+ New category</SelectItem>
-                </Select>
+                  options={[
+                    ...(selectedArea?.categories ?? []).map((category) => ({
+                      value: String(category.id),
+                      label: category.name,
+                    })),
+                    { value: NEW_CATEGORY_VALUE, label: "+ New category" },
+                  ]}
+                />
                 {moveModal.targetCategoryId === NEW_CATEGORY_VALUE ? (
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                    <Input
+                    <NativeInput
                       label="New category"
                       value={newCategoryName}
                       onValueChange={setNewCategoryName}
@@ -559,7 +551,7 @@ export default function MoveItemsModal({
                       radius="lg"
                       classNames={modalInputClassNames}
                     />
-                    <Button
+                    <NativeButton
                       className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
                       isLoading={creating === "category"}
                       isDisabled={
@@ -571,7 +563,7 @@ export default function MoveItemsModal({
                       onPress={createCategory}
                     >
                       Create
-                    </Button>
+                    </NativeButton>
                   </div>
                 ) : null}
               </div>

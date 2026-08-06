@@ -1,17 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+
+import NativeButton from "@/components/ui/NativeButton";
+import {
+  useEffect,
+  useRef,
+  useState } from "react";
+import NativeInput from "@/components/ui/NativeInput";
 import { useRouter } from "next/navigation";
 import {
-  Button,
-  Input,
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
-import { AnimatePresence, motion } from "framer-motion";
+} from "@/components/ui/NativeModal";
 import {
   FaBoxOpen,
   FaCalendarAlt,
@@ -260,7 +263,7 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
   };
 
   const renderSearchInput = ({ autoFocus = false, className = "" } = {}) => (
-    <Input
+    <NativeInput
       autoFocus={autoFocus}
       value={query}
       onValueChange={setQuery}
@@ -363,21 +366,15 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
               )}
 
               <div className="min-h-[220px] flex-1 space-y-2 overflow-x-hidden max-md:min-h-0 max-md:pb-4">
-                <AnimatePresence initial={false}>
-                  {results.map((item) => {
+                {results.map((item) => {
                     const imageUrl = item.imageThumbUrl || item.imageUrl;
                     const expirationLabel = formatExpirationDate(item.expirationDate);
                     const expirationStatus = getExpirationStatus(item.expirationDate);
                     const isShoppingListItem = isShoppingListResult(item);
 
                     return (
-                      <motion.button
+                      <button
                         key={`${item.type ?? "inventory_item"}:${item.id}`}
-                        layout
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        transition={{ duration: 0.18, ease: "easeOut" }}
                         onClick={() => openResult(item)}
                         className="w-full min-w-0 overflow-hidden rounded-xl border border-stocksense-gray bg-white p-3 text-left shadow-sm transition hover:-translate-y-[1px] hover:bg-gray-50 hover:shadow-md"
                       >
@@ -460,17 +457,12 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
 
                           <FaChevronRight className="h-4 w-4 shrink-0 text-gray-300" />
                         </div>
-                      </motion.button>
+                      </button>
                     );
                   })}
-                </AnimatePresence>
 
                 {showEmptyState && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.18, ease: "easeOut" }}
+                  <div
                     className="grid min-h-[260px] place-items-center rounded-2xl border border-dashed border-gray-200 bg-white px-4 py-8 text-center shadow-sm"
                   >
                     <div className="max-w-xs">
@@ -484,31 +476,31 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
                         We couldn&apos;t find any items matching &quot;{trimmedQuery}&quot;
                       </p>
                       <div className="flex items-center gap-2 mt-4 ">
-                        <Button
+                        <NativeButton
                           className="min-h-11 rounded-2xl bg-[var(--stocksense-brand)] text-white"
                           onPress={openAddFromSearch}
                           startContent={<FaPlus />}
                         >
                           Add &quot;{trimmedQuery}&quot;
-                        </Button>
-                        <Button
+                        </NativeButton>
+                        <NativeButton
                           className="min-h-11 rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
                           variant="bordered"
                           onPress={() => setQuery("")}
                         >
                           Clear search
-                        </Button>
+                        </NativeButton>
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 )}
               </div>
             </ModalBody>
 
             <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-              <Button variant="light" className="rounded-xl" onPress={onClose}>
+              <NativeButton variant="light" className="rounded-xl" onPress={onClose}>
                 Close
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </>
         )}

@@ -1,49 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import NativeInput from "@/components/ui/NativeInput";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
+import NativeButton from "@/components/ui/NativeButton";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
-import {
-  Input,
-  Button,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownTrigger,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Select,
-  SelectItem,
-} from "@heroui/react";
+import { AnimatePresence,
+  motion } from "@/components/ui/MotionLite";
 import {
   FaBoxOpen,
-  FaCamera,
   FaChevronRight,
-  FaEllipsisV,
-  FaImage,
   FaMapMarkedAlt,
   FaPlus,
   FaSearch,
   FaTags,
   FaTrash,
-  FaUpload,
   FaWarehouse,
 } from "react-icons/fa";
-import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
-import {
-  modalBodyClass,
-  modalContentClass,
-  modalContentStyle,
-  modalFooterClass,
-  modalHeaderClass,
-  modalInputClassNames,
-  themedSelectClassNames,
-} from "@/components/modals/modalTheme";
+import NativeDropdown from "@/components/ui/NativeDropdown";
+import NativeSelect from "@/components/ui/NativeSelect";
 import {
   addCategory,
   deleteCategory,
@@ -56,8 +38,12 @@ import PaginationControls from "@/components/ui/PaginationControls";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
 import SearchResultsLoadingState from "@/components/ui/SearchResultsLoadingState";
 
-const EntityImageManager = dynamic(
-  () => import("@/components/inventory/EntityImageManager"),
+const CategoryCreateModal = dynamic(
+  () => import("@/components/categories/CategoryCreateModal"),
+  { ssr: false }
+);
+const CategoryDrawer = dynamic(
+  () => import("@/components/categories/CategoryDrawer"),
   { ssr: false }
 );
 const ConfirmDeleteModal = dynamic(
@@ -571,8 +557,8 @@ export default function CategoriesPageClient({
     return result?.data ?? null;
   };
 
-  const handleCreateLocationChange = (keys) => {
-    const nextLocationId = String(Array.from(keys)[0] || "");
+  const handleCreateLocationChange = (value) => {
+    const nextLocationId = String(value || "");
     const nextAreas = filterAreas.filter(
       (area) => String(area.location_id) === nextLocationId
     );
@@ -784,7 +770,7 @@ export default function CategoriesPageClient({
           </div>
         </div>
 
-        <Input
+        <NativeInput
           value={search}
           onValueChange={handleSearchChange}
           placeholder="Search categories"
@@ -799,52 +785,40 @@ export default function CategoriesPageClient({
           }}
         />
         <div className="mt-2 grid grid-cols-2 gap-2">
-          <Select
+          <NativeSelect
             aria-label="Filter categories by location"
-            selectedKeys={new Set([locationFilter])}
-            onSelectionChange={(keys) => {
-              setLocationFilter(String(Array.from(keys)[0] || ALL_FILTER_KEY));
+            value={locationFilter}
+            onChange={(value) => {
+              setLocationFilter(value || ALL_FILTER_KEY);
               setAreaFilter(ALL_FILTER_KEY);
             }}
-            variant="bordered"
-            radius="lg"
-            classNames={themedSelectClassNames}
-          >
-            <SelectItem key={ALL_FILTER_KEY}>All locations</SelectItem>
-            {filterLocations.map((location) => (
-              <SelectItem key={String(location.id)}>{location.name}</SelectItem>
-            ))}
-          </Select>
-          <Select
+            options={[
+              { value: ALL_FILTER_KEY, label: "All locations" },
+              ...filterLocations.map((location) => ({
+                value: String(location.id),
+                label: location.name,
+              })),
+            ]}
+          />
+          <NativeSelect
             aria-label="Filter categories by storage area"
-            selectedKeys={new Set([areaFilter])}
-            onSelectionChange={(keys) =>
-              setAreaFilter(String(Array.from(keys)[0] || ALL_FILTER_KEY))
-            }
-            variant="bordered"
-            radius="lg"
-            classNames={themedSelectClassNames}
-          >
-            <SelectItem key={ALL_FILTER_KEY}>All areas</SelectItem>
-            {areaOptions.map((area) => (
-              <SelectItem key={String(area.id)}>{area.name}</SelectItem>
-            ))}
-          </Select>
-          <Select
+            value={areaFilter}
+            onChange={(value) => setAreaFilter(value || ALL_FILTER_KEY)}
+            options={[
+              { value: ALL_FILTER_KEY, label: "All areas" },
+              ...areaOptions.map((area) => ({
+                value: String(area.id),
+                label: area.name,
+              })),
+            ]}
+          />
+          <NativeSelect
             aria-label="Sort categories"
-            selectedKeys={new Set([sortBy])}
-            onSelectionChange={(keys) =>
-              setSortBy(String(Array.from(keys)[0] || "name_asc"))
-            }
-            variant="bordered"
-            radius="lg"
             className="col-span-2"
-            classNames={themedSelectClassNames}
-          >
-            {SORT_OPTIONS.map(([value, label]) => (
-              <SelectItem key={value}>{label}</SelectItem>
-            ))}
-          </Select>
+            value={sortBy}
+            onChange={(value) => setSortBy(value || "name_asc")}
+            options={SORT_OPTIONS.map(([value, label]) => ({ value, label }))}
+          />
         </div>
       </motion.section>
 
@@ -895,13 +869,13 @@ export default function CategoriesPageClient({
               </span>
             </div>
 
-            <Button
+            <NativeButton
               className="mt-2 min-h-11 w-full rounded-xl bg-rose-600 text-sm font-semibold text-white"
               onPress={openBulkDelete}
               isDisabled={selectedCount === 0 || deleteDialog.isDeleting}
             >
               Delete
-            </Button>
+            </NativeButton>
           </motion.div>
         )}
         {showSearchRestoreLoader ? (
@@ -942,23 +916,23 @@ export default function CategoriesPageClient({
                 : "Try a different filter or add an item to create a category."}
             </p>
             {normalizedSearch ? (
-              <Button
+              <NativeButton
                 onPress={clearSearch}
                 radius="lg"
                 variant="bordered"
                 className="mt-5 w-full border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] font-semibold text-[var(--stocksense-brand)]"
               >
                 Clear search
-              </Button>
+              </NativeButton>
             ) : canEditInventory ? (
               <div className="mt-5 flex justify-center">
-                <Button
+                <NativeButton
                   onPress={openCreateCategoryModal}
                   className="rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white"
                   startContent={<FaPlus />}
                 >
                   Add Category
-                </Button>
+                </NativeButton>
               </div>
             ) : null}
           </motion.div>
@@ -1034,38 +1008,29 @@ export default function CategoriesPageClient({
                     onClick={(event) => event.stopPropagation()}
                     onKeyDown={(event) => event.stopPropagation()}
                   >
-                    <Dropdown placement="bottom-end">
-                      <DropdownTrigger>
-                        <Button
-                          isIconOnly
-                          variant="light"
-                          radius="lg"
-                          className="h-9 w-9 min-w-9 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-                          aria-label={`${category.name} actions`}
-                        >
-                          <FaEllipsisV className="h-4 w-4" />
-                        </Button>
-                      </DropdownTrigger>
-                      <DropdownMenu aria-label={`${category.name} actions`}>
-                        <DropdownItem key="select" onPress={() => toggleSelect(category.id)}>
-                          {selectedIds.has(String(category.id))
+                    <NativeDropdown
+                      ariaLabel={`${category.name} actions`}
+                      items={[
+                        {
+                          key: "select",
+                          label: selectedIds.has(String(category.id))
                             ? "Deselect for bulk action"
-                            : "Select for bulk action"}
-                        </DropdownItem>
-                        <DropdownItem key="edit" onPress={() => openDrawer(category)}>
-                          Edit Category
-                        </DropdownItem>
-                        <DropdownItem
-                          key="delete"
-                          className="text-danger"
-                          color="danger"
-                          startContent={<FaTrash className="h-3.5 w-3.5" />}
-                          onPress={() => openDeleteForCategory(category)}
-                        >
-                          Delete Category
-                        </DropdownItem>
-                      </DropdownMenu>
-                    </Dropdown>
+                            : "Select for bulk action",
+                          onSelect: () => toggleSelect(category.id),
+                        },
+                        {
+                          key: "edit",
+                          label: "Edit Category",
+                          onSelect: () => openDrawer(category),
+                        },
+                        {
+                          key: "delete",
+                          label: "Delete Category",
+                          danger: true,
+                          onSelect: () => openDeleteForCategory(category),
+                        },
+                      ]}
+                    />
                   </span>
                 ) : (
                   <FaChevronRight className="h-4 w-4 shrink-0 text-[var(--stocksense-brand)]" />
@@ -1101,7 +1066,7 @@ export default function CategoriesPageClient({
           </div>
 
           <div className="flex w-full max-w-6xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <Input
+            <NativeInput
               value={search}
               onValueChange={handleSearchChange}
               placeholder="Search categories"
@@ -1115,62 +1080,50 @@ export default function CategoriesPageClient({
                 input: "text-sm text-gray-900 placeholder:text-gray-400",
               }}
             />
-            <Select
+            <NativeSelect
               aria-label="Filter categories by location"
-              selectedKeys={new Set([locationFilter])}
-              onSelectionChange={(keys) => {
-                setLocationFilter(String(Array.from(keys)[0] || ALL_FILTER_KEY));
+              className="w-full sm:w-48"
+              value={locationFilter}
+              onChange={(value) => {
+                setLocationFilter(value || ALL_FILTER_KEY);
                 setAreaFilter(ALL_FILTER_KEY);
               }}
-              variant="bordered"
-              radius="lg"
-              className="w-full sm:w-48"
-              classNames={themedSelectClassNames}
-            >
-              <SelectItem key={ALL_FILTER_KEY}>All locations</SelectItem>
-              {filterLocations.map((location) => (
-                <SelectItem key={String(location.id)}>{location.name}</SelectItem>
-              ))}
-            </Select>
-            <Select
+              options={[
+                { value: ALL_FILTER_KEY, label: "All locations" },
+                ...filterLocations.map((location) => ({
+                  value: String(location.id),
+                  label: location.name,
+                })),
+              ]}
+            />
+            <NativeSelect
               aria-label="Filter categories by storage area"
-              selectedKeys={new Set([areaFilter])}
-              onSelectionChange={(keys) =>
-                setAreaFilter(String(Array.from(keys)[0] || ALL_FILTER_KEY))
-              }
-              variant="bordered"
-              radius="lg"
               className="w-full sm:w-48"
-              classNames={themedSelectClassNames}
-            >
-              <SelectItem key={ALL_FILTER_KEY}>All areas</SelectItem>
-              {areaOptions.map((area) => (
-                <SelectItem key={String(area.id)}>{area.name}</SelectItem>
-              ))}
-            </Select>
-            <Select
+              value={areaFilter}
+              onChange={(value) => setAreaFilter(value || ALL_FILTER_KEY)}
+              options={[
+                { value: ALL_FILTER_KEY, label: "All areas" },
+                ...areaOptions.map((area) => ({
+                  value: String(area.id),
+                  label: area.name,
+                })),
+              ]}
+            />
+            <NativeSelect
               aria-label="Sort categories"
-              selectedKeys={new Set([sortBy])}
-              onSelectionChange={(keys) =>
-                setSortBy(String(Array.from(keys)[0] || "name_asc"))
-              }
-              variant="bordered"
-              radius="lg"
               className="w-full sm:w-40"
-              classNames={themedSelectClassNames}
-            >
-              {SORT_OPTIONS.map(([value, label]) => (
-                <SelectItem key={value}>{label}</SelectItem>
-              ))}
-            </Select>
+              value={sortBy}
+              onChange={(value) => setSortBy(value || "name_asc")}
+              options={SORT_OPTIONS.map(([value, label]) => ({ value, label }))}
+            />
             {canEditInventory && (
-              <Button
+              <NativeButton
                 onPress={openCreateCategoryModal}
                 className="min-h-10 w-full whitespace-nowrap rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm sm:w-auto"
                 startContent={<FaPlus />}
               >
                 Add Category
-              </Button>
+              </NativeButton>
             )}
           </div>
         </header>
@@ -1203,7 +1156,7 @@ export default function CategoriesPageClient({
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button
+                    <NativeButton
                       size="sm"
                       variant="flat"
                       className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
@@ -1211,8 +1164,8 @@ export default function CategoriesPageClient({
                       onPress={clearSelection}
                     >
                       Clear selection
-                    </Button>
-                    <Button
+                    </NativeButton>
+                    <NativeButton
                       size="sm"
                       color="danger"
                       variant="flat"
@@ -1222,7 +1175,7 @@ export default function CategoriesPageClient({
                       startContent={<FaTrash />}
                     >
                       Delete selected
-                    </Button>
+                    </NativeButton>
                   </div>
                 </div>
               </motion.div>
@@ -1360,38 +1313,29 @@ export default function CategoriesPageClient({
                         </div>
 
                         {canEditInventory ? (
-                          <Dropdown placement="bottom-end">
-                            <DropdownTrigger>
-                              <Button
-                                isIconOnly
-                                variant="light"
-                                radius="lg"
-                                className="h-9 w-9 min-w-9 shrink-0 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-                                aria-label={`${c.name} actions`}
-                              >
-                                <FaEllipsisV className="h-4 w-4" />
-                              </Button>
-                            </DropdownTrigger>
-                            <DropdownMenu aria-label={`${c.name} actions`}>
-                              <DropdownItem key="edit" onPress={() => openDrawer(c)}>
-                                Edit Category
-                              </DropdownItem>
-                              <DropdownItem key="select" onPress={() => toggleSelect(c.id)}>
-                                {selectedIds.has(String(c.id))
+                          <NativeDropdown
+                            ariaLabel={`${c.name} actions`}
+                            items={[
+                              {
+                                key: "edit",
+                                label: "Edit Category",
+                                onSelect: () => openDrawer(c),
+                              },
+                              {
+                                key: "select",
+                                label: selectedIds.has(String(c.id))
                                   ? "Deselect for bulk action"
-                                  : "Select for bulk action"}
-                              </DropdownItem>
-                              <DropdownItem
-                                key="delete"
-                                className="text-danger"
-                                color="danger"
-                                startContent={<FaTrash className="h-3.5 w-3.5" />}
-                                onPress={() => openDeleteForCategory(c)}
-                              >
-                                Delete Category
-                              </DropdownItem>
-                            </DropdownMenu>
-                          </Dropdown>
+                                  : "Select for bulk action",
+                                onSelect: () => toggleSelect(c.id),
+                              },
+                              {
+                                key: "delete",
+                                label: "Delete Category",
+                                danger: true,
+                                onSelect: () => openDeleteForCategory(c),
+                              },
+                            ]}
+                          />
                         ) : null}
                       </div>
 
@@ -1464,13 +1408,13 @@ export default function CategoriesPageClient({
                         )}
                       </div>
 
-                      <Button
+                      <NativeButton
                         as={Link}
                         href={`/categories/${c.id}`}
                         className="mt-auto min-h-10 w-full rounded-xl bg-[var(--stocksense-brand)] text-sm font-semibold text-white shadow-sm"
                       >
                         View Category
-                      </Button>
+                      </NativeButton>
                     </motion.article>
                   );
                 })}
@@ -1489,13 +1433,13 @@ export default function CategoriesPageClient({
                     <p className="mt-3 max-w-sm text-sm leading-6 text-gray-600">
                       Create a new group inside one of your storage areas.
                     </p>
-                    <Button
+                    <NativeButton
                       onPress={openCreateCategoryModal}
                       className="mt-6 min-h-10 rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm"
                       startContent={<FaPlus />}
                     >
                       Add Category
-                    </Button>
+                    </NativeButton>
                   </motion.div>
                 ) : null}
               </motion.div>
@@ -1539,22 +1483,22 @@ export default function CategoriesPageClient({
                 : "Create the first category for your household."}
             </p>
             {normalizedSearch ? (
-              <Button
+              <NativeButton
                 onPress={clearSearch}
                 radius="lg"
                 variant="bordered"
                 className="mt-7 border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-5 text-sm font-semibold text-[var(--stocksense-brand)] shadow-sm"
               >
                 Clear search
-              </Button>
+              </NativeButton>
             ) : canEditInventory ? (
-              <Button
+              <NativeButton
                 onPress={openCreateCategoryModal}
                 className="mt-7 min-h-10 rounded-xl bg-[var(--stocksense-brand)] px-5 text-sm font-semibold text-white shadow-sm"
                 startContent={<FaPlus />}
               >
                 Add Category
-              </Button>
+              </NativeButton>
             ) : null}
           </motion.div>
         )}
@@ -1580,380 +1524,46 @@ export default function CategoriesPageClient({
         </div>
       </motion.section>
 
-      {canEditInventory && (
-        <Modal
+      {canEditInventory && createCategoryOpen && (
+        <CategoryCreateModal
           isOpen={createCategoryOpen}
-          onOpenChange={(open) => {
-            if (!open) closeCreateCategoryModal();
-          }}
-          placement="center"
-          scrollBehavior="inside"
-          classNames={{
-            wrapper: "z-[100] max-md:items-end",
-            base:
-              "mx-0 my-0 w-full rounded-t-[1.75rem] rounded-b-none border border-white/70 bg-white shadow-2xl md:mx-4 md:my-8 md:max-w-lg md:rounded-[1.5rem]",
-            closeButton: "hidden",
-          }}
-        >
-          <ModalContent className={modalContentClass} style={modalContentStyle}>
-            {(onClose) => (
-              <>
-                <ModalHeader className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}>
-                  <span className="min-w-0 flex-1 truncate">Add category</span>
-                  <Button
-                    size="sm"
-                    className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
-                    onPress={handleCreateCategory}
-                    isLoading={isCreatingCategory}
-                    isDisabled={
-                      isCreatingCategory ||
-                      !createCategoryName.trim() ||
-                      !createCategoryAreaId
-                    }
-                  >
-                    Add
-                  </Button>
-                  <MobileSheetCloseButton onPress={onClose} />
-                </ModalHeader>
-                <ModalBody className={`space-y-3 ${modalBodyClass}`}>
-                  <Input
-                    label="Category name"
-                    value={createCategoryName}
-                    onValueChange={setCreateCategoryName}
-                    isDisabled={isCreatingCategory}
-                    variant="bordered"
-                    radius="lg"
-                    classNames={modalInputClassNames}
-                  />
-                  <Select
-                    label="Location"
-                    selectedKeys={
-                      createCategoryLocationId
-                        ? new Set([String(createCategoryLocationId)])
-                        : new Set()
-                    }
-                    onSelectionChange={handleCreateLocationChange}
-                    isDisabled={isCreatingCategory || filterLocations.length === 0}
-                    variant="bordered"
-                    radius="lg"
-                    classNames={themedSelectClassNames}
-                  >
-                    {filterLocations.map((location) => (
-                      <SelectItem key={String(location.id)}>
-                        {location.name}
-                      </SelectItem>
-                    ))}
-                  </Select>
-                  <Select
-                    label="Storage area"
-                    selectedKeys={
-                      createCategoryAreaId
-                        ? new Set([String(createCategoryAreaId)])
-                        : new Set()
-                    }
-                    onSelectionChange={(keys) =>
-                      setCreateCategoryAreaId(String(Array.from(keys)[0] || ""))
-                    }
-                    isDisabled={isCreatingCategory || createAreaOptions.length === 0}
-                    variant="bordered"
-                    radius="lg"
-                    classNames={themedSelectClassNames}
-                  >
-                    {createAreaOptions.map((area) => (
-                      <SelectItem key={String(area.id)}>{area.name}</SelectItem>
-                    ))}
-                  </Select>
-                  <div className="rounded-2xl border border-gray-200 bg-white p-3">
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
-                        <FaImage className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
-                        Category photo optional
-                      </div>
-                      {createCategoryImageFile ? (
-                        <span className="rounded-full bg-[var(--stocksense-brand-soft)] px-2 py-0.5 text-[11px] font-medium text-[var(--stocksense-brand)]">
-                          Ready to upload
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                      <div className="aspect-video w-full overflow-hidden rounded-xl border border-gray-200 bg-white sm:h-28 sm:w-40">
-                        {createCategoryImagePreview ? (
-                          <ImageWithLoader
-                            src={createCategoryImagePreview}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="grid h-full w-full place-items-center text-xs text-gray-400">
-                            Optional photo
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-1 flex-col gap-2">
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            variant="flat"
-                            className="min-h-10 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] sm:hidden"
-                            isDisabled={isCreatingCategory}
-                            onPress={() =>
-                              document
-                                .getElementById("create-category-camera-input")
-                                ?.click()
-                            }
-                            startContent={<FaCamera className="h-3.5 w-3.5" />}
-                          >
-                            Take photo
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="flat"
-                            className="min-h-10 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
-                            isDisabled={isCreatingCategory}
-                            onPress={() =>
-                              document
-                                .getElementById("create-category-image-input")
-                                ?.click()
-                            }
-                            startContent={<FaUpload className="h-3.5 w-3.5" />}
-                          >
-                            {createCategoryImageFile ? "Change photo" : "Add photo"}
-                          </Button>
-                          {createCategoryImageFile ? (
-                            <Button
-                              size="sm"
-                              variant="flat"
-                              className="min-h-10 rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
-                              isDisabled={isCreatingCategory}
-                              onPress={clearCreateCategoryImageFile}
-                              startContent={<FaTrash className="h-3.5 w-3.5" />}
-                            >
-                              Remove photo
-                            </Button>
-                          ) : null}
-                        </div>
-                        <input
-                          id="create-category-image-input"
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(event) => {
-                            const file = event.target.files?.[0];
-                            event.target.value = "";
-                            selectCreateCategoryImageFile(file);
-                          }}
-                        />
-                        <input
-                          id="create-category-camera-input"
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          className="hidden"
-                          onChange={(event) => {
-                            const file = event.target.files?.[0];
-                            event.target.value = "";
-                            selectCreateCategoryImageFile(file);
-                          }}
-                        />
-                        <p className="text-xs leading-5 text-gray-500 max-md:hidden">
-                          {createCategoryImageFile
-                            ? createCategoryImageFile.name
-                            : "Take a photo or choose one from your camera roll. Max 5 MB."}
-                        </p>
-                        {createCategoryImageMessage ? (
-                          <p className="text-xs text-rose-700">
-                            {createCategoryImageMessage}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                  {filterAreas.length === 0 ? (
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                      Add a storage area before creating categories.
-                    </div>
-                  ) : null}
-                  {createCategoryError ? (
-                    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                      {createCategoryError}
-                    </div>
-                  ) : null}
-                </ModalBody>
-                <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-                  <Button
-                    variant="light"
-                    onPress={onClose}
-                    isDisabled={isCreatingCategory}
-                    className="max-md:hidden"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
-                    onPress={handleCreateCategory}
-                    isLoading={isCreatingCategory}
-                    isDisabled={
-                      isCreatingCategory ||
-                      !createCategoryName.trim() ||
-                      !createCategoryAreaId
-                    }
-                  >
-                    Add Category
-                  </Button>
-                </ModalFooter>
-              </>
-            )}
-          </ModalContent>
-        </Modal>
+          onClose={closeCreateCategoryModal}
+          categoryName={createCategoryName}
+          setCategoryName={setCreateCategoryName}
+          locationId={createCategoryLocationId}
+          areaId={createCategoryAreaId}
+          filterLocations={filterLocations}
+          createAreaOptions={createAreaOptions}
+          onLocationChange={handleCreateLocationChange}
+          setAreaId={setCreateCategoryAreaId}
+          imageFile={createCategoryImageFile}
+          imagePreview={createCategoryImagePreview}
+          imageMessage={createCategoryImageMessage}
+          onSelectImageFile={selectCreateCategoryImageFile}
+          onClearImageFile={clearCreateCategoryImageFile}
+          filterAreas={filterAreas}
+          error={createCategoryError}
+          isCreating={isCreatingCategory}
+          onCreate={handleCreateCategory}
+        />
       )}
 
-      {/* Drawer (HeroUI Modal styled as right drawer) */}
-      <Modal
-        isOpen={drawerOpen}
-        onOpenChange={(open) => (open ? null : closeDrawer())}
-        placement="right"
-        size="lg"
-        classNames={{
-          base: "rounded-none md:rounded-l-2xl h-full md:h-[calc(100vh-24px)] md:my-3",
-          wrapper: "items-stretch justify-end",
-        }}
-      >
-        <ModalContent className={modalContentClass} style={modalContentStyle}>
-          {() => (
-            <>
-              <ModalHeader className={`flex flex-col gap-1 ${modalHeaderClass} max-md:flex-row max-md:gap-3`}>
-                <div
-                  className="min-w-0 flex-1 truncate text-lg font-semibold text-[var(--stocksense-brand)]"
-                  title={activeCategory?.name || "Category"}
-                >
-                  {activeCategory?.name || "Category"}
-                </div>
-                <div
-                  className="truncate text-sm text-gray-500 max-md:hidden"
-                  title={`${activeCategory?.location?.name || ""} / ${activeCategory?.storageArea?.name || ""}`}
-                >
-                  {activeCategory?.location?.name} &gt; {activeCategory?.storageArea?.name}
-                </div>
-                {canEditInventory && (
-                  <Button
-                    size="sm"
-                    className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
-                    onClick={handleRename}
-                    isDisabled={!renameValue.trim()}
-                  >
-                    Save
-                  </Button>
-                )}
-                <MobileSheetCloseButton onPress={closeDrawer} />
-              </ModalHeader>
-
-              <ModalBody className={`space-y-4 ${modalBodyClass}`}>
-                {canEditInventory && (
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-gray-600">Category name</div>
-                    <Input
-                      value={renameValue}
-                      onValueChange={setRenameValue}
-                      variant="bordered"
-                      radius="lg"
-                      classNames={modalInputClassNames}
-                    />
-                    <Button
-                      onClick={handleRename}
-                      isDisabled={!renameValue.trim()}
-                      className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
-                    >
-                      Save name
-                    </Button>
-                  </div>
-                )}
-
-                {canEditInventory && activeCategory?.id && (
-                  <EntityImageManager
-                    entityType="category"
-                    entityId={activeCategory.id}
-                    imageUrl={activeCategory.imageUrl}
-                    label="Category photo"
-                    onChange={handleCategoryImageChange}
-                  />
-                )}
-
-                {canEditInventory && activeCategory?.id && (
-                  <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
-                    <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                    <Button
-                      className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
-                      onClick={openDelete}
-                    >
-                      Delete category
-                    </Button>
-                  </div>
-                )}
-
-                {/* Items preview */}
-                <div>
-                  <div className="mb-2 text-sm font-semibold text-gray-950">
-                    Items ({activeCategory?.itemsCount ?? 0})
-                  </div>
-
-                  <div className="space-y-2">
-                    {(activeCategory?.items || []).slice(0, 8).map((it) => (
-                      <div
-                        key={it.id}
-                        className="flex justify-between gap-3 rounded-xl border border-gray-200 bg-white p-3"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div
-                            className="truncate font-medium text-gray-950"
-                            title={it.name}
-                          >
-                            {it.name}
-                          </div>
-                          <div
-                            className="truncate text-sm text-gray-500"
-                            title={`Qty: ${it.quantity ?? 0} - Exp: ${it.expiration_date || "-"}`}
-                          >
-                            Qty: {it.quantity ?? 0} &bull; Exp: {it.expiration_date || "-"}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-
-                    {(activeCategory?.items || []).length === 0 && (
-                      <div className="text-sm text-gray-500">
-                        No items in this category yet.
-                      </div>
-                    )}
-
-                    {(activeCategory?.items || []).length > 8 && (
-                      <div className="text-xs text-gray-400">
-                        Showing first 8 items...
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </ModalBody>
-
-              <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-                <Button variant="light" className="rounded-xl max-md:hidden" onClick={closeDrawer}>
-                  Close
-                </Button>
-                {canEditInventory && (
-                  <Button
-                    className="rounded-xl bg-rose-600 text-white max-md:hidden"
-                    onClick={openDelete}
-                  >
-                    Delete category
-                  </Button>
-                )}
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
+      {drawerOpen && (
+        <CategoryDrawer
+          isOpen={drawerOpen}
+          onClose={closeDrawer}
+          activeCategory={activeCategory}
+          canEditInventory={canEditInventory}
+          renameValue={renameValue}
+          setRenameValue={setRenameValue}
+          onRename={handleRename}
+          onImageChange={handleCategoryImageChange}
+          onDelete={openDelete}
+        />
+      )}
 
       {/* Delete confirmation */}
-      {canEditInventory && <ConfirmDeleteModal
+      {canEditInventory && deleteDialog.open && <ConfirmDeleteModal
         isOpen={deleteDialog.open}
         isDeleting={deleteDialog.isDeleting}
         onCancel={closeDelete}

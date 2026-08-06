@@ -1,11 +1,18 @@
 "use client";
 
+
+import NativeButton from "@/components/ui/NativeButton";
+import NativeInput from "@/components/ui/NativeInput";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
-import { Button, Input, Select, SelectItem } from "@heroui/react";
+import { AnimatePresence,
+  motion } from "@/components/ui/MotionLite";
 import {
   FaBoxOpen,
   FaCheckCircle,
@@ -62,7 +69,7 @@ import {
   updatePreferredNameAction,
   updateUserPreferencesAction,
 } from "@/app/actions/preferences";
-import { themedSelectClassNames } from "@/components/modals/modalTheme";
+import NativeSelect from "@/components/ui/NativeSelect";
 
 const ConfirmDeleteModal = dynamic(
   () => import("@/components/modals/ConfirmDeleteModal"),
@@ -90,12 +97,12 @@ const HOUSEHOLD_ROLE_OPTIONS = [
   {
     id: "editor",
     label: "Editor",
-    description: "Can add, edit, move, delete, and manage shopping list items.",
+    description: "add, edit, delete",
   },
   {
     id: "viewer",
     label: "Viewer",
-    description: "Can view inventory, shopping list, and recent activity only.",
+    description: "only view",
   },
 ];
 
@@ -350,7 +357,7 @@ function DisplayNameForm({
 }) {
   return (
     <form onSubmit={onSubmit} className={`space-y-3 ${className}`}>
-      <Input
+      <NativeInput
         label="Display name"
         value={value}
         onValueChange={onValueChange}
@@ -360,7 +367,7 @@ function DisplayNameForm({
           inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
         }}
       />
-      <Button
+      <NativeButton
         type="submit"
         className="h-11 w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
         isLoading={isSaving}
@@ -368,7 +375,7 @@ function DisplayNameForm({
         startContent={<FaIdBadge className="h-3.5 w-3.5" />}
       >
         Save display name
-      </Button>
+      </NativeButton>
       {message && (
         <div
           className={`rounded-xl border px-3 py-2 text-sm ${
@@ -447,7 +454,7 @@ function BillingPlanButton({
   const label = interval === BILLING_INTERVALS.yearly ? "yearly" : "monthly";
 
   return (
-    <Button
+    <NativeButton
       variant={isCurrent ? "flat" : "solid"}
       className={`rounded-xl ${
         isCurrent
@@ -459,7 +466,7 @@ function BillingPlanButton({
       onPress={() => onCheckout(plan.id, interval)}
     >
       {isCurrent ? "Current plan" : `${price} ${label}`}
-    </Button>
+    </NativeButton>
   );
 }
 
@@ -554,7 +561,7 @@ function BillingSection({ billing, billingError, billingLoading, onCheckout, onP
           </div>
         ))}
 
-        <Button
+        <NativeButton
           variant="flat"
           className="w-full rounded-xl border border-stocksense-gray bg-white text-gray-700"
           onPress={onPortal}
@@ -563,7 +570,7 @@ function BillingSection({ billing, billingError, billingLoading, onCheckout, onP
           startContent={<FaExternalLinkAlt className="h-3.5 w-3.5" />}
         >
           {billing.hasStripeCustomer ? "Manage billing" : "Billing portal available after checkout"}
-        </Button>
+        </NativeButton>
       </div>
     </motion.section>
   );
@@ -698,7 +705,7 @@ function SharingSection({
               className="scroll-mt-6 space-y-3"
             >
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_220px_auto]">
-                <Input
+                <NativeInput
                   label="Invite by email"
                   type="email"
                   value={inviteEmail}
@@ -708,25 +715,20 @@ function SharingSection({
                     inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
                   }}
                 />
-                <Select
+                <NativeSelect
                   label="Role"
-                  selectedKeys={new Set([inviteRole])}
-                  onSelectionChange={(keys) => {
-                    const value = Array.from(keys)[0];
+                  aria-label="Invite role"
+                  value={inviteRole}
+                  onChange={(value) => {
                     if (value) onInviteRoleChange(String(value));
                   }}
-                  isDisabled={loading === "invite" || !sharing.canInvite}
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  {HOUSEHOLD_ROLE_OPTIONS.map((role) => (
-                    <SelectItem key={role.id} textValue={role.label}>
-                      {role.label} - {role.description}
-                    </SelectItem>
-                  ))}
-                </Select>
-                <Button
+                  disabled={loading === "invite" || !sharing.canInvite}
+                  options={HOUSEHOLD_ROLE_OPTIONS.map((role) => ({
+                    value: role.id,
+                    label: `${role.label} - ${role.description}`,
+                  }))}
+                />
+                <NativeButton
                   type="submit"
                   className="h-14 rounded-xl bg-[var(--stocksense-brand)] px-5 text-white lg:self-end"
                   isLoading={loading === "invite"}
@@ -734,7 +736,7 @@ function SharingSection({
                   startContent={<FaUserPlus className="h-3.5 w-3.5" />}
                 >
                   Send invite
-                </Button>
+                </NativeButton>
               </div>
 
               {!sharing.canInvite && (
@@ -776,25 +778,21 @@ function SharingSection({
                   </div>
                   {isOwner && member.role !== "owner" ? (
                     <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
-                      <Select
+                      <NativeSelect
                         aria-label={`Role for ${member.email}`}
-                        size="sm"
-                        selectedKeys={new Set([member.role === "viewer" ? "viewer" : "editor"])}
-                        onSelectionChange={(keys) => {
-                          const value = Array.from(keys)[0];
+                        value={member.role === "viewer" ? "viewer" : "editor"}
+                        onChange={(value) => {
                           if (value) onUpdateMemberRole(member, String(value));
                         }}
-                        isDisabled={loading === `role:${member.userId}`}
-                        variant="bordered"
-                        radius="lg"
+                        disabled={loading === `role:${member.userId}`}
                         className="w-36"
-                        classNames={themedSelectClassNames}
-                      >
-                        {HOUSEHOLD_ROLE_OPTIONS.map((role) => (
-                          <SelectItem key={role.id}>{role.label}</SelectItem>
-                        ))}
-                      </Select>
-                      <Button
+                        triggerClassName="h-9 text-xs"
+                        options={HOUSEHOLD_ROLE_OPTIONS.map((role) => ({
+                          value: role.id,
+                          label: role.label,
+                        }))}
+                      />
+                      <NativeButton
                         size="sm"
                         variant="flat"
                         className="rounded-lg border border-rose-200 bg-rose-50 text-rose-700"
@@ -803,7 +801,7 @@ function SharingSection({
                         startContent={<FaTimesCircle className="h-3.5 w-3.5" />}
                       >
                         Remove
-                      </Button>
+                      </NativeButton>
                     </div>
                   ) : (
                     <FaCheckCircle className="h-4 w-4 shrink-0 text-[var(--stocksense-brand)]" />
@@ -834,7 +832,7 @@ function SharingSection({
                         </div>
                       </div>
                       <div className="flex shrink-0 gap-2">
-                        <Button
+                        <NativeButton
                           size="sm"
                           variant="flat"
                           className="rounded-lg border border-stocksense-gray bg-white text-gray-700"
@@ -842,8 +840,8 @@ function SharingSection({
                           startContent={<FaCopy className="h-3.5 w-3.5" />}
                         >
                           {copiedInviteId === invite.id ? "Copied" : "Copy"}
-                        </Button>
-                        <Button
+                        </NativeButton>
+                        <NativeButton
                           size="sm"
                           variant="flat"
                           className="rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
@@ -852,8 +850,8 @@ function SharingSection({
                           startContent={<FaEnvelope className="h-3.5 w-3.5" />}
                         >
                           Resend
-                        </Button>
-                        <Button
+                        </NativeButton>
+                        <NativeButton
                           size="sm"
                           variant="flat"
                           className="rounded-lg border border-rose-200 bg-rose-50 text-rose-700"
@@ -862,7 +860,7 @@ function SharingSection({
                           startContent={<FaTimesCircle className="h-3.5 w-3.5" />}
                         >
                           Revoke
-                        </Button>
+                        </NativeButton>
                       </div>
                     </div>
                   </div>
@@ -1148,14 +1146,14 @@ export default function ProfileClient({
     });
   };
 
-  const handleThemeChange = (keys) => {
-    const themeId = Array.from(keys)[0];
+  const handleThemeChange = (value) => {
+    const themeId = value;
     if (!themeId || themeId === preferences.themeId) return;
     updatePreferences({ themeId: String(themeId) });
   };
 
-  const handleFontChange = (keys) => {
-    const fontId = Array.from(keys)[0];
+  const handleFontChange = (value) => {
+    const fontId = value;
     if (!fontId || fontId === preferences.fontId) return;
     updatePreferences({ fontId: String(fontId) });
   };
@@ -1462,41 +1460,41 @@ export default function ProfileClient({
               </div>
             )}
 
-            <Select
-              label="Color theme"
-              selectedKeys={new Set([preferences.themeId])}
-              onSelectionChange={handleThemeChange}
-              isDisabled={savingPreferences || !canCustomizeAppearance}
-              variant="bordered"
-              radius="lg"
-              startContent={<FaPalette className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />}
-              classNames={themedSelectClassNames}
-            >
-              {THEME_OPTIONS.map((theme) => (
-                <SelectItem key={theme.id} textValue={theme.label}>
-                  {theme.label} - {theme.description}
-                </SelectItem>
-              ))}
-            </Select>
+            <NativeSelect
+              label={
+                <span className="inline-flex items-center gap-1.5">
+                  <FaPalette className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+                  Color theme
+                </span>
+              }
+              aria-label="Color theme"
+              value={preferences.themeId}
+              onChange={handleThemeChange}
+              disabled={savingPreferences || !canCustomizeAppearance}
+              options={THEME_OPTIONS.map((theme) => ({
+                value: theme.id,
+                label: `${theme.label} - ${theme.description}`,
+              }))}
+            />
 
-            <Select
-              label="Font family"
-              selectedKeys={new Set([preferences.fontId])}
-              onSelectionChange={handleFontChange}
-              isDisabled={savingPreferences || !canCustomizeAppearance}
-              variant="bordered"
-              radius="lg"
-              startContent={<FaFont className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />}
-              classNames={themedSelectClassNames}
-            >
-              {FONT_OPTIONS.map((font) => (
-                <SelectItem key={font.id} textValue={font.label}>
-                  {font.label} - {font.description}
-                </SelectItem>
-              ))}
-            </Select>
+            <NativeSelect
+              label={
+                <span className="inline-flex items-center gap-1.5">
+                  <FaFont className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+                  Font family
+                </span>
+              }
+              aria-label="Font family"
+              value={preferences.fontId}
+              onChange={handleFontChange}
+              disabled={savingPreferences || !canCustomizeAppearance}
+              options={FONT_OPTIONS.map((font) => ({
+                value: font.id,
+                label: `${font.label} - ${font.description}`,
+              }))}
+            />
 
-            <Button
+            <NativeButton
               variant="flat"
               className="w-full rounded-xl border border-stocksense-gray bg-white text-gray-700"
               onPress={() => updatePreferences(DEFAULT_PREFERENCES)}
@@ -1505,7 +1503,7 @@ export default function ProfileClient({
               startContent={<FaRedo className="h-3.5 w-3.5" />}
             >
               Reset appearance
-            </Button>
+            </NativeButton>
 
             {appearanceMessage && (
               <div
@@ -1551,7 +1549,7 @@ export default function ProfileClient({
               </div>
             )}
 
-            <Button
+            <NativeButton
               variant="flat"
               className="w-full rounded-xl border border-stocksense-gray bg-white text-gray-700"
               onPress={handleBillingPortal}
@@ -1560,7 +1558,7 @@ export default function ProfileClient({
               startContent={<FaExternalLinkAlt className="h-3.5 w-3.5" />}
             >
               {billing.hasStripeCustomer ? "Manage billing" : "Billing portal available after checkout"}
-            </Button>
+            </NativeButton>
 
             <div className="grid gap-2">
               {paidPlans.map((plan) => (
@@ -1652,7 +1650,7 @@ export default function ProfileClient({
 
                 {sharingIsFamily && sharingIsOwner && (
                   <form onSubmit={handleCreateInvite} className="space-y-3">
-                    <Input
+                    <NativeInput
                       label="Invite by email"
                       type="email"
                       value={inviteEmail}
@@ -1662,25 +1660,20 @@ export default function ProfileClient({
                         inputWrapper: "rounded-xl border border-stocksense-gray shadow-none",
                       }}
                     />
-                    <Select
+                    <NativeSelect
                       label="Role"
-                      selectedKeys={new Set([inviteRole])}
-                      onSelectionChange={(keys) => {
-                        const value = Array.from(keys)[0];
+                      aria-label="Invite role"
+                      value={inviteRole}
+                      onChange={(value) => {
                         if (value) setInviteRole(String(value));
                       }}
-                      isDisabled={sharingLoading === "invite" || !sharing.canInvite}
-                      variant="bordered"
-                      radius="lg"
-                      classNames={themedSelectClassNames}
-                    >
-                      {HOUSEHOLD_ROLE_OPTIONS.map((role) => (
-                        <SelectItem key={role.id} textValue={role.label}>
-                          {role.label} - {role.description}
-                        </SelectItem>
-                      ))}
-                    </Select>
-                    <Button
+                      disabled={sharingLoading === "invite" || !sharing.canInvite}
+                      options={HOUSEHOLD_ROLE_OPTIONS.map((role) => ({
+                        value: role.id,
+                        label: `${role.label} - ${role.description}`,
+                      }))}
+                    />
+                    <NativeButton
                       type="submit"
                       className="h-12 w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
                       isLoading={sharingLoading === "invite"}
@@ -1688,7 +1681,7 @@ export default function ProfileClient({
                       startContent={<FaUserPlus className="h-3.5 w-3.5" />}
                     >
                       Send invite
-                    </Button>
+                    </NativeButton>
                   </form>
                 )}
 
@@ -1744,7 +1737,7 @@ export default function ProfileClient({
                             </p>
                           </div>
                           <div className="mt-3 grid grid-cols-3 gap-2">
-                            <Button
+                            <NativeButton
                               size="sm"
                               variant="flat"
                               className="rounded-lg border border-stocksense-gray bg-white px-2 text-gray-700"
@@ -1752,8 +1745,8 @@ export default function ProfileClient({
                               startContent={<FaCopy className="h-3.5 w-3.5" />}
                             >
                               {copiedInviteId === invite.id ? "Copied" : "Copy"}
-                            </Button>
-                            <Button
+                            </NativeButton>
+                            <NativeButton
                               size="sm"
                               variant="flat"
                               className="rounded-lg border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-2 text-[var(--stocksense-brand)]"
@@ -1762,8 +1755,8 @@ export default function ProfileClient({
                               startContent={<FaEnvelope className="h-3.5 w-3.5" />}
                             >
                               Resend
-                            </Button>
-                            <Button
+                            </NativeButton>
+                            <NativeButton
                               size="sm"
                               variant="flat"
                               className="rounded-lg border border-rose-200 bg-rose-50 px-2 text-rose-700"
@@ -1772,7 +1765,7 @@ export default function ProfileClient({
                               startContent={<FaTimesCircle className="h-3.5 w-3.5" />}
                             >
                               Revoke
-                            </Button>
+                            </NativeButton>
                           </div>
                         </div>
                       ))}
@@ -1805,7 +1798,7 @@ export default function ProfileClient({
               )}
             </AnimatePresence>
 
-            <Input
+            <NativeInput
               label="New password"
               type={showPassword ? "text" : "password"}
               value={password}
@@ -1828,7 +1821,7 @@ export default function ProfileClient({
               }}
             />
 
-            <Input
+            <NativeInput
               label="Confirm password"
               type={showPassword ? "text" : "password"}
               value={confirmPassword}
@@ -1841,14 +1834,14 @@ export default function ProfileClient({
               }}
             />
 
-            <Button
+            <NativeButton
               type="submit"
               className="h-12 w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
               isLoading={savingPassword}
               isDisabled={savingPassword}
             >
               {savingPassword ? "Updating..." : "Update password"}
-            </Button>
+            </NativeButton>
           </form>
         </MobileProfileCard>
 
@@ -1870,14 +1863,14 @@ export default function ProfileClient({
             <MobileInfoRow label="Last sign in" value={user.lastSignInLabel} />
           </div>
           {user.id && (
-            <Button
+            <NativeButton
               variant="flat"
               className="mt-3 w-full rounded-xl border border-stocksense-gray bg-white text-gray-700"
               onPress={handleCopyUserId}
               startContent={<FaClipboard />}
             >
               {copiedUserId ? "Copied user ID" : "Copy user ID"}
-            </Button>
+            </NativeButton>
           )}
         </MobileAccordionCard>
 
@@ -1973,7 +1966,7 @@ export default function ProfileClient({
                 )}
               </AnimatePresence>
 
-              <Input
+              <NativeInput
                 label="New password"
                 type={showPassword ? "text" : "password"}
                 value={password}
@@ -2000,7 +1993,7 @@ export default function ProfileClient({
                 }}
               />
 
-              <Input
+              <NativeInput
                 label="Confirm password"
                 type={showPassword ? "text" : "password"}
                 value={confirmPassword}
@@ -2018,14 +2011,14 @@ export default function ProfileClient({
                   <FaShieldAlt className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
                   Password changes apply to future logins.
                 </div>
-                <Button
+                <NativeButton
                   type="submit"
                   className="rounded-xl bg-[var(--stocksense-brand)] px-5 text-white"
                   isLoading={savingPassword}
                   isDisabled={savingPassword}
                 >
                   {savingPassword ? "Updating..." : "Update password"}
-                </Button>
+                </NativeButton>
               </div>
             </form>
           </motion.section>
@@ -2058,44 +2051,44 @@ export default function ProfileClient({
               )}
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Select
-                  label="Color theme"
-                  selectedKeys={new Set([preferences.themeId])}
-                  onSelectionChange={handleThemeChange}
-                  isDisabled={savingPreferences || !canCustomizeAppearance}
-                  variant="bordered"
-                  radius="lg"
-                  startContent={<FaPalette className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />}
-                  classNames={themedSelectClassNames}
-                >
-                  {THEME_OPTIONS.map((theme) => (
-                    <SelectItem key={theme.id} textValue={theme.label}>
-                      {theme.label} - {theme.description}
-                    </SelectItem>
-                  ))}
-                </Select>
+                <NativeSelect
+                  label={
+                    <span className="inline-flex items-center gap-1.5">
+                      <FaPalette className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+                      Color theme
+                    </span>
+                  }
+                  aria-label="Color theme"
+                  value={preferences.themeId}
+                  onChange={handleThemeChange}
+                  disabled={savingPreferences || !canCustomizeAppearance}
+                  options={THEME_OPTIONS.map((theme) => ({
+                    value: theme.id,
+                    label: `${theme.label} - ${theme.description}`,
+                  }))}
+                />
 
-                <Select
-                  label="Font family"
-                  selectedKeys={new Set([preferences.fontId])}
-                  onSelectionChange={handleFontChange}
-                  isDisabled={savingPreferences || !canCustomizeAppearance}
-                  variant="bordered"
-                  radius="lg"
-                  startContent={<FaFont className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />}
-                  classNames={themedSelectClassNames}
-                >
-                  {FONT_OPTIONS.map((font) => (
-                    <SelectItem key={font.id} textValue={font.label}>
-                      {font.label} - {font.description}
-                    </SelectItem>
-                  ))}
-                </Select>
+                <NativeSelect
+                  label={
+                    <span className="inline-flex items-center gap-1.5">
+                      <FaFont className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+                      Font family
+                    </span>
+                  }
+                  aria-label="Font family"
+                  value={preferences.fontId}
+                  onChange={handleFontChange}
+                  disabled={savingPreferences || !canCustomizeAppearance}
+                  options={FONT_OPTIONS.map((font) => ({
+                    value: font.id,
+                    label: `${font.label} - ${font.description}`,
+                  }))}
+                />
               </div>
 
               <AppearancePreview theme={selectedTheme} font={selectedFont} />
 
-              <Button
+              <NativeButton
                 variant="flat"
                 className="rounded-xl border border-stocksense-gray bg-white text-gray-700"
                 onPress={() => updatePreferences(DEFAULT_PREFERENCES)}
@@ -2104,7 +2097,7 @@ export default function ProfileClient({
                 startContent={<FaRedo className="h-3.5 w-3.5" />}
               >
                 Reset appearance
-              </Button>
+              </NativeButton>
 
               {appearanceMessage && (
                 <div
@@ -2171,14 +2164,14 @@ export default function ProfileClient({
             </div>
 
             {user.id && (
-              <Button
+              <NativeButton
                 variant="flat"
                 className="mt-4 w-full rounded-xl border border-stocksense-gray bg-white text-gray-700"
                 onPress={handleCopyUserId}
                 startContent={<FaClipboard />}
               >
                 {copiedUserId ? "Copied user ID" : "Copy user ID"}
-              </Button>
+              </NativeButton>
             )}
           </section>
 

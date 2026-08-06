@@ -1,33 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import dynamic from "next/dynamic";
-import { AnimatePresence, motion } from "framer-motion";
-import {
-  Input,
-  Button,
-  DatePicker,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownTrigger,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Select,
-  SelectItem,
-} from "@heroui/react";
-import { parseDate } from "@internationalized/date";
+import { AnimatePresence, motion } from "@/components/ui/MotionLite";
 import {
   FaBarcode,
   FaBoxOpen,
   FaChevronDown,
   FaChevronLeft,
   FaChevronRight,
-  FaEllipsisV,
   FaExclamationTriangle,
   FaFilter,
   FaMapMarkedAlt,
@@ -35,7 +16,6 @@ import {
   FaShoppingBasket,
   FaTags,
   FaTimes,
-  FaWarehouse,
 } from "react-icons/fa";
 import {
   addCategory,
@@ -50,20 +30,11 @@ import {
   updateItemsLocation,
 } from "@/app/actions/server";
 import { deleteItemAndAddToShoppingListAction } from "@/app/actions/shoppingList";
-import {
-  modalBodyClass,
-  modalContentClass,
-  modalContentStyle,
-  modalFooterClass,
-  modalHeaderClass,
-  modalInputClassNames,
-  mobileSheetModalClassNames,
-  themedSelectClassNames,
-} from "@/components/modals/modalTheme";
 import { emitInventoryChange } from "@/utils/clientEvents";
-import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
-import QuantityStepperInput from "@/components/modals/QuantityStepperInput";
+import useDebouncedValue from "@/utils/useDebouncedValue";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
+import NativeDropdown from "@/components/ui/NativeDropdown";
+import NativeSelect from "@/components/ui/NativeSelect";
 import SearchResultsLoadingState from "@/components/ui/SearchResultsLoadingState";
 import {
   daysUntil,
@@ -73,8 +44,16 @@ import {
 } from "@/utils/pantry/date";
 import { normalizeMoveLocations } from "@/utils/pantry/moveLocations";
 
-const EntityImageManager = dynamic(
-  () => import("@/components/inventory/EntityImageManager"),
+const ItemsFilterSheet = dynamic(
+  () => import("@/components/items/ItemsFilterSheet"),
+  { ssr: false }
+);
+const ItemDetailDrawer = dynamic(
+  () => import("@/components/items/ItemDetailDrawer"),
+  { ssr: false }
+);
+const ItemsMoveModal = dynamic(
+  () => import("@/components/items/ItemsMoveModal"),
   { ssr: false }
 );
 const ConfirmDeleteModal = dynamic(
@@ -152,6 +131,102 @@ const SORT_LABELS = {
   [SORT_OPTIONS.QUANTITY_ASC]: "Quantity low to high",
 };
 
+const EXPIRATION_FILTER_OPTIONS = [
+  { value: EXPIRATION_FILTERS.ALL, label: "Any expiration" },
+  { value: EXPIRATION_FILTERS.EXPIRED, label: "Expired" },
+  { value: EXPIRATION_FILTERS.SOON, label: "Expiring soon" },
+  { value: EXPIRATION_FILTERS.NONE, label: "No expiration" },
+];
+
+const STOCK_FILTER_OPTIONS = [
+  { value: STOCK_FILTERS.ALL, label: "Any stock" },
+  { value: STOCK_FILTERS.IN_STOCK, label: "In stock" },
+  { value: STOCK_FILTERS.LOW_OR_EMPTY, label: "Low or empty" },
+];
+
+const buttonBaseClass =
+  "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
+
+function InlineButton({
+  children,
+  className = "",
+  disabled = false,
+  onClick,
+  type = "button",
+}) {
+  return (
+    <button
+      type={type}
+      disabled={disabled}
+      onClick={onClick}
+      className={`${buttonBaseClass} ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SearchInput({ value, onChange, placeholder, className = "" }) {
+  return (
+    <label
+      className={`flex min-h-10 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 shadow-sm transition focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)] ${className}`}
+    >
+      <FaSearch className="h-4 w-4 shrink-0 text-gray-400" />
+      <input
+        type="search"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
+      />
+    </label>
+  );
+}
+
+function LabeledSelect({
+  "aria-label": ariaLabel,
+  className = "",
+  disabled = false,
+  hideLabel = false,
+  label,
+  onChange,
+  onOpen,
+  options,
+  triggerClassName = "",
+  value,
+}) {
+  return (
+    <div className={`space-y-1 ${className}`}>
+      <span
+        className={`block text-xs font-semibold text-gray-500 ${
+          hideLabel ? "sr-only" : ""
+        }`}
+      >
+        {label}
+      </span>
+      <NativeSelect
+        aria-label={ariaLabel}
+        disabled={disabled}
+        onChange={onChange}
+        onOpen={onOpen}
+        options={options}
+        triggerClassName={triggerClassName}
+        value={value}
+      />
+    </div>
+  );
+}
+
+function ActionMenu({ ariaLabel, items, disabled = false }) {
+  return (
+    <NativeDropdown
+      ariaLabel={ariaLabel}
+      disabled={disabled}
+      items={items}
+    />
+  );
+}
+
 function PaginationControls({
   currentPage,
   totalPages,
@@ -174,133 +249,27 @@ function PaginationControls({
       </div>
 
       <div className="flex items-center justify-between gap-3 sm:justify-end">
-        <Button
-          size="sm"
-          variant="flat"
-          className="rounded-xl"
-          onPress={onPrevious}
-          isDisabled={currentPage <= 1}
-          startContent={<FaChevronLeft className="h-3 w-3" />}
+        <InlineButton
+          className="min-h-9 border border-gray-200 bg-gray-50 px-3 text-gray-700 hover:bg-gray-100"
+          onClick={onPrevious}
+          disabled={currentPage <= 1}
         >
+          <FaChevronLeft className="h-3 w-3" />
           Previous
-        </Button>
+        </InlineButton>
         <span className="min-w-[88px] text-center text-xs text-gray-500">
           Page {currentPage} of {totalPages}
         </span>
-        <Button
-          size="sm"
-          variant="flat"
-          className="rounded-xl"
-          onPress={onNext}
-          isDisabled={currentPage >= totalPages}
-          endContent={<FaChevronRight className="h-3 w-3" />}
+        <InlineButton
+          className="min-h-9 border border-gray-200 bg-gray-50 px-3 text-gray-700 hover:bg-gray-100"
+          onClick={onNext}
+          disabled={currentPage >= totalPages}
         >
           Next
-        </Button>
+          <FaChevronRight className="h-3 w-3" />
+        </InlineButton>
       </div>
     </div>
-  );
-}
-
-function HierarchyImageTile({ imageUrl, icon: Icon, label }) {
-  return (
-    <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)] md:h-20 md:w-full">
-      {imageUrl ? (
-        <ImageWithLoader
-          src={imageUrl}
-          alt={`${label} image`}
-          className="h-full w-full object-cover"
-        />
-      ) : (
-        <Icon className="h-5 w-5" />
-      )}
-    </div>
-  );
-}
-
-function ItemHierarchyCard({ item }) {
-  if (!item) return null;
-
-  const levels = [
-    {
-      key: "location",
-      label: "Location",
-      name: item.location?.name || "Unknown location",
-      href: item.location?.id ? `/locations/${item.location.id}` : null,
-      imageUrl: item.location?.imageUrl,
-      icon: FaMapMarkedAlt,
-    },
-    {
-      key: "area",
-      label: "Storage Area",
-      name: item.area?.name || "Storage area",
-      href: item.area?.id ? `/areas/${item.area.id}` : null,
-      imageUrl: item.area?.imageUrl,
-      icon: FaWarehouse,
-    },
-    {
-      key: "category",
-      label: "Category",
-      name: item.category?.name || "Category",
-      href: item.category?.id ? `/categories/${item.category.id}` : null,
-      imageUrl: item.category?.imageUrl,
-      icon: FaTags,
-    },
-  ];
-
-  return (
-    <section className="rounded-3xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-3 shadow-sm sm:p-4">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--stocksense-brand)]">
-            Stored in
-          </p>
-          <h3 className="text-base font-semibold text-gray-950">
-            Item location
-          </h3>
-        </div>
-        <p className="text-xs text-gray-500">
-          Location / Storage Area / Category
-        </p>
-      </div>
-
-      <div className="mt-3 grid gap-2 md:grid-cols-3">
-        {levels.map((level) => {
-          const content = (
-            <div className="flex h-full min-w-0 items-center gap-3 rounded-2xl border border-[var(--stocksense-brand-border)] bg-white/90 p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:flex-col md:items-stretch md:gap-3">
-              <HierarchyImageTile
-                imageUrl={level.imageUrl}
-                icon={level.icon}
-                label={level.label}
-              />
-              <div className="min-w-0 flex-1 md:text-center">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                  {level.label}
-                </p>
-                <p
-                  className="mt-0.5 whitespace-normal break-words text-sm font-semibold leading-5 text-gray-950"
-                  title={level.name}
-                >
-                  {level.name}
-                </p>
-              </div>
-            </div>
-          );
-
-          return level.href ? (
-            <Link
-              key={level.key}
-              href={level.href}
-              className="block rounded-2xl focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)]"
-            >
-              {content}
-            </Link>
-          ) : (
-            <div key={level.key}>{content}</div>
-          );
-        })}
-      </div>
-    </section>
   );
 }
 
@@ -427,16 +396,6 @@ export default function ItemsPageClient({
     );
   }, [activeItem, editBarcode, editExp, editName, editQty]);
 
-  const editExpirationDateValue = useMemo(() => {
-    if (!editExp) return null;
-
-    try {
-      return parseDate(editExp);
-    } catch {
-      return null;
-    }
-  }, [editExp]);
-
   useEffect(() => {
     const nextMoveLocations = normalizeMoveLocations(moveLocations);
     if (nextMoveLocations.length === 0) return;
@@ -512,7 +471,9 @@ export default function ItemsPageClient({
     };
   }, []);
 
+  const debouncedSearch = useDebouncedValue(search, 250);
   const normalizedSearch = search.trim().toLowerCase();
+  const requestSearch = debouncedSearch.trim().toLowerCase();
 
   const locationOptions = useMemo(
     () => localMoveLocations || [],
@@ -554,6 +515,47 @@ export default function ItemsPageClient({
       }))
     );
   }, [areaFilter, areaOptions]);
+
+  const locationFilterOptions = useMemo(
+    () => [
+      { value: ALL_FILTER_KEY, label: "All locations" },
+      ...locationOptions.map((location) => ({
+        value: String(location.id),
+        label: location.name,
+      })),
+    ],
+    [locationOptions]
+  );
+
+  const areaFilterOptions = useMemo(
+    () => [
+      { value: ALL_FILTER_KEY, label: "All areas" },
+      ...areaOptions.map((area) => ({
+        value: String(area.id),
+        label:
+          locationFilter === ALL_FILTER_KEY
+            ? `${area.name} - ${area.locationName}`
+            : area.name,
+      })),
+    ],
+    [areaOptions, locationFilter]
+  );
+
+  const categoryFilterOptions = useMemo(
+    () => [
+      { value: ALL_FILTER_KEY, label: "All categories" },
+      ...categoryOptions.map((category) => ({
+        value: String(category.id),
+        label:
+          locationFilter === ALL_FILTER_KEY
+            ? `${category.name} - ${category.areaName} - ${category.locationName}`
+            : areaFilter === ALL_FILTER_KEY
+            ? `${category.name} - ${category.areaName}`
+            : category.name,
+      })),
+    ],
+    [areaFilter, categoryOptions, locationFilter]
+  );
 
   const selectedLocation = useMemo(
     () =>
@@ -674,7 +676,7 @@ export default function ItemsPageClient({
 
   const itemRequestFilters = useMemo(
     () => ({
-      search: normalizedSearch,
+      search: requestSearch,
       locationId: locationFilter === ALL_FILTER_KEY ? null : locationFilter,
       areaId: areaFilter === ALL_FILTER_KEY ? null : areaFilter,
       categoryId: categoryFilter === ALL_FILTER_KEY ? null : categoryFilter,
@@ -689,7 +691,7 @@ export default function ItemsPageClient({
       expDays,
       expirationFilter,
       locationFilter,
-      normalizedSearch,
+      requestSearch,
       sortBy,
       stockFilter,
     ]
@@ -768,7 +770,7 @@ export default function ItemsPageClient({
     expDays,
     expirationFilter,
     locationFilter,
-    normalizedSearch,
+    requestSearch,
     sortBy,
     stockFilter,
   ]);
@@ -923,11 +925,6 @@ export default function ItemsPageClient({
     } else {
       selectAllVisibleItems();
     }
-  };
-
-  const getSelectedValue = (keys) => {
-    const value = Array.from(keys)[0];
-    return value ? String(value) : "";
   };
 
   const handleLocationFilterChange = (value) => {
@@ -1693,20 +1690,20 @@ export default function ItemsPageClient({
             </div>
 
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <Button
+              <InlineButton
                 className="min-h-11 rounded-xl bg-[var(--stocksense-brand)] text-sm font-semibold text-white"
                 onClick={() => openMove("bulk")}
-                isDisabled={selectedCount === 0}
+                disabled={selectedCount === 0}
               >
                 Move
-              </Button>
-              <Button
+              </InlineButton>
+              <InlineButton
                 className="min-h-11 rounded-xl bg-rose-600 text-sm font-semibold text-white"
                 onClick={openDeleteBulk}
-                isDisabled={selectedCount === 0}
+                disabled={selectedCount === 0}
               >
                 Delete
-              </Button>
+              </InlineButton>
             </div>
           </motion.div>
         ) : (
@@ -1735,15 +1732,11 @@ export default function ItemsPageClient({
                 )}
               </div>
 
-              <Input
+              <SearchInput
                 value={search}
-                onValueChange={handleSearchChange}
+                onChange={handleSearchChange}
                 placeholder="Search items"
-                startContent={<FaSearch className="text-gray-400" />}
-                classNames={{
-                  inputWrapper:
-                    "min-h-12 rounded-2xl border border-stocksense-gray bg-white shadow-sm",
-                }}
+                className="min-h-12 rounded-2xl"
               />
 
               <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
@@ -1865,36 +1858,29 @@ export default function ItemsPageClient({
             </div>
           </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(220px,280px)_auto] md:items-start">
-          <Input
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(220px,280px)_auto] md:items-center">
+          <SearchInput
             value={search}
-            onValueChange={handleSearchChange}
+            onChange={handleSearchChange}
             placeholder="Search items, locations, areas, categories..."
-            startContent={<FaSearch className="text-gray-400" />}
-            classNames={{
-              inputWrapper: "rounded-xl border border-stocksense-gray shadow-none max-w-[500px] h-[56px]",
-            }}
+            className="h-14 max-w-[500px] shadow-none"
           />
 
-          <Select
+          <LabeledSelect
             aria-label="Filter by location"
+            className="h-14"
+            hideLabel
             label="Location"
-            selectedKeys={new Set([locationFilter])}
-            onSelectionChange={(keys) =>
-              handleLocationFilterChange(getSelectedValue(keys) || ALL_FILTER_KEY)
+            value={locationFilter}
+            onChange={(value) =>
+              handleLocationFilterChange(value || ALL_FILTER_KEY)
             }
-            onOpenChange={(open) => {
-              if (open) void loadHierarchy();
+            onOpen={() => {
+              void loadHierarchy();
             }}
-            variant="bordered"
-            radius="lg"
-            classNames={themedSelectClassNames}
-          >
-            <SelectItem key={ALL_FILTER_KEY}>All locations</SelectItem>
-            {locationOptions.map((location) => (
-              <SelectItem key={String(location.id)}>{location.name}</SelectItem>
-            ))}
-          </Select>
+            options={locationFilterOptions}
+            triggerClassName="!h-14"
+          />
 
           <button
             type="button"
@@ -1940,57 +1926,37 @@ export default function ItemsPageClient({
             >
               <div className="mt-3 rounded-2xl border border-stocksense-gray bg-gray-50 p-3">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <Select
+                  <LabeledSelect
                     aria-label="Filter by storage area"
+                    hideLabel
                     label="Storage area"
-                    selectedKeys={new Set([areaFilter])}
-                    onSelectionChange={(keys) =>
-                      handleAreaFilterChange(getSelectedValue(keys) || ALL_FILTER_KEY)
+                    value={areaFilter}
+                    onChange={(value) =>
+                      handleAreaFilterChange(value || ALL_FILTER_KEY)
                     }
-                    onOpenChange={(open) => {
-                      if (open) void loadHierarchy();
+                    onOpen={() => {
+                      void loadHierarchy();
                     }}
-                    isDisabled={isLoadingHierarchy || areaOptions.length === 0}
-                    variant="bordered"
-                    radius="lg"
-                    classNames={themedSelectClassNames}
-                  >
-                    <SelectItem key={ALL_FILTER_KEY}>All areas</SelectItem>
-                    {areaOptions.map((area) => (
-                      <SelectItem key={String(area.id)}>
-                        {locationFilter === ALL_FILTER_KEY
-                          ? `${area.name} - ${area.locationName}`
-                          : area.name}
-                      </SelectItem>
-                    ))}
-                  </Select>
+                    disabled={isLoadingHierarchy || areaOptions.length === 0}
+                    options={areaFilterOptions}
+                    triggerClassName="!h-14"
+                  />
 
-                  <Select
+                  <LabeledSelect
                     aria-label="Filter by category"
+                    hideLabel
                     label="Category"
-                    selectedKeys={new Set([categoryFilter])}
-                    onSelectionChange={(keys) =>
-                      setCategoryFilter(getSelectedValue(keys) || ALL_FILTER_KEY)
+                    value={categoryFilter}
+                    onChange={(value) =>
+                      setCategoryFilter(value || ALL_FILTER_KEY)
                     }
-                    onOpenChange={(open) => {
-                      if (open) void loadHierarchy();
+                    onOpen={() => {
+                      void loadHierarchy();
                     }}
-                    isDisabled={isLoadingHierarchy || categoryOptions.length === 0}
-                    variant="bordered"
-                    radius="lg"
-                    classNames={themedSelectClassNames}
-                  >
-                    <SelectItem key={ALL_FILTER_KEY}>All categories</SelectItem>
-                    {categoryOptions.map((category) => (
-                      <SelectItem key={String(category.id)}>
-                        {locationFilter === ALL_FILTER_KEY
-                          ? `${category.name} - ${category.areaName} - ${category.locationName}`
-                          : areaFilter === ALL_FILTER_KEY
-                          ? `${category.name} - ${category.areaName}`
-                          : category.name}
-                      </SelectItem>
-                    ))}
-                  </Select>
+                    disabled={isLoadingHierarchy || categoryOptions.length === 0}
+                    options={categoryFilterOptions}
+                    triggerClassName="!h-14"
+                  />
 
                   {isLoadingHierarchy ? (
                     <div className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 py-2 text-xs font-medium text-[var(--stocksense-brand)] sm:col-span-2 lg:col-span-4">
@@ -2000,46 +1966,28 @@ export default function ItemsPageClient({
                   {hierarchyError ? (
                     <div className="flex flex-col gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 sm:col-span-2 lg:col-span-4 md:flex-row md:items-center md:justify-between">
                       <span>{hierarchyError}</span>
-                      <Button
-                        size="sm"
-                        color="danger"
-                        variant="flat"
-                        className="rounded-xl"
-                        onPress={() => loadHierarchy({ force: true })}
+                      <InlineButton
+                        className="min-h-9 border border-rose-200 bg-white px-3 text-rose-700 hover:bg-rose-100"
+                        onClick={() => loadHierarchy({ force: true })}
                       >
                         Retry
-                      </Button>
+                      </InlineButton>
                     </div>
                   ) : null}
 
                   <div className="flex gap-2 sm:col-span-2 lg:col-span-1">
-                    <Select
+                    <LabeledSelect
                       aria-label="Filter by expiration"
+                      hideLabel
                       label="Expiration"
-                      selectedKeys={new Set([expirationFilter])}
-                      onSelectionChange={(keys) =>
-                        setExpirationFilter(
-                          getSelectedValue(keys) || EXPIRATION_FILTERS.ALL
-                        )
+                      value={expirationFilter}
+                      onChange={(value) =>
+                        setExpirationFilter(value || EXPIRATION_FILTERS.ALL)
                       }
-                      variant="bordered"
-                      radius="lg"
                       className="min-w-0 flex-1"
-                      classNames={themedSelectClassNames}
-                    >
-                      <SelectItem key={EXPIRATION_FILTERS.ALL}>
-                        Any expiration
-                      </SelectItem>
-                      <SelectItem key={EXPIRATION_FILTERS.EXPIRED}>
-                        Expired
-                      </SelectItem>
-                      <SelectItem key={EXPIRATION_FILTERS.SOON}>
-                        Expiring soon
-                      </SelectItem>
-                      <SelectItem key={EXPIRATION_FILTERS.NONE}>
-                        No expiration
-                      </SelectItem>
-                    </Select>
+                      options={EXPIRATION_FILTER_OPTIONS}
+                      triggerClassName="!h-14"
+                    />
 
                     <input
                       aria-label="Expiring soon day window"
@@ -2047,7 +1995,7 @@ export default function ItemsPageClient({
                       min={1}
                       value={expDays}
                       onChange={(e) => setExpDays(toPositiveInteger(e.target.value, 7))}
-                      className={`w-20 rounded-xl border border-stocksense-gray px-3 text-sm ${
+                      className={`h-14 w-20 rounded-xl border border-stocksense-gray px-3 text-sm ${
                         expirationFilter !== EXPIRATION_FILTERS.SOON
                           ? "bg-gray-100 text-gray-400"
                           : "bg-white text-gray-800"
@@ -2056,23 +2004,17 @@ export default function ItemsPageClient({
                     />
                   </div>
 
-                  <Select
+                  <LabeledSelect
                     aria-label="Filter by stock"
+                    hideLabel
                     label="Stock"
-                    selectedKeys={new Set([stockFilter])}
-                    onSelectionChange={(keys) =>
-                      setStockFilter(getSelectedValue(keys) || STOCK_FILTERS.ALL)
+                    value={stockFilter}
+                    onChange={(value) =>
+                      setStockFilter(value || STOCK_FILTERS.ALL)
                     }
-                    variant="bordered"
-                    radius="lg"
-                    classNames={themedSelectClassNames}
-                  >
-                    <SelectItem key={STOCK_FILTERS.ALL}>Any stock</SelectItem>
-                    <SelectItem key={STOCK_FILTERS.IN_STOCK}>In stock</SelectItem>
-                    <SelectItem key={STOCK_FILTERS.LOW_OR_EMPTY}>
-                      Low or empty
-                    </SelectItem>
-                  </Select>
+                    options={STOCK_FILTER_OPTIONS}
+                    triggerClassName="!h-14"
+                  />
                 </div>
               </div>
             </motion.div>
@@ -2362,14 +2304,12 @@ export default function ItemsPageClient({
                     : "Start adding things you want to keep track of."}
                 </p>
                 {normalizedSearch ? (
-                  <Button
-                    onPress={() => clearFilter("search")}
-                    radius="lg"
-                    variant="bordered"
+                  <InlineButton
+                    onClick={() => clearFilter("search")}
                     className="mt-5 w-full border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] font-semibold text-[var(--stocksense-brand)]"
                   >
                     Clear search
-                  </Button>
+                  </InlineButton>
                 ) : null}
               </motion.div>
             )}
@@ -2507,40 +2447,29 @@ export default function ItemsPageClient({
                     onClick={(event) => event.stopPropagation()}
                     onKeyDown={(event) => event.stopPropagation()}
                   >
-                    <Dropdown placement="bottom-end">
-                      <DropdownTrigger>
-                        <Button
-                          isIconOnly
-                          variant="light"
-                          radius="lg"
-                          className="h-9 w-9 min-w-9 text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
-                          aria-label={`${it.name} actions`}
-                        >
-                          <FaEllipsisV className="h-4 w-4" />
-                        </Button>
-                      </DropdownTrigger>
-                      <DropdownMenu aria-label={`${it.name} actions`}>
-                        <DropdownItem
-                          key="select"
-                          onPress={() => toggleSelect(it.id)}
-                        >
-                          {selected
+                    <ActionMenu
+                      ariaLabel={`${it.name} actions`}
+                      items={[
+                        {
+                          key: "select",
+                          label: selected
                             ? "Deselect for bulk action"
-                            : "Select for bulk action"}
-                        </DropdownItem>
-                        <DropdownItem key="view" onPress={() => openDrawer(it)}>
-                          View / Edit
-                        </DropdownItem>
-                        <DropdownItem
-                          key="delete"
-                          className="text-danger"
-                          color="danger"
-                          onPress={() => openDeleteForItem(it)}
-                        >
-                          Delete
-                        </DropdownItem>
-                      </DropdownMenu>
-                    </Dropdown>
+                            : "Select for bulk action",
+                          onSelect: () => toggleSelect(it.id),
+                        },
+                        {
+                          key: "view",
+                          label: "View / Edit",
+                          onSelect: () => openDrawer(it),
+                        },
+                        {
+                          key: "delete",
+                          label: "Delete",
+                          danger: true,
+                          onSelect: () => openDeleteForItem(it),
+                        },
+                      ]}
+                    />
                   </div>
                 )}
               </div>
@@ -2581,14 +2510,12 @@ export default function ItemsPageClient({
                 : "No items yet."}
             </p>
             {normalizedSearch ? (
-              <Button
-                onPress={() => clearFilter("search")}
-                radius="lg"
-                variant="bordered"
+              <InlineButton
+                onClick={() => clearFilter("search")}
                 className="mt-5 border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-5 text-sm font-semibold text-[var(--stocksense-brand)]"
               >
                 Clear search
-              </Button>
+              </InlineButton>
             ) : null}
           </motion.div>
         )}
@@ -2608,743 +2535,89 @@ export default function ItemsPageClient({
         )}
       </motion.div>
 
-      <Modal
-        isOpen={filterSheetOpen}
-        onOpenChange={(open) => {
-          setFilterSheetOpen(open);
-          if (open) void loadHierarchy();
-        }}
-        placement="bottom"
-        size="full"
-        classNames={{
-          wrapper: "items-end md:hidden",
-          base: "m-0 w-full max-w-none rounded-t-3xl border-0 bg-white shadow-2xl md:hidden",
-        }}
-      >
-        <ModalContent
-          className="wherekeep-modal-content max-h-[88svh] w-full overflow-hidden rounded-t-3xl bg-white text-gray-700 md:hidden"
-          style={modalContentStyle}
-        >
-          {() => (
-            <>
-              <ModalHeader className="sticky top-0 z-20 flex items-center gap-3 border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 py-3 text-[var(--stocksense-brand)]">
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-lg font-semibold text-[var(--stocksense-brand)]">Filters</h2>
-                </div>
-                <MobileSheetCloseButton onPress={() => setFilterSheetOpen(false)} />
-              </ModalHeader>
+      {filterSheetOpen && (
+        <ItemsFilterSheet
+          isOpen={filterSheetOpen}
+          onOpenChange={setFilterSheetOpen}
+          onLoadHierarchy={loadHierarchy}
+          isLoadingHierarchy={isLoadingHierarchy}
+          hierarchyError={hierarchyError}
+          locationFilter={locationFilter}
+          areaFilter={areaFilter}
+          categoryFilter={categoryFilter}
+          expirationFilter={expirationFilter}
+          stockFilter={stockFilter}
+          sortBy={sortBy}
+          expDays={expDays}
+          locationOptions={locationOptions}
+          areaOptions={areaOptions}
+          categoryOptions={categoryOptions}
+          sortLabels={SORT_LABELS}
+          onLocationFilterChange={handleLocationFilterChange}
+          onAreaFilterChange={handleAreaFilterChange}
+          onCategoryFilterChange={setCategoryFilter}
+          onExpirationFilterChange={setExpirationFilter}
+          onStockFilterChange={setStockFilter}
+          onSortChange={setSortBy}
+          onExpDaysChange={setExpDays}
+        />
+      )}
 
-              <ModalBody className="wherekeep-modal-body min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 pb-6">
-                {isLoadingHierarchy ? (
-                  <div className="rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/40 px-3 py-2 text-sm font-medium text-[var(--stocksense-brand)]">
-                    Loading locations, storage areas, and categories...
-                  </div>
-                ) : null}
-                {hierarchyError ? (
-                  <div className="flex flex-col gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                    <span>{hierarchyError}</span>
-                    <Button
-                      size="sm"
-                      color="danger"
-                      variant="flat"
-                      className="rounded-xl self-start"
-                      onPress={() => loadHierarchy({ force: true })}
-                    >
-                      Retry
-                    </Button>
-                  </div>
-                ) : null}
-                <Select
-                  aria-label="Filter by location"
-                  label="Location"
-                  selectedKeys={new Set([locationFilter])}
-                  onSelectionChange={(keys) =>
-                    handleLocationFilterChange(getSelectedValue(keys) || ALL_FILTER_KEY)
-                  }
-                  onOpenChange={(open) => {
-                    if (open) void loadHierarchy();
-                  }}
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  <SelectItem key={ALL_FILTER_KEY}>All locations</SelectItem>
-                  {locationOptions.map((location) => (
-                    <SelectItem key={String(location.id)}>
-                      {location.name}
-                    </SelectItem>
-                  ))}
-                </Select>
+      {drawerOpen && (
+        <ItemDetailDrawer
+          isOpen={drawerOpen}
+          activeItem={activeItem}
+          canEditInventory={canEditInventory}
+          editName={editName}
+          editQty={editQty}
+          editExp={editExp}
+          editBarcode={editBarcode}
+          hasItemEditChanges={hasItemEditChanges}
+          onClose={closeDrawer}
+          onSave={saveEdits}
+          onMove={() => openMove("single")}
+          onDelete={openDeleteSingle}
+          onEditNameChange={setEditName}
+          onEditQtyChange={setEditQty}
+          onEditExpChange={setEditExp}
+          onEditBarcodeChange={setEditBarcode}
+          onImageChange={handleActiveItemImageChange}
+        />
+      )}
 
-                <Select
-                  aria-label="Filter by storage area"
-                  label="Storage Area"
-                  selectedKeys={new Set([areaFilter])}
-                  onSelectionChange={(keys) =>
-                    handleAreaFilterChange(getSelectedValue(keys) || ALL_FILTER_KEY)
-                  }
-                  onOpenChange={(open) => {
-                    if (open) void loadHierarchy();
-                  }}
-                  isDisabled={isLoadingHierarchy || areaOptions.length === 0}
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  <SelectItem key={ALL_FILTER_KEY}>All storage areas</SelectItem>
-                  {areaOptions.map((area) => (
-                    <SelectItem key={String(area.id)}>
-                      {locationFilter === ALL_FILTER_KEY
-                        ? `${area.name} - ${area.locationName}`
-                        : area.name}
-                    </SelectItem>
-                  ))}
-                </Select>
-
-                <Select
-                  aria-label="Filter by category"
-                  label="Category"
-                  selectedKeys={new Set([categoryFilter])}
-                  onSelectionChange={(keys) =>
-                    setCategoryFilter(getSelectedValue(keys) || ALL_FILTER_KEY)
-                  }
-                  onOpenChange={(open) => {
-                    if (open) void loadHierarchy();
-                  }}
-                  isDisabled={isLoadingHierarchy || categoryOptions.length === 0}
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  <SelectItem key={ALL_FILTER_KEY}>All categories</SelectItem>
-                  {categoryOptions.map((category) => (
-                    <SelectItem key={String(category.id)}>
-                      {locationFilter === ALL_FILTER_KEY
-                        ? `${category.name} - ${category.areaName} - ${category.locationName}`
-                        : areaFilter === ALL_FILTER_KEY
-                          ? `${category.name} - ${category.areaName}`
-                          : category.name}
-                    </SelectItem>
-                  ))}
-                </Select>
-
-                <div className="grid grid-cols-[minmax(0,1fr)_88px] gap-2">
-                  <Select
-                    aria-label="Filter by expiration"
-                    label="Expiration"
-                    selectedKeys={new Set([expirationFilter])}
-                    onSelectionChange={(keys) =>
-                      setExpirationFilter(
-                        getSelectedValue(keys) || EXPIRATION_FILTERS.ALL
-                      )
-                    }
-                    variant="bordered"
-                    radius="lg"
-                    classNames={themedSelectClassNames}
-                  >
-                    <SelectItem key={EXPIRATION_FILTERS.ALL}>
-                      Any expiration
-                    </SelectItem>
-                    <SelectItem key={EXPIRATION_FILTERS.EXPIRED}>
-                      Expired
-                    </SelectItem>
-                    <SelectItem key={EXPIRATION_FILTERS.SOON}>
-                      Expiring soon
-                    </SelectItem>
-                    <SelectItem key={EXPIRATION_FILTERS.NONE}>
-                      No expiration
-                    </SelectItem>
-                  </Select>
-
-                  <input
-                    aria-label="Expiring soon day window"
-                    type="number"
-                    min={1}
-                    value={expDays}
-                    onChange={(event) =>
-                      setExpDays(toPositiveInteger(event.target.value, 7))
-                    }
-                    className={`min-h-14 rounded-xl border border-stocksense-gray px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--stocksense-brand-border)] ${
-                      expirationFilter !== EXPIRATION_FILTERS.SOON
-                        ? "bg-gray-100 text-gray-400"
-                        : "bg-white text-gray-800"
-                    }`}
-                    disabled={expirationFilter !== EXPIRATION_FILTERS.SOON}
-                  />
-                </div>
-
-                <Select
-                  aria-label="Filter by stock"
-                  label="Stock"
-                  selectedKeys={new Set([stockFilter])}
-                  onSelectionChange={(keys) =>
-                    setStockFilter(getSelectedValue(keys) || STOCK_FILTERS.ALL)
-                  }
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  <SelectItem key={STOCK_FILTERS.ALL}>Any stock</SelectItem>
-                  <SelectItem key={STOCK_FILTERS.IN_STOCK}>In stock</SelectItem>
-                  <SelectItem key={STOCK_FILTERS.LOW_OR_EMPTY}>
-                    Low or empty
-                  </SelectItem>
-                </Select>
-
-                <Select
-                  aria-label="Sort items"
-                  label="Sort by"
-                  selectedKeys={new Set([sortBy])}
-                  onSelectionChange={(keys) =>
-                    setSortBy(getSelectedValue(keys) || SORT_OPTIONS.NAME_ASC)
-                  }
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  {Object.entries(SORT_LABELS).map(([key, label]) => (
-                    <SelectItem key={key}>{label}</SelectItem>
-                  ))}
-                </Select>
-              </ModalBody>
-
-              <ModalFooter className="wherekeep-modal-footer sticky bottom-0 z-20 border-t border-gray-200 bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)]">
-                <Button
-                  className="min-h-12 w-full rounded-xl bg-[var(--stocksense-brand)] text-base font-semibold text-white"
-                  onClick={() => setFilterSheetOpen(false)}
-                >
-                  Apply filters
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
-
-      {/* Drawer (single item) */}
-      <Modal
-        isOpen={drawerOpen}
-        onOpenChange={(open) => (open ? null : closeDrawer())}
-        placement="right"
-        size="lg"
-        classNames={{
-          base: "rounded-none md:rounded-l-2xl h-full md:h-[calc(100vh-24px)] md:my-3",
-          wrapper: "items-stretch justify-end",
-        }}
-      >
-        <ModalContent className={modalContentClass} style={modalContentStyle}>
-          {() => (
-            <>
-              <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
-                <div className="min-w-0 flex-1">
-                  <div
-                    className="truncate text-lg font-semibold text-[var(--stocksense-brand)]"
-                    title={activeItem?.name || "Item"}
-                  >
-                    {activeItem?.name || "Item"}
-                  </div>
-                  <div className="truncate text-sm text-gray-500">Item details</div>
-                </div>
-                {canEditInventory ? (
-                  <Button
-                    size="sm"
-                    className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
-                    onClick={saveEdits}
-                    isDisabled={!hasItemEditChanges}
-                  >
-                    Save
-                  </Button>
-                ) : null}
-                <MobileSheetCloseButton onPress={closeDrawer} />
-              </ModalHeader>
-
-              <ModalBody className={`space-y-5 ${modalBodyClass}`}>
-                <ItemHierarchyCard item={activeItem} />
-
-                {canEditInventory ? (
-                  <>
-                    <div className="space-y-2">
-                      <div className="text-xs font-medium text-gray-600">Item name</div>
-                      <Input
-                        value={editName}
-                        onValueChange={setEditName}
-                        variant="bordered"
-                        radius="lg"
-                        classNames={modalInputClassNames}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <QuantityStepperInput
-                        label="Quantity"
-                        value={editQty}
-                        onValueChange={setEditQty}
-                        min={0}
-                        classNames={modalInputClassNames}
-                      />
-
-                      <DatePicker
-                        label="Expiration date"
-                        labelPlacement="inside"
-                        value={editExpirationDateValue}
-                        onChange={(date) => setEditExp(date ? date.toString() : "")}
-                        variant="bordered"
-                        radius="lg"
-                        classNames={modalInputClassNames}
-                        showMonthAndYearPickers
-                      />
-                    </div>
-
-                    <div className="space-y-2 max-md:hidden">
-                      <div className="text-xs font-medium text-gray-600">Barcode</div>
-                      <Input
-                        value={editBarcode}
-                        onValueChange={setEditBarcode}
-                        placeholder="e.g., 012345678905"
-                        variant="bordered"
-                        radius="lg"
-                        classNames={modalInputClassNames}
-                        startContent={<FaBarcode className="text-gray-400" />}
-                      />
-                    </div>
-
-                    <EntityImageManager
-                      entityType="item"
-                      entityId={activeItem?.id}
-                      imageUrl={activeItem?.imageUrl}
-                      label="Item photo"
-                      onChange={handleActiveItemImageChange}
-                    />
-
-                    {activeItem?.barcode && (
-                      <div className="rounded-xl border border-gray-200 bg-white p-3 md:hidden">
-                        <div className="flex items-center gap-2 text-xs font-medium text-gray-500">
-                          <FaBarcode className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
-                          <span>Barcode</span>
-                        </div>
-                        <div
-                          className="mt-1 truncate text-sm font-semibold text-gray-800"
-                          title={activeItem.barcode}
-                        >
-                          {activeItem.barcode}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex gap-2 max-md:flex-col">
-                      <Button
-                        onClick={saveEdits}
-                        isDisabled={!hasItemEditChanges}
-                        className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
-                      >
-                        Save changes
-                      </Button>
-                      <Button
-                        onClick={() => openMove("single")}
-                        className="w-full rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
-                      >
-                        Move
-                      </Button>
-                    </div>
-                    <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
-                      <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                      <Button
-                        className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
-                        onClick={openDeleteSingle}
-                      >
-                        Delete item
-                      </Button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="rounded-xl border border-stocksense-gray bg-white p-3">
-                      <div className="text-xs font-medium text-gray-500">Quantity</div>
-                      <div className="mt-1 text-sm font-semibold text-gray-800">
-                        {activeItem?.quantity ?? 0}
-                      </div>
-                    </div>
-                    <div className="rounded-xl border border-stocksense-gray bg-white p-3">
-                      <div className="text-xs font-medium text-gray-500">Expiration</div>
-                      <div className="mt-1 text-sm font-semibold text-gray-800">
-                        {activeItem?.expiration_date || "None"}
-                      </div>
-                    </div>
-                    {activeItem?.barcode && (
-                      <div className="rounded-xl border border-stocksense-gray bg-white p-3 sm:col-span-2">
-                        <div className="text-xs font-medium text-gray-500">Barcode</div>
-                        <div className="mt-1 text-sm font-semibold text-gray-800">
-                          {activeItem.barcode}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </ModalBody>
-
-              <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-                <Button variant="light" className="rounded-xl max-md:hidden" onClick={closeDrawer}>
-                  Close
-                </Button>
-                {canEditInventory && (
-                  <Button
-                    className="rounded-xl bg-rose-600 text-white max-md:hidden"
-                    onClick={openDeleteSingle}
-                  >
-                    Delete
-                  </Button>
-                )}
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
-
-      {/* Move Modal (single + bulk) */}
-      {canEditInventory && <Modal
-        isOpen={moveModalOpen}
-        onOpenChange={setMoveModalOpen}
-        size="md"
-        placement="center"
-        scrollBehavior="inside"
-        classNames={mobileSheetModalClassNames}
-      >
-        <ModalContent className={modalContentClass} style={modalContentStyle}>
-          {() => (
-            <>
-              <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-lg font-semibold text-[var(--stocksense-brand)]">
-                    Move {selectedCount > 0 && !drawerOpen ? `${selectedCount} items` : "item"}
-                  </div>
-                  <div className="truncate text-sm text-gray-500">
-                    Choose the destination category.
-                  </div>
-                </div>
-                <MobileSheetCloseButton onPress={() => setMoveModalOpen(false)} />
-              </ModalHeader>
-
-              <ModalBody className={`space-y-4 ${modalBodyClass}`}>
-                {moveCreateMessage ? (
-                  <div
-                    className={`rounded-2xl border px-3 py-2 text-sm ${
-                      moveCreateMessage.type === "success"
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                        : "border-rose-200 bg-rose-50 text-rose-700"
-                    }`}
-                  >
-                    {moveCreateMessage.text}
-                  </div>
-                ) : null}
-
-                {drawerOpen && activeItem ? (
-                  <div className="rounded-2xl border border-gray-200 bg-white p-3">
-                    <p className="text-xs font-medium uppercase text-gray-500">
-                      Current
-                    </p>
-                    <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-semibold text-gray-950">
-                      {activeItem.location?.id ? (
-                        <Link
-                          href={`/locations/${activeItem.location.id}`}
-                          className="hover:text-[var(--stocksense-brand)]"
-                        >
-                          {activeItem.location.name || "Unknown location"}
-                        </Link>
-                      ) : (
-                        <span>{activeItem.location?.name || "Unknown location"}</span>
-                      )}
-                      <span className="text-gray-300">/</span>
-                      {activeItem.area?.id ? (
-                        <Link
-                          href={`/areas/${activeItem.area.id}`}
-                          className="hover:text-[var(--stocksense-brand)]"
-                        >
-                          {activeItem.area.name || "Storage area"}
-                        </Link>
-                      ) : (
-                        <span>{activeItem.area?.name || "Storage area"}</span>
-                      )}
-                      <span className="text-gray-300">/</span>
-                      {activeItem.category?.id ? (
-                        <Link
-                          href={`/categories/${activeItem.category.id}`}
-                          className="hover:text-[var(--stocksense-brand)]"
-                        >
-                          {activeItem.category.name || "Category"}
-                        </Link>
-                      ) : (
-                        <span>{activeItem.category?.name || "Category"}</span>
-                      )}
-                    </p>
-                  </div>
-                ) : null}
-                {isLoadingHierarchy ? (
-                  <div className="rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]/40 px-3 py-2 text-sm font-medium text-[var(--stocksense-brand)]">
-                    Loading move destinations...
-                  </div>
-                ) : null}
-                {hierarchyError ? (
-                  <div className="flex flex-col gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between">
-                    <span>{hierarchyError}</span>
-                    <Button
-                      size="sm"
-                      color="danger"
-                      variant="flat"
-                      className="rounded-xl"
-                      onPress={() => loadHierarchy({ force: true })}
-                    >
-                      Retry
-                    </Button>
-                  </div>
-                ) : null}
-                <Select
-                  label="Location"
-                  selectedKeys={
-                    moveTarget.locationId
-                      ? new Set([String(moveTarget.locationId)])
-                      : new Set()
-                  }
-                  onSelectionChange={(keys) => {
-                    const locId = getSelectedValue(keys) || null;
-                    if (locId === NEW_LOCATION_VALUE) {
-                      setMoveTarget({
-                        locationId: NEW_LOCATION_VALUE,
-                        areaId: null,
-                        categoryId: null,
-                      });
-                      return;
-                    }
-
-                    const loc =
-                      locationOptions.find((l) => String(l.id) === String(locId)) ||
-                      locationOptions[0];
-                    const firstArea = loc?.storage_areas?.[0] || null;
-                    const firstCat = firstArea?.categories?.[0] || null;
-
-                    setMoveTarget({
-                      locationId: loc?.id ?? null,
-                      areaId: firstArea?.id ?? null,
-                      categoryId: firstCat?.id ?? null,
-                    });
-                  }}
-                  isDisabled={isLoadingHierarchy}
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  {locationOptions.map((location) => (
-                    <SelectItem key={String(location.id)}>
-                      {location.name}
-                    </SelectItem>
-                  ))}
-                  <SelectItem key={NEW_LOCATION_VALUE}>+ New location</SelectItem>
-                </Select>
-                {moveTarget.locationId === NEW_LOCATION_VALUE ? (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                    <Input
-                      label="New location"
-                      value={moveCreateNames.location}
-                      onValueChange={(value) => updateMoveCreateName("location", value)}
-                      placeholder="Kitchen, garage, closet..."
-                      variant="bordered"
-                      radius="lg"
-                      classNames={modalInputClassNames}
-                    />
-                    <Button
-                      className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
-                      isLoading={moveCreateAction === "location"}
-                      isDisabled={!moveCreateNames.location.trim() || Boolean(moveCreateAction)}
-                      onPress={createMoveLocation}
-                    >
-                      Create
-                    </Button>
-                  </div>
-                ) : null}
-
-                <Select
-                  label="Storage area"
-                  placeholder="Select area..."
-                  selectedKeys={
-                    moveTarget.areaId
-                      ? new Set([String(moveTarget.areaId)])
-                      : new Set()
-                  }
-                  onSelectionChange={(keys) => {
-                    const areaId = getSelectedValue(keys) || null;
-                    if (areaId === NEW_AREA_VALUE) {
-                      setMoveTarget((prev) => ({
-                        ...prev,
-                        areaId: NEW_AREA_VALUE,
-                        categoryId: null,
-                      }));
-                      return;
-                    }
-
-                    const area =
-                      currentAreas.find((a) => String(a.id) === String(areaId)) ||
-                      currentAreas[0];
-                    const firstCat = area?.categories?.[0] || null;
-
-                    setMoveTarget((prev) => ({
-                      ...prev,
-                      areaId: area?.id ?? null,
-                      categoryId: firstCat?.id ?? null,
-                    }));
-                  }}
-                  isDisabled={
-                    isLoadingHierarchy ||
-                    !moveTarget.locationId ||
-                    moveTarget.locationId === NEW_LOCATION_VALUE
-                  }
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  {currentAreas.map((area) => (
-                    <SelectItem key={String(area.id)}>{area.name}</SelectItem>
-                  ))}
-                  <SelectItem key={NEW_AREA_VALUE}>+ New storage area</SelectItem>
-                </Select>
-                {moveTarget.areaId === NEW_AREA_VALUE ? (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                    <Input
-                      label="New storage area"
-                      value={moveCreateNames.area}
-                      onValueChange={(value) => updateMoveCreateName("area", value)}
-                      placeholder="Pantry, shelf, drawer..."
-                      isDisabled={
-                        isLoadingHierarchy ||
-                        !moveTarget.locationId ||
-                        moveTarget.locationId === NEW_LOCATION_VALUE
-                      }
-                      variant="bordered"
-                      radius="lg"
-                      classNames={modalInputClassNames}
-                    />
-                    <Button
-                      className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
-                      isLoading={moveCreateAction === "area"}
-                      isDisabled={
-                        !moveCreateNames.area.trim() ||
-                        !moveTarget.locationId ||
-                        moveTarget.locationId === NEW_LOCATION_VALUE ||
-                        Boolean(moveCreateAction)
-                      }
-                      onPress={createMoveArea}
-                    >
-                      Create
-                    </Button>
-                  </div>
-                ) : null}
-
-                <Select
-                  label="Category"
-                  placeholder="Select category..."
-                  selectedKeys={
-                    moveTarget.categoryId
-                      ? new Set([String(moveTarget.categoryId)])
-                      : new Set()
-                  }
-                  onSelectionChange={(keys) =>
-                    setMoveTarget((prev) => ({
-                      ...prev,
-                      categoryId: getSelectedValue(keys) || null,
-                    }))
-                  }
-                  isDisabled={
-                    isLoadingHierarchy ||
-                    !moveTarget.areaId ||
-                    moveTarget.areaId === NEW_AREA_VALUE
-                  }
-                  variant="bordered"
-                  radius="lg"
-                  classNames={themedSelectClassNames}
-                >
-                  {currentCategories.map((category) => (
-                    <SelectItem key={String(category.id)}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                  <SelectItem key={NEW_CATEGORY_VALUE}>+ New category</SelectItem>
-                </Select>
-                {moveTarget.categoryId === NEW_CATEGORY_VALUE ? (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-                    <Input
-                      label="New category"
-                      value={moveCreateNames.category}
-                      onValueChange={(value) => updateMoveCreateName("category", value)}
-                      placeholder="Snacks, tools, cleaning..."
-                      isDisabled={
-                        isLoadingHierarchy ||
-                        !moveTarget.areaId ||
-                        moveTarget.areaId === NEW_AREA_VALUE
-                      }
-                      variant="bordered"
-                      radius="lg"
-                      classNames={modalInputClassNames}
-                    />
-                    <Button
-                      className="self-end rounded-xl bg-[var(--stocksense-brand)] text-white"
-                      isLoading={moveCreateAction === "category"}
-                      isDisabled={
-                        !moveCreateNames.category.trim() ||
-                        !moveTarget.areaId ||
-                        moveTarget.areaId === NEW_AREA_VALUE ||
-                        Boolean(moveCreateAction)
-                      }
-                      onPress={createMoveCategory}
-                    >
-                      Create
-                    </Button>
-                  </div>
-                ) : null}
-              </ModalBody>
-
-              <ModalFooter className={modalFooterClass}>
-                <Button
-                  variant="light"
-                  className="rounded-xl max-md:hidden"
-                  onClick={() => setMoveModalOpen(false)}
-                  isDisabled={Boolean(shoppingListMoveAction)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="rounded-xl border border-[var(--entity-shopping-border)] bg-white text-[var(--entity-shopping-accent)]"
-                  onClick={confirmMoveSelectionToShoppingList}
-                  isLoading={Boolean(shoppingListMoveAction)}
-                  isDisabled={
-                    Boolean(shoppingListMoveAction) ||
-                    (!drawerOpen && selectedIds.size === 0) ||
-                    (drawerOpen && !activeItem)
-                  }
-                  startContent={!shoppingListMoveAction ? <FaShoppingBasket /> : null}
-                >
-                  Move to shopping list
-                </Button>
-                <Button
-                  className="rounded-xl bg-[var(--stocksense-brand)] text-white"
-                  onClick={() => {
-                    // If user has selected items and the drawer isn't driving the interaction, treat as bulk.
-                    if (selectedIds.size > 0 && !drawerOpen) confirmMoveBulk();
-                    else confirmMoveSingle();
-                  }}
-                  isDisabled={
-                    isLoadingHierarchy ||
-                    !canConfirmMove ||
-                    Boolean(shoppingListMoveAction)
-                  }
-                >
-                  Move
-                </Button>
-              </ModalFooter>
-            </>
-          )}
-        </ModalContent>
-      </Modal>}
+      {canEditInventory && moveModalOpen && (
+        <ItemsMoveModal
+          isOpen={moveModalOpen}
+          onOpenChange={setMoveModalOpen}
+          selectedCount={selectedCount}
+          drawerOpen={drawerOpen}
+          activeItem={activeItem}
+          selectedIds={selectedIds}
+          moveTarget={moveTarget}
+          setMoveTarget={setMoveTarget}
+          locationOptions={locationOptions}
+          currentAreas={currentAreas}
+          currentCategories={currentCategories}
+          isLoadingHierarchy={isLoadingHierarchy}
+          hierarchyError={hierarchyError}
+          onRetryLoadHierarchy={() => loadHierarchy({ force: true })}
+          moveCreateMessage={moveCreateMessage}
+          moveCreateNames={moveCreateNames}
+          moveCreateAction={moveCreateAction}
+          onMoveCreateNameChange={updateMoveCreateName}
+          onCreateMoveLocation={createMoveLocation}
+          onCreateMoveArea={createMoveArea}
+          onCreateMoveCategory={createMoveCategory}
+          shoppingListMoveAction={shoppingListMoveAction}
+          canConfirmMove={canConfirmMove}
+          onMoveToShoppingList={confirmMoveSelectionToShoppingList}
+          onConfirmMoveSingle={confirmMoveSingle}
+          onConfirmMoveBulk={confirmMoveBulk}
+        />
+      )}
 
       {/* Delete confirmation (single + bulk) */}
-      {canEditInventory && <ConfirmDeleteModal
+      {canEditInventory && deleteDialog.open && <ConfirmDeleteModal
         isOpen={deleteDialog.open}
         isDeleting={deleteDialog.isDeleting}
         isSecondaryConfirming={deleteDialog.isAddingToShoppingList}

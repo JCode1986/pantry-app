@@ -1,7 +1,6 @@
 'use server';
 
 import { getSession } from "@/lib/sessionOptions";
-import { supabase } from "@/lib/supabaseClient";
 
 /** LOGIN – server action */
 export async function login({ email, password, redirectTo = "/dashboard" }) {
@@ -159,7 +158,9 @@ export async function refreshToken() {
     throw new Error("Missing refresh token");
   }
 
-  const { data, error } = await supabase.auth.refreshSession({ refresh_token });
+  const { createClient } = await import('@/utils/supabase/server');
+  const supa = await createClient();
+  const { data, error } = await supa.auth.refreshSession({ refresh_token });
 
   if (error || !data?.session) {
     throw new Error(error?.message || "Failed to refresh session");
@@ -196,7 +197,9 @@ export async function refreshTokenIfNeeded() {
   }
 
   // ⚠️ Token is close to expiring -> refresh via Supabase
-  const { data, error } = await supabase.auth.refreshSession({
+  const { createClient } = await import('@/utils/supabase/server');
+  const supa = await createClient();
+  const { data, error } = await supa.auth.refreshSession({
     refresh_token: user.refresh_token,
   });
 

@@ -1,25 +1,17 @@
 'use client';
 
-import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/modal";
-import { Button } from "@heroui/button";
+import NativeButton from "@/components/ui/NativeButton";
+import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@/components/ui/NativeModal";
+
 import {
   modalBodyClass,
   modalContentClass,
   modalContentStyle,
   modalFooterClass,
   modalHeaderClass,
+  modalTitleClass,
 } from "@/components/modals/modalTheme";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
-
-
-// import {
-//   Modal,
-//   ModalContent,
-//   ModalHeader,
-//   ModalBody,
-//   ModalFooter,
-//   Button,
-// } from '@heroui/modal';
 
 export default function ConfirmDeleteModal({
   isOpen,
@@ -60,7 +52,7 @@ export default function ConfirmDeleteModal({
         {(close) => (
           <>
             <ModalHeader className={`${modalHeaderClass} max-md:static max-md:flex max-md:items-center max-md:gap-3`}>
-              <span className="min-w-0 flex-1 truncate">{title}</span>
+              <span className={`min-w-0 flex-1 ${modalTitleClass}`}>{title}</span>
               {!isBusy ? (
                 <MobileSheetCloseButton
                   onPress={() => {
@@ -76,7 +68,7 @@ export default function ConfirmDeleteModal({
             <ModalFooter
               className={`${modalFooterClass} flex flex-col-reverse gap-2 sm:flex-row sm:justify-end max-md:static`}
             >
-              <Button
+              <NativeButton
                 variant="flat"
                 color="default"
                 className="min-h-11 rounded-xl"
@@ -89,18 +81,18 @@ export default function ConfirmDeleteModal({
                 isDisabled={isBusy}
               >
                 {cancelLabel}
-              </Button>
+              </NativeButton>
               {secondaryConfirmLabel && onSecondaryConfirm ? (
-                <Button
+                <NativeButton
                   className={`min-h-11 rounded-xl ${secondaryConfirmClassName}`}
                   onPress={onSecondaryConfirm}
                   isLoading={isSecondaryConfirming}
                   isDisabled={isDeleting}
                 >
                   {secondaryConfirmLabel}
-                </Button>
+                </NativeButton>
               ) : null}
-              <Button
+              <NativeButton
                 color="danger"
                 className="min-h-11 rounded-xl"
                 onPress={onConfirm}
@@ -108,7 +100,7 @@ export default function ConfirmDeleteModal({
                 isDisabled={isSecondaryConfirming}
               >
                 {confirmLabel}
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </>
         )}

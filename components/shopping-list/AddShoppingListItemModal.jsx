@@ -1,15 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+
+import NativeButton from "@/components/ui/NativeButton";
 import {
-  Button,
-  Input,
+  useEffect,
+  useRef,
+  useState } from "react";
+import {
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
+import NativeInput from "@/components/ui/NativeInput";
 import { FaCamera, FaImage, FaPlus, FaShoppingBasket, FaTrash, FaUpload } from "react-icons/fa";
 import { uploadInventoryImage } from "@/app/actions/server";
 import { addShoppingListItemAction } from "@/app/actions/shoppingList";
@@ -21,6 +25,7 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  modalTitleClass,
   mobileSheetModalClassNames,
 } from "@/components/modals/modalTheme";
 import MobileSuggestionChips from "@/components/modals/MobileSuggestionChips";
@@ -196,12 +201,12 @@ export default function AddShoppingListItemModal({
       <ModalContent className={modalContentClass} style={modalContentStyle}>
         {() => (
           <>
-            <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
-              <span className="inline-flex min-w-0 flex-1 items-center gap-2 truncate">
+            <ModalHeader className={`flex items-center gap-3 ${modalHeaderClass}`}>
+              <span className="inline-flex min-w-0 flex-1 items-center gap-2">
                 <FaShoppingBasket className="h-4 w-4 shrink-0" />
-                <span className="truncate">Add to shopping list</span>
+                <span className={modalTitleClass}>Add to shopping list</span>
               </span>
-              <Button
+              <NativeButton
                 size="sm"
                 className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
                 onPress={() => handleSubmit({ closeAfterAdd: true })}
@@ -209,7 +214,7 @@ export default function AddShoppingListItemModal({
                 startContent={!isSaving ? <FaPlus className="h-3.5 w-3.5" /> : null}
               >
                 Add
-              </Button>
+              </NativeButton>
               <MobileSheetCloseButton onPress={handleClose} />
             </ModalHeader>
 
@@ -220,7 +225,7 @@ export default function AddShoppingListItemModal({
                 </p>
               ) : null}
 
-              <Input
+              <NativeInput
                 label="Item"
                 value={form.name}
                 onValueChange={(value) => updateForm("name", value)}
@@ -289,7 +294,7 @@ export default function AddShoppingListItemModal({
                       }}
                     />
                     <div className="flex flex-wrap gap-2">
-                      <Button
+                      <NativeButton
                         size="sm"
                         variant="flat"
                         className="min-h-10 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)] sm:hidden"
@@ -298,8 +303,8 @@ export default function AddShoppingListItemModal({
                         startContent={<FaCamera className="h-3.5 w-3.5" />}
                       >
                         Take photo
-                      </Button>
-                      <Button
+                      </NativeButton>
+                      <NativeButton
                         size="sm"
                         variant="flat"
                         className="min-h-10 rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
@@ -308,9 +313,9 @@ export default function AddShoppingListItemModal({
                         startContent={<FaUpload className="h-3.5 w-3.5" />}
                       >
                         {imageFile ? "Change photo" : "Add photo"}
-                      </Button>
+                      </NativeButton>
                       {imageFile ? (
-                        <Button
+                        <NativeButton
                           size="sm"
                           variant="flat"
                           className="min-h-10 rounded-xl border border-rose-200 bg-rose-50 text-rose-700"
@@ -319,7 +324,7 @@ export default function AddShoppingListItemModal({
                           startContent={<FaTrash className="h-3.5 w-3.5" />}
                         >
                           Remove
-                        </Button>
+                        </NativeButton>
                       ) : null}
                     </div>
                     <p className="text-xs leading-5 text-gray-500 max-md:hidden">
@@ -332,23 +337,23 @@ export default function AddShoppingListItemModal({
             </ModalBody>
 
             <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-              <Button
+              <NativeButton
                 variant="light"
                 className="rounded-xl max-md:hidden"
                 onPress={handleClose}
                 isDisabled={isSaving}
               >
                 Cancel
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 variant="flat"
                 className="rounded-xl max-md:hidden"
                 onPress={() => handleSubmit({ closeAfterAdd: false })}
                 isDisabled={isSaving}
               >
                 Add another
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                 onPress={() => handleSubmit({ closeAfterAdd: true })}
                 isLoading={isSaving}
@@ -356,7 +361,7 @@ export default function AddShoppingListItemModal({
               >
                 <span className="md:hidden">Create Shopping List Item</span>
                 <span className="max-md:hidden">Add</span>
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </>
         )}

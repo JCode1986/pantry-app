@@ -1,17 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
+
+import NativeButton from "@/components/ui/NativeButton";
+import DatePicker from "@/components/ui/NativeDatePicker";
 import {
-  Button,
-  DatePicker,
-  Input,
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
-import { parseDate } from "@internationalized/date";
+} from "@/components/ui/NativeModal";
+import NativeInput from "@/components/ui/NativeInput";
 import { FaBarcode } from "react-icons/fa";
 
 import EntityImageManager from "@/components/inventory/EntityImageManager";
@@ -24,6 +23,8 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  modalSubtitleClass,
+  modalTitleClass,
   mobileSheetModalClassNames,
 } from "@/components/modals/modalTheme";
 
@@ -36,16 +37,6 @@ export default function AreaItemEditModal({
   onDelete,
   onImageChange,
 }) {
-  const expirationDateValue = useMemo(() => {
-    if (!itemModal.expirationDate) return null;
-
-    try {
-      return parseDate(itemModal.expirationDate);
-    } catch {
-      return null;
-    }
-  }, [itemModal.expirationDate]);
-
   return (
     <Modal
       isOpen={itemModal.open}
@@ -59,14 +50,14 @@ export default function AreaItemEditModal({
       <ModalContent className={modalContentClass} style={modalContentStyle}>
         {() => (
           <>
-            <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
+            <ModalHeader className={`flex items-center gap-3 ${modalHeaderClass}`}>
               <span className="min-w-0 flex-1">
-                <span className="block truncate">Edit item</span>
-                <span className="block truncate text-sm font-normal text-gray-500">
+                <span className={`block ${modalTitleClass}`}>Edit item</span>
+                <span className={`block ${modalSubtitleClass}`}>
                   {itemModal.categoryName || "Category"}
                 </span>
               </span>
-              <Button
+              <NativeButton
                 size="sm"
                 className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
                 onPress={onSave}
@@ -74,11 +65,11 @@ export default function AreaItemEditModal({
                 isDisabled={isSaving || !itemModal.name.trim()}
               >
                 Save
-              </Button>
+              </NativeButton>
               <MobileSheetCloseButton onPress={onClose} />
             </ModalHeader>
             <ModalBody className={`space-y-3 ${modalBodyClass}`}>
-              <Input
+              <NativeInput
                 label="Item name"
                 value={itemModal.name}
                 onValueChange={(value) =>
@@ -101,7 +92,7 @@ export default function AreaItemEditModal({
                 <DatePicker
                   label="Expiration date"
                   labelPlacement="inside"
-                  value={expirationDateValue}
+                  value={itemModal.expirationDate || null}
                   onChange={(date) =>
                     setItemModal((prev) => ({
                       ...prev,
@@ -114,7 +105,7 @@ export default function AreaItemEditModal({
                   showMonthAndYearPickers
                 />
               </div>
-              <Input
+              <NativeInput
                 label="Barcode"
                 value={itemModal.barcode}
                 onValueChange={(value) =>
@@ -134,31 +125,31 @@ export default function AreaItemEditModal({
               />
               <div className="rounded-2xl border border-rose-200 bg-white p-3 md:hidden">
                 <p className="text-sm font-semibold text-gray-950">Danger zone</p>
-                <Button
+                <NativeButton
                   className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
                   onPress={onDelete}
                 >
                   Delete item
-                </Button>
+                </NativeButton>
               </div>
             </ModalBody>
             <ModalFooter className={`${modalFooterClass} max-md:hidden`}>
-              <Button
+              <NativeButton
                 variant="light"
                 onPress={onClose}
                 isDisabled={isSaving}
                 className="max-md:hidden"
               >
                 Cancel
-              </Button>
-              <Button
+              </NativeButton>
+              <NativeButton
                 className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                 onPress={onSave}
                 isLoading={isSaving}
                 isDisabled={!itemModal.name.trim()}
               >
                 Save changes
-              </Button>
+              </NativeButton>
             </ModalFooter>
           </>
         )}

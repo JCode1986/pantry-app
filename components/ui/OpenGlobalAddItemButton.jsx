@@ -1,6 +1,7 @@
 "use client";
 
-import { Button } from "@heroui/react";
+
+import NativeButton from "@/components/ui/NativeButton";
 import { FaPlus } from "react-icons/fa";
 
 export default function OpenGlobalAddItemButton({
@@ -13,7 +14,7 @@ export default function OpenGlobalAddItemButton({
   if (!canEditInventory) return null;
 
   return (
-    <Button
+    <NativeButton
       variant={variant}
       className={className || "rounded-xl bg-[var(--stocksense-brand)] text-white"}
       startContent={<FaPlus />}
@@ -26,6 +27,6 @@ export default function OpenGlobalAddItemButton({
       }}
     >
       {children}
-    </Button>
+    </NativeButton>
   );
 }

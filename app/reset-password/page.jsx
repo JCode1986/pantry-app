@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { supabase } from '@/lib/supabaseClient';
+import { motion, AnimatePresence } from '@/components/ui/MotionLite';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import SiteFooter from '@/components/app-shell/SiteFooter';
+import NativeInput from '@/components/ui/NativeInput';
 
 export default function ResetPasswordPage() {
   const [checking, setChecking] = useState(true);
@@ -26,6 +26,7 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     // After the Supabase magic link, there should be a session.
     const check = async () => {
+      const { supabase } = await import('@/lib/supabaseClient');
       const { data } = await supabase.auth.getSession();
       setAuthed(!!data?.session);
       setChecking(false);
@@ -41,6 +42,7 @@ export default function ResetPasswordPage() {
     setError(null);
     setOk(null);
 
+    const { supabase } = await import('@/lib/supabaseClient');
     const { error: err } = await supabase.auth.updateUser({ password: pw });
     if (err) setError(err.message);
     else setOk('Password updated! You can now log in with your new password.');
@@ -137,43 +139,43 @@ export default function ResetPasswordPage() {
             {authed && (
               <form onSubmit={handleSave} className="space-y-4" noValidate>
                 <motion.div variants={item} className="space-y-1">
-                  <label className="text-sm font-medium text-stocksense-dark-gray" htmlFor="pw">
-                    New password
-                  </label>
-                  <div className="relative">
-                    <input
+                  <NativeInput
+                    label="New password"
                       id="pw"
                       type={showPw ? 'text' : 'password'}
                       value={pw}
-                      onChange={(e) => setPw(e.target.value)}
+                      onValueChange={setPw}
                       placeholder="••••••••"
-                      className="w-full rounded-lg border border-stocksense-gray px-3 py-2 outline-none focus:ring-2 focus:ring-stocksense-sky/60 focus:border-stocksense-sky bg-white pr-10"
+                      endContent={
+                        <button
+                          type="button"
+                          onClick={() => setShowPw((s) => !s)}
+                          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-gray-400 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+                          aria-label={showPw ? 'Hide password' : 'Show password'}
+                        >
+                          {showPw ? <FaEyeSlash className="h-4 w-4" /> : <FaEye className="h-4 w-4" />}
+                        </button>
+                      }
+                      classNames={{
+                        inputWrapper: "rounded-xl border-stocksense-gray shadow-none",
+                      }}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPw((s) => !s)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-stocksense-teal"
-                      aria-label={showPw ? 'Hide password' : 'Show password'}
-                    >
-                      {showPw ? <FaEyeSlash className="h-4 w-4" /> : <FaEye className="h-4 w-4" />}
-                    </button>
-                  </div>
                   {pw.length > 0 && !pwValid && (
                     <p className="text-xs text-amber-700">Min length is 6 characters.</p>
                   )}
                 </motion.div>
 
                 <motion.div variants={item} className="space-y-1">
-                  <label className="text-sm font-medium text-stocksense-dark-gray" htmlFor="pw2">
-                    Confirm password
-                  </label>
-                  <input
+                  <NativeInput
                     id="pw2"
+                    label="Confirm password"
                     type={showPw ? 'text' : 'password'}
                     value={pw2}
-                    onChange={(e) => setPw2(e.target.value)}
+                    onValueChange={setPw2}
                     placeholder="••••••••"
-                    className="w-full rounded-lg border border-stocksense-gray px-3 py-2 outline-none focus:ring-2 focus:ring-stocksense-sky/60 focus:border-stocksense-sky bg-white"
+                    classNames={{
+                      inputWrapper: "rounded-xl border-stocksense-gray shadow-none",
+                    }}
                   />
                   {pw2.length > 0 && !match && (
                     <p className="text-xs text-rose-700">Passwords do not match.</p>

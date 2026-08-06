@@ -1,15 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+
+import NativeButton from "@/components/ui/NativeButton";
 import {
-  Button,
+  useEffect,
+  useState } from "react";
+import { usePathname,
+  useRouter,
+  useSearchParams } from "next/navigation";
+import {
   Modal,
   ModalBody,
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from "@heroui/react";
+} from "@/components/ui/NativeModal";
 import { FaCheckCircle } from "react-icons/fa";
 
 function getCleanUrl(pathname, search) {
@@ -117,13 +122,13 @@ export default function InviteAcceptedModal() {
           ) : null}
         </ModalBody>
         <ModalFooter className="border-t border-gray-200 px-5 py-4">
-          <Button
+          <NativeButton
             className="min-h-11 w-full rounded-xl bg-[var(--stocksense-brand)] text-white"
             onPress={handleContinue}
             startContent={<FaCheckCircle className="h-4 w-4" />}
           >
             Continue
-          </Button>
+          </NativeButton>
         </ModalFooter>
       </ModalContent>
     </Modal>
