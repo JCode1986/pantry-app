@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from '@/components/ui/MotionLite';
 import {
   addStorageArea,
@@ -26,7 +25,6 @@ import {
   FaEdit,
   FaTrash,
   FaChevronUp,
-  FaEllipsisV,
   FaSearch,
   FaBoxOpen,
   FaLayerGroup,
@@ -37,6 +35,7 @@ import {
 } from 'react-icons/fa';
 import { emitInventoryChange, emitItemAdded } from '@/utils/clientEvents';
 import ImageWithLoader from '@/components/ui/ImageWithLoader';
+import NativeDropdown from '@/components/ui/NativeDropdown';
 import NativeSelect from '@/components/ui/NativeSelect';
 import PaginationControls from '@/components/ui/PaginationControls';
 import SearchResultsLoadingState from '@/components/ui/SearchResultsLoadingState';
@@ -137,95 +136,12 @@ function SearchInput({ value, onChange, placeholder, className = '' }) {
 }
 
 function ActionMenu({ ariaLabel, items, buttonClassName = 'h-9 w-9 min-w-9' }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState(null);
-  const buttonRef = useRef(null);
-  const menuRef = useRef(null);
-
-  useEffect(() => {
-    if (!isOpen) return undefined;
-
-    const closeOnOutsideClick = (event) => {
-      const target = event.target;
-      if (
-        buttonRef.current?.contains(target) ||
-        menuRef.current?.contains(target)
-      ) {
-        return;
-      }
-      setIsOpen(false);
-    };
-
-    const closeMenu = () => setIsOpen(false);
-
-    document.addEventListener('pointerdown', closeOnOutsideClick);
-    window.addEventListener('scroll', closeMenu, true);
-    window.addEventListener('resize', closeMenu);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsideClick);
-      window.removeEventListener('scroll', closeMenu, true);
-      window.removeEventListener('resize', closeMenu);
-    };
-  }, [isOpen]);
-
-  const menu =
-    isOpen && menuPosition
-      ? createPortal(
-          <div
-            ref={menuRef}
-            role="menu"
-            aria-label={ariaLabel}
-            style={{
-              top: `${menuPosition.top}px`,
-              right: `${menuPosition.right}px`,
-            }}
-            className="fixed z-[120] min-w-48 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 text-sm shadow-xl"
-          >
-            {items.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setIsOpen(false);
-                  item.onSelect();
-                }}
-                className={`block w-full px-3 py-2 text-left font-medium transition hover:bg-gray-50 ${
-                  item.danger ? 'text-rose-700' : 'text-gray-700'
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>,
-          document.body
-        )
-      : null;
-
   return (
-    <div className="relative">
-      <button
-        ref={buttonRef}
-        type="button"
-        aria-label={ariaLabel}
-        aria-haspopup="menu"
-        aria-expanded={isOpen}
-        onClick={() => {
-          const rect = buttonRef.current?.getBoundingClientRect();
-          if (rect) {
-            setMenuPosition({
-              top: rect.bottom + 8,
-              right: Math.max(12, window.innerWidth - rect.right),
-            });
-          }
-          setIsOpen((current) => !current);
-        }}
-        className={`grid shrink-0 place-items-center rounded-xl text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)] ${buttonClassName}`}
-      >
-        <FaEllipsisV className="h-4 w-4" />
-      </button>
-      {menu}
-    </div>
+    <NativeDropdown
+      ariaLabel={ariaLabel}
+      buttonClassName={buttonClassName}
+      items={items}
+    />
   );
 }
 

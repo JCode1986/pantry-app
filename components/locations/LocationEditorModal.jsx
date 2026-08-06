@@ -24,6 +24,7 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  modalTitleClass,
   mobileSheetModalClassNames,
 } from "@/components/modals/modalTheme";
 
@@ -69,7 +70,7 @@ export default function LocationEditorModal({
         <ModalHeader
           className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}
         >
-          <span className="min-w-0 flex-1 truncate">
+          <span className={`min-w-0 flex-1 ${modalTitleClass}`}>
             {locationModal.mode === "edit"
               ? `Edit location ${locationModal.name || ""}`
               : "Create Location"}

@@ -37,20 +37,14 @@ const NativeInput = forwardRef(function NativeInput(
   const inputId = id ?? generatedId;
   const resolvedDisabled = disabled || isDisabled;
   const showError = isInvalid && errorMessage;
+  const hasLabel = Boolean(label);
 
   return (
     <div className={cx("space-y-1", className)}>
-      {label ? (
-        <label
-          htmlFor={inputId}
-          className={cx("block text-xs font-semibold text-gray-700", classNames.label)}
-        >
-          {label}
-        </label>
-      ) : null}
       <div
         className={cx(
-          "flex min-h-10 items-center gap-2 border bg-white px-3 shadow-sm transition focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]",
+          "group flex items-center gap-2 border bg-white px-3 shadow-sm transition focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]",
+          hasLabel ? "min-h-14 py-2" : "min-h-10 py-1",
           variant === "bordered" ? "border-gray-200" : "border-transparent",
           radiusClasses[radius] ?? radiusClasses.lg,
           isInvalid ? "border-rose-500 bg-rose-50/40 focus-within:border-rose-500" : "",
@@ -59,24 +53,40 @@ const NativeInput = forwardRef(function NativeInput(
         )}
       >
         {startContent}
-        <input
-          {...props}
-          id={inputId}
-          ref={ref}
-          type={type}
-          value={value}
-          disabled={resolvedDisabled}
-          aria-invalid={isInvalid || undefined}
-          aria-describedby={showError ? `${inputId}-error` : undefined}
-          onChange={(event) => {
-            onChange?.(event);
-            onValueChange?.(event.target.value);
-          }}
-          className={cx(
-            "min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400 disabled:text-gray-400",
-            classNames.input
-          )}
-        />
+        <div className="min-w-0 flex-1">
+          {hasLabel ? (
+            <label
+              htmlFor={inputId}
+              className={cx(
+                "block truncate text-[11px] font-semibold leading-4 text-gray-500 transition group-focus-within:text-[var(--stocksense-brand)]",
+                isInvalid ? "text-rose-600 group-focus-within:text-rose-600" : "",
+                resolvedDisabled ? "text-gray-400" : "",
+                classNames.label
+              )}
+            >
+              {label}
+            </label>
+          ) : null}
+          <input
+            {...props}
+            id={inputId}
+            ref={ref}
+            type={type}
+            value={value}
+            disabled={resolvedDisabled}
+            aria-invalid={isInvalid || undefined}
+            aria-describedby={showError ? `${inputId}-error` : undefined}
+            onChange={(event) => {
+              onChange?.(event);
+              onValueChange?.(event.target.value);
+            }}
+            className={cx(
+              "block w-full min-w-0 bg-transparent text-sm font-medium text-gray-900 outline-none placeholder:text-gray-400 disabled:text-gray-400",
+              hasLabel ? "h-5 leading-5" : "h-7 leading-7",
+              classNames.input
+            )}
+          />
+        </div>
         {endContent}
       </div>
       {showError ? (

@@ -21,6 +21,7 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  modalTitleClass,
   mobileSheetModalClassNames,
 } from "@/components/modals/modalTheme";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
@@ -83,7 +84,7 @@ export default function AreaDetailModals({
               <ModalHeader
                 className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}
               >
-                <span className="min-w-0 flex-1 truncate">Create Category</span>
+                <span className={`min-w-0 flex-1 ${modalTitleClass}`}>Create Category</span>
                 <NativeButton
                   size="sm"
                   className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
@@ -225,7 +226,7 @@ export default function AreaDetailModals({
               <ModalHeader
                 className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}
               >
-                <span className="min-w-0 flex-1 truncate">Edit storage area</span>
+                <span className={`min-w-0 flex-1 ${modalTitleClass}`}>Edit storage area</span>
                 <NativeButton
                   size="sm"
                   className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
@@ -303,7 +304,7 @@ export default function AreaDetailModals({
               <ModalHeader
                 className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}
               >
-                <span className="min-w-0 flex-1 truncate">Edit category</span>
+                <span className={`min-w-0 flex-1 ${modalTitleClass}`}>Edit category</span>
                 <NativeButton
                   size="sm"
                   className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"

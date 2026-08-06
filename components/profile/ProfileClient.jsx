@@ -97,12 +97,12 @@ const HOUSEHOLD_ROLE_OPTIONS = [
   {
     id: "editor",
     label: "Editor",
-    description: "Can add, edit, move, delete, and manage shopping list items.",
+    description: "add, edit, delete",
   },
   {
     id: "viewer",
     label: "Viewer",
-    description: "Can view inventory, shopping list, and recent activity only.",
+    description: "only view",
   },
 ];
 

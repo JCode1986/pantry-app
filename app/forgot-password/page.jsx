@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from '@/components/ui/MotionLite';
-import { supabase } from '@/lib/supabaseClient';
 import SiteFooter from '@/components/app-shell/SiteFooter';
+import NativeInput from '@/components/ui/NativeInput';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -26,6 +26,7 @@ export default function ForgotPasswordPage() {
         ? window.location.origin
         : process.env.NEXT_PUBLIC_APP_URL || 'https://www.wherekeep.com';
 
+    const { supabase } = await import('@/lib/supabaseClient');
     const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${origin}/reset-password`,
     });
@@ -102,16 +103,16 @@ export default function ForgotPasswordPage() {
 
             <form onSubmit={handleSend} className="space-y-4" noValidate>
               <motion.div variants={item} className="space-y-1">
-                <label className="text-sm font-medium text-stocksense-dark-gray" htmlFor="email">
-                  Email
-                </label>
-                <input
+                <NativeInput
                   id="email"
+                  label="Email"
                   type="email"
                   placeholder="you@domain.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-lg border border-stocksense-gray px-3 py-2 outline-none focus:ring-2 focus:ring-stocksense-sky/60 focus:border-stocksense-sky bg-white"
+                  onValueChange={setEmail}
+                  classNames={{
+                    inputWrapper: "rounded-xl border-stocksense-gray shadow-none",
+                  }}
                 />
                 {!emailValid && email.length > 0 && (
                   <p className="text-xs text-amber-700">Please enter a valid email.</p>

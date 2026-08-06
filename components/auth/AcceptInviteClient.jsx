@@ -219,7 +219,7 @@ export default function AcceptInviteClient({
       }}
     >
       <ModalContent className="border border-gray-200 bg-white text-gray-800 shadow-2xl max-md:rounded-b-none max-md:rounded-t-2xl">
-        <ModalHeader className="border-b border-amber-200 bg-amber-50 text-gray-950">
+        <ModalHeader className="flex items-center gap-3 border-b border-amber-200 bg-amber-50 text-gray-950">
           Existing inventory found
         </ModalHeader>
         <ModalBody className="space-y-3 px-5 py-4 text-sm leading-5 text-amber-900">

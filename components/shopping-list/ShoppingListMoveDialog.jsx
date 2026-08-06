@@ -14,6 +14,8 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  modalSubtitleClass,
+  modalTitleClass,
   mobileSheetModalClassNames,
 } from "@/components/modals/modalTheme";
 import NativeInput from "@/components/ui/NativeInput";
@@ -60,15 +62,15 @@ export default function ShoppingListMoveDialog({
       <ModalContent className={modalContentClass} style={modalContentStyle}>
         {() => (
           <>
-            <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
+            <ModalHeader className={`flex items-center gap-3 ${modalHeaderClass}`}>
               <span className="min-w-0 flex-1">
-                <span className="block truncate">Move to inventory</span>
+                <span className={`block ${modalTitleClass}`}>Move to inventory</span>
                 {moveDialog.item?.name ? (
-                  <span className="block truncate text-sm font-normal text-gray-500">
+                  <span className={`block ${modalSubtitleClass}`}>
                     {moveDialog.item.name}
                   </span>
                 ) : moveDialog.itemIds?.length > 1 ? (
-                  <span className="block truncate text-sm font-normal text-gray-500">
+                  <span className={`block ${modalSubtitleClass}`}>
                     {moveDialog.itemIds.length} selected items
                   </span>
                 ) : null}

@@ -12,8 +12,6 @@ import NativeInput from "@/components/ui/NativeInput";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { AnimatePresence,
-  motion } from "framer-motion";
 import DatePicker from "@/components/ui/NativeDatePicker";
 import {
   Modal,
@@ -74,14 +72,6 @@ const ADD_METHODS = [
   { id: "voice", label: "Voice", icon: FaMicrophone },
   { id: "manual", label: "Manual", icon: FaPlus },
 ];
-const revealTransition = { duration: 0.2, ease: "easeOut" };
-const revealMotion = {
-  initial: { opacity: 0, height: 0, y: -6 },
-  animate: { opacity: 1, height: "auto", y: 0 },
-  exit: { opacity: 0, height: 0, y: -6 },
-  transition: revealTransition,
-};
-
 const emptyForm = {
   locationName: "",
   storageAreaName: "",
@@ -183,9 +173,7 @@ function AddItemMessage({ message, upgradeHref, onLinkClick, className = "" }) {
   if (!message) return null;
 
   return (
-    <motion.div
-      layout
-      {...revealMotion}
+    <div
       role="alert"
       aria-live="polite"
       className={`overflow-hidden rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 ${className}`}
@@ -200,7 +188,7 @@ function AddItemMessage({ message, upgradeHref, onLinkClick, className = "" }) {
           View plans
         </Link>
       )}
-    </motion.div>
+    </div>
   );
 }
 
@@ -216,9 +204,7 @@ function NewPathField({
   errorMessage = "",
 }) {
   return (
-    <motion.div
-      layout
-      {...revealMotion}
+    <div
       className={`overflow-hidden rounded-xl border p-3 shadow-sm ${
         isInvalid
           ? "border-rose-200 bg-rose-50/60"
@@ -249,7 +235,7 @@ function NewPathField({
             }`,
         }}
       />
-    </motion.div>
+    </div>
   );
 }
 
@@ -1156,36 +1142,42 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
             </ModalHeader>
 
             <ModalBody className={`min-h-[150px] space-y-4 pb-3 max-md:bg-gray-50 max-md:px-4 max-md:pb-5 max-md:pt-4 ${modalBodyClass}`}>
-              <AnimatePresence initial={false}>
-                <AddItemMessage
-                  message={message}
-                  upgradeHref={upgradeHref}
-                  onLinkClick={handleClose}
-                  className="hidden md:block"
-                />
-              </AnimatePresence>
+              <AddItemMessage
+                message={message}
+                upgradeHref={upgradeHref}
+                onLinkClick={handleClose}
+                className="hidden md:block"
+              />
+              {mobileAddedToast && (
+                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-3 shadow-sm md:hidden">
+                  <div className="text-sm font-semibold text-gray-950">
+                    Item added
+                  </div>
+                  <div className="mt-0.5 text-xs text-gray-600">
+                    {mobileAddedToast.itemName} was added to{" "}
+                    {mobileAddedToast.destinationName}.
+                  </div>
+                </div>
+              )}
+              <AddItemMessage
+                message={message}
+                upgradeHref={upgradeHref}
+                onLinkClick={handleClose}
+                className="md:hidden"
+              />
 
-              <AnimatePresence mode="wait" initial={false}>
+              <>
                 {isLoading ? (
-                  <motion.div
+                  <div
                     key="loading"
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={revealTransition}
                     className="flex min-h-[150px] items-center justify-center rounded-2xl border border-dashed border-stocksense-gray bg-gray-50 text-sm text-gray-500"
                   >
                     <FaSpinner className="mr-2 animate-spin" />
                     Loading inventory...
-                  </motion.div>
+                  </div>
                 ) : (
-                  <motion.div
+                  <div
                     key="form"
-                    layout
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={revealTransition}
                     className="flex min-w-0 flex-col gap-3 sm:gap-4"
                   >
                     <div className="order-0 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm md:hidden">
@@ -1277,8 +1269,8 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                         </div>
                       </div>
 
-                      <motion.div layout className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                      <motion.div layout className="space-y-2">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                      <div className="space-y-2">
                         {hasExistingLocations && (
                           <NativeSelect
                             label="Location"
@@ -1300,24 +1292,22 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                             ]}
                           />
                         )}
-                        <AnimatePresence initial={false}>
-                          {locationId === NEW_VALUE && (
-                            <NewPathField
-                              icon={FaMapMarkerAlt}
-                              title="Create location"
-                              label="Location name"
-                              value={form.locationName}
-                              onValueChange={(value) => updateForm("locationName", value)}
-                              placeholder="e.g., Home"
-                              isDisabled={isSaving}
-                              isInvalid={Boolean(validationErrors.locationName)}
-                              errorMessage={validationErrors.locationName}
-                            />
-                          )}
-                        </AnimatePresence>
-                      </motion.div>
+                        {locationId === NEW_VALUE && (
+                          <NewPathField
+                            icon={FaMapMarkerAlt}
+                            title="Create location"
+                            label="Location name"
+                            value={form.locationName}
+                            onValueChange={(value) => updateForm("locationName", value)}
+                            placeholder="e.g., Home"
+                            isDisabled={isSaving}
+                            isInvalid={Boolean(validationErrors.locationName)}
+                            errorMessage={validationErrors.locationName}
+                          />
+                        )}
+                      </div>
 
-                      <motion.div layout className="space-y-2">
+                      <div className="space-y-2">
                         {hasExistingStorageAreas && (
                           <NativeSelect
                             label="Storage area"
@@ -1339,24 +1329,22 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                             ]}
                           />
                         )}
-                        <AnimatePresence initial={false}>
-                          {storageAreaId === NEW_VALUE && (
-                            <NewPathField
-                              icon={FaWarehouse}
-                              title="Create storage area"
-                              label="Storage area name"
-                              value={form.storageAreaName}
-                              onValueChange={(value) => updateForm("storageAreaName", value)}
-                              placeholder="e.g., Kitchen pantry"
-                              isDisabled={isSaving}
-                              isInvalid={Boolean(validationErrors.storageAreaName)}
-                              errorMessage={validationErrors.storageAreaName}
-                            />
-                          )}
-                        </AnimatePresence>
-                      </motion.div>
+                        {storageAreaId === NEW_VALUE && (
+                          <NewPathField
+                            icon={FaWarehouse}
+                            title="Create storage area"
+                            label="Storage area name"
+                            value={form.storageAreaName}
+                            onValueChange={(value) => updateForm("storageAreaName", value)}
+                            placeholder="e.g., Kitchen pantry"
+                            isDisabled={isSaving}
+                            isInvalid={Boolean(validationErrors.storageAreaName)}
+                            errorMessage={validationErrors.storageAreaName}
+                          />
+                        )}
+                      </div>
 
-                      <motion.div layout className="space-y-2">
+                      <div className="space-y-2">
                         {hasExistingCategories && (
                           <NativeSelect
                             label="Category"
@@ -1384,23 +1372,21 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                             ]}
                           />
                         )}
-                        <AnimatePresence initial={false}>
-                          {categoryId === NEW_VALUE && (
-                            <NewPathField
-                              icon={FaTags}
-                              title="Create category"
-                              label="Category name"
-                              value={form.categoryName}
-                              onValueChange={(value) => updateForm("categoryName", value)}
-                              placeholder="e.g., Snacks or Shelf 1"
-                              isDisabled={isSaving}
-                              isInvalid={Boolean(validationErrors.categoryName)}
-                              errorMessage={validationErrors.categoryName}
-                            />
-                          )}
-                        </AnimatePresence>
-                      </motion.div>
-                      </motion.div>
+                        {categoryId === NEW_VALUE && (
+                          <NewPathField
+                            icon={FaTags}
+                            title="Create category"
+                            label="Category name"
+                            value={form.categoryName}
+                            onValueChange={(value) => updateForm("categoryName", value)}
+                            placeholder="e.g., Snacks or Shelf 1"
+                            isDisabled={isSaving}
+                            isInvalid={Boolean(validationErrors.categoryName)}
+                            errorMessage={validationErrors.categoryName}
+                          />
+                        )}
+                      </div>
+                      </div>
                     </div>
 
                     <label className="order-[45] flex min-h-14 w-full cursor-pointer items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm md:hidden">
@@ -1474,7 +1460,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                           startContent={<FaBarcode className="text-gray-400" />}
                           classNames={modalInputClassNames}
                         />
-                        <div className="grid grid-cols-1 gap-2 md:grid-cols-1">
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                           <NativeButton
                             className="hidden rounded-xl bg-[var(--stocksense-brand)] text-white md:inline-flex"
                             onPress={() => {
@@ -1697,74 +1683,14 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                         </div>
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 )}
-              </AnimatePresence>
+              </>
             </ModalBody>
 
             <ModalFooter
-              className="wherekeep-modal-footer flex shrink-0 flex-col gap-2 border-t border-gray-200 bg-white max-md:sticky max-md:bottom-0 max-md:z-20 max-md:px-4 max-md:pb-[max(4.5rem,calc(env(safe-area-inset-bottom)+1rem))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)] sm:flex-row sm:items-center sm:justify-end"
+              className="wherekeep-modal-footer hidden shrink-0 gap-2 border-t border-gray-200 bg-white md:flex md:flex-row md:items-center md:justify-end"
             >
-              <AnimatePresence initial={false}>
-                {mobileAddedToast && (
-                  <motion.div
-                    layout
-                    {...revealMotion}
-                    className="w-full overflow-hidden rounded-2xl border border-gray-200 bg-white p-3 shadow-sm md:hidden"
-                  >
-                    <div className="text-sm font-semibold text-gray-950">
-                      Item added
-                    </div>
-                    <div className="mt-0.5 truncate text-xs text-gray-600">
-                      {mobileAddedToast.itemName} was added to{" "}
-                      {mobileAddedToast.destinationName}.
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <NativeButton
-                        size="sm"
-                        variant="flat"
-                        className="rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
-                        onPress={() => {
-                          handleClose();
-                        }}
-                      >
-                        Done
-                      </NativeButton>
-                      <NativeButton
-                        size="sm"
-                        className="rounded-xl bg-[var(--stocksense-brand)] text-white"
-                        onPress={() => {
-                          setMobileAddedToast(null);
-                          setMessage("");
-                          if (addMethod === "barcode") {
-                            setIsBarcodeExpanded(true);
-                            openBarcodeScanner(true);
-                          }
-                          if (addMethod === "voice") {
-                            handleVoiceQuickAdd();
-                          }
-                        }}
-                      >
-                        {addMethod === "barcode"
-                          ? "Scan next"
-                          : addMethod === "voice"
-                          ? "Voice next"
-                          : "Add another"}
-                      </NativeButton>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <AnimatePresence initial={false}>
-                <AddItemMessage
-                  message={message}
-                  upgradeHref={upgradeHref}
-                  onLinkClick={handleClose}
-                  className="w-full md:hidden"
-                />
-              </AnimatePresence>
-
               <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:justify-end">
                 <NativeButton variant="light" className="hidden rounded-xl md:inline-flex" onPress={handleClose} isDisabled={isSaving}>
                   Cancel
@@ -1783,16 +1709,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                   isDisabled={isSaving || isLoading || isQuickAdding}
                   startContent={isSaving ? <FaSpinner className="animate-spin" /> : <FaPlus />}
                 >
-                  {isSaving ? (
-                    "Adding..."
-                  ) : (
-                    <>
-                      <span className="md:hidden">
-                        {keepAdding ? "Add item" : "Add item & done"}
-                      </span>
-                      <span className="hidden md:inline">Add another</span>
-                    </>
-                  )}
+                  {isSaving ? "Adding..." : "Add another"}
                 </NativeButton>
               </div>
             </ModalFooter>

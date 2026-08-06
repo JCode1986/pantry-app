@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FaEllipsisV } from "react-icons/fa";
+import { cx } from "@/components/ui/classNames";
+import useTransitionMount from "@/components/ui/useTransitionMount";
 
 export default function NativeDropdown({
   ariaLabel,
@@ -15,6 +17,7 @@ export default function NativeDropdown({
   const [menuPosition, setMenuPosition] = useState(null);
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
+  const { isVisible, shouldRender } = useTransitionMount(isOpen);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -56,7 +59,7 @@ export default function NativeDropdown({
   };
 
   const menu =
-    isOpen && menuPosition
+    shouldRender && menuPosition
       ? createPortal(
           <div
             ref={menuRef}
@@ -66,7 +69,12 @@ export default function NativeDropdown({
               top: `${menuPosition.top}px`,
               right: `${menuPosition.right}px`,
             }}
-            className="fixed z-[120] min-w-48 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 text-sm shadow-xl"
+            className={cx(
+              "fixed z-[180] origin-top-right min-w-48 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 text-sm shadow-xl transition duration-200 ease-out motion-reduce:transition-none",
+              isVisible
+                ? "translate-y-0 scale-100 opacity-100"
+                : "pointer-events-none -translate-y-2 scale-95 opacity-0"
+            )}
           >
             {items.filter(Boolean).map((item) => (
               <button

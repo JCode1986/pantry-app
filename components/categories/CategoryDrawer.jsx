@@ -18,6 +18,8 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  modalSubtitleClass,
+  modalTitleClass,
 } from "@/components/modals/modalTheme";
 
 export default function CategoryDrawer({
@@ -46,16 +48,16 @@ export default function CategoryDrawer({
         {() => (
           <>
             <ModalHeader
-              className={`flex flex-col gap-1 ${modalHeaderClass} max-md:flex-row max-md:gap-3`}
+              className={`flex flex-col gap-1 ${modalHeaderClass} max-md:flex-row max-md:items-center max-md:gap-3`}
             >
               <div
-                className="min-w-0 flex-1 truncate text-lg font-semibold text-[var(--stocksense-brand)]"
+                className={`min-w-0 flex-1 ${modalTitleClass}`}
                 title={activeCategory?.name || "Category"}
               >
                 {activeCategory?.name || "Category"}
               </div>
               <div
-                className="truncate text-sm text-gray-500 max-md:hidden"
+                className={`${modalSubtitleClass} max-md:hidden`}
                 title={`${activeCategory?.location?.name || ""} / ${activeCategory?.storageArea?.name || ""}`}
               >
                 {activeCategory?.location?.name} &gt; {activeCategory?.storageArea?.name}

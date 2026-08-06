@@ -25,6 +25,7 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  modalTitleClass,
   mobileSheetModalClassNames,
 } from "@/components/modals/modalTheme";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
@@ -151,10 +152,10 @@ export default function EditShoppingListItemModal({
       <ModalContent className={modalContentClass} style={modalContentStyle}>
         {() => (
           <>
-            <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
-              <span className="inline-flex min-w-0 flex-1 items-center gap-2 truncate">
+            <ModalHeader className={`flex items-center gap-3 ${modalHeaderClass}`}>
+              <span className="inline-flex min-w-0 flex-1 items-center gap-2">
                 <FaEdit className="h-4 w-4 shrink-0" />
-                <span className="truncate">Edit shopping list item</span>
+                <span className={modalTitleClass}>Edit shopping list item</span>
               </span>
               <NativeButton
                 size="sm"

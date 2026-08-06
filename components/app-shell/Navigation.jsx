@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { INVENTORY_CHANGE_EVENT } from "@/utils/clientEvents";
-import { createClient as createBrowserSupabaseClient } from "@/utils/supabase/client";
 import WhereKeepLogo from "@/components/ui/WhereKeepLogo";
 import {
   DEFAULT_PREFERENCES,
@@ -14,6 +13,7 @@ import {
 } from "@/utils/appPreferences";
 import { clearBrowserLogoutStorage } from "@/utils/logoutStorage";
 import { cx } from "@/components/ui/classNames";
+import useTransitionMount from "@/components/ui/useTransitionMount";
 import {
   FaBell,
   FaMapMarkedAlt,
@@ -152,6 +152,9 @@ function logNavigationWarning(message, details) {
 }
 
 async function fetchAttentionCounts() {
+  const { createClient: createBrowserSupabaseClient } = await import(
+    "@/utils/supabase/client"
+  );
   const supabase = createBrowserSupabaseClient();
   try {
     const { data, error } = await supabase.rpc(
@@ -601,10 +604,8 @@ export default function Navigation({
 
   const [loggingOut, setLoggingOut] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [renderLogoutModal, setRenderLogoutModal] = useState(false);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [showAddActionSheet, setShowAddActionSheet] = useState(false);
-  const [renderAddActionSheet, setRenderAddActionSheet] = useState(false);
   const [showItemSearchModal, setShowItemSearchModal] = useState(false);
   const [isAttentionOpen, setIsAttentionOpen] = useState(false);
   const [attentionAnchor, setAttentionAnchor] = useState(null);
@@ -617,6 +618,7 @@ export default function Navigation({
     useState(false);
   const [activeHash, setActiveHash] = useState("");
   const [sharingPanel, setSharingPanel] = useState(null);
+  const [lastSharingPanel, setLastSharingPanel] = useState(null);
   const [sharingTab, setSharingTab] = useState("members");
   const [sharingData, setSharingData] = useState(null);
   const [sharingLoading, setSharingLoading] = useState(false);
@@ -626,7 +628,6 @@ export default function Navigation({
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("editor");
   const [removeMemberCandidate, setRemoveMemberCandidate] = useState(null);
-  const [renderRemoveMemberModal, setRenderRemoveMemberModal] = useState(false);
   const [lastRemoveMemberCandidate, setLastRemoveMemberCandidate] = useState(null);
   const [copiedInviteId, setCopiedInviteId] = useState(null);
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
@@ -635,47 +636,43 @@ export default function Navigation({
   const [preferenceMessage, setPreferenceMessage] = useState(null);
   const canCustomizeAppearance =
     (navigationSummary?.effectivePlanId || "free") !== "free";
+  const { shouldRender: shouldRenderLogoutModal } = useTransitionMount(
+    showLogoutModal,
+    NATIVE_MODAL_EXIT_MS
+  );
+  const { shouldRender: shouldRenderAddActionSheet } = useTransitionMount(
+    showAddActionSheet,
+    NATIVE_MODAL_EXIT_MS
+  );
+  const { shouldRender: shouldRenderAttentionSheet } = useTransitionMount(
+    isAttentionOpen,
+    NATIVE_MODAL_EXIT_MS
+  );
+  const { shouldRender: shouldRenderSharingPanel } = useTransitionMount(
+    Boolean(sharingPanel),
+    NATIVE_MODAL_EXIT_MS
+  );
+  const { shouldRender: shouldRenderRemoveMemberModal } = useTransitionMount(
+    Boolean(removeMemberCandidate),
+    NATIVE_MODAL_EXIT_MS
+  );
+  const displayedSharingPanel = sharingPanel || lastSharingPanel;
 
   useEffect(() => {
-    if (showLogoutModal) {
-      setRenderLogoutModal(true);
-      return undefined;
+    if (sharingPanel) {
+      setLastSharingPanel(sharingPanel);
+    } else if (!shouldRenderSharingPanel) {
+      setLastSharingPanel(null);
     }
-
-    const closeTimer = window.setTimeout(() => {
-      setRenderLogoutModal(false);
-    }, NATIVE_MODAL_EXIT_MS);
-
-    return () => window.clearTimeout(closeTimer);
-  }, [showLogoutModal]);
-
-  useEffect(() => {
-    if (showAddActionSheet) {
-      setRenderAddActionSheet(true);
-      return undefined;
-    }
-
-    const closeTimer = window.setTimeout(() => {
-      setRenderAddActionSheet(false);
-    }, NATIVE_MODAL_EXIT_MS);
-
-    return () => window.clearTimeout(closeTimer);
-  }, [showAddActionSheet]);
+  }, [sharingPanel, shouldRenderSharingPanel]);
 
   useEffect(() => {
     if (removeMemberCandidate) {
       setLastRemoveMemberCandidate(removeMemberCandidate);
-      setRenderRemoveMemberModal(true);
-      return undefined;
-    }
-
-    const closeTimer = window.setTimeout(() => {
-      setRenderRemoveMemberModal(false);
+    } else if (!shouldRenderRemoveMemberModal) {
       setLastRemoveMemberCandidate(null);
-    }, NATIVE_MODAL_EXIT_MS);
-
-    return () => window.clearTimeout(closeTimer);
-  }, [removeMemberCandidate]);
+    }
+  }, [removeMemberCandidate, shouldRenderRemoveMemberModal]);
 
   const activeHref = useMemo(() => {
     const desktopItems = desktopSidebarSections.flatMap((section) => section.items);
@@ -1309,7 +1306,7 @@ export default function Navigation({
         onOpenAttention={openAttentionSheet}
       />
 
-      {sharingPanel === "members" && (
+      {shouldRenderSharingPanel && displayedSharingPanel === "members" && (
         <HouseholdSharingPanel
           activePanel={sharingPanel}
           activeTab={sharingTab}
@@ -1334,7 +1331,7 @@ export default function Navigation({
         />
       )}
 
-      {sharingPanel === "preferences" && (
+      {shouldRenderSharingPanel && displayedSharingPanel === "preferences" && (
         <PreferencesPanel
           isOpen={sharingPanel === "preferences"}
           preferences={preferences}
@@ -1365,7 +1362,7 @@ export default function Navigation({
         />
       )}
 
-      {isAttentionOpen && (
+      {shouldRenderAttentionSheet && (
         <AttentionSheet
           isOpen={isAttentionOpen}
           onClose={() => setIsAttentionOpen(false)}
@@ -1458,7 +1455,7 @@ export default function Navigation({
         />
       )}
 
-      {(showAddActionSheet || renderAddActionSheet) && (
+      {shouldRenderAddActionSheet && (
         <NavigationAddActionSheet
           isOpen={showAddActionSheet}
           onOpenChange={setShowAddActionSheet}
@@ -1483,7 +1480,7 @@ export default function Navigation({
         </div>
       )}
 
-      {(removeMemberCandidate || renderRemoveMemberModal) && (
+      {shouldRenderRemoveMemberModal && (
         <NavigationRemoveMemberModal
           candidate={removeMemberCandidate}
           displayCandidate={removeMemberCandidate || lastRemoveMemberCandidate}
@@ -1493,7 +1490,7 @@ export default function Navigation({
         />
       )}
 
-      {(showLogoutModal || renderLogoutModal) && (
+      {shouldRenderLogoutModal && (
         <NavigationLogoutModal
           isOpen={showLogoutModal}
           onOpenChange={setShowLogoutModal}

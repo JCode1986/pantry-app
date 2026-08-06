@@ -18,6 +18,8 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  modalSubtitleClass,
+  modalTitleClass,
 } from "@/components/modals/modalTheme";
 
 export default function AreaDrawer({
@@ -45,16 +47,16 @@ export default function AreaDrawer({
       <ModalContent className={modalContentClass} style={modalContentStyle}>
         {() => (
           <>
-            <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
+            <ModalHeader className={`flex items-center gap-3 ${modalHeaderClass}`}>
               <div className="min-w-0 flex-1">
                 <div
-                  className="truncate text-lg font-semibold text-[var(--stocksense-brand)]"
+                  className={modalTitleClass}
                   title={activeArea?.name || "Storage Area"}
                 >
                   {activeArea?.name || "Storage Area"}
                 </div>
                 <div
-                  className="truncate text-sm text-gray-500"
+                  className={modalSubtitleClass}
                   title={activeArea?.location?.name || ""}
                 >
                   {activeArea?.location?.name}

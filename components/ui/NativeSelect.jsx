@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FaChevronDown } from "react-icons/fa";
+import { cx } from "@/components/ui/classNames";
+import useTransitionMount from "@/components/ui/useTransitionMount";
 
 export default function NativeSelect({
   "aria-label": ariaLabel,
@@ -21,6 +23,8 @@ export default function NativeSelect({
   const [menuPosition, setMenuPosition] = useState(null);
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
+  const { isVisible, shouldRender } = useTransitionMount(isOpen);
+  const hasLabel = Boolean(label);
   const selectedOption = useMemo(
     () => options.find((option) => option.value === value),
     [options, value]
@@ -72,7 +76,7 @@ export default function NativeSelect({
   };
 
   const menu =
-    isOpen && menuPosition
+    shouldRender && menuPosition
       ? createPortal(
           <div
             ref={menuRef}
@@ -84,7 +88,12 @@ export default function NativeSelect({
               width: `${menuPosition.width}px`,
               maxHeight: `${menuPosition.maxHeight}px`,
             }}
-            className="fixed z-[120] overflow-y-auto rounded-xl border border-gray-200 bg-white p-1 text-sm shadow-xl"
+            className={cx(
+              "fixed z-[180] origin-top overflow-y-auto rounded-xl border border-gray-200 bg-white p-1 text-sm shadow-xl transition duration-200 ease-out motion-reduce:transition-none",
+              isVisible
+                ? "translate-y-0 scale-100 opacity-100"
+                : "pointer-events-none -translate-y-2 scale-95 opacity-0"
+            )}
           >
             {options.map((option) => {
               const selected = option.value === value;
@@ -116,15 +125,6 @@ export default function NativeSelect({
 
   return (
     <div className={`relative ${label ? "space-y-1" : ""} ${className}`}>
-      {label ? (
-        <span
-          className={`block text-xs font-semibold text-gray-500 ${
-            hideLabel ? "sr-only" : ""
-          }`}
-        >
-          {label}
-        </span>
-      ) : null}
       <button
         ref={buttonRef}
         type="button"
@@ -140,9 +140,27 @@ export default function NativeSelect({
             openMenu();
           }
         }}
-        className={`flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 text-left text-sm font-semibold text-gray-700 shadow-sm outline-none transition hover:border-[var(--stocksense-brand-border)] focus:border-[var(--stocksense-brand)] focus:ring-1 focus:ring-[var(--stocksense-brand-border)] disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 ${triggerClassName}`}
+        className={cx(
+          "group flex w-full items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 text-left text-sm font-semibold text-gray-700 shadow-sm outline-none transition hover:border-[var(--stocksense-brand-border)] focus:border-[var(--stocksense-brand)] focus:ring-1 focus:ring-[var(--stocksense-brand-border)] disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400",
+          hasLabel ? "min-h-14 py-2" : "h-10",
+          triggerClassName
+        )}
       >
-        <span className="truncate">{selectedOption?.label ?? placeholder}</span>
+        <span className="min-w-0 flex-1">
+          {hasLabel ? (
+            <span
+              className={cx(
+                "block truncate text-[11px] font-semibold leading-4 text-gray-500 transition group-focus:text-[var(--stocksense-brand)]",
+                hideLabel ? "sr-only" : ""
+              )}
+            >
+              {label}
+            </span>
+          ) : null}
+          <span className="block truncate text-sm leading-5 text-gray-900">
+            {selectedOption?.label ?? placeholder}
+          </span>
+        </span>
         <FaChevronDown
           className={`h-3 w-3 shrink-0 text-gray-400 transition ${
             isOpen ? "rotate-180" : ""

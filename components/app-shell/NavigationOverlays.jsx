@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   FaBell,
   FaBolt,
@@ -20,6 +19,7 @@ import {
 import { LuLifeBuoy } from "react-icons/lu";
 import WhereKeepLogo from "@/components/ui/WhereKeepLogo";
 import { cx } from "@/components/ui/classNames";
+import useTransitionMount from "@/components/ui/useTransitionMount";
 
 function CountBadge({ value }) {
   if (value === null || value === undefined || value <= 0) return null;
@@ -37,56 +37,6 @@ function formatHouseholdRole(role) {
   if (role === "editor") return "Editor";
   return "";
 }
-
-const menuBackdropVariants = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { duration: 0.18, ease: "easeOut" } },
-  exit: { opacity: 0, transition: { duration: 0.16, ease: "easeIn" } },
-};
-
-const menuPanelVariants = {
-  hidden: { opacity: 0, y: -14 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.28,
-      ease: [0.22, 1, 0.36, 1],
-      staggerChildren: 0.045,
-      delayChildren: 0.05,
-    },
-  },
-  exit: {
-    opacity: 0,
-    y: -10,
-    transition: { duration: 0.18, ease: "easeIn" },
-  },
-};
-
-const menuItemVariants = {
-  hidden: { opacity: 0, y: 10 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.22, ease: "easeOut" },
-  },
-};
-
-const sheetPanelVariants = {
-  hidden: { opacity: 0, y: -12, scale: 0.98 },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0.24, ease: [0.22, 1, 0.36, 1] },
-  },
-  exit: {
-    opacity: 0,
-    y: -8,
-    scale: 0.98,
-    transition: { duration: 0.16, ease: "easeIn" },
-  },
-};
 
 const iconTones = {
   warning: {
@@ -176,24 +126,15 @@ export function MobileMenu({
   const locationCount = counts.locationsCount ?? 0;
 
   return (
-    <AnimatePresence>
+    <>
       {isOpen && (
-        <motion.div
+        <div
           className="fixed inset-0 z-[70] bg-slate-950/20 lg:hidden"
-          variants={menuBackdropVariants}
-          initial="hidden"
-          animate="show"
-          exit="exit"
         >
-          <motion.div
+          <div
             className="flex h-full w-full flex-col overflow-y-auto bg-white px-5 pt-5 shadow-2xl pb-[max(1.25rem,env(safe-area-inset-bottom))]"
-            variants={menuPanelVariants}
-            initial="hidden"
-            animate="show"
-            exit="exit"
           >
-            <motion.div
-              variants={menuItemVariants}
+            <div
               className="mb-5 flex items-center justify-between gap-3"
             >
               <Link
@@ -214,10 +155,9 @@ export function MobileMenu({
               >
                 <FaTimes className="h-4 w-4" />
               </button>
-            </motion.div>
+            </div>
 
-            <motion.div
-              variants={menuItemVariants}
+            <div
               className="mb-5 rounded-2xl border border-gray-200 bg-gray-50 p-4"
             >
               <p className="truncate text-base font-semibold text-gray-950">
@@ -234,11 +174,11 @@ export function MobileMenu({
               <p className="mt-2 inline-flex rounded-full border border-[var(--stocksense-brand-border)] bg-white px-2.5 py-1 text-xs font-semibold text-[var(--stocksense-brand)]">
                 {locationCount} location{locationCount === 1 ? "" : "s"}
               </p>
-            </motion.div>
+            </div>
 
             <div className="grid flex-1 content-start gap-5">
               {mobileMenuSections.map((section) => (
-                <motion.section key={section.title} variants={menuItemVariants}>
+                <section key={section.title}>
                   <h2 className="px-1 pb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">
                     {section.title}
                   </h2>
@@ -283,12 +223,11 @@ export function MobileMenu({
                       );
                     })}
                   </div>
-                </motion.section>
+                </section>
               ))}
             </div>
 
-            <motion.div
-              variants={menuItemVariants}
+            <div
               className="mt-6 border-t border-gray-200 pt-4"
             >
               <div className="mb-4 flex items-center justify-center gap-2 text-xs font-medium text-gray-400">
@@ -326,11 +265,11 @@ export function MobileMenu({
                 )}
                 {loggingOut ? "Logging out..." : "Logout"}
               </button>
-            </motion.div>
-          </motion.div>
-        </motion.div>
+            </div>
+          </div>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   );
 }
 
@@ -342,6 +281,7 @@ export function AttentionSheet({
   expiringSoonCount,
   shoppingListItems,
 }) {
+  const { isVisible, shouldRender } = useTransitionMount(isOpen, 240);
   const hasAttention =
     expiredCount > 0 || expiringSoonCount > 0 || shoppingListItems > 0;
   const anchoredStyle = anchor
@@ -357,31 +297,31 @@ export function AttentionSheet({
       : undefined;
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          className="fixed inset-0 z-50 bg-slate-950/25 md:bg-transparent"
-          variants={menuBackdropVariants}
-          initial="hidden"
-          animate="show"
-          exit="exit"
+    <>
+      {shouldRender && (
+        <div
+          className={cx(
+            "fixed inset-0 z-50 bg-slate-950/25 transition-opacity duration-200 ease-out md:bg-transparent motion-reduce:transition-none",
+            isVisible ? "opacity-100" : "pointer-events-none opacity-0"
+          )}
           onClick={onClose}
         >
-          <motion.div
-            className="absolute left-4 right-4 top-[4.25rem] ml-auto max-h-[calc(100svh-5.25rem)] max-w-md overflow-visible rounded-2xl border border-[var(--stocksense-brand-border)] bg-white shadow-2xl md:left-auto md:right-5 md:top-[4.5rem] md:w-[390px]"
+          <div
+            className={cx(
+              "absolute left-4 right-4 top-[4.25rem] ml-auto max-h-[calc(100svh-5.25rem)] max-w-md origin-top overflow-visible rounded-2xl border border-[var(--stocksense-brand-border)] bg-white shadow-2xl transition duration-200 ease-out motion-reduce:transition-none md:left-auto md:right-5 md:top-[4.5rem] md:w-[390px]",
+              isVisible
+                ? "translate-y-0 scale-100 opacity-100"
+                : "-translate-y-4 scale-95 opacity-0"
+            )}
             style={anchoredStyle}
-            variants={sheetPanelVariants}
-            initial="hidden"
-            animate="show"
-            exit="exit"
             onClick={(event) => event.stopPropagation()}
           >
             <div
               className="absolute -top-2 right-5 h-4 w-4 rotate-45 border-l border-t border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)]"
               style={arrowStyle}
             />
-            <div className="flex items-start justify-between gap-3 rounded-t-2xl border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-4">
-              <div className="flex items-start gap-3">
+            <div className="flex items-center justify-between gap-3 rounded-t-2xl border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] p-4">
+              <div className="flex items-center gap-3">
                 <IconCircle
                   icon={hasAttention ? FaBell : FaCheckCircle}
                   tone="warning"
@@ -454,9 +394,9 @@ export function AttentionSheet({
                 </div>
               </div>
             )}
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   );
 }

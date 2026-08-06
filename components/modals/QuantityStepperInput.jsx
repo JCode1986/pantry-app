@@ -50,9 +50,6 @@ export default function QuantityStepperInput({
   return (
     <div className={className}>
       <div className={`md:hidden ${mobileClassName}`}>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-          {label}
-        </label>
         <div className="grid min-h-14 grid-cols-[3.25rem_minmax(0,1fr)_3.25rem] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]">
           <button
             type="button"
@@ -63,18 +60,23 @@ export default function QuantityStepperInput({
           >
             <FaMinus className="h-3.5 w-3.5" />
           </button>
-          <input
-            aria-label={label}
-            type="number"
-            inputMode="numeric"
-            min={safeMin}
-            max={safeMax}
-            step={safeStep}
-            value={value}
-            onChange={(event) => onValueChange?.(event.target.value)}
-            disabled={isDisabled}
-            className="h-full min-h-14 w-full min-w-0 border-0 bg-white px-3 text-center text-lg font-semibold text-gray-950 outline-none disabled:bg-gray-50 disabled:text-gray-400"
-          />
+          <label className="flex min-h-14 min-w-0 flex-col justify-center bg-white px-3">
+            <span className="truncate text-center text-[11px] font-semibold leading-4 text-gray-500">
+              {label}
+            </span>
+            <input
+              aria-label={label}
+              type="number"
+              inputMode="numeric"
+              min={safeMin}
+              max={safeMax}
+              step={safeStep}
+              value={value}
+              onChange={(event) => onValueChange?.(event.target.value)}
+              disabled={isDisabled}
+              className="h-6 w-full min-w-0 border-0 bg-transparent text-center text-lg font-semibold leading-6 text-gray-950 outline-none disabled:text-gray-400"
+            />
+          </label>
           <button
             type="button"
             aria-label={`Increase ${label.toLowerCase()}`}

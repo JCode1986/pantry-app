@@ -20,6 +20,8 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  modalSubtitleClass,
+  modalTitleClass,
   mobileSheetModalClassNames,
 } from "@/components/modals/modalTheme";
 import NativeInput from "@/components/ui/NativeInput";
@@ -352,13 +354,13 @@ export default function MoveItemsModal({
       <ModalContent className={modalContentClass} style={modalContentStyle}>
         {() => (
           <>
-            <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
+            <ModalHeader className={`flex items-center gap-3 ${modalHeaderClass}`}>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-lg font-semibold text-[var(--stocksense-brand)]">
+                <div className={modalTitleClass}>
                   Move {moveModal.itemIds.length} item
                   {moveModal.itemIds.length > 1 ? "s" : ""}
                 </div>
-                <div className="truncate text-sm text-gray-500">
+                <div className={modalSubtitleClass}>
                   Choose where you want to move the selected item
                   {moveModal.itemIds.length > 1 ? "s" : ""}.
                 </div>

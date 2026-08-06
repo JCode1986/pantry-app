@@ -9,6 +9,7 @@ import {
   modalContentStyle,
   modalFooterClass,
   modalHeaderClass,
+  modalTitleClass,
 } from "@/components/modals/modalTheme";
 import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 
@@ -51,7 +52,7 @@ export default function ConfirmDeleteModal({
         {(close) => (
           <>
             <ModalHeader className={`${modalHeaderClass} max-md:static max-md:flex max-md:items-center max-md:gap-3`}>
-              <span className="min-w-0 flex-1 truncate">{title}</span>
+              <span className={`min-w-0 flex-1 ${modalTitleClass}`}>{title}</span>
               {!isBusy ? (
                 <MobileSheetCloseButton
                   onPress={() => {

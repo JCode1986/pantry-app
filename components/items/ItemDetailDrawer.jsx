@@ -27,6 +27,8 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  modalSubtitleClass,
+  modalTitleClass,
 } from "@/components/modals/modalTheme";
 import ImageWithLoader from "@/components/ui/ImageWithLoader";
 
@@ -161,15 +163,15 @@ export default function ItemDetailDrawer({
       <ModalContent className={modalContentClass} style={modalContentStyle}>
         {() => (
           <>
-            <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
+            <ModalHeader className={`flex items-center gap-3 ${modalHeaderClass}`}>
               <div className="min-w-0 flex-1">
                 <div
-                  className="truncate text-lg font-semibold text-[var(--stocksense-brand)]"
+                  className={modalTitleClass}
                   title={activeItem?.name || "Item"}
                 >
                   {activeItem?.name || "Item"}
                 </div>
-                <div className="truncate text-sm text-gray-500">Item details</div>
+                <div className={modalSubtitleClass}>Item details</div>
               </div>
               {canEditInventory ? (
                 <NativeButton

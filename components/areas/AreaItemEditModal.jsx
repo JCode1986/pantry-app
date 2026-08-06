@@ -23,6 +23,8 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  modalSubtitleClass,
+  modalTitleClass,
   mobileSheetModalClassNames,
 } from "@/components/modals/modalTheme";
 
@@ -48,10 +50,10 @@ export default function AreaItemEditModal({
       <ModalContent className={modalContentClass} style={modalContentStyle}>
         {() => (
           <>
-            <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
+            <ModalHeader className={`flex items-center gap-3 ${modalHeaderClass}`}>
               <span className="min-w-0 flex-1">
-                <span className="block truncate">Edit item</span>
-                <span className="block truncate text-sm font-normal text-gray-500">
+                <span className={`block ${modalTitleClass}`}>Edit item</span>
+                <span className={`block ${modalSubtitleClass}`}>
                   {itemModal.categoryName || "Category"}
                 </span>
               </span>

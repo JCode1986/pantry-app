@@ -15,7 +15,6 @@ import {
   ModalFooter,
   ModalHeader,
 } from "@/components/ui/NativeModal";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   FaBoxOpen,
   FaCalendarAlt,
@@ -367,21 +366,15 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
               )}
 
               <div className="min-h-[220px] flex-1 space-y-2 overflow-x-hidden max-md:min-h-0 max-md:pb-4">
-                <AnimatePresence initial={false}>
-                  {results.map((item) => {
+                {results.map((item) => {
                     const imageUrl = item.imageThumbUrl || item.imageUrl;
                     const expirationLabel = formatExpirationDate(item.expirationDate);
                     const expirationStatus = getExpirationStatus(item.expirationDate);
                     const isShoppingListItem = isShoppingListResult(item);
 
                     return (
-                      <motion.button
+                      <button
                         key={`${item.type ?? "inventory_item"}:${item.id}`}
-                        layout
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        transition={{ duration: 0.18, ease: "easeOut" }}
                         onClick={() => openResult(item)}
                         className="w-full min-w-0 overflow-hidden rounded-xl border border-stocksense-gray bg-white p-3 text-left shadow-sm transition hover:-translate-y-[1px] hover:bg-gray-50 hover:shadow-md"
                       >
@@ -464,17 +457,12 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
 
                           <FaChevronRight className="h-4 w-4 shrink-0 text-gray-300" />
                         </div>
-                      </motion.button>
+                      </button>
                     );
                   })}
-                </AnimatePresence>
 
                 {showEmptyState && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.18, ease: "easeOut" }}
+                  <div
                     className="grid min-h-[260px] place-items-center rounded-2xl border border-dashed border-gray-200 bg-white px-4 py-8 text-center shadow-sm"
                   >
                     <div className="max-w-xs">
@@ -504,7 +492,7 @@ export default function GlobalItemSearchModal({ isOpen, onClose }) {
                         </NativeButton>
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 )}
               </div>
             </ModalBody>

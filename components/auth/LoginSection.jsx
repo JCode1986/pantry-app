@@ -4,11 +4,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from '@/components/ui/MotionLite';
-import { supabase } from '@/lib/supabaseClient';
 import { login } from '@/app/actions/auth';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import Image from 'next/image';
 import SiteFooter from '@/components/app-shell/SiteFooter';
+import NativeInput from '@/components/ui/NativeInput';
 
 const CREDENTIAL_VALIDATION_ERROR =
   'Enter a valid email and a password with at least 6 characters.';
@@ -157,6 +157,7 @@ export default function LoginPage({ mode = 'login' }) {
         ? `/login?confirmed=1&redirectTo=${encodeURIComponent(redirectTo)}`
         : '/login?confirmed=1';
 
+    const { supabase } = await import('@/lib/supabaseClient');
     const { data, error: signErr } = await supabase.auth.signUp({
       email,
       password,
@@ -300,63 +301,50 @@ export default function LoginPage({ mode = 'login' }) {
             </AnimatePresence>
 
             <form onSubmit={formSubmit} className="space-y-4" noValidate>
-              {/* Email */}
               <motion.div variants={item} className="space-y-1">
-                <label htmlFor="email" className="text-sm font-medium text-stocksense-dark-gray">
-                  Email
-                </label>
-                <input
+                <NativeInput
                   id="email"
+                  label="Email"
                   type="email"
                   autoComplete="email"
                   inputMode="email"
                   placeholder="you@domain.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onValueChange={setEmail}
                   required
-                  className="w-full rounded-lg border border-stocksense-gray px-3 py-2 outline-none focus:ring-2 focus:ring-stocksense-sky/60 focus:border-stocksense-sky bg-white"
+                  classNames={{
+                    inputWrapper: "rounded-xl border-stocksense-gray shadow-none",
+                  }}
                 />
                 {showEmailValidation && (
                   <p className="text-xs text-amber-700">Please enter a valid email.</p>
                 )}
               </motion.div>
 
-              {/* Password */}
               <motion.div variants={item} className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label htmlFor="password" className="text-sm font-medium text-stocksense-dark-gray">
-                    Password
-                  </label>
+                <NativeInput
+                  id="password"
+                  label="Password"
+                  type={showPw ? 'text' : 'password'}
+                  autoComplete={pageCopy.passwordAutoComplete}
+                  placeholder="Password"
+                  value={password}
+                  onValueChange={setPassword}
+                  required
+                  endContent={
                   <button
                     type="button"
                     onClick={() => setShowPw((s) => !s)}
-                    className="text-xs text-stocksense-teal hover:text-stocksense-tealDark"
+                    className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-gray-400 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
                     aria-label={showPw ? 'Hide password' : 'Show password'}
                   >
-                    {showPw ? (
-                      <span className="inline-flex items-center gap-1">
-                        <FaEyeSlash className="h-3.5 w-3.5" /> Hide
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1">
-                        <FaEye className="h-3.5 w-3.5" /> Show
-                      </span>
-                    )}
+                    {showPw ? <FaEyeSlash className="h-4 w-4" /> : <FaEye className="h-4 w-4" />}
                   </button>
-                </div>
-
-                <div className="relative">
-                  <input
-                    id="password"
-                    type={showPw ? 'text' : 'password'}
-                    autoComplete={pageCopy.passwordAutoComplete}
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="w-full rounded-lg border border-stocksense-gray px-3 py-2 outline-none focus:ring-2 focus:ring-stocksense-sky/60 focus:border-stocksense-sky bg-white pr-10"
-                  />
-                </div>
+                  }
+                  classNames={{
+                    inputWrapper: "rounded-xl border-stocksense-gray shadow-none",
+                  }}
+                />
                 {showPasswordValidation && (
                   <p className="text-xs text-amber-700">Min length is 6 characters.</p>
                 )}
@@ -364,18 +352,18 @@ export default function LoginPage({ mode = 'login' }) {
 
               {isSignupMode && (
                 <motion.div variants={item} className="space-y-1">
-                  <label htmlFor="confirm-password" className="text-sm font-medium text-stocksense-dark-gray">
-                    Confirm password
-                  </label>
-                  <input
+                  <NativeInput
                     id="confirm-password"
+                    label="Confirm password"
                     type={showPw ? 'text' : 'password'}
                     autoComplete="new-password"
                     placeholder="Confirm password"
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onValueChange={setConfirmPassword}
                     required
-                    className="w-full rounded-lg border border-stocksense-gray px-3 py-2 outline-none focus:ring-2 focus:ring-stocksense-sky/60 focus:border-stocksense-sky bg-white"
+                    classNames={{
+                      inputWrapper: "rounded-xl border-stocksense-gray shadow-none",
+                    }}
                   />
                   {showConfirmValidation && (
                     <p className="text-xs text-amber-700">Passwords must match.</p>

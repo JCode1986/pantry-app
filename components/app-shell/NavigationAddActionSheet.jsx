@@ -41,7 +41,9 @@ export default function NavigationAddActionSheet({
       >
         {(onClose) => (
           <>
-            <ModalHeader className={modalHeaderClass}>Add to WhereKeep</ModalHeader>
+            <ModalHeader className={`flex items-center gap-3 ${modalHeaderClass}`}>
+              Add to WhereKeep
+            </ModalHeader>
             <ModalBody className={`${modalBodyClass} grid gap-2`}>
               <button
                 type="button"

@@ -51,7 +51,9 @@ export default function AreaCreateModal({
       <ModalContent className={modalContentClass} style={modalContentStyle}>
         {(onCloseFromModal) => (
           <>
-            <ModalHeader className={modalHeaderClass}>Add Storage Area</ModalHeader>
+            <ModalHeader className={`flex items-center gap-3 ${modalHeaderClass}`}>
+              Add Storage Area
+            </ModalHeader>
             <ModalBody className={`space-y-4 ${modalBodyClass}`}>
               <NativeSelect
                 label="Location"

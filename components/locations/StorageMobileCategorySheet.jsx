@@ -2,9 +2,6 @@
 
 import NativeButton from "@/components/ui/NativeButton";
 import {
-  AnimatePresence,
-  motion } from "framer-motion";
-import {
   Modal,
   ModalBody,
   ModalContent,
@@ -26,6 +23,8 @@ import {
   modalContentClass,
   modalContentStyle,
   modalHeaderClass,
+  modalSubtitleClass,
+  modalTitleClass,
 } from "@/components/modals/modalTheme";
 
 export default function StorageMobileCategorySheet({
@@ -56,21 +55,24 @@ export default function StorageMobileCategorySheet({
       scrollBehavior="inside"
       size="full"
       classNames={{
-        wrapper: "items-end",
+        wrapper: "items-end max-md:overflow-hidden max-md:p-0 max-md:pt-4",
       }}
     >
       <ModalContent
-        className={`${modalContentClass} max-h-[88svh] max-md:h-[88svh] max-md:max-h-[88svh] max-md:rounded-b-none max-md:rounded-t-3xl sm:rounded-2xl`}
-        style={modalContentStyle}
+        className={`${modalContentClass} max-h-[88svh] max-md:h-[calc(100svh-1rem)] max-md:max-h-[calc(100svh-1rem)] max-md:rounded-b-none max-md:rounded-t-3xl sm:rounded-2xl`}
+        style={{
+          ...modalContentStyle,
+          "--wherekeep-mobile-sheet-height": "calc(100svh - 1rem)",
+        }}
       >
         {() => (
           <>
-            <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
+            <ModalHeader className={`flex items-center gap-2 ${modalHeaderClass}`}>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[var(--stocksense-brand)]">
+                <span className={`block ${modalTitleClass}`}>
                   {activeMobileCategory?.category?.name || "Category"}
                 </span>
-                <span className="block truncate text-sm font-normal text-gray-500">
+                <span className={`block ${modalSubtitleClass}`}>
                   {activeMobileCategory?.area?.name} | {locationName}
                 </span>
               </span>
@@ -79,14 +81,10 @@ export default function StorageMobileCategorySheet({
 
             <ModalBody className={`space-y-3 ${modalBodyClass}`}>
               {canEditInventory && activeMobileCategory && (
-                <AnimatePresence initial={false} mode="wait">
+                <>
                   {activeMobileSelectionContext ? (
-                    <motion.div
+                    <div
                       key="location-mobile-category-selection"
-                      initial={{ opacity: 0, y: -6, scale: 0.985 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -6, scale: 0.985 }}
-                      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
                       className="sticky top-3 z-[60] rounded-2xl border border-gray-200 bg-white p-3 shadow-lg"
                     >
                       <div className="flex items-center justify-between gap-3">
@@ -158,14 +156,10 @@ export default function StorageMobileCategorySheet({
                           Delete
                         </NativeButton>
                       </div>
-                    </motion.div>
+                    </div>
                   ) : (
-                    <motion.div
+                    <div
                       key="location-mobile-category-default"
-                      initial={{ opacity: 0, y: 6, scale: 0.995 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 6, scale: 0.995 }}
-                      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
                       className="grid grid-cols-2 gap-2"
                     >
                       <button
@@ -190,9 +184,9 @@ export default function StorageMobileCategorySheet({
                       >
                         <FaEdit /> Edit category
                       </button>
-                    </motion.div>
+                    </div>
                   )}
-                </AnimatePresence>
+                </>
               )}
 
               {activeMobileCategory?.category?.itemsLoading ? (

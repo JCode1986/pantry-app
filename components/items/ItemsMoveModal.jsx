@@ -19,6 +19,8 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  modalSubtitleClass,
+  modalTitleClass,
   mobileSheetModalClassNames,
 } from "@/components/modals/modalTheme";
 import NativeSelect from "@/components/ui/NativeSelect";
@@ -67,12 +69,12 @@ export default function ItemsMoveModal({
       <ModalContent className={modalContentClass} style={modalContentStyle}>
         {() => (
           <>
-            <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
+            <ModalHeader className={`flex items-center gap-3 ${modalHeaderClass}`}>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-lg font-semibold text-[var(--stocksense-brand)]">
+                <div className={modalTitleClass}>
                   Move {selectedCount > 0 && !drawerOpen ? `${selectedCount} items` : "item"}
                 </div>
-                <div className="truncate text-sm text-gray-500">
+                <div className={modalSubtitleClass}>
                   Choose the destination category.
                 </div>
               </div>

@@ -10,6 +10,7 @@ import {
   FaChevronRight,
   FaTimes,
 } from "react-icons/fa";
+import useTransitionMount from "@/components/ui/useTransitionMount";
 
 const MONTHS = [
   "January",
@@ -128,6 +129,7 @@ function CalendarDropdown({
   options,
   value,
 }) {
+  const { isVisible, shouldRender } = useTransitionMount(isOpen);
   const selectedValue = String(value);
   const selectedOption =
     options.find((option) => String(option.value) === selectedValue) ?? options[0];
@@ -157,11 +159,16 @@ function CalendarDropdown({
         />
       </button>
 
-      {isOpen ? (
+      {shouldRender ? (
         <div
           role="listbox"
           aria-label={ariaLabel}
-          className="absolute left-0 top-[calc(100%+0.375rem)] z-[160] max-h-56 w-full overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-gray-200 bg-white p-1 text-sm shadow-xl"
+          className={cx(
+            "absolute left-0 top-[calc(100%+0.375rem)] z-[160] max-h-56 w-full origin-top overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-gray-200 bg-white p-1 text-sm shadow-xl transition duration-200 ease-out motion-reduce:transition-none",
+            isVisible
+              ? "translate-y-0 scale-100 opacity-100"
+              : "pointer-events-none -translate-y-2 scale-95 opacity-0"
+          )}
         >
           {options.map((option) => {
             const optionValue = String(option.value);
@@ -214,6 +221,8 @@ function NativeDatePicker({
   const [popoverPosition, setPopoverPosition] = useState(null);
   const triggerRef = useRef(null);
   const popoverRef = useRef(null);
+  const { isVisible: isPopoverVisible, shouldRender: shouldRenderPopover } =
+    useTransitionMount(isOpen);
   const resolvedDisabled = disabled || isDisabled;
   const showError = isInvalid && errorMessage;
   const selectedDateString = selectedDate ? toDateString(selectedDate) : "";
@@ -339,7 +348,7 @@ function NativeDatePicker({
   };
 
   const popover =
-    isOpen && popoverPosition
+    shouldRenderPopover && popoverPosition
       ? createPortal(
           <div
             ref={popoverRef}
@@ -348,7 +357,12 @@ function NativeDatePicker({
               top: `${popoverPosition.top}px`,
               width: `${popoverPosition.width}px`,
             }}
-            className="fixed z-[140] rounded-2xl border border-[var(--stocksense-brand-border)] bg-white p-3 text-gray-900 shadow-2xl"
+            className={cx(
+              "fixed z-[140] origin-top rounded-2xl border border-[var(--stocksense-brand-border)] bg-white p-3 text-gray-900 shadow-2xl transition duration-200 ease-out motion-reduce:transition-none",
+              isPopoverVisible
+                ? "translate-y-0 scale-100 opacity-100"
+                : "pointer-events-none -translate-y-2 scale-95 opacity-0"
+            )}
           >
             <div className="mb-3 flex items-center justify-between gap-2">
               <button
@@ -478,8 +492,10 @@ function NativeDatePicker({
             {label && labelPlacement === "inside" ? (
               <span
                 className={cx(
-                  "block text-xs font-semibold leading-4 text-gray-700",
+                  "block truncate text-[11px] font-semibold leading-4 text-gray-500",
                   isOpen ? "text-[var(--stocksense-brand)]" : "",
+                  isInvalid ? "text-rose-600" : "",
+                  resolvedDisabled ? "text-gray-400" : "",
                   classNames.label
                 )}
               >

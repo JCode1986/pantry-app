@@ -4,7 +4,6 @@ import NativeButton from "@/components/ui/NativeButton";
 import NativeInput from "@/components/ui/NativeInput";
 import { cx } from "@/components/ui/classNames";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   FaCopy,
   FaEnvelope,
@@ -15,6 +14,7 @@ import {
 } from "react-icons/fa";
 import { LuMail } from "react-icons/lu";
 import NativeSelect from "@/components/ui/NativeSelect";
+import useTransitionMount from "@/components/ui/useTransitionMount";
 import {
   FONT_OPTIONS,
   THEME_OPTIONS,
@@ -70,6 +70,10 @@ export function HouseholdSharingPanel({
   onUpdateMemberRole,
   onRequestRemoveMember,
 }) {
+  const { isVisible, shouldRender } = useTransitionMount(
+    activePanel === "members",
+    240
+  );
   const members = sharing?.members ?? [];
   const invites = sharing?.invites ?? [];
   const pendingInviteCount = invites.filter((invite) => invite.status === "pending").length;
@@ -83,15 +87,14 @@ export function HouseholdSharingPanel({
     : "Pending and recent household invitations.";
 
   return (
-    <AnimatePresence>
-      {activePanel === "members" && (
-        <motion.div
-          className="fixed bottom-0 right-0 top-0 z-[45] hidden transition-[left] duration-200 lg:block"
+    <>
+      {shouldRender && (
+        <div
+          className={cx(
+            "fixed bottom-0 right-0 top-0 z-[45] hidden transition-opacity duration-200 ease-out lg:block motion-reduce:transition-none",
+            isVisible ? "opacity-100" : "pointer-events-none opacity-0"
+          )}
           style={{ left: "var(--wherekeep-sidebar-offset)" }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
         >
           <button
             type="button"
@@ -99,15 +102,16 @@ export function HouseholdSharingPanel({
             onClick={onClose}
             className="absolute inset-0 cursor-default bg-slate-950/5"
           />
-          <motion.aside
-            className="absolute bottom-4 left-4 top-4 flex flex-col overflow-hidden rounded-3xl border border-[var(--stocksense-brand-border)] bg-white shadow-2xl transition-[width] duration-200"
+          <aside
+            className={cx(
+              "absolute bottom-4 left-4 top-4 flex flex-col overflow-hidden rounded-3xl border border-[var(--stocksense-brand-border)] bg-white shadow-2xl transition duration-200 ease-out motion-reduce:transition-none",
+              isVisible
+                ? "translate-x-0 opacity-100"
+                : "-translate-x-8 opacity-0"
+            )}
             style={{
               width: "min(420px, calc(100vw - var(--wherekeep-sidebar-offset) - 2rem))",
             }}
-            initial={{ x: -24, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -24, opacity: 0 }}
-            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
             role="dialog"
             aria-modal="true"
             aria-label={title}
@@ -447,10 +451,10 @@ export function HouseholdSharingPanel({
                 </div>
               )}
             </div>
-          </motion.aside>
-        </motion.div>
+          </aside>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   );
 }
 
@@ -467,19 +471,19 @@ export function PreferencesPanel({
   onPreferredNameChange,
   onSavePreferredName,
 }) {
+  const { isVisible, shouldRender } = useTransitionMount(isOpen, 240);
   const selectedTheme = getThemeById(preferences.themeId);
   const selectedFont = getFontById(preferences.fontId);
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          className="fixed bottom-0 right-0 top-0 z-[45] hidden transition-[left] duration-200 lg:block"
+    <>
+      {shouldRender && (
+        <div
+          className={cx(
+            "fixed bottom-0 right-0 top-0 z-[45] hidden transition-opacity duration-200 ease-out lg:block motion-reduce:transition-none",
+            isVisible ? "opacity-100" : "pointer-events-none opacity-0"
+          )}
           style={{ left: "var(--wherekeep-sidebar-offset)" }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
         >
           <button
             type="button"
@@ -487,15 +491,16 @@ export function PreferencesPanel({
             onClick={onClose}
             className="absolute inset-0 cursor-default bg-slate-950/5"
           />
-          <motion.aside
-            className="absolute bottom-4 left-4 top-4 flex flex-col overflow-hidden rounded-3xl border border-[var(--stocksense-brand-border)] bg-white shadow-2xl transition-[width] duration-200"
+          <aside
+            className={cx(
+              "absolute bottom-4 left-4 top-4 flex flex-col overflow-hidden rounded-3xl border border-[var(--stocksense-brand-border)] bg-white shadow-2xl transition duration-200 ease-out motion-reduce:transition-none",
+              isVisible
+                ? "translate-x-0 opacity-100"
+                : "-translate-x-8 opacity-0"
+            )}
             style={{
               width: "min(420px, calc(100vw - var(--wherekeep-sidebar-offset) - 2rem))",
             }}
-            initial={{ x: -24, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -24, opacity: 0 }}
-            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
             role="dialog"
             aria-modal="true"
             aria-label="Preferences"
@@ -617,9 +622,9 @@ export function PreferencesPanel({
                 </div>
               </div>
             </div>
-          </motion.aside>
-        </motion.div>
+          </aside>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   );
 }

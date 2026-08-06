@@ -22,6 +22,7 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  modalTitleClass,
 } from "@/components/modals/modalTheme";
 
 export default function CategoryCreateModal({
@@ -69,7 +70,7 @@ export default function CategoryCreateModal({
             <ModalHeader
               className={`${modalHeaderClass} max-md:flex max-md:items-center max-md:gap-3`}
             >
-              <span className="min-w-0 flex-1 truncate">Add category</span>
+              <span className={`min-w-0 flex-1 ${modalTitleClass}`}>Add category</span>
               <NativeButton
                 size="sm"
                 className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"

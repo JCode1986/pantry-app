@@ -26,6 +26,7 @@ import {
   modalFooterClass,
   modalHeaderClass,
   modalInputClassNames,
+  modalTitleClass,
   mobileSheetModalClassNames,
 } from "@/components/modals/modalTheme";
 
@@ -216,8 +217,8 @@ export default function StorageEntityModals({
           classNames={mobileSheetModalClassNames}
         >
           <ModalContent className={modalContentClass} style={modalContentStyle}>
-            <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
-              <span className="min-w-0 flex-1 truncate">
+            <ModalHeader className={`flex items-center gap-3 ${modalHeaderClass}`}>
+              <span className={`min-w-0 flex-1 ${modalTitleClass}`}>
                 {areaModal.mode === "edit"
                   ? `Edit storage area in ${areaModal.locationName || locationName}`
                   : `Create new storage in ${areaModal.locationName || locationName}`}
@@ -319,8 +320,8 @@ export default function StorageEntityModals({
           classNames={mobileSheetModalClassNames}
         >
           <ModalContent className={modalContentClass} style={modalContentStyle}>
-            <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
-              <span className="min-w-0 flex-1 truncate">
+            <ModalHeader className={`flex items-center gap-3 ${modalHeaderClass}`}>
+              <span className={`min-w-0 flex-1 ${modalTitleClass}`}>
                 {categoryModal.mode === "edit"
                   ? `Edit category in ${categoryModal.areaName || "storage area"}`
                   : `Create new category in ${categoryModal.areaName || "storage area"}`}
@@ -424,8 +425,8 @@ export default function StorageEntityModals({
           classNames={mobileSheetModalClassNames}
         >
           <ModalContent className={modalContentClass} style={modalContentStyle}>
-            <ModalHeader className={`flex gap-3 ${modalHeaderClass}`}>
-              <span className="min-w-0 flex-1 truncate">
+            <ModalHeader className={`flex items-center gap-3 ${modalHeaderClass}`}>
+              <span className={`min-w-0 flex-1 ${modalTitleClass}`}>
                 {itemModal.mode === "edit"
                   ? `Edit item in ${itemModal.categoryName || "category"}`
                   : `Create new item in ${itemModal.categoryName || "category"}`}
