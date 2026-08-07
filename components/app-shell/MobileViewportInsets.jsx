@@ -15,6 +15,7 @@ export default function MobileViewportInsets() {
       const currentWidth = window.innerWidth;
       const viewportHeight = visualViewport?.height ?? window.innerHeight;
       const viewportOffsetTop = visualViewport?.offsetTop ?? 0;
+      const visibleViewportHeight = Math.max(320, viewportHeight);
 
       if (Math.abs(currentWidth - lastWidth) > 24) {
         stableHeight = 0;
@@ -27,11 +28,15 @@ export default function MobileViewportInsets() {
         0,
         stableHeight - viewportHeight - viewportOffsetTop
       );
-      const usableKeyboardInset = keyboardInset > 80 ? keyboardInset : 0;
-      const sheetHeight =
-        usableKeyboardInset > 0
-          ? Math.max(320, stableHeight - usableKeyboardInset)
-          : stableHeight;
+      const activeElement = document.activeElement;
+      const isEditingText =
+        activeElement instanceof HTMLElement &&
+        activeElement.matches(
+          'input:not([type="button"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]), textarea, select, [contenteditable="true"]'
+        );
+      const usableKeyboardInset =
+        isEditingText && keyboardInset > 80 ? keyboardInset : 0;
+      const sheetHeight = visibleViewportHeight;
 
       root.style.setProperty(
         "--wherekeep-mobile-sheet-height",
@@ -40,6 +45,10 @@ export default function MobileViewportInsets() {
       root.style.setProperty(
         "--wherekeep-mobile-layout-height",
         `${Math.round(stableHeight)}px`
+      );
+      root.style.setProperty(
+        "--wherekeep-visual-viewport-height",
+        `${Math.round(visibleViewportHeight)}px`
       );
       root.style.setProperty(
         "--wherekeep-keyboard-inset",
@@ -96,6 +105,7 @@ export default function MobileViewportInsets() {
       visualViewport?.removeEventListener("scroll", setInsets);
       root.style.removeProperty("--wherekeep-mobile-sheet-height");
       root.style.removeProperty("--wherekeep-mobile-layout-height");
+      root.style.removeProperty("--wherekeep-visual-viewport-height");
       root.style.removeProperty("--wherekeep-keyboard-inset");
       root.style.removeProperty("--wherekeep-visual-viewport-top");
       delete root.dataset.wherekeepKeyboard;
