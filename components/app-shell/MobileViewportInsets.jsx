@@ -45,6 +45,10 @@ export default function MobileViewportInsets() {
         "--wherekeep-keyboard-inset",
         `${Math.round(usableKeyboardInset)}px`
       );
+      root.style.setProperty(
+        "--wherekeep-visual-viewport-top",
+        `${Math.round(Math.max(0, viewportOffsetTop))}px`
+      );
       root.dataset.wherekeepKeyboard =
         usableKeyboardInset > 0 ? "open" : "closed";
     };
@@ -93,6 +97,7 @@ export default function MobileViewportInsets() {
       root.style.removeProperty("--wherekeep-mobile-sheet-height");
       root.style.removeProperty("--wherekeep-mobile-layout-height");
       root.style.removeProperty("--wherekeep-keyboard-inset");
+      root.style.removeProperty("--wherekeep-visual-viewport-top");
       delete root.dataset.wherekeepKeyboard;
     };
   }, []);

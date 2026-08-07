@@ -169,6 +169,13 @@ input[type="radio"] {
 }
 
 @media (max-width: 767px) {
+  .wherekeep-native-modal-header {
+    padding-top: max(
+      1rem,
+      calc(env(safe-area-inset-top) + var(--wherekeep-visual-viewport-top, 0px) + 0.75rem)
+    ) !important;
+  }
+
   html[data-wherekeep-keyboard="open"] .wherekeep-modal-content {
     max-height: var(--wherekeep-mobile-sheet-height, 100svh) !important;
     overflow-y: auto !important;
