@@ -43,7 +43,7 @@ const NativeInput = forwardRef(function NativeInput(
     <div className={cx("space-y-1", className)}>
       <div
         className={cx(
-          "group flex items-center gap-2 border bg-white px-3 shadow-sm transition focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]",
+          "group flex items-center gap-2 border bg-white px-3 shadow-sm transition duration-200 ease-out focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)] motion-reduce:transition-none",
           hasLabel ? "min-h-14 py-2" : "min-h-10 py-1",
           variant === "bordered" ? "border-gray-200" : "border-transparent",
           radiusClasses[radius] ?? radiusClasses.lg,
@@ -58,7 +58,7 @@ const NativeInput = forwardRef(function NativeInput(
             <label
               htmlFor={inputId}
               className={cx(
-                "block truncate text-[11px] font-semibold leading-4 text-gray-500 transition group-focus-within:text-[var(--stocksense-brand)]",
+                "block truncate text-[11px] font-semibold leading-4 text-gray-500 transition duration-200 ease-out group-focus-within:text-[var(--stocksense-brand)] motion-reduce:transition-none",
                 isInvalid ? "text-rose-600 group-focus-within:text-rose-600" : "",
                 resolvedDisabled ? "text-gray-400" : "",
                 classNames.label

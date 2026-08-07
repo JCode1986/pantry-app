@@ -148,12 +148,12 @@ function CalendarDropdown({
             onToggle();
           }
         }}
-        className="flex min-h-9 w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 text-left text-sm font-semibold text-gray-900 shadow-sm outline-none transition hover:border-[var(--stocksense-brand-border)] focus:border-[var(--stocksense-brand)] focus:ring-1 focus:ring-[var(--stocksense-brand-border)]"
+        className="flex min-h-9 w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 text-left text-sm font-semibold text-gray-900 shadow-sm outline-none transition duration-200 ease-out hover:border-[var(--stocksense-brand-border)] focus:border-[var(--stocksense-brand)] focus:ring-1 focus:ring-[var(--stocksense-brand-border)] motion-reduce:transition-none"
       >
         <span className="min-w-0 truncate">{selectedOption?.label}</span>
         <FaChevronDown
           className={cx(
-            "h-3 w-3 shrink-0 text-[var(--stocksense-brand)] transition",
+            "h-3 w-3 shrink-0 text-[var(--stocksense-brand)] transition duration-200 ease-out motion-reduce:transition-none",
             isOpen ? "rotate-180" : ""
           )}
         />
@@ -182,7 +182,7 @@ function CalendarDropdown({
                 aria-selected={selected}
                 onClick={() => onChange(optionValue)}
                 className={cx(
-                  "flex min-h-9 w-full min-w-0 items-center rounded-lg px-3 text-left font-semibold transition",
+                  "flex min-h-9 w-full min-w-0 items-center rounded-lg px-3 text-left font-semibold transition duration-200 ease-out motion-reduce:transition-none",
                   selected
                     ? "bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
                     : "text-gray-700 hover:bg-gray-50"
@@ -369,7 +369,7 @@ function NativeDatePicker({
                 type="button"
                 aria-label="Previous month"
                 onClick={() => moveMonth(-1)}
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-gray-500 transition duration-200 ease-out hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)] motion-reduce:transition-none"
               >
                 <FaChevronLeft className="h-3.5 w-3.5" />
               </button>
@@ -412,7 +412,7 @@ function NativeDatePicker({
                 type="button"
                 aria-label="Next month"
                 onClick={() => moveMonth(1)}
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-gray-500 transition duration-200 ease-out hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)] motion-reduce:transition-none"
               >
                 <FaChevronRight className="h-3.5 w-3.5" />
               </button>
@@ -439,7 +439,7 @@ function NativeDatePicker({
                     aria-pressed={isSelected || undefined}
                     onClick={() => selectDate(date)}
                     className={cx(
-                      "grid h-9 w-full place-items-center rounded-full text-sm font-semibold outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--stocksense-brand-border)]",
+                      "grid h-9 w-full place-items-center rounded-full text-sm font-semibold outline-none transition duration-200 ease-out focus-visible:ring-2 focus-visible:ring-[var(--stocksense-brand-border)] motion-reduce:transition-none",
                       isSelected
                         ? "bg-[var(--stocksense-brand)] text-white shadow-sm"
                         : "text-gray-700 hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)]",
@@ -471,7 +471,7 @@ function NativeDatePicker({
       <div
         ref={triggerRef}
         className={cx(
-          "flex min-h-14 w-full items-center gap-2 border bg-white px-3 text-left shadow-sm transition hover:border-[var(--stocksense-brand-border)] focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]",
+          "flex min-h-14 w-full items-center gap-2 border bg-white px-3 text-left shadow-sm transition duration-200 ease-out hover:border-[var(--stocksense-brand-border)] focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)] motion-reduce:transition-none",
           variant === "bordered" ? "border-gray-200" : "border-transparent",
           radiusClasses[radius] ?? radiusClasses.lg,
           isInvalid ? "border-rose-500 bg-rose-50/40 focus-within:border-rose-500" : "",
@@ -520,7 +520,7 @@ function NativeDatePicker({
             type="button"
             aria-label="Clear date"
             onClick={clearDate}
-            className="grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+            className="grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-full text-gray-400 transition duration-200 ease-out hover:bg-gray-100 hover:text-gray-700 motion-reduce:transition-none"
           >
             <FaTimes className="h-3 w-3" />
           </button>

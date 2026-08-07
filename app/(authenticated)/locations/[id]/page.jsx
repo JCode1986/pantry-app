@@ -109,7 +109,7 @@ export default async function Page({ params }) {
   const locationStats = await getLocationStats(supabase, id, storageAreas);
 
   return (
-    <main className="page-enter mx-auto max-w-[1560px] px-5 py-8 md:min-h-[100vh] lg:px-6 xl:px-8 max-md:px-4 max-md:pb-0 max-md:pt-4">
+    <main className="mx-auto max-w-[1560px] px-5 py-8 md:min-h-[100vh] lg:px-6 xl:px-8 max-md:px-4 max-md:pb-0 max-md:pt-4">
       <LocationDetailHeaderClient
         location={location}
         imageUrl={locationImageUrl}

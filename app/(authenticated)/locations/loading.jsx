@@ -1,12 +1,10 @@
-import WhereKeepLoader from "@/components/ui/WhereKeepLoader";
+import PageLoadingState from "@/components/ui/PageLoadingState";
 
 export default function LocationsLoading() {
   return (
-    <main className="flex min-h-[70vh] items-center justify-center px-4 py-12">
-      <WhereKeepLoader
-        label="Loading locations..."
-        detail="Checking storage spaces and recent items."
-      />
-    </main>
+    <PageLoadingState
+      label="Loading locations..."
+      detail="Checking storage spaces and recent items."
+    />
   );
 }

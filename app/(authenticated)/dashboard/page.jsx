@@ -496,7 +496,7 @@ export default async function HomePage() {
         />
       </div>
 
-      <main className="page-enter mx-auto hidden min-h-[100vh] max-w-[1500px] space-y-5 px-5 py-8 md:block lg:px-6 xl:px-8">
+      <main className="mx-auto hidden min-h-[100vh] max-w-[1500px] space-y-5 px-5 py-8 md:block lg:px-6 xl:px-8">
         <DesktopDashboardToolbar
           greeting={getGreeting()}
           userName={getDisplayName(currentUser)}

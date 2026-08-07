@@ -108,7 +108,7 @@ export default function NativeSelect({
                     setIsOpen(false);
                     onChange(option.value);
                   }}
-                  className={`flex min-h-9 w-full items-center rounded-lg px-3 text-left font-semibold transition ${
+                  className={`flex min-h-9 w-full items-center rounded-lg px-3 text-left font-semibold transition duration-200 ease-out motion-reduce:transition-none ${
                     selected
                       ? "bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
                       : "text-gray-700 hover:bg-gray-50"
@@ -141,7 +141,7 @@ export default function NativeSelect({
           }
         }}
         className={cx(
-          "group flex w-full items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 text-left text-sm font-semibold text-gray-700 shadow-sm outline-none transition hover:border-[var(--stocksense-brand-border)] focus:border-[var(--stocksense-brand)] focus:ring-1 focus:ring-[var(--stocksense-brand-border)] disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400",
+          "group flex w-full items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 text-left text-sm font-semibold text-gray-700 shadow-sm outline-none transition duration-200 ease-out hover:border-[var(--stocksense-brand-border)] focus:border-[var(--stocksense-brand)] focus:ring-1 focus:ring-[var(--stocksense-brand-border)] disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400 motion-reduce:transition-none",
           hasLabel ? "min-h-14 py-2" : "h-10",
           triggerClassName
         )}
@@ -150,7 +150,7 @@ export default function NativeSelect({
           {hasLabel ? (
             <span
               className={cx(
-                "block truncate text-[11px] font-semibold leading-4 text-gray-500 transition group-focus:text-[var(--stocksense-brand)]",
+                "block truncate text-[11px] font-semibold leading-4 text-gray-500 transition duration-200 ease-out group-focus:text-[var(--stocksense-brand)] motion-reduce:transition-none",
                 hideLabel ? "sr-only" : ""
               )}
             >
@@ -162,7 +162,7 @@ export default function NativeSelect({
           </span>
         </span>
         <FaChevronDown
-          className={`h-3 w-3 shrink-0 text-gray-400 transition ${
+          className={`h-3 w-3 shrink-0 text-gray-400 transition duration-200 ease-out motion-reduce:transition-none ${
             isOpen ? "rotate-180" : ""
           }`}
         />

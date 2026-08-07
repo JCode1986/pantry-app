@@ -138,12 +138,12 @@ export function Modal({
           transition: "background-color 220ms cubic-bezier(0.22, 1, 0.36, 1)",
         }}
         className={cx(
-          "fixed inset-0 z-[140] flex overflow-y-auto px-0 py-4 motion-reduce:transition-none",
+          "fixed inset-0 z-[140] flex overflow-y-auto px-0 py-[max(1rem,env(safe-area-inset-top))] motion-reduce:transition-none md:py-4",
           placement === "bottom"
             ? "items-end justify-center"
             : placement === "right"
               ? "items-stretch justify-end md:py-0"
-            : "items-center justify-center",
+            : "items-start justify-center md:items-center",
           isVisible ? "" : "pointer-events-none",
           classNames.wrapper
         )}

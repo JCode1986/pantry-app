@@ -84,7 +84,7 @@ export default function NativeButton({
         if (!event.defaultPrevented) onPress?.(event);
       }}
       className={cx(
-        "inline-flex shrink-0 items-center justify-center gap-2 font-semibold outline-none transition hover:opacity-85 focus-visible:ring-2 focus-visible:ring-[var(--stocksense-brand-border)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex shrink-0 items-center justify-center gap-2 font-semibold outline-none transition duration-200 ease-out hover:opacity-85 focus-visible:ring-2 focus-visible:ring-[var(--stocksense-brand-border)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none",
         isIconOnly ? "h-10 w-10 min-w-10 p-0" : sizeClasses[size] ?? sizeClasses.md,
         radiusClasses[radius] ?? radiusClasses.lg,
         variantClasses[resolvedVariant][resolvedColor],
