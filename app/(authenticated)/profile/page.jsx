@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import ProfileClient from "@/components/profile/ProfileClient";
+import { LazyProfileClient } from "@/components/app-shell/LazyPageClients";
 import { getSessionForLayout } from "@/app/actions/auth";
 import { getUserBillingAction } from "@/app/actions/billing";
 import { getHouseholdSharingAction } from "@/app/actions/household";
@@ -80,7 +80,7 @@ export default async function ProfilePage() {
 
   return (
     <main className="page-enter mx-auto max-w-[1500px] px-5 py-8 md:min-h-[100vh] max-md:px-4 max-md:pb-0 max-md:pt-4">
-      <ProfileClient
+      <LazyProfileClient
         user={user}
         initialPreferences={preferences}
         initialBilling={billing}

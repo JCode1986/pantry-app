@@ -15,9 +15,16 @@ const immutableAssetHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  allowedDevOrigins: [
+    "127.0.0.1",
+    "127.0.0.1:3100",
+    "localhost",
+    "localhost:3100",
+  ],
   images: {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 60 * 60 * 24 * 30,
+    qualities: [75, 78],
   },
   experimental: {
     optimizePackageImports: [

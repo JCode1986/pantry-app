@@ -205,11 +205,13 @@ export const DEFAULT_PREFERENCES = {
 };
 
 export function normalizePreferences(preferences = {}) {
-  const themeId = THEME_OPTIONS.some((theme) => theme.id === preferences.themeId)
-    ? preferences.themeId
+  const source =
+    preferences && typeof preferences === "object" ? preferences : DEFAULT_PREFERENCES;
+  const themeId = THEME_OPTIONS.some((theme) => theme.id === source.themeId)
+    ? source.themeId
     : DEFAULT_PREFERENCES.themeId;
-  const fontId = FONT_OPTIONS.some((font) => font.id === preferences.fontId)
-    ? preferences.fontId
+  const fontId = FONT_OPTIONS.some((font) => font.id === source.fontId)
+    ? source.fontId
     : DEFAULT_PREFERENCES.fontId;
 
   return { themeId, fontId };

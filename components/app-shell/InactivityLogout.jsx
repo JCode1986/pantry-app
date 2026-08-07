@@ -19,7 +19,6 @@ import {
 import { FaClock, FaSignOutAlt, FaSpinner } from "react-icons/fa";
 import { refreshTokenIfNeeded } from "@/app/actions/auth";
 import { clearBrowserLogoutStorage } from "@/utils/logoutStorage";
-import { useSession } from "@/lib/SessionContext";
 import {
   modalBodyClass,
   modalContentClass,
@@ -53,9 +52,7 @@ function formatCountdown(totalSeconds) {
 
 export default function InactivityLogout({ isAuthenticated: serverAuthenticated = false }) {
   const router = useRouter();
-  const { session, loading } = useSession();
-  const clientAuthenticated = Boolean(session?.access_token) && !loading;
-  const isAuthenticated = serverAuthenticated || clientAuthenticated;
+  const isAuthenticated = serverAuthenticated;
 
   const [mounted, setMounted] = useState(false);
   const [lastActivityAt, setLastActivityAt] = useState(0);
@@ -169,7 +166,7 @@ export default function InactivityLogout({ isAuthenticated: serverAuthenticated 
     }
 
     markActive();
-  }, [isAuthenticated, markActive, mounted, session?.access_token]);
+  }, [isAuthenticated, markActive, mounted]);
 
   useEffect(() => {
     if (!mounted || !isAuthenticated || loggingOutRef.current) return;

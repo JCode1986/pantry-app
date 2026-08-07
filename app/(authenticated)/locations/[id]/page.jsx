@@ -1,5 +1,5 @@
 import { createClient } from '@/utils/supabase/server';
-import StorageAreasSection from '@/components/locations/StorageAreasSection';
+import { LazyStorageAreasSection } from '@/components/app-shell/LazyPageClients';
 import LocationDetailHeaderClient from '@/components/locations/LocationDetailHeaderClient';
 import { notFound } from 'next/navigation';
 import { createPageMetadata, NO_INDEX_ROBOTS } from '@/utils/metadata';
@@ -120,7 +120,7 @@ export default async function Page({ params }) {
           totalItems: locationStats.totalItems,
         }}
       />
-      <StorageAreasSection
+      <LazyStorageAreasSection
         locationName={location?.name}
         locationId={location.id}
         initialStorageAreas={storageAreas}

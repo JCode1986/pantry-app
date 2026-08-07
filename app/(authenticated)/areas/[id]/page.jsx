@@ -1,6 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { notFound } from "next/navigation";
-import AreaDetailClient from "@/components/areas/AreaDetailClient";
+import { LazyAreaDetailClient } from "@/components/app-shell/LazyPageClients";
 import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
 import { getCanEditInventoryForUser } from "@/utils/households";
 import {
@@ -77,7 +77,7 @@ export default async function Page({ params }) {
 
   return (
     <main className="page-enter mx-auto max-w-[1500px] px-5 py-8 md:min-h-[100vh] lg:px-6 xl:px-8 max-md:px-4 max-md:pb-0 max-md:pt-4">
-      <AreaDetailClient
+      <LazyAreaDetailClient
         area={{
           id: area.id,
           name: area.name,
