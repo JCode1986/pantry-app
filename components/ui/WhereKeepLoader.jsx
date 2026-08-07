@@ -1,9 +1,10 @@
 export default function WhereKeepLoader({
+  className = "",
   label = "Finding your inventory...",
   detail = "Checking every location, area, and category.",
 }) {
   return (
-    <div className="wherekeep-loader" role="status" aria-live="polite">
+    <div className={`wherekeep-loader ${className}`} role="status" aria-live="polite">
       <svg
         className="wherekeep-loader__mark"
         viewBox="0 0 160 160"

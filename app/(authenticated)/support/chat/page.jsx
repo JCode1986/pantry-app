@@ -10,7 +10,7 @@ export const metadata = createPageMetadata({
 
 export default function SupportChatPage() {
   return (
-    <main className="page-enter mx-auto min-h-[100vh] max-w-[900px] px-0 py-0 md:px-5 md:py-8">
+    <main className="mx-auto min-h-[100vh] max-w-[900px] px-0 py-0 md:px-5 md:py-8">
       <SupportChatbot defaultOpen variant="page" />
     </main>
   );

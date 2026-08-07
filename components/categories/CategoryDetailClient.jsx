@@ -868,8 +868,8 @@ export default function CategoryDetailClient({
   };
 
   return (
-    <main className="page-enter mx-auto max-w-[1500px] space-y-5 px-5 py-8 md:min-h-[100vh] lg:px-6 xl:px-8 max-md:px-4 max-md:pb-0 max-md:pt-4">
-      <header className="content-enter md:hidden">
+    <main className="mx-auto max-w-[1500px] space-y-5 px-5 py-8 md:min-h-[100vh] lg:px-6 xl:px-8 max-md:px-4 max-md:pb-0 max-md:pt-4">
+      <header className="md:hidden">
         <Link
           href="/categories"
           className="inline-flex items-center text-sm font-medium text-[var(--stocksense-brand)]"
@@ -947,7 +947,7 @@ export default function CategoryDetailClient({
         </div>
       </header>
 
-      <section className="content-enter max-md:hidden">
+      <section className="max-md:hidden">
         <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
           <Link
             href="/categories"

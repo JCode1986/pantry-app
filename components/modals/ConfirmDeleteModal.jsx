@@ -62,11 +62,11 @@ export default function ConfirmDeleteModal({
                 />
               ) : null}
             </ModalHeader>
-            <ModalBody className={`${modalBodyClass} max-md:pb-4`}>
+            <ModalBody className={`${modalBodyClass} max-md:!flex-none max-md:!pb-3 max-md:pt-3`}>
               <p className="text-sm text-gray-600">{description}</p>
             </ModalBody>
             <ModalFooter
-              className={`${modalFooterClass} flex flex-col-reverse gap-2 sm:flex-row sm:justify-end max-md:static`}
+              className={`${modalFooterClass} flex flex-col-reverse gap-2 sm:flex-row sm:justify-end max-md:static max-md:!pb-[max(1rem,env(safe-area-inset-bottom))] max-md:!pt-2`}
             >
               <NativeButton
                 variant="flat"

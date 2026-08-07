@@ -85,7 +85,7 @@ export default function NativeDropdown({
                   setIsOpen(false);
                   item.onSelect();
                 }}
-                className={`block w-full px-3 py-2 text-left font-medium transition hover:bg-gray-50 ${
+                className={`block w-full px-3 py-2 text-left font-medium transition duration-200 ease-out hover:bg-gray-50 motion-reduce:transition-none ${
                   item.danger ? "text-rose-700" : "text-gray-700"
                 }`}
               >
@@ -114,7 +114,7 @@ export default function NativeDropdown({
             toggleMenu();
           }
         }}
-        className={`grid shrink-0 place-items-center rounded-xl text-gray-500 transition hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)] disabled:cursor-not-allowed disabled:opacity-50 ${buttonClassName}`}
+        className={`grid shrink-0 place-items-center rounded-xl text-gray-500 transition duration-200 ease-out hover:bg-[var(--stocksense-brand-soft)] hover:text-[var(--stocksense-brand)] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none ${buttonClassName}`}
       >
         <FaEllipsisV className="h-4 w-4" />
       </button>

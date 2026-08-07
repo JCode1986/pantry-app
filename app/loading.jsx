@@ -1,9 +1,5 @@
-import WhereKeepLoader from "@/components/ui/WhereKeepLoader";
+import PageLoadingState from "@/components/ui/PageLoadingState";
 
 export default function Loading() {
-  return (
-    <main className="flex min-h-screen items-center justify-center px-4">
-      <WhereKeepLoader />
-    </main>
-  );
+  return <PageLoadingState isAuthenticated={false} />;
 }

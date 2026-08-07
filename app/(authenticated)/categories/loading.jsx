@@ -1,12 +1,10 @@
-import WhereKeepLoader from "@/components/ui/WhereKeepLoader";
+import PageLoadingState from "@/components/ui/PageLoadingState";
 
 export default function CategoriesLoading() {
   return (
-    <main className="flex min-h-[70vh] items-center justify-center px-4 py-12">
-      <WhereKeepLoader
-        label="Loading categories..."
-        detail="Grouping items across your storage areas."
-      />
-    </main>
+    <PageLoadingState
+      label="Loading categories..."
+      detail="Grouping items across your storage areas."
+    />
   );
 }

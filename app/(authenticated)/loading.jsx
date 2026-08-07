@@ -1,9 +1,5 @@
-import WhereKeepLoader from "@/components/ui/WhereKeepLoader";
+import PageLoadingState from "@/components/ui/PageLoadingState";
 
 export default function AuthenticatedLoading() {
-  return (
-    <main className="flex min-h-[70vh] items-center justify-center px-4 py-12">
-      <WhereKeepLoader />
-    </main>
-  );
+  return <PageLoadingState />;
 }

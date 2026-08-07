@@ -734,7 +734,7 @@ export default function LocationsSection({
       variants={listVariants}
       initial="hidden"
       animate="show"
-      className="page-enter mx-auto max-w-[1560px] px-5 py-8 md:min-h-[96.3vh] lg:px-6 xl:px-8 max-md:px-4 max-md:pb-0 max-md:pt-4"
+      className="mx-auto max-w-[1560px] px-5 py-8 md:min-h-[96.3vh] lg:px-6 xl:px-8 max-md:px-4 max-md:pb-0 max-md:pt-4"
     >
       <motion.section
         variants={pageItemVariants}
