@@ -2,6 +2,13 @@
 
 import { getSession } from "@/lib/sessionOptions";
 
+function needsInvitePasswordSetup(user) {
+  return Boolean(
+    user?.user_metadata?.requires_password_setup &&
+      (user?.invited_at || user?.user_metadata?.household_invite_token)
+  );
+}
+
 /** LOGIN – server action */
 export async function login({ email, password, redirectTo = "/dashboard" }) {
   const { createClient } = await import('@/utils/supabase/server');
@@ -91,7 +98,9 @@ export async function logoutAction() {
   };
 }
 
-export async function updatePasswordAction({ password }) {
+export async function updatePasswordAction({ currentPassword, password }) {
+  const normalizedCurrentPassword =
+    typeof currentPassword === 'string' ? currentPassword : '';
   const normalizedPassword = typeof password === 'string' ? password : '';
 
   if (normalizedPassword.length < 6) {
@@ -127,8 +136,43 @@ export async function updatePasswordAction({ password }) {
     };
   }
 
+  const sessionUser = sessionData?.session?.user ?? session?.user?.user;
+  const mustVerifyCurrentPassword = !needsInvitePasswordSetup(sessionUser);
+
+  let verifiedPasswordSession = null;
+
+  if (mustVerifyCurrentPassword) {
+    if (!normalizedCurrentPassword) {
+      return {
+        success: false,
+        error: 'Enter your current password.',
+      };
+    }
+
+    if (!sessionUser?.email) {
+      return {
+        success: false,
+        error: 'Could not verify the current password for this account.',
+      };
+    }
+
+    const { data: verifyData, error: verifyError } = await supa.auth.signInWithPassword({
+      email: sessionUser.email,
+      password: normalizedCurrentPassword,
+    });
+
+    if (verifyError) {
+      return {
+        success: false,
+        error: 'Current password is incorrect.',
+      };
+    }
+
+    verifiedPasswordSession = verifyData?.session ?? null;
+  }
+
   const nextUserMetadata = {
-    ...(sessionData?.session?.user?.user_metadata ?? session?.user?.user?.user_metadata ?? {}),
+    ...(sessionUser?.user_metadata ?? {}),
     requires_password_setup: false,
   };
 
@@ -147,9 +191,18 @@ export async function updatePasswordAction({ password }) {
 
   if (sessionData?.session || data?.user) {
     session.user = {
-      access_token: sessionData?.session?.access_token ?? accessToken,
-      refresh_token: sessionData?.session?.refresh_token ?? refreshToken,
-      expires_at: sessionData?.session?.expires_at ?? session?.user?.expires_at,
+      access_token:
+        verifiedPasswordSession?.access_token ??
+        sessionData?.session?.access_token ??
+        accessToken,
+      refresh_token:
+        verifiedPasswordSession?.refresh_token ??
+        sessionData?.session?.refresh_token ??
+        refreshToken,
+      expires_at:
+        verifiedPasswordSession?.expires_at ??
+        sessionData?.session?.expires_at ??
+        session?.user?.expires_at,
       user: data?.user ?? sessionData?.session?.user ?? session?.user?.user,
     };
     await session.save();

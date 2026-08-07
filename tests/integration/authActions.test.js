@@ -185,15 +185,35 @@ describe("auth server actions", () => {
     expect(authMocks.createClient).not.toHaveBeenCalled();
   });
 
-  it("updates a password only when an app session can be restored", async () => {
+  it("requires the current password before updating a normal account password", async () => {
     const session = createSessionMock(createTestUser());
     authMocks.getSession.mockResolvedValue(session);
 
     const result = await updatePasswordAction({ password: "new-password" });
 
+    expect(result).toEqual({
+      success: false,
+      error: "Enter your current password.",
+    });
+    expect(authMocks.supabase.auth.updateUser).not.toHaveBeenCalled();
+  });
+
+  it("updates a password only when an app session can be restored", async () => {
+    const session = createSessionMock(createTestUser());
+    authMocks.getSession.mockResolvedValue(session);
+
+    const result = await updatePasswordAction({
+      currentPassword: "old-password",
+      password: "new-password",
+    });
+
     expect(authMocks.supabase.auth.setSession).toHaveBeenCalledWith({
       access_token: "access_test",
       refresh_token: "refresh_test",
+    });
+    expect(authMocks.supabase.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: "owner@example.test",
+      password: "old-password",
     });
     expect(authMocks.supabase.auth.updateUser).toHaveBeenCalledWith({
       password: "new-password",
