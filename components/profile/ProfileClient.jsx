@@ -1786,7 +1786,28 @@ export default function ProfileClient({
               disabled={savingPreferences || !canCustomizeAppearance}
               options={THEME_OPTIONS.map((theme) => ({
                 value: theme.id,
-                label: `${theme.label} - ${theme.description}`,
+                startContent: (
+                  <span
+                    className="block h-9 w-9 rounded-xl border border-black/5 shadow-sm"
+                    style={{
+                      background: `linear-gradient(135deg, ${theme.swatch}, ${theme.border})`,
+                    }}
+                    aria-hidden="true"
+                  />
+                ),
+                label: (
+                  <span className="flex min-w-0 flex-col leading-tight">
+                    <span
+                      className="truncate text-sm font-semibold"
+                      style={{ color: theme.swatch }}
+                    >
+                      {theme.label}
+                    </span>
+                    <span className="mt-0.5 truncate text-xs font-medium text-gray-500">
+                      {theme.description}
+                    </span>
+                  </span>
+                ),
               }))}
             />
 
@@ -1803,7 +1824,19 @@ export default function ProfileClient({
               disabled={savingPreferences || !canCustomizeAppearance}
               options={FONT_OPTIONS.map((font) => ({
                 value: font.id,
-                label: `${font.label} - ${font.description}`,
+                label: (
+                  <span
+                    className="flex min-w-0 flex-col leading-tight"
+                    style={{ fontFamily: font.family }}
+                  >
+                    <span className="truncate text-sm font-semibold text-gray-950">
+                      {font.label}
+                    </span>
+                    <span className="mt-0.5 truncate text-xs font-medium text-gray-500">
+                      {font.description}
+                    </span>
+                  </span>
+                ),
               }))}
             />
 
