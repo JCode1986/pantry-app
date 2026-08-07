@@ -12,7 +12,7 @@ export const mobileSheetModalClassNames = {
 };
 
 export const modalHeaderClass =
-  "shrink-0 border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-base font-semibold text-[var(--stocksense-brand)] max-md:sticky max-md:top-0 max-md:z-20 max-md:px-4 max-md:pb-3 max-md:pt-[max(1rem,calc(env(safe-area-inset-top)+var(--wherekeep-visual-viewport-top,0px)+0.75rem))]";
+  "shrink-0 border-b border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-base font-semibold text-[var(--stocksense-brand)] max-md:sticky max-md:top-0 max-md:z-20 max-md:px-4 max-md:pb-3 max-md:pt-[max(1rem,calc(env(safe-area-inset-top)+0.75rem))]";
 
 export const modalTitleClass =
   "min-w-0 whitespace-normal break-words text-lg font-semibold leading-6 text-[var(--stocksense-brand)] max-md:text-base max-md:leading-5";

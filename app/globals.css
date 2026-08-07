@@ -169,10 +169,17 @@ input[type="radio"] {
 }
 
 @media (max-width: 767px) {
+  .wherekeep-native-modal-wrapper {
+    top: var(--wherekeep-visual-viewport-top, 0px) !important;
+    bottom: auto !important;
+    height: var(--wherekeep-visual-viewport-height, 100svh) !important;
+    max-height: var(--wherekeep-visual-viewport-height, 100svh) !important;
+  }
+
   .wherekeep-native-modal-header {
     padding-top: max(
       1rem,
-      calc(env(safe-area-inset-top) + var(--wherekeep-visual-viewport-top, 0px) + 0.75rem)
+      calc(env(safe-area-inset-top) + 0.75rem)
     ) !important;
   }
 

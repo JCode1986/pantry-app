@@ -136,11 +136,9 @@ export function Modal({
         style={{
           backgroundColor: isVisible ? "rgb(0 0 0 / 0.4)" : "rgb(0 0 0 / 0)",
           transition: "background-color 220ms cubic-bezier(0.22, 1, 0.36, 1)",
-          paddingTop:
-            "max(1rem, calc(env(safe-area-inset-top) + var(--wherekeep-visual-viewport-top, 0px) + 0.75rem))",
         }}
         className={cx(
-          "fixed inset-0 z-[140] flex overflow-y-auto px-0 pb-[max(1rem,env(safe-area-inset-bottom))] motion-reduce:transition-none md:py-4",
+          "wherekeep-native-modal-wrapper fixed inset-0 z-[140] flex overflow-y-auto px-0 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,calc(env(safe-area-inset-top)+0.75rem))] motion-reduce:transition-none md:py-4",
           placement === "bottom"
             ? "items-end justify-center"
             : placement === "right"
