@@ -108,13 +108,16 @@ export default function NativeSelect({
                     setIsOpen(false);
                     onChange(option.value);
                   }}
-                  className={`flex min-h-9 w-full items-center rounded-lg px-3 text-left font-semibold transition duration-200 ease-out motion-reduce:transition-none ${
+                  className={`flex min-h-9 w-full items-center gap-3 rounded-lg px-3 py-2 text-left font-semibold transition duration-200 ease-out motion-reduce:transition-none ${
                     selected
                       ? "bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]"
                       : "text-gray-700 hover:bg-gray-50"
                   }`}
                 >
-                  {option.label}
+                  {option.startContent ? (
+                    <span className="shrink-0">{option.startContent}</span>
+                  ) : null}
+                  <span className="min-w-0 flex-1">{option.label}</span>
                 </button>
               );
             })}
@@ -146,6 +149,9 @@ export default function NativeSelect({
           triggerClassName
         )}
       >
+        {selectedOption?.startContent ? (
+          <span className="shrink-0">{selectedOption.startContent}</span>
+        ) : null}
         <span className="min-w-0 flex-1">
           {hasLabel ? (
             <span
@@ -157,7 +163,7 @@ export default function NativeSelect({
               {label}
             </span>
           ) : null}
-          <span className="block truncate text-sm leading-5 text-gray-900">
+          <span className="block min-w-0 truncate text-sm leading-5 text-gray-900">
             {selectedOption?.label ?? placeholder}
           </span>
         </span>
