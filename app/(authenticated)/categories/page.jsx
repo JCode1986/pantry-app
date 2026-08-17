@@ -1,4 +1,4 @@
-import CategoriesPageClient from "@/components/categories/CategoriesPageClient";
+import { LazyCategoriesPageClient } from "@/components/app-shell/LazyInventoryListClients";
 import { createClient } from "@/utils/supabase/server";
 import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
 import { getCanEditInventoryForUser } from "@/utils/households";
@@ -33,7 +33,7 @@ export default async function Page() {
 
   return (
     <main className="mx-auto max-w-[1500px] px-5 py-8 md:min-h-[100vh] lg:px-6 xl:px-8 max-md:px-4 max-md:pb-0 max-md:pt-4">
-      <CategoriesPageClient
+      <LazyCategoriesPageClient
         initialCategories={categoriesResult.data.items}
         initialTotalCategories={categoriesResult.data.totalCount}
         filterLocations={filterLocations}

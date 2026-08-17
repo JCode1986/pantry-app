@@ -3,6 +3,7 @@
 import { cx } from "@/components/ui/classNames";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { toDateString } from "@/utils/pantry/date";
 import {
   FaCalendarAlt,
   FaChevronDown,
@@ -41,16 +42,6 @@ const radiusClasses = {
   lg: "rounded-xl",
   full: "rounded-full",
 };
-
-function padNumber(value) {
-  return String(value).padStart(2, "0");
-}
-
-function toDateString(date) {
-  return `${date.getFullYear()}-${padNumber(date.getMonth() + 1)}-${padNumber(
-    date.getDate()
-  )}`;
-}
 
 function createCalendarDate(value) {
   return {

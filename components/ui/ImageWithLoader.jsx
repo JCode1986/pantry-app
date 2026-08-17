@@ -1,7 +1,14 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { FaSpinner } from "react-icons/fa";
+
+function canUseOptimizedImage(src) {
+  if (typeof src !== "string" || !src) return false;
+  if (src.startsWith("blob:") || src.startsWith("data:")) return false;
+  return src.startsWith("/") || src.startsWith("http://") || src.startsWith("https://");
+}
 
 export default function ImageWithLoader({
   src,
@@ -9,12 +16,14 @@ export default function ImageWithLoader({
   className = "h-full w-full object-cover",
   loaderClassName = "",
   wrapperClassName = "",
+  sizes = "100vw",
   onLoad,
   onError,
   ...props
 }) {
   const imageRef = useRef(null);
   const [isLoaded, setIsLoaded] = useState(!src);
+  const useOptimizedImage = canUseOptimizedImage(src);
 
   useEffect(() => {
     if (!src) {
@@ -27,7 +36,7 @@ export default function ImageWithLoader({
 
     setIsLoaded(false);
 
-    if (image?.complete) {
+    if (!useOptimizedImage && image?.complete) {
       setIsLoaded(true);
       return () => {
         isActive = false;
@@ -44,7 +53,7 @@ export default function ImageWithLoader({
       isActive = false;
       window.clearTimeout(fallbackTimer);
     };
-  }, [src]);
+  }, [src, useOptimizedImage]);
 
   return (
     <span
@@ -58,7 +67,26 @@ export default function ImageWithLoader({
           <FaSpinner className="block h-4 w-4 animate-spin" />
         </span>
       ) : null}
-      {src ? (
+      {src && useOptimizedImage ? (
+        <Image
+          src={src}
+          alt={alt}
+          fill
+          sizes={sizes}
+          {...props}
+          className={`block ${className} transition-opacity duration-200 ${
+            isLoaded ? "opacity-100" : "opacity-0"
+          }`}
+          onLoad={(event) => {
+            setIsLoaded(true);
+            onLoad?.(event);
+          }}
+          onError={(event) => {
+            setIsLoaded(true);
+            onError?.(event);
+          }}
+        />
+      ) : src ? (
         <img
           ref={imageRef}
           src={src}

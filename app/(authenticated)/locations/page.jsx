@@ -1,4 +1,4 @@
-import LocationsSection from '@/components/locations/LocationsSection';
+import { LazyLocationsSection } from '@/components/app-shell/LazyInventoryListClients';
 import { createClient } from '@/utils/supabase/server';
 import { createPageMetadata, NO_INDEX_ROBOTS } from '@/utils/metadata';
 import { getCanEditInventoryForUser } from '@/utils/households';
@@ -21,7 +21,7 @@ export default async function Home() {
   const locationsResult = await getLocationsPageAction({ offset: 0, limit: 24 });
 
   return (
-    <LocationsSection
+    <LazyLocationsSection
       locations={locationsResult.data.items}
       totalLocations={locationsResult.data.totalCount}
       canEditInventory={canEditInventory}

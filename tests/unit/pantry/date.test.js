@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
+  addDays,
   daysUntil,
   isExpiringSoon,
   parsePantryDate,
+  toDateString,
   toNonNegativeInteger,
   toPositiveInteger,
 } from "@/utils/pantry/date";
+
+function formatDateOnly(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 describe("pantry date utilities", () => {
   it("parses ISO date-only strings as valid pantry dates", () => {
@@ -31,12 +40,27 @@ describe("pantry date utilities", () => {
     expect(daysUntil("2026-08-05", today)).toBe(-1);
   });
 
+  it("adds days from the start of the provided day", () => {
+    const result = addDays(new Date("2026-08-06T15:30:00"), 3);
+
+    expect(toDateString(result)).toBe("2026-08-09");
+    expect(result.getHours()).toBe(0);
+    expect(result.getMinutes()).toBe(0);
+  });
+
+  it("formats local dates as yyyy-mm-dd strings", () => {
+    expect(toDateString(new Date("2026-08-06T15:30:00"))).toBe("2026-08-06");
+  });
+
   it("treats invalid expiration dates as infinitely far away", () => {
     expect(daysUntil("bad input", new Date("2026-08-06T00:00:00"))).toBe(Infinity);
   });
 
   it("detects upcoming expirations inside an inclusive window", () => {
-    expect(isExpiringSoon("2026-08-10", 7)).toBe(true);
+    const upcoming = new Date();
+    upcoming.setDate(upcoming.getDate() + 3);
+
+    expect(isExpiringSoon(formatDateOnly(upcoming), 7)).toBe(true);
     expect(isExpiringSoon("2020-01-01", 7)).toBe(false);
   });
 

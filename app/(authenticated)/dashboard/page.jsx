@@ -13,6 +13,7 @@ import {
   INVENTORY_IMAGE_VARIANT,
   getInventoryImageUrls,
 } from '@/utils/inventoryImages';
+import { addDays, toDateString } from '@/utils/pantry/date';
 import { LuClock3, LuPackageMinus, LuTriangleAlert } from 'react-icons/lu';
 
 export const metadata = createPageMetadata({
@@ -21,20 +22,6 @@ export const metadata = createPageMetadata({
   path: '/dashboard',
   robots: NO_INDEX_ROBOTS,
 });
-
-function addDays(date, days) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function toDateString(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 function getDisplayName(user) {
   const metadata = user?.user_metadata ?? {};
@@ -61,13 +48,73 @@ function getPendingInviteToken(user) {
   return typeof token === 'string' && token.trim() ? token.trim() : null;
 }
 
+function uniqueIds(rows = [], key = 'id') {
+  return [
+    ...new Set((rows ?? []).map((row) => row?.[key]).filter(Boolean).map(String)),
+  ];
+}
+
+async function getItemLocationMaps(supabase, itemsRaw = []) {
+  const categoryIds = uniqueIds(itemsRaw, 'category_id');
+
+  if (categoryIds.length === 0) {
+    return {
+      categoryMap: new Map(),
+      areaMap: new Map(),
+      locationMap: new Map(),
+    };
+  }
+
+  const { data: categoriesRaw = [] } = await supabase
+    .from('storage_categories')
+    .select('id, name, storage_area_id')
+    .in('id', categoryIds);
+  const areaIds = uniqueIds(categoriesRaw, 'storage_area_id');
+
+  const { data: areasRaw = [] } = areaIds.length
+    ? await supabase
+        .from('storage_areas')
+        .select('id, name, location_id')
+        .in('id', areaIds)
+    : { data: [] };
+  const locationIds = uniqueIds(areasRaw, 'location_id');
+
+  const { data: locationsRaw = [] } = locationIds.length
+    ? await supabase.from('locations').select('id, name').in('id', locationIds)
+    : { data: [] };
+
+  return {
+    categoryMap: new Map((categoriesRaw ?? []).map((category) => [String(category.id), category])),
+    areaMap: new Map((areasRaw ?? []).map((area) => [String(area.id), area])),
+    locationMap: new Map((locationsRaw ?? []).map((location) => [String(location.id), location])),
+  };
+}
+
+function getItemLocationPath(item, { categoryMap, areaMap, locationMap }) {
+  const category = item.category_id
+    ? categoryMap.get(String(item.category_id))
+    : null;
+  const area = category?.storage_area_id
+    ? areaMap.get(String(category.storage_area_id))
+    : null;
+  const location = area?.location_id
+    ? locationMap.get(String(area.location_id))
+    : null;
+
+  return {
+    categoryId: category?.id ?? item.category_id ?? null,
+    categoryName: category?.name ?? null,
+    areaName: area?.name ?? null,
+    locationName: location?.name ?? null,
+  };
+}
+
 async function getExpirationNotifications(
   supabase,
   withinDays = 3,
   counts = {}
 ) {
   const cutoff = toDateString(addDays(new Date(), withinDays));
-  const today = toDateString(new Date());
 
   const { data: itemsRaw = [], error: itemsError } = await supabase
     .from('items')
@@ -96,60 +143,20 @@ async function getExpirationNotifications(
     };
   }
 
-  const categoryIds = [
-    ...new Set(itemsRaw.map((item) => item.category_id).filter(Boolean)),
-  ];
-
-  const { data: categoriesRaw = [] } = categoryIds.length
-    ? await supabase
-        .from('storage_categories')
-        .select('id, name, storage_area_id')
-        .in('id', categoryIds)
-    : { data: [] };
-
-  const areaIds = [
-    ...new Set((categoriesRaw ?? []).map((category) => category.storage_area_id).filter(Boolean)),
-  ];
-
-  const { data: areasRaw = [] } = areaIds.length
-    ? await supabase
-        .from('storage_areas')
-        .select('id, name, location_id')
-        .in('id', areaIds)
-    : { data: [] };
-
-  const locationIds = [
-    ...new Set((areasRaw ?? []).map((area) => area.location_id).filter(Boolean)),
-  ];
-
-  const { data: locationsRaw = [] } = locationIds.length
-    ? await supabase.from('locations').select('id, name').in('id', locationIds)
-    : { data: [] };
-
-  const categoryMap = new Map((categoriesRaw ?? []).map((category) => [String(category.id), category]));
-  const areaMap = new Map((areasRaw ?? []).map((area) => [String(area.id), area]));
-  const locationMap = new Map((locationsRaw ?? []).map((location) => [String(location.id), location]));
+  const locationMaps = await getItemLocationMaps(supabase, itemsRaw);
 
   return {
     items: itemsRaw.map((item) => {
-      const category = item.category_id
-        ? categoryMap.get(String(item.category_id))
-        : null;
-      const area = category?.storage_area_id
-        ? areaMap.get(String(category.storage_area_id))
-        : null;
-      const location = area?.location_id
-        ? locationMap.get(String(area.location_id))
-        : null;
+      const path = getItemLocationPath(item, locationMaps);
 
       return {
         id: item.id,
         name: item.name,
         quantity: item.quantity ?? 0,
         expirationDate: item.expiration_date,
-        categoryName: category?.name ?? null,
-        areaName: area?.name ?? null,
-        locationName: location?.name ?? null,
+        categoryName: path.categoryName,
+        areaName: path.areaName,
+        locationName: path.locationName,
       };
     }),
     expiredCount: counts.expiredCount ?? 0,
@@ -161,54 +168,16 @@ async function getExpirationNotifications(
 async function hydrateDashboardItems(supabase, itemsRaw = []) {
   if (itemsRaw.length === 0) return [];
 
-  const imageUrlsByPath = await getInventoryImageUrls(
-    itemsRaw.map((item) => item.image_path),
-    { variant: INVENTORY_IMAGE_VARIANT.CARD }
-  );
-  const categoryIds = [
-    ...new Set(itemsRaw.map((item) => item.category_id).filter(Boolean)),
-  ];
-
-  const { data: categoriesRaw = [] } = categoryIds.length
-    ? await supabase
-        .from('storage_categories')
-        .select('id, name, storage_area_id')
-        .in('id', categoryIds)
-    : { data: [] };
-
-  const areaIds = [
-    ...new Set((categoriesRaw ?? []).map((category) => category.storage_area_id).filter(Boolean)),
-  ];
-
-  const { data: areasRaw = [] } = areaIds.length
-    ? await supabase
-        .from('storage_areas')
-        .select('id, name, location_id')
-        .in('id', areaIds)
-    : { data: [] };
-
-  const locationIds = [
-    ...new Set((areasRaw ?? []).map((area) => area.location_id).filter(Boolean)),
-  ];
-
-  const { data: locationsRaw = [] } = locationIds.length
-    ? await supabase.from('locations').select('id, name').in('id', locationIds)
-    : { data: [] };
-
-  const categoryMap = new Map((categoriesRaw ?? []).map((category) => [String(category.id), category]));
-  const areaMap = new Map((areasRaw ?? []).map((area) => [String(area.id), area]));
-  const locationMap = new Map((locationsRaw ?? []).map((location) => [String(location.id), location]));
+  const [imageUrlsByPath, locationMaps] = await Promise.all([
+    getInventoryImageUrls(
+      itemsRaw.map((item) => item.image_path),
+      { variant: INVENTORY_IMAGE_VARIANT.CARD }
+    ),
+    getItemLocationMaps(supabase, itemsRaw),
+  ]);
 
   return itemsRaw.map((item) => {
-    const category = item.category_id
-      ? categoryMap.get(String(item.category_id))
-      : null;
-    const area = category?.storage_area_id
-      ? areaMap.get(String(category.storage_area_id))
-      : null;
-    const location = area?.location_id
-      ? locationMap.get(String(area.location_id))
-      : null;
+    const path = getItemLocationPath(item, locationMaps);
 
     return {
       id: item.id,
@@ -217,10 +186,10 @@ async function hydrateDashboardItems(supabase, itemsRaw = []) {
       expirationDate: item.expiration_date,
       imageUrl: imageUrlsByPath.get(item.image_path) ?? null,
       imageThumbUrl: imageUrlsByPath.get(item.image_path) ?? null,
-      categoryId: category?.id ?? item.category_id ?? null,
-      categoryName: category?.name ?? null,
-      areaName: area?.name ?? null,
-      locationName: location?.name ?? null,
+      categoryId: path.categoryId,
+      categoryName: path.categoryName,
+      areaName: path.areaName,
+      locationName: path.locationName,
     };
   });
 }
