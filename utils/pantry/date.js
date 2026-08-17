@@ -1,5 +1,12 @@
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
+export function addDays(date, days) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
 export function parsePantryDate(value) {
   if (!value) return null;
 
@@ -26,6 +33,13 @@ export function daysUntil(value, today = new Date()) {
   startOfToday.setHours(0, 0, 0, 0);
 
   return Math.floor((date.getTime() - startOfToday.getTime()) / MS_PER_DAY);
+}
+
+export function toDateString(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export function isExpiringSoon(value, withinDays) {

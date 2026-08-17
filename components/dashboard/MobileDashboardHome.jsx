@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { motion } from "@/components/ui/MotionLite";
+import { daysUntil } from "@/utils/pantry/date";
 import {
   FaBell,
   FaBoxOpen,
@@ -186,23 +187,10 @@ function formatRelativeDate(value) {
   });
 }
 
-function daysUntilDate(value) {
-  if (!value) return null;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  date.setHours(0, 0, 0, 0);
-
-  return Math.round((date.getTime() - today.getTime()) / 86400000);
-}
-
 function formatExpirationLabel(value) {
-  const days = daysUntilDate(value);
+  const days = daysUntil(value);
 
-  if (days === null) return "Date unknown";
+  if (!Number.isFinite(days)) return "Date unknown";
   if (days < 0) return `${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} overdue`;
   if (days === 0) return "Today";
   if (days === 1) return "Tomorrow";
@@ -510,8 +498,8 @@ export default function MobileDashboardHome({
 
   const expiringItems = (expirationNotifications.items ?? [])
     .filter((item) => {
-      const days = daysUntilDate(item.expirationDate);
-      return days !== null && days >= 0;
+      const days = daysUntil(item.expirationDate);
+      return Number.isFinite(days) && days >= 0;
     })
     .slice(0, 3);
 

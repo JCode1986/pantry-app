@@ -12,6 +12,31 @@ const immutableAssetHeaders = [
   },
 ];
 
+function supabaseImageRemotePatterns() {
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
+  const patterns = [
+    {
+      protocol: "https",
+      hostname: "**.supabase.co",
+      pathname: "/storage/v1/**",
+    },
+  ];
+
+  try {
+    const { hostname, protocol } = new URL(supabaseUrl);
+    patterns.unshift({
+      protocol: protocol.replace(":", ""),
+      hostname,
+      pathname: "/storage/v1/**",
+    });
+  } catch {
+    // The wildcard Supabase storage pattern still covers hosted projects.
+  }
+
+  return patterns;
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
@@ -25,6 +50,7 @@ const nextConfig = {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 60 * 60 * 24 * 30,
     qualities: [75, 78],
+    remotePatterns: supabaseImageRemotePatterns(),
   },
   experimental: {
     optimizePackageImports: [

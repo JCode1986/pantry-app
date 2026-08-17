@@ -1,7 +1,11 @@
 'use server';
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
-import { toNonNegativeInteger } from '@/utils/pantry/date';
+import {
+  addDays,
+  toDateString,
+  toNonNegativeInteger,
+} from '@/utils/pantry/date';
 import {
   normalizeBarcode,
   normalizeName,
@@ -1135,20 +1139,6 @@ function normalizeItemListFilters(filters = {}) {
     stockFilter,
     sortBy,
   };
-}
-
-function addDays(date, days) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function toDateString(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }
 
 function uniqueIds(rows = [], key = 'id') {

@@ -1,6 +1,8 @@
 import { createClient } from '@/utils/supabase/server';
-import { LazyStorageAreasSection } from '@/components/app-shell/LazyPageClients';
-import LocationDetailHeaderClient from '@/components/locations/LocationDetailHeaderClient';
+import {
+  LazyLocationDetailHeaderClient,
+  LazyLocationStorageAreasSection,
+} from '@/components/app-shell/LazyLocationDetailClients';
 import { notFound } from 'next/navigation';
 import { createPageMetadata, NO_INDEX_ROBOTS } from '@/utils/metadata';
 import { getCanEditInventoryForUser } from '@/utils/households';
@@ -110,7 +112,7 @@ export default async function Page({ params }) {
 
   return (
     <main className="mx-auto max-w-[1560px] px-5 py-8 md:min-h-[100vh] lg:px-6 xl:px-8 max-md:px-4 max-md:pb-0 max-md:pt-4">
-      <LocationDetailHeaderClient
+      <LazyLocationDetailHeaderClient
         location={location}
         imageUrl={locationImageUrl}
         canEditInventory={canEditInventory}
@@ -120,7 +122,7 @@ export default async function Page({ params }) {
           totalItems: locationStats.totalItems,
         }}
       />
-      <LazyStorageAreasSection
+      <LazyLocationStorageAreasSection
         locationName={location?.name}
         locationId={location.id}
         initialStorageAreas={storageAreas}

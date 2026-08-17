@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { INVENTORY_CHANGE_EVENT } from "@/utils/clientEvents";
+import { addDays, toDateString } from "@/utils/pantry/date";
 import WhereKeepLogo from "@/components/ui/WhereKeepLogo";
 import {
   DEFAULT_PREFERENCES,
@@ -116,20 +117,6 @@ const AttentionSheet = dynamic(
     ),
   { ssr: false }
 );
-
-function addDays(date, days) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function toDateString(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
 
 function getErrorMessage(error) {
   if (!error) return null;
@@ -401,7 +388,7 @@ function DesktopSidebar({
     <aside
       className={cx(
         "fixed inset-y-0 left-0 z-50 hidden h-dvh max-h-dvh min-h-0 border-r border-[var(--stocksense-brand-border)] bg-white/95 py-5 shadow-xl backdrop-blur transition-[width,padding] duration-200 lg:flex lg:flex-col",
-        isCollapsed ? "w-24 px-4" : "w-60 px-4"
+        isCollapsed ? "w-24 px-4" : "w-61 px-4"
       )}
     >
       <button
