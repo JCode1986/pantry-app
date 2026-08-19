@@ -462,7 +462,7 @@ function TaskDesktopPreview() {
         {taskPreviewSections.map((section) => (
           <div key={section.label} className="grid gap-2.5">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-gray-400">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-gray-600">
                 {section.label}
               </p>
               <span className="text-xs font-semibold text-[var(--stocksense-brand)]">
