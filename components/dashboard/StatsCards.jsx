@@ -48,9 +48,9 @@ const cards = [
     href: '/shopping-list',
   },
   {
-    key: 'tasksActive',
+    key: 'tasksDue',
     label: 'Tasks',
-    subtext: 'Active household tasks',
+    subtext: 'Due today or overdue',
     icon: LuClipboardCheck,
     href: '/tasks',
   },
