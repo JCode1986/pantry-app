@@ -364,7 +364,7 @@ function TaskPreviewPriority({ priority }) {
         : 'border-amber-200 bg-amber-50 text-amber-700';
 
   return (
-    <span className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold ${tone}`}>
+    <span className={`inline-flex w-fit max-w-full items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold ${tone}`}>
       <LuFlag className="h-3 w-3" />
       {priority}
     </span>
@@ -384,8 +384,8 @@ function TaskPreviewAvatar({ initials, assignee }) {
 
 function TaskPreviewRow({ task }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white px-3 py-3 shadow-sm">
-      <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3">
+    <div className="min-w-0 rounded-2xl border border-gray-100 bg-white px-3 py-3 shadow-sm">
+      <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
         <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-gray-300 bg-white">
           <LuCircleCheck className="h-3.5 w-3.5 text-transparent" />
         </span>
@@ -411,7 +411,9 @@ function TaskPreviewRow({ task }) {
             </span>
           </div>
         </div>
-        <TaskPreviewPriority priority={task.priority} />
+        <div className="col-start-2 min-w-0 sm:col-start-auto">
+          <TaskPreviewPriority priority={task.priority} />
+        </div>
       </div>
       <div className="mt-3 flex min-w-0 items-center gap-2 border-t border-gray-100 pt-3">
         <TaskPreviewAvatar initials={task.initials} assignee={task.assignee} />
@@ -425,7 +427,7 @@ function TaskPreviewRow({ task }) {
 
 function TaskDesktopPreview() {
   return (
-    <div className="relative rounded-3xl border border-gray-200 bg-white p-4 shadow-2xl">
+    <div className="relative min-w-0 max-w-full overflow-hidden rounded-3xl border border-gray-200 bg-white p-3 shadow-2xl sm:p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -447,7 +449,7 @@ function TaskDesktopPreview() {
         {taskPreviewTabs.map((tab, index) => (
           <span
             key={tab}
-            className={`shrink-0 rounded-xl px-3 py-2 text-xs font-semibold ${
+            className={`shrink-0 rounded-xl px-2.5 py-2 text-xs font-semibold sm:px-3 ${
               index === 0
                 ? 'bg-[var(--stocksense-brand)] text-white'
                 : 'border border-gray-200 bg-white text-gray-600'
@@ -543,9 +545,9 @@ function TaskMobilePreview() {
 
 function TasksChoresSection() {
   return (
-    <section className="border-y border-gray-200 bg-gray-50">
+    <section className="overflow-hidden border-y border-gray-200 bg-gray-50">
       <div className="mx-auto grid max-w-6xl gap-9 px-5 py-14 lg:grid-cols-[0.86fr_1.14fr] lg:items-center">
-        <div>
+        <div className="min-w-0">
           <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--stocksense-brand)]">
             NEW &middot; TASKS & CHORES
           </div>
@@ -587,7 +589,7 @@ function TasksChoresSection() {
         </div>
 
         <div
-          className="relative mx-auto w-full max-w-2xl rounded-[2rem] border border-white/80 bg-white/70 p-3 shadow-[0_24px_70px_rgba(14,116,136,0.10)] sm:p-4"
+          className="relative mx-auto w-full min-w-0 max-w-2xl overflow-hidden rounded-[2rem] border border-white/80 bg-white/70 p-2 shadow-[0_24px_70px_rgba(14,116,136,0.10)] sm:p-4 md:overflow-visible"
           role="img"
           aria-label="Preview of household tasks and chores in WhereKeep"
         >
@@ -595,7 +597,7 @@ function TasksChoresSection() {
             <LuCalendarClock className="h-3.5 w-3.5" />
             Due today
           </div>
-          <div className="pt-0 sm:pt-8">
+          <div className="min-w-0 pt-0 sm:pt-8">
             <TaskDesktopPreview />
           </div>
           <TaskMobilePreview />
