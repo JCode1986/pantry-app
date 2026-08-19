@@ -25,6 +25,7 @@ npm run test:e2e
 npm run test:e2e:headed
 npm run test:e2e:ui
 npm run test:all
+npm run build
 ```
 
 This repo currently has no ESLint config or type-check script, so lint/type-check commands are not part of the test workflow yet. `next build` still runs Next's build-time checks.
@@ -43,7 +44,7 @@ tests/
 
 ## Fixtures and mocks
 
-- `tests/helpers/factories.js` creates deterministic users, households, locations, storage areas, categories, items, shopping-list entries, and role fixtures.
+- `tests/helpers/factories.js` creates deterministic users, households, locations, storage areas, categories, items, shopping-list entries, tasks, and role fixtures.
 - `tests/mocks/supabase.js` provides chainable Supabase query mocks with sequential table responses.
 - `tests/mocks/stripe.js` provides checkout, billing portal, and webhook mocks.
 - `tests/mocks/session.js` provides Iron Session and verified-session shapes.
@@ -69,6 +70,16 @@ Playwright fails immediately if pointed at `wherekeep.com`, a live Stripe key, o
 
 The current E2E suite covers public pages, login form accessibility, invalid sign-in behavior, and unauthenticated protected-route redirects. Full authenticated inventory, permission, and subscription E2E flows still require an isolated test Supabase project or equivalent local test backend.
 
+## Current task coverage
+
+Task coverage includes:
+
+- Unit tests for task grouping, overdue/due-today/upcoming detection, summary counts, priority sorting, recurrence calculations, payload validation, and permission checks.
+- Integration tests for creating, loading, editing, assigning, completing, reopening, deleting, recurring next-occurrence generation, viewer/editor restrictions, and cross-household rejection.
+- Component tests for task filters, mobile tab behavior, task cards, completion controls, action visibility, completed task edit restrictions, toasts, and error display.
+- Activity integration tests for task activity fallback loading, task-only filtering, non-task filtering, actor fallback, and merged ordering.
+- Dropdown component tests for viewport-aware menu placement near the bottom of the screen.
+
 ## CI
 
 GitHub Actions runs dependency install, unit/integration/component tests, coverage, production build, Playwright browser install, and focused Playwright tests. Playwright reports are uploaded on failure.
@@ -92,6 +103,7 @@ Open the HTML coverage report from `coverage/index.html` after running coverage.
 ## Known gaps
 
 - Full authenticated E2E CRUD flows are not enabled until a safe isolated test backend exists.
+- The authenticated Tasks Playwright flow is not enabled until a safe isolated test backend exists.
 - Supabase Row Level Security is not verified by application mocks.
 - Large inventory page clients still need targeted component or extracted-logic tests.
 
@@ -107,3 +119,8 @@ When a safe test Supabase project or local Supabase stack exists, add SQL/RLS te
 - Invite tokens cannot be reused after revocation, expiration, or acceptance.
 - Owner role cannot be self-elevated or reassigned through direct database writes.
 - Billing and subscription rows cannot be read or modified by unrelated users.
+- Tasks can only be read by household members.
+- Owners and editors can create, edit, assign, and delete household tasks according to the server policy.
+- Viewers cannot create, edit, assign, delete, or modify another member's task.
+- Household members can complete or reopen only tasks assigned to themselves or unassigned.
+- Recurring task completion cannot create duplicate future occurrences after repeated completion requests.
