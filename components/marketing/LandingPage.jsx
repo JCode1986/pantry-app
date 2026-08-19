@@ -763,8 +763,18 @@ export default function LandingPage() {
 
         <div className="relative mx-auto flex max-w-6xl flex-col px-5 py-3">
           <nav className="flex items-center justify-between gap-4">
-            <Link href="/" className="flex items-center gap-3">
-              <WhereKeepLogo className="drop-shadow-sm" markClassName="h-20 max-w-[350px]" />
+            <Link href="/" className="-ml-5 flex min-w-0 items-center gap-3 sm:ml-0">
+              <WhereKeepLogo
+                className="drop-shadow-sm"
+                markClassName="h-16 max-w-[240px] sm:h-20 sm:max-w-[350px]"
+              />
+            </Link>
+
+            <Link
+              href="/login"
+              className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-[var(--stocksense-brand-border)] bg-white/90 px-4 text-sm font-semibold text-[var(--stocksense-brand)] shadow-sm transition hover:bg-white sm:hidden"
+            >
+              Log in
             </Link>
 
             <div className="hidden items-center gap-2 sm:flex">

@@ -478,7 +478,7 @@ function TaskEditorModal({
           </NativeButton>
           <MobileSheetCloseButton onPress={onClose} />
         </ModalHeader>
-        <ModalBody className={`grid gap-4 overflow-y-auto pt-5 ${modalBodyClass}`}>
+        <ModalBody className={`grid gap-3 overflow-y-auto pt-5 ${modalBodyClass}`}>
           <NativeInput
             label="Task name"
             value={form.title}
@@ -486,8 +486,8 @@ function TaskEditorModal({
             disabled={isSaving}
             classNames={modalInputClassNames}
           />
-          <label className="space-y-1">
-            <span className="block text-xs font-semibold text-gray-700">
+          <label className="group block rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-sm transition focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)]">
+            <span className="block truncate text-[11px] font-semibold leading-4 text-gray-500 transition duration-200 ease-out group-focus-within:text-[var(--stocksense-brand)] motion-reduce:transition-none">
               Description
             </span>
             <textarea
@@ -495,7 +495,7 @@ function TaskEditorModal({
               onChange={(event) => setValue("description", event.target.value)}
               disabled={isSaving}
               rows={3}
-              className="w-full resize-none rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm outline-none transition focus:border-[var(--stocksense-brand)] focus:ring-1 focus:ring-[var(--stocksense-brand-border)] disabled:bg-gray-50"
+              className="mt-0.5 block w-full resize-none bg-transparent text-sm font-medium leading-5 text-gray-900 outline-none disabled:text-gray-400"
             />
           </label>
           <div className="grid gap-3 sm:grid-cols-2">

@@ -386,25 +386,6 @@ async function getInventoryByLocation(supabase) {
     );
 }
 
-async function getActiveTaskCount(supabase) {
-  try {
-    const { count = 0, error } = await supabase
-      .from('tasks')
-      .select('id', { count: 'exact', head: true })
-      .neq('status', 'completed');
-
-    if (error) {
-      console.error('dashboard active task count error:', error);
-      return 0;
-    }
-
-    return count ?? 0;
-  } catch (err) {
-    console.error('dashboard active task count failed:', err);
-    return 0;
-  }
-}
-
 export default async function HomePage() {
   const shellState = await getAuthenticatedAppShellState();
   const supabase = await createClient();
@@ -454,12 +435,10 @@ export default async function HomePage() {
     expirationNotifications,
     dashboardAttentionItems,
     inventoryByLocation,
-    activeTaskCount,
   ] = await Promise.all([
     getExpirationNotifications(supabase, 3, shellState.attentionCounts),
     getDashboardAttentionItems(supabase, 3, shellState.attentionCounts),
     getInventoryByLocation(supabase),
-    getActiveTaskCount(supabase),
   ]);
 
   const totals = {
@@ -469,7 +448,7 @@ export default async function HomePage() {
     items: shellState.attentionCounts.itemsCount,
     shoppingListItems,
     shoppingListNeededItems: shellState.attentionCounts.shoppingListNeededItems,
-    tasksActive: activeTaskCount,
+    tasksDue: shellState.attentionCounts.tasksAttentionCount,
     expiringSoonItems: expirationNotifications.expiringSoonCount,
     lowStockItems: dashboardAttentionItems.lowStockCount,
   };

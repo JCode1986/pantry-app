@@ -357,7 +357,7 @@ function HomeOverview({ totals, isEmpty, canEditInventory }) {
           <StatTile
             icon={FaClipboardCheck}
             tone="brand"
-            value={totals.tasksActive ?? 0}
+            value={totals.tasksDue ?? 0}
             label="Tasks"
             href="/tasks"
           />

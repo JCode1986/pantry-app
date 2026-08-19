@@ -23,7 +23,7 @@ describe("StatsCards", () => {
           lowStockItems: 2,
           locations: 5,
           shoppingListNeededItems: 7,
-          tasksActive: 4,
+          tasksDue: 4,
         }}
       />
     );
