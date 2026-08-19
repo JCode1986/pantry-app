@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { motion } from '@/components/ui/MotionLite';
 import {
   LuClock3,
+  LuClipboardCheck,
   LuMapPin,
   LuPackage,
   LuShoppingBasket,
@@ -46,6 +47,13 @@ const cards = [
     icon: LuShoppingBasket,
     href: '/shopping-list',
   },
+  {
+    key: 'tasksActive',
+    label: 'Tasks',
+    subtext: 'Active household tasks',
+    icon: LuClipboardCheck,
+    href: '/tasks',
+  },
 ];
 
 function SkeletonCard() {
@@ -60,7 +68,7 @@ function SkeletonCard() {
 
 export default function StatsCards({ totals, isLoading = false }) {
   return (
-    <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+    <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       {cards.map((card, index) => {
         const Icon = card.icon;
         const value = totals?.[card.key] ?? 0;

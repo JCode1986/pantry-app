@@ -23,6 +23,7 @@ describe("StatsCards", () => {
           lowStockItems: 2,
           locations: 5,
           shoppingListNeededItems: 7,
+          tasksActive: 4,
         }}
       />
     );
@@ -43,20 +44,25 @@ describe("StatsCards", () => {
       "href",
       "/shopping-list"
     );
+    expect(screen.getByRole("link", { name: /tasks/i })).toHaveAttribute(
+      "href",
+      "/tasks"
+    );
     expect(screen.getByText("1,234")).toBeInTheDocument();
     expect(screen.getByText("7")).toBeInTheDocument();
+    expect(screen.getByText("4")).toBeInTheDocument();
   });
 
   it("defaults missing totals to zero", () => {
     renderWithProviders(<StatsCards totals={{}} />);
 
-    expect(screen.getAllByText("0")).toHaveLength(5);
+    expect(screen.getAllByText("0")).toHaveLength(6);
   });
 
   it("shows loading placeholders instead of interactive links while loading", () => {
     const { container } = renderWithProviders(<StatsCards isLoading />);
 
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
-    expect(container.querySelectorAll(".animate-pulse")).toHaveLength(15);
+    expect(container.querySelectorAll(".animate-pulse")).toHaveLength(18);
   });
 });

@@ -4,9 +4,7 @@ import MobileDashboardHome from '@/components/dashboard/MobileDashboardHome';
 import DesktopDashboardToolbar from '@/components/dashboard/DesktopDashboardToolbar';
 import AttentionItemsCard from '@/components/dashboard/AttentionItemsCard';
 import InventoryByLocation from '@/components/dashboard/InventoryByLocation';
-import TasksDueCard from '@/components/dashboard/TasksDueCard';
 import { getAuthenticatedAppShellState } from '@/components/app-shell/authenticatedShellState';
-import { getTasksAction } from '@/app/actions/tasks';
 import { createPageMetadata, NO_INDEX_ROBOTS } from '@/utils/metadata';
 import {
   getHouseholdForUser,
@@ -16,11 +14,6 @@ import {
   getInventoryImageUrls,
 } from '@/utils/inventoryImages';
 import { addDays, toDateString } from '@/utils/pantry/date';
-import {
-  groupTasksByDate,
-  sortTasks,
-  summarizeTasks,
-} from '@/utils/tasks';
 import { LuClock3, LuPackageMinus, LuTriangleAlert } from 'react-icons/lu';
 
 export const metadata = createPageMetadata({
@@ -393,33 +386,23 @@ async function getInventoryByLocation(supabase) {
     );
 }
 
-async function getDashboardTasks(supabase, tasks = []) {
-  const taskSummary = summarizeTasks(tasks);
-  const groupedTasks = groupTasksByDate(sortTasks(tasks));
-  const visibleTasks = [
-    ...groupedTasks.overdue,
-    ...groupedTasks.today,
-    ...groupedTasks.upcoming,
-  ].slice(0, 5);
-  const locationIds = [
-    ...new Set(visibleTasks.map((task) => task.locationId).filter(Boolean)),
-  ];
-  const { data: locationsRaw = [] } = locationIds.length
-    ? await supabase.from('locations').select('id, name').in('id', locationIds)
-    : { data: [] };
-  const locationNameById = new Map(
-    (locationsRaw ?? []).map((location) => [String(location.id), location.name])
-  );
+async function getActiveTaskCount(supabase) {
+  try {
+    const { count = 0, error } = await supabase
+      .from('tasks')
+      .select('id', { count: 'exact', head: true })
+      .neq('status', 'completed');
 
-  return {
-    dueTodayCount: taskSummary.dueToday,
-    tasks: visibleTasks.map((task) => ({
-      ...task,
-      locationName: task.locationId
-        ? locationNameById.get(String(task.locationId)) ?? null
-        : null,
-    })),
-  };
+    if (error) {
+      console.error('dashboard active task count error:', error);
+      return 0;
+    }
+
+    return count ?? 0;
+  } catch (err) {
+    console.error('dashboard active task count failed:', err);
+    return 0;
+  }
 }
 
 export default async function HomePage() {
@@ -471,17 +454,13 @@ export default async function HomePage() {
     expirationNotifications,
     dashboardAttentionItems,
     inventoryByLocation,
-    tasksResult,
+    activeTaskCount,
   ] = await Promise.all([
     getExpirationNotifications(supabase, 3, shellState.attentionCounts),
     getDashboardAttentionItems(supabase, 3, shellState.attentionCounts),
     getInventoryByLocation(supabase),
-    getTasksAction(),
+    getActiveTaskCount(supabase),
   ]);
-  const dashboardTasks = await getDashboardTasks(
-    supabase,
-    tasksResult.data?.items ?? []
-  );
 
   const totals = {
     locations: shellState.attentionCounts.locationsCount,
@@ -490,6 +469,7 @@ export default async function HomePage() {
     items: shellState.attentionCounts.itemsCount,
     shoppingListItems,
     shoppingListNeededItems: shellState.attentionCounts.shoppingListNeededItems,
+    tasksActive: activeTaskCount,
     expiringSoonItems: expirationNotifications.expiringSoonCount,
     lowStockItems: dashboardAttentionItems.lowStockCount,
   };
@@ -555,10 +535,6 @@ export default async function HomePage() {
                 emptyText="No low-stock items."
                 icon={LuPackageMinus}
                 detailType="stock"
-              />
-              <TasksDueCard
-                tasks={dashboardTasks.tasks}
-                dueTodayCount={dashboardTasks.dueTodayCount}
               />
             </div>
           </div>

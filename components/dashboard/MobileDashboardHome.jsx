@@ -354,6 +354,13 @@ function HomeOverview({ totals, isEmpty, canEditInventory }) {
             label="Shopping list"
             href="/shopping-list"
           />
+          <StatTile
+            icon={FaClipboardCheck}
+            tone="brand"
+            value={totals.tasksActive ?? 0}
+            label="Tasks"
+            href="/tasks"
+          />
         </div>
       )}
     </section>
