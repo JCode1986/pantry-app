@@ -20,3 +20,7 @@
  GET / 200 in 440ms
  GET / 200 in 457ms
  ✓ Compiled in 209ms
+ ✓ Compiled in 266ms
+ ✓ Compiled / in 21ms
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 1040ms
