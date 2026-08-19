@@ -8,6 +8,7 @@ import {
   FaBell,
   FaBoxOpen,
   FaCamera,
+  FaClipboardCheck,
   FaMapMarkedAlt,
   FaMapMarkerAlt,
   FaPlus,
@@ -85,6 +86,7 @@ function activityActionLabel(row) {
   }
 
   if (action === "added") return "Added";
+  if (action === "completed") return "Completed";
   if (action === "deleted") return "Removed";
   if (action === "moved") return "Moved";
   if (action === "updated") return "Updated";
@@ -95,6 +97,7 @@ function activityActionClass(row) {
   const action = String(row?.action || "").toLowerCase();
   const classes = {
     added: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+    completed: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
     updated: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
     deleted: "bg-rose-50 text-rose-700 ring-1 ring-rose-200",
     moved: "bg-sky-50 text-sky-700 ring-1 ring-sky-200",
@@ -109,6 +112,7 @@ function activityTone(row) {
   if (entity === "location") return "location";
   if (entity === "storage_area") return "area";
   if (entity === "category") return "category";
+  if (entity === "task") return "brand";
   if (entity === "shopping_list_item") return "shopping";
   return "item";
 }
@@ -119,6 +123,7 @@ function activityIcon(row) {
   if (entity === "location") return FaMapMarkedAlt;
   if (entity === "storage_area") return FaWarehouse;
   if (entity === "category") return FaTags;
+  if (entity === "task") return FaClipboardCheck;
   if (entity === "shopping_list_item") return FaShoppingBasket;
   return FaBoxOpen;
 }

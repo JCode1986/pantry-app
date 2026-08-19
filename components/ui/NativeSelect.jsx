@@ -117,7 +117,9 @@ export default function NativeSelect({
                   {option.startContent ? (
                     <span className="shrink-0">{option.startContent}</span>
                   ) : null}
-                  <span className="min-w-0 flex-1">{option.label}</span>
+                  <span className="min-w-0 flex-1 truncate" title={option.label}>
+                    {option.label}
+                  </span>
                 </button>
               );
             })}

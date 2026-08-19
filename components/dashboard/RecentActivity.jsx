@@ -6,6 +6,7 @@ import { motion } from '@/components/ui/MotionLite';
 import {
   FaBolt,
   FaBoxOpen,
+  FaClipboardCheck,
   FaMapMarkedAlt,
   FaShoppingBasket,
   FaTags,
@@ -23,9 +24,19 @@ const ALL_FILTER = 'all';
 const ACTION_OPTIONS = [
   { value: ALL_FILTER, label: 'All activity' },
   { value: 'added', label: 'Added' },
+  { value: 'completed', label: 'Completed' },
   { value: 'deleted', label: 'Removed' },
   { value: 'moved', label: 'Moved' },
   { value: 'updated', label: 'Updated' },
+];
+const ENTITY_OPTIONS = [
+  { value: ALL_FILTER, label: 'All types' },
+  { value: 'location', label: 'Locations' },
+  { value: 'storage_area', label: 'Storage Areas' },
+  { value: 'category', label: 'Categories' },
+  { value: 'item', label: 'Items' },
+  { value: 'shopping_list_item', label: 'Shopping List' },
+  { value: 'task', label: 'Tasks' },
 ];
 
 function label(key) {
@@ -114,6 +125,14 @@ function entityName(row) {
       'changes.name.to',
       'changes.snapshot.name',
       'changes.from_deleted_item.name',
+    ],
+    task: [
+      'item_name',
+      'name_at_event',
+      'changes.title.to',
+      'changes.title.from',
+      'changes.name.to',
+      'changes.name.from',
     ],
   };
 
@@ -251,6 +270,14 @@ function ActionBadge({ action }) {
         color: 'var(--entity-category-accent)',
       },
     },
+    completed: {
+      text: 'Completed',
+      style: {
+        backgroundColor: 'color-mix(in oklab, var(--entity-category-accent) 12%, white)',
+        borderColor: 'color-mix(in oklab, var(--entity-category-accent) 28%, white)',
+        color: 'var(--entity-category-accent)',
+      },
+    },
     updated: {
       text: 'Updated',
       style: {
@@ -296,6 +323,8 @@ function entityIcon(entity) {
       return <FaWarehouse className="h-4 w-4 text-[var(--stocksense-brand)]" />;
     case 'category':
       return <FaTags className="h-4 w-4 text-[var(--stocksense-brand)]" />;
+    case 'task':
+      return <FaClipboardCheck className="h-4 w-4 text-[var(--stocksense-brand)]" />;
     case 'shopping_list_item':
       return <FaShoppingBasket className="h-4 w-4 text-[var(--stocksense-brand)]" />;
     default:
@@ -368,6 +397,15 @@ function detailLine(row) {
     }
 
     return `Shopping list activity | ${formatChanges(row.changes)}`;
+  }
+
+  if (entity === 'task') {
+    if (action === 'added') return 'Created household task.';
+    if (action === 'completed') return 'Completed task.';
+    if (action === 'deleted') return 'Removed task.';
+    if (row.changes?.reopened) return 'Reopened task.';
+    if (action === 'updated') return 'Updated task.';
+    return formatChanges(row.changes);
   }
 
   if (action === 'deleted') {
@@ -471,6 +509,7 @@ export default function RecentActivity({
     isFullView ? items : items.slice(0, DASHBOARD_ACTIVITY_LIMIT)
   );
   const [actorUserId, setActorUserId] = useState(ALL_FILTER);
+  const [entityType, setEntityType] = useState(ALL_FILTER);
   const [action, setAction] = useState(ALL_FILTER);
   const [cursor, setCursor] = useState(initialCursor);
   const [hasMore, setHasMore] = useState(initialHasMore);
@@ -505,7 +544,13 @@ export default function RecentActivity({
       return;
     }
 
-    if (actorUserId !== ALL_FILTER || action !== ALL_FILTER) return;
+    if (
+      actorUserId !== ALL_FILTER ||
+      entityType !== ALL_FILTER ||
+      action !== ALL_FILTER
+    ) {
+      return;
+    }
 
     setActivityItems(items);
     setCursor(initialCursor);
@@ -514,6 +559,7 @@ export default function RecentActivity({
   }, [
     action,
     actorUserId,
+    entityType,
     initialCursor,
     initialError,
     initialHasMore,
@@ -523,6 +569,7 @@ export default function RecentActivity({
 
   const loadActivity = useCallback(async function loadActivity({
     nextActorUserId = actorUserId,
+    nextEntityType = entityType,
     nextAction = action,
     mode = 'replace',
   } = {}) {
@@ -542,6 +589,7 @@ export default function RecentActivity({
           ? {
               limit: PAGE_SIZE,
               action: nextAction,
+              entityType: nextEntityType,
               actorUserId:
                 nextActorUserId === ALL_FILTER ? null : nextActorUserId,
               cursor: append ? cursor : null,
@@ -570,7 +618,7 @@ export default function RecentActivity({
       setIsRefreshing(false);
       setIsLoadingMore(false);
     }
-  }, [action, actorUserId, cursor, isFullView]);
+  }, [action, actorUserId, cursor, entityType, isFullView]);
 
   function handleActorChange(value) {
     const nextActorUserId = String(value || ALL_FILTER);
@@ -582,6 +630,12 @@ export default function RecentActivity({
     const nextAction = String(value || ALL_FILTER);
     setAction(nextAction);
     void loadActivity({ nextAction, mode: 'replace' });
+  }
+
+  function handleEntityTypeChange(value) {
+    const nextEntityType = String(value || ALL_FILTER);
+    setEntityType(nextEntityType);
+    void loadActivity({ nextEntityType, mode: 'replace' });
   }
 
   useEffect(() => {
@@ -620,7 +674,7 @@ export default function RecentActivity({
         {isFullView ? (
           <div
             className={`mt-4 grid gap-3 ${
-              showUserFilter ? 'sm:grid-cols-2' : 'sm:grid-cols-1'
+              showUserFilter ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
             }`}
           >
             {showUserFilter ? (
@@ -644,6 +698,20 @@ export default function RecentActivity({
                 ]}
               />
             ) : null}
+
+            <NativeSelect
+              aria-label="Filter recent activity by type"
+              label={
+                <span className="inline-flex items-center gap-1.5">
+                  <FaBoxOpen className="h-3.5 w-3.5 text-[var(--stocksense-brand)]" />
+                  Activity type
+                </span>
+              }
+              value={entityType}
+              onChange={handleEntityTypeChange}
+              disabled={isRefreshing}
+              options={ENTITY_OPTIONS}
+            />
 
             <NativeSelect
               aria-label="Filter recent activity by action"

@@ -95,6 +95,30 @@ export function createTestShoppingListEntry(overrides = {}) {
   };
 }
 
+export function createTestTask(overrides = {}) {
+  return {
+    id: "task_1",
+    household_id: "household_1",
+    title: "Take out trash",
+    description: null,
+    assigned_to: "user_owner",
+    created_by: "user_owner",
+    location_id: "location_1",
+    status: "todo",
+    priority: "medium",
+    due_date: "2026-08-17",
+    is_recurring: false,
+    recurrence_type: null,
+    recurrence_interval: 1,
+    recurring_parent_task_id: null,
+    completed_at: null,
+    completed_by: null,
+    created_at: "2026-08-01T00:00:00.000Z",
+    updated_at: "2026-08-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
 export function createRoleFixtures() {
   return {
     owner: createTestMember({ role: HOUSEHOLD_ROLES.OWNER }),

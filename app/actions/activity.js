@@ -15,7 +15,16 @@ import {
 
 const DEFAULT_LIMIT = 12;
 const MAX_LIMIT = 50;
-const ACTION_FILTERS = new Set(["added", "updated", "deleted", "moved"]);
+const ACTION_FILTERS = new Set(["added", "updated", "deleted", "moved", "completed"]);
+const TASK_ACTIVITY_ACTIONS = new Set(["added", "updated", "deleted", "completed"]);
+const ENTITY_FILTERS = new Set([
+  "location",
+  "storage_area",
+  "category",
+  "item",
+  "shopping_list_item",
+  "task",
+]);
 
 function normalizeLimit(value) {
   const limit = Number(value);
@@ -26,6 +35,11 @@ function normalizeLimit(value) {
 function normalizeAction(value) {
   const action = typeof value === "string" ? value.toLowerCase() : "";
   return ACTION_FILTERS.has(action) ? action : "all";
+}
+
+function normalizeEntityType(value) {
+  const entityType = typeof value === "string" ? value.toLowerCase() : "";
+  return ENTITY_FILTERS.has(entityType) ? entityType : "all";
 }
 
 function normalizeText(value) {
@@ -157,6 +171,39 @@ function rowTime(value) {
   return Number.isFinite(time) ? time : null;
 }
 
+function activityRowKey(row) {
+  if (row?.id) return `id:${row.id}`;
+  return [
+    row?.entity_type ?? "",
+    row?.entity_id ?? "",
+    row?.action ?? "",
+    row?.created_at ?? "",
+  ].join(":");
+}
+
+function sortActivityRows(rows) {
+  return [...(rows ?? [])].sort((a, b) => {
+    const bTime = rowTime(b?.created_at) ?? 0;
+    const aTime = rowTime(a?.created_at) ?? 0;
+    return bTime - aTime;
+  });
+}
+
+function mergeActivityRows(...rowGroups) {
+  const seen = new Set();
+  const merged = [];
+
+  for (const row of rowGroups.flat()) {
+    if (!row) continue;
+    const key = activityRowKey(row);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(row);
+  }
+
+  return sortActivityRows(merged);
+}
+
 function activityImagePath(row) {
   const changes = row?.changes || {};
   const value = firstValue(
@@ -241,6 +288,9 @@ async function enrichActivityImages(supabase, items) {
       return activityImagePath(row) || imagePathByRowKey.get(`${entityType}:${entityId}`);
     })
     .filter(Boolean);
+
+  if (imagePaths.length === 0) return items;
+
   const urlsByPath = await getInventoryImageUrls(imagePaths, {
     variant: INVENTORY_IMAGE_VARIANT.CARD,
   });
@@ -472,6 +522,49 @@ async function enrichActivityActors(items, householdId) {
   }
 }
 
+async function getTaskActivityRows({
+  householdId,
+  action,
+  actorUserId,
+  entityType,
+  cursor,
+  limit,
+}) {
+  if (!householdId || (entityType !== "all" && entityType !== "task")) return [];
+  if (action !== "all" && !TASK_ACTIVITY_ACTIONS.has(action)) return [];
+
+  try {
+    const admin = createAdminClient();
+    let query = admin
+      .from("activity_events")
+      .select("*")
+      .eq("household_id", householdId)
+      .eq("entity_type", "task")
+      .order("created_at", { ascending: false })
+      .limit(limit + 1);
+
+    if (action !== "all") {
+      query = query.eq("action", action);
+    }
+
+    if (actorUserId) {
+      query = query.eq("actor_user_id", actorUserId);
+    }
+
+    if (cursor) {
+      query = query.lt("created_at", cursor);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return data ?? [];
+  } catch (err) {
+    console.error("getTaskActivityRows error:", err);
+    return [];
+  }
+}
+
 async function getAuthedUser() {
   const { user, error } = await getVerifiedSession();
 
@@ -544,6 +637,7 @@ export async function getRecentActivityAction(filters = {}) {
 
   const limit = normalizeLimit(filters.limit);
   const action = normalizeAction(filters.action);
+  const entityType = normalizeEntityType(filters.entityType ?? filters.entity_type);
   const actorUserId = normalizeText(filters.actorUserId);
   const cursor = normalizeText(filters.cursor);
 
@@ -554,31 +648,49 @@ export async function getRecentActivityAction(filters = {}) {
       createIfMissing: !hasHouseholdInviteMetadata(user),
     });
     const supabase = await createClient();
-    let query = supabase
-      .from("recent_activity")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(limit + 1);
+    let recentRows = [];
 
-    if (action !== "all") {
-      query = query.eq("action", action);
+    if (entityType !== "task") {
+      let query = supabase
+        .from("recent_activity")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(limit + 1);
+
+      if (action !== "all") {
+        query = query.eq("action", action);
+      }
+
+      if (entityType !== "all") {
+        query = query.eq("entity_type", entityType);
+      }
+
+      if (actorUserId) {
+        query = query.eq("actor_user_id", actorUserId);
+      }
+
+      if (cursor) {
+        query = query.lt("created_at", cursor);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      recentRows = data ?? [];
     }
 
-    if (actorUserId) {
-      query = query.eq("actor_user_id", actorUserId);
-    }
-
-    if (cursor) {
-      query = query.lt("created_at", cursor);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    const rows = data ?? [];
+    const taskRows = await getTaskActivityRows({
+      householdId: household?.id,
+      action,
+      actorUserId,
+      entityType,
+      cursor,
+      limit,
+    });
+    const rows = mergeActivityRows(recentRows, taskRows);
+    const visibleRows = rows.slice(0, limit);
     const movedItems = await enrichMovedActivityItems(
       supabase,
-      rows.slice(0, limit)
+      visibleRows
     );
     const actorItems = await enrichActivityActors(movedItems, household?.id);
     const items = await enrichActivityImages(supabase, actorItems);

@@ -44,6 +44,7 @@ import {
   LuShoppingBasket,
   LuTags,
   LuCircleUser,
+  LuClipboardCheck,
   LuUsers,
   LuWarehouse,
 } from "react-icons/lu";
@@ -56,6 +57,7 @@ const navItems = [
   { href: "/categories", label: "Categories", icon: FaTags },
   { href: "/items", label: "Items", icon: FaBoxOpen },
   { href: "/shopping-list", label: "Shopping List", icon: FaShoppingBasket },
+  { href: "/tasks", label: "Tasks", icon: LuClipboardCheck },
   { href: "/profile", label: "Profile", icon: FaUserCircle },
 ];
 
@@ -133,6 +135,8 @@ async function fetchAttentionCounts() {
     "@/utils/supabase/client"
   );
   const supabase = createBrowserSupabaseClient();
+  const taskAttentionCountPromise = fetchTaskAttentionCount(supabase);
+
   try {
     const { data, error } = await supabase.rpc(
       "wherekeep_inventory_summary_counts",
@@ -151,6 +155,7 @@ async function fetchAttentionCounts() {
         categoriesCount: Number(row.categories_count ?? 0),
         itemsCount: Number(row.items_count ?? 0),
         lowStockCount: Number(row.low_stock_count ?? 0),
+        tasksAttentionCount: await taskAttentionCountPromise,
         summaryCountsLoaded: true,
       };
     }
@@ -220,7 +225,31 @@ async function fetchAttentionCounts() {
     storageAreasCount: storageAreasCount ?? 0,
     categoriesCount: categoriesCount ?? 0,
     itemsCount: itemsCount ?? 0,
+    tasksAttentionCount: await taskAttentionCountPromise,
   };
+}
+
+async function fetchTaskAttentionCount(supabase) {
+  const today = toDateString(new Date());
+
+  try {
+    const { count = 0, error } = await supabase
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .neq("status", "completed")
+      .not("due_date", "is", null)
+      .lte("due_date", today);
+
+    if (error) {
+      logNavigationWarning("Navigation task counts unavailable.", getErrorMessage(error));
+      return 0;
+    }
+
+    return count ?? 0;
+  } catch (err) {
+    logNavigationWarning("Navigation task counts failed.", getErrorMessage(err));
+    return 0;
+  }
 }
 
 function MobileTopBar({ attentionCount, onOpenMenu, onOpenAttention }) {
@@ -319,7 +348,6 @@ const desktopSidebarSections = [
     title: "HOME",
     items: [
       { href: "/dashboard", label: "Overview", icon: LuHouse },
-      { href: "/activity", label: "Activities", icon: LuActivity },
       { href: "/locations", label: "Locations", icon: LuMapPin, countKey: "locationsCount" },
       { href: "/areas", label: "Storage Areas", icon: LuWarehouse, countKey: "storageAreasCount" },
       { href: "/categories", label: "Categories", icon: LuTags, countKey: "categoriesCount" },
@@ -330,6 +358,8 @@ const desktopSidebarSections = [
         icon: LuShoppingBasket,
         countKey: "shoppingListNeededItems",
       },
+      { href: "/tasks", label: "Tasks", icon: LuClipboardCheck, countKey: "tasksAttentionCount" },
+      { href: "/activity", label: "Activities", icon: LuActivity },
     ],
   },
   {
@@ -682,8 +712,9 @@ export default function Navigation({
   const expiringSoonCount = liveAttentionCounts.expiringSoonCount ?? 0;
   const shoppingListNeededItems =
     liveAttentionCounts.shoppingListNeededItems ?? 0;
+  const taskAttentionCount = liveAttentionCounts.tasksAttentionCount ?? 0;
   const attentionCount =
-    expiredCount + expiringSoonCount + shoppingListNeededItems;
+    expiredCount + expiringSoonCount + shoppingListNeededItems + taskAttentionCount;
   const bottomNavItemClass = (isActive = false) =>
     cx(
       "flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl border transition",
@@ -1060,6 +1091,7 @@ export default function Navigation({
     attentionCounts.storageAreasCount,
     attentionCounts.categoriesCount,
     attentionCounts.itemsCount,
+    attentionCounts.tasksAttentionCount,
     attentionCounts.memberCount,
   ]);
 
@@ -1308,6 +1340,7 @@ export default function Navigation({
           expiredCount={expiredCount}
           expiringSoonCount={expiringSoonCount}
           shoppingListItems={shoppingListNeededItems}
+          taskAttentionCount={taskAttentionCount}
         />
       )}
 
