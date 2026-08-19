@@ -46,7 +46,7 @@ export default async function ActivityPage() {
           Recent activity
         </h1>
         <p className="mt-1 text-sm text-gray-500">
-          Review additions, updates, moves, removals, and shopping list changes.
+          Review additions, updates, moves, removals, completed tasks, and shopping list changes.
         </p>
       </div>
 

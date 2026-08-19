@@ -11,6 +11,7 @@ import {
   FaShoppingBasket,
   FaSignOutAlt,
   FaSpinner,
+  FaTasks,
   FaTags,
   FaTimes,
   FaUserCircle,
@@ -88,6 +89,12 @@ const mobileMenuSections = [
   {
     title: "Tools",
     items: [
+      {
+        href: "/tasks",
+        label: "Tasks",
+        icon: FaTasks,
+        countKey: "tasksAttentionCount",
+      },
       {
         href: "/shopping-list",
         label: "Shopping List",
@@ -280,10 +287,14 @@ export function AttentionSheet({
   expiredCount,
   expiringSoonCount,
   shoppingListItems,
+  taskAttentionCount = 0,
 }) {
   const { isVisible, shouldRender } = useTransitionMount(isOpen, 240);
   const hasAttention =
-    expiredCount > 0 || expiringSoonCount > 0 || shoppingListItems > 0;
+    expiredCount > 0 ||
+    expiringSoonCount > 0 ||
+    shoppingListItems > 0 ||
+    taskAttentionCount > 0;
   const anchoredStyle = anchor
     ? {
         top: `${anchor.top}px`,
@@ -333,7 +344,7 @@ export function AttentionSheet({
                   </h2>
                   <p className="mt-1 text-sm leading-5 text-slate-500">
                     {hasAttention
-                      ? "Items that need a quick look."
+                      ? "Household updates that need a quick look."
                       : "Everything looks good."}
                   </p>
                 </div>
@@ -386,11 +397,23 @@ export function AttentionSheet({
                     <span className="font-semibold text-[var(--stocksense-brand)]">Open</span>
                   </Link>
                 )}
+                {taskAttentionCount > 0 && (
+                  <Link
+                    href="/tasks"
+                    onClick={onClose}
+                    className="flex min-h-11 items-center justify-between gap-3 rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-3 py-2 text-sm font-medium text-[var(--stocksense-brand)]"
+                  >
+                    <span>
+                      {taskAttentionCount} task{taskAttentionCount === 1 ? "" : "s"} overdue or due today
+                    </span>
+                    <span className="font-semibold">Open</span>
+                  </Link>
+                )}
               </div>
             ) : (
               <div className="p-4">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
-                  No expired items, urgent expirations, or needed shopping list items.
+                  No expired items, urgent expirations, needed shopping list items, or tasks due today.
                 </div>
               </div>
             )}

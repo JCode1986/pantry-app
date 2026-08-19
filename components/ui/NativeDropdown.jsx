@@ -1,23 +1,54 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FaEllipsisV } from "react-icons/fa";
 import { cx } from "@/components/ui/classNames";
 import useTransitionMount from "@/components/ui/useTransitionMount";
+
+function getDropdownPosition(rect, itemCount) {
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+  const margin = 12;
+  const gap = 8;
+  const estimatedHeight = Math.min(Math.max(itemCount * 36 + 8, 44), 288);
+  const spaceBelow = Math.max(0, viewportHeight - rect.bottom - margin - gap);
+  const spaceAbove = Math.max(0, rect.top - margin - gap);
+  const placement =
+    spaceBelow < estimatedHeight && spaceAbove > spaceBelow ? "top" : "bottom";
+  const maxHeight = Math.max(
+    44,
+    Math.min(288, placement === "top" ? spaceAbove : spaceBelow)
+  );
+  const top =
+    placement === "top"
+      ? Math.max(margin, rect.top - Math.min(estimatedHeight, maxHeight) - gap)
+      : Math.min(
+          rect.bottom + gap,
+          Math.max(margin, viewportHeight - margin - maxHeight)
+        );
+
+  return {
+    top,
+    right: Math.max(margin, viewportWidth - rect.right),
+    maxHeight,
+    placement,
+  };
+}
 
 export default function NativeDropdown({
   ariaLabel,
   buttonClassName = "h-9 w-9 min-w-9",
   className = "",
   disabled = false,
-  items,
+  items = [],
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState(null);
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
   const { isVisible, shouldRender } = useTransitionMount(isOpen);
+  const visibleItems = useMemo(() => items.filter(Boolean), [items]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -50,10 +81,7 @@ export default function NativeDropdown({
 
     const rect = buttonRef.current?.getBoundingClientRect();
     if (rect) {
-      setMenuPosition({
-        top: rect.bottom + 8,
-        right: Math.max(12, window.innerWidth - rect.right),
-      });
+      setMenuPosition(getDropdownPosition(rect, visibleItems.length));
     }
     setIsOpen((current) => !current);
   };
@@ -68,15 +96,20 @@ export default function NativeDropdown({
             style={{
               top: `${menuPosition.top}px`,
               right: `${menuPosition.right}px`,
+              maxHeight: `${menuPosition.maxHeight}px`,
             }}
             className={cx(
-              "fixed z-[180] origin-top-right min-w-48 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 text-sm shadow-xl transition duration-200 ease-out motion-reduce:transition-none",
+              "fixed z-[180] min-w-48 overflow-y-auto rounded-xl border border-gray-200 bg-white py-1 text-sm shadow-xl transition duration-200 ease-out motion-reduce:transition-none",
+              menuPosition.placement === "top" ? "origin-bottom-right" : "origin-top-right",
               isVisible
                 ? "translate-y-0 scale-100 opacity-100"
-                : "pointer-events-none -translate-y-2 scale-95 opacity-0"
+                : cx(
+                    "pointer-events-none scale-95 opacity-0",
+                    menuPosition.placement === "top" ? "translate-y-2" : "-translate-y-2"
+                  )
             )}
           >
-            {items.filter(Boolean).map((item) => (
+            {visibleItems.map((item) => (
               <button
                 key={item.key}
                 type="button"

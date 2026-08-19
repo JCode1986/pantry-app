@@ -1,6 +1,6 @@
 # WhereKeep
 
-WhereKeep is a household inventory app for tracking what you have, where it is stored, what needs attention, and what needs to be bought again. It supports shared households, role-based editing, locations, storage areas, categories, item search, shopping lists, expiration tracking, images, barcode-assisted item entry, voice-assisted quick add, billing plans, mobile-first workflows, and session management.
+WhereKeep is a household inventory app for tracking what you have, where it is stored, what needs attention, what needs to be bought again, and which household tasks need to be done. It supports shared households, role-based editing, locations, storage areas, categories, item search, shopping lists, household tasks and chores, expiration tracking, images, barcode-assisted item entry, voice-assisted quick add, billing plans, mobile-first workflows, activity tracking, and session management.
 
 ## Tech Stack
 
@@ -83,6 +83,8 @@ Protected routes include:
 - `/categories`
 - `/items`
 - `/shopping-list`
+- `/tasks`
+- `/activity`
 - `/profile`
 
 ## Performance Notes
@@ -93,16 +95,28 @@ Protected routes include:
 - Public image assets get long-lived immutable cache headers from `next.config.mjs`.
 - Next Image is configured to emit AVIF/WebP variants and cache optimized images.
 - Package import optimization is enabled for the icon packages used by the app.
-- The support chatbot, bulk move modal, and barcode scanner are lazy-loaded so they do not ship in initial route bundles until needed.
+- The support chatbot, tasks client, bulk move modal, and barcode scanner are lazy-loaded so they do not ship in initial route bundles until needed.
 - App image helpers default to lazy loading and async decoding.
+- Activity loading skips redundant task queries when filters cannot match task activity and skips image URL enrichment when no image paths are present.
+- Navigation attention counts load inventory and task counts in parallel where possible.
 
-Current verification command:
+Current verification commands:
 
 ```bash
+npm run test:unit
+npm run test:e2e
 npm run build
 ```
 
-This repo does not currently include an ESLint config. Add one before reintroducing a lint script.
+This repo does not currently include an ESLint config or `lint` script. `next build` still runs Next's build-time validation.
+
+Latest production build snapshot:
+
+- Shared first-load JS: 103 kB
+- Middleware: 74.9 kB
+- `/tasks`: 1.3 kB route size, 104 kB first-load JS
+- `/dashboard`: 4.69 kB route size, 137 kB first-load JS
+- `/activity`: 173 B route size, 131 kB first-load JS
 
 ## Project Structure
 
@@ -117,7 +131,8 @@ app/
     locations/
     profile/
     shopping-list/
-  actions/              Server actions for auth, billing, inventory, households, preferences, and activity
+    tasks/
+  actions/              Server actions for auth, billing, inventory, households, preferences, activity, and tasks
   api/                  API routes for session sync and Stripe webhooks
   auth/                 Supabase auth confirmation route
   contact/              Public contact page
@@ -138,6 +153,7 @@ components/
   modals/               Shared modal theme and controls
   profile/              Profile client UI
   shopping-list/        Shopping list page and modals
+  tasks/                Tasks page client, cards, filters, editor, and completion UI
   ui/                   Shared UI components
 
 lib/
@@ -153,6 +169,7 @@ utils/
   households.js         Household roles, limits, and membership helpers
   inventoryImages.js    Image storage entity metadata and signed URL helpers
   metadata.js           App metadata helpers
+  tasks.js              Task validation, permissions, grouping, sorting, and recurrence helpers
   stripe.js             Stripe client helper
 ```
 
@@ -186,6 +203,23 @@ Supported image entity types:
 
 Images are limited to JPG, PNG, WebP, or GIF files up to 5 MB. The app stores image paths in the database and serves signed URLs from the shared `inventory-images` Supabase Storage bucket.
 
+## Tasks And Activity
+
+Household tasks live under `/tasks` and are backed by the Supabase `tasks` table. Tasks support assignment, optional locations, due dates, priority, recurrence, completion, reopening, deletion, filtering, sorting, and mobile-friendly task cards.
+
+Task permissions follow household roles:
+
+- Owners and editors can create, edit, assign, delete, complete, and reopen household tasks.
+- Owners and editors can create, edit, assign, and delete household tasks.
+- Viewers can view household tasks but cannot create, edit, assign, or delete them.
+- Any household member can complete or reopen a task only when it is assigned to them or unassigned.
+
+Recurring chores use an occurrence-generation model: completing a recurring task keeps the completed record for history and creates the next task occurrence from the recurrence settings when needed.
+
+Task create, update, completion, reopen, and delete actions write to `activity_events` and appear in Recent Activity. The activity page supports filtering by activity type, including locations, storage areas, categories, items, shopping list, and tasks. Navigation and notifications show open tasks due today or overdue.
+
+Database migrations for tasks and task activity live under `supabase/migrations/`.
+
 ## Billing
 
 Billing plan definitions live in `utils/billingPlans.js`.
@@ -206,6 +240,7 @@ Stripe checkout and webhook code reads price IDs from environment variables. Kee
 - Use `modalTheme.js` for shared modal and sheet styling.
 - Apply the user's selected color as an accent for controls, active states, icons, and modal headers.
 - When adding image support for a new entity, update the Supabase schema, `INVENTORY_IMAGE_ENTITY`, `getImageEntityRecord`, and the relevant serializer.
+- When adding task behavior, keep authorization in `app/actions/tasks.js` and pure rules in `utils/tasks.js`.
 - If auth behavior looks stale during development, restart the dev server and clear browser cookies for `localhost`.
 
 ## License

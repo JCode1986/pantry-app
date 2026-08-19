@@ -68,7 +68,9 @@ describe("authenticated app-shell state", () => {
       household_members: createSupabaseResponse({ count: 3 }),
       household_invites: createSupabaseResponse({ count: 1 }),
     });
-    shellMocks.supabase = createSupabaseMock();
+    shellMocks.supabase = createSupabaseMock({
+      tasks: createSupabaseResponse({ count: 12 }),
+    });
     shellMocks.supabase.auth.getUser.mockResolvedValue({
       data: {
         user: createTestUser({
@@ -139,8 +141,14 @@ describe("authenticated app-shell state", () => {
       categoriesCount: 9,
       itemsCount: 10,
       lowStockCount: 11,
+      tasksAttentionCount: 12,
       summaryCountsLoaded: true,
     });
+    const tasksQuery = shellMocks.supabase.__queries.get("tasks");
+    expect(tasksQuery.neq).toHaveBeenCalledWith("status", "completed");
+    expect(tasksQuery.not).toHaveBeenCalledWith("due_date", "is", null);
+    expect(tasksQuery.lte).toHaveBeenCalledWith("due_date", expect.any(String));
+    expect(tasksQuery.gte).not.toHaveBeenCalled();
     expect(shellMocks.supabase.rpc).toHaveBeenCalledWith(
       "wherekeep_inventory_summary_counts",
       { p_within_days: 3 }
@@ -174,6 +182,7 @@ describe("authenticated app-shell state", () => {
       locations: createSupabaseResponse({ count: 4 }),
       storage_areas: createSupabaseResponse({ count: 5 }),
       storage_categories: createSupabaseResponse({ count: 6 }),
+      tasks: createSupabaseResponse({ count: 7 }),
     });
     shellMocks.supabase.auth.getUser.mockResolvedValue({
       data: {
@@ -200,6 +209,7 @@ describe("authenticated app-shell state", () => {
       itemsCount: 9,
       lowStockCount: 0,
       shoppingListItemsCount: 0,
+      tasksAttentionCount: 7,
       summaryCountsLoaded: false,
     });
     expect(shellMocks.supabase.__queryHistory.get("items")).toHaveLength(3);

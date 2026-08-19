@@ -43,6 +43,29 @@ function normalizeSummaryCounts(row) {
   };
 }
 
+async function getNavigationTaskCounts(supabase) {
+  const today = toDateString(new Date());
+
+  try {
+    const { count = 0, error } = await supabase
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .neq("status", "completed")
+      .not("due_date", "is", null)
+      .lte("due_date", today);
+
+    if (error) {
+      logNavigationWarning("Navigation task counts unavailable.", getErrorMessage(error));
+      return { tasksAttentionCount: 0 };
+    }
+
+    return { tasksAttentionCount: count ?? 0 };
+  } catch (err) {
+    logNavigationWarning("Navigation task counts failed.", getErrorMessage(err));
+    return { tasksAttentionCount: 0 };
+  }
+}
+
 async function getNavigationAttentionCounts(supabase, withinDays = 3) {
   try {
     const { data, error } = await supabase.rpc(
@@ -220,6 +243,7 @@ export const getAuthenticatedAppShellState = cache(async function getAuthenticat
     shoppingListItemsCount: 0,
     lowStockCount: 0,
     summaryCountsLoaded: false,
+    tasksAttentionCount: 0,
     memberCount: 0,
     inviteCount: 0,
   };
@@ -289,9 +313,14 @@ export const getAuthenticatedAppShellState = cache(async function getAuthenticat
 
     try {
       if (!supabase) supabase = await createClient();
+      const [inventoryCounts, taskCounts] = await Promise.all([
+        getNavigationAttentionCounts(supabase),
+        getNavigationTaskCounts(supabase),
+      ]);
       attentionCounts = {
         ...attentionCounts,
-        ...(await getNavigationAttentionCounts(supabase)),
+        ...inventoryCounts,
+        ...taskCounts,
       };
     } catch (err) {
       logNavigationWarning("Navigation attention counts unavailable.", getErrorMessage(err));

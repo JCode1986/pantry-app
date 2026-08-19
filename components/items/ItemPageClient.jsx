@@ -2629,7 +2629,7 @@ export default function ItemsPageClient({
         secondaryConfirmLabel={
           deleteDialog.mode === "single" ? "Move to shopping list" : null
         }
-        secondaryConfirmClassName="rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700"
+        secondaryConfirmClassName="rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand)] text-white"
         title={
           deleteDialog.mode === "bulk"
             ? `Delete ${deleteDialog.payload?.count ?? 0} items?`

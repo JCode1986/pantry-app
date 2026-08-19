@@ -160,6 +160,7 @@ describe("activity server actions", () => {
       }),
     });
     activityMocks.admin = createSupabaseMock({
+      activity_events: createSupabaseResponse({ data: [] }),
       activity_log: createSupabaseResponse({ data: [] }),
       household_members: createSupabaseResponse({
         data: [{ user_id: "user_editor", email: "editor@example.test" }],
@@ -200,5 +201,144 @@ describe("activity server actions", () => {
         },
       },
     });
+  });
+
+  it("loads completed task activity with actor fallback", async () => {
+    const taskRow = {
+      id: "activity_task_1",
+      entity_type: "task",
+      entity_id: "task_1",
+      actor_user_id: "user_viewer",
+      actor_email: null,
+      action: "completed",
+      item_name: "Take out trash",
+      name_at_event: "Take out trash",
+      created_at: "2026-01-04T00:00:00.000Z",
+      changes: {
+        completed_at: "2026-01-04T00:00:00.000Z",
+      },
+    };
+
+    activityMocks.supabase = createSupabaseMock({
+      recent_activity: createSupabaseResponse({ data: [] }),
+    });
+    activityMocks.admin = createSupabaseMock({
+      activity_events: createSupabaseResponse({ data: [taskRow] }),
+      household_members: createSupabaseResponse({
+        data: [{ user_id: "user_viewer", email: "viewer@example.test" }],
+      }),
+    });
+    activityMocks.createClient.mockResolvedValue(activityMocks.supabase);
+    activityMocks.createAdminClient.mockReturnValue(activityMocks.admin);
+
+    const result = await getRecentActivityAction({
+      limit: 5,
+      action: "completed",
+      entityType: "task",
+    });
+
+    expect(activityMocks.supabase.__queries.get("recent_activity")).toBeUndefined();
+    const taskActivityQuery = activityMocks.admin.__queries.get("activity_events");
+    expect(taskActivityQuery.eq).toHaveBeenCalledWith("household_id", "household_1");
+    expect(taskActivityQuery.eq).toHaveBeenCalledWith("entity_type", "task");
+    expect(taskActivityQuery.eq).toHaveBeenCalledWith("action", "completed");
+    expect(result.error).toBeNull();
+    expect(result.data.items).toEqual([
+      expect.objectContaining({
+        entity_type: "task",
+        action: "completed",
+        actor_email: "viewer@example.test",
+        item_name: "Take out trash",
+      }),
+    ]);
+  });
+
+  it("merges task activity into all recent activity when the view omits tasks", async () => {
+    const itemRow = {
+      id: "activity_item_1",
+      entity_type: "item",
+      entity_id: "item_1",
+      actor_user_id: "user_owner",
+      actor_email: "owner@example.test",
+      action: "added",
+      item_name: "Rice",
+      created_at: "2026-01-04T00:00:00.000Z",
+      changes: {},
+    };
+    const taskRow = {
+      id: "activity_task_1",
+      entity_type: "task",
+      entity_id: "task_1",
+      actor_user_id: "user_owner",
+      actor_email: "owner@example.test",
+      action: "completed",
+      item_name: "Take out trash",
+      name_at_event: "Take out trash",
+      created_at: "2026-01-05T00:00:00.000Z",
+      changes: {
+        completed_at: "2026-01-05T00:00:00.000Z",
+      },
+    };
+
+    activityMocks.supabase = createSupabaseMock({
+      recent_activity: createSupabaseResponse({ data: [itemRow] }),
+    });
+    activityMocks.admin = createSupabaseMock({
+      activity_events: createSupabaseResponse({ data: [taskRow] }),
+    });
+    activityMocks.createClient.mockResolvedValue(activityMocks.supabase);
+    activityMocks.createAdminClient.mockReturnValue(activityMocks.admin);
+
+    const result = await getRecentActivityAction({ limit: 5 });
+
+    expect(result.error).toBeNull();
+    expect(result.data.items.map((row) => row.id)).toEqual([
+      "activity_task_1",
+      "activity_item_1",
+    ]);
+    expect(result.data.items[0]).toMatchObject({
+      entity_type: "task",
+      action: "completed",
+      item_name: "Take out trash",
+    });
+  });
+
+  it("filters recent activity by non-task entity type without task fallback rows", async () => {
+    const itemRow = {
+      id: "activity_item_1",
+      entity_type: "item",
+      entity_id: "item_1",
+      actor_user_id: "user_owner",
+      actor_email: "owner@example.test",
+      action: "updated",
+      item_name: "Rice",
+      created_at: "2026-01-06T00:00:00.000Z",
+      changes: {
+        quantity: { from: 1, to: 2 },
+      },
+    };
+
+    activityMocks.supabase = createSupabaseMock({
+      recent_activity: createSupabaseResponse({ data: [itemRow] }),
+    });
+    activityMocks.admin = createSupabaseMock();
+    activityMocks.createClient.mockResolvedValue(activityMocks.supabase);
+    activityMocks.createAdminClient.mockReturnValue(activityMocks.admin);
+
+    const result = await getRecentActivityAction({
+      limit: 5,
+      entityType: "item",
+    });
+
+    const activityQuery = activityMocks.supabase.__queries.get("recent_activity");
+    expect(activityQuery.eq).toHaveBeenCalledWith("entity_type", "item");
+    expect(activityMocks.admin.__queryHistory.get("activity_events")).toBeUndefined();
+    expect(result.error).toBeNull();
+    expect(result.data.items).toEqual([
+      expect.objectContaining({
+        entity_type: "item",
+        item_name: "Rice",
+      }),
+    ]);
   });
 });
