@@ -25,6 +25,7 @@ import NativeDatePicker from "@/components/ui/NativeDatePicker";
 import NativeDropdown from "@/components/ui/NativeDropdown";
 import NativeInput from "@/components/ui/NativeInput";
 import ConfirmDeleteModal from "@/components/modals/ConfirmDeleteModal";
+import MobileSheetCloseButton from "@/components/modals/MobileSheetCloseButton";
 import { cx } from "@/components/ui/classNames";
 import { emitInventoryChange } from "@/utils/clientEvents";
 import {
@@ -34,6 +35,12 @@ import {
   ModalFooter,
   ModalHeader,
 } from "@/components/ui/NativeModal";
+import {
+  modalBodyClass,
+  modalContentStyle,
+  modalInputClassNames,
+  mobileSheetModalClassNames,
+} from "@/components/modals/modalTheme";
 import NativeSelect from "@/components/ui/NativeSelect";
 import {
   TASK_PRIORITY,
@@ -445,23 +452,39 @@ function TaskEditorModal({
       isOpen={isOpen}
       onOpenChange={(open) => !open && onClose()}
       size="2xl"
-      classNames={{
-        wrapper: "max-md:items-end",
-        base: "max-md:m-0 max-md:w-screen max-md:max-w-none max-md:rounded-b-none max-md:rounded-t-2xl",
-      }}
+      classNames={mobileSheetModalClassNames}
     >
-      <ModalContent className="wherekeep-modal-content w-full rounded-2xl bg-white shadow-2xl max-md:max-h-[88svh] max-md:overflow-hidden max-md:rounded-b-none max-md:rounded-t-2xl">
-        <ModalHeader className="border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-950">
-            {mode === "edit" ? "Edit task" : "New task"}
-          </h2>
+      <ModalContent
+        style={modalContentStyle}
+        className="wherekeep-modal-content flex w-full max-h-[calc(100svh-1rem)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl max-md:h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:max-h-[var(--wherekeep-mobile-sheet-height,100svh)] max-md:w-screen max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:bg-gray-50 max-md:shadow-none"
+      >
+        <ModalHeader
+          className="flex items-center gap-3 border-b border-gray-100 max-md:sticky max-md:top-0 max-md:z-20 max-md:shrink-0 max-md:border-[var(--stocksense-brand-border)] max-md:bg-[var(--stocksense-brand-soft)] max-md:px-4 max-md:pb-3 max-md:pt-[max(1rem,calc(env(safe-area-inset-top)+0.75rem))] max-md:text-[var(--stocksense-brand)]"
+        >
+          <span className="inline-flex min-w-0 flex-1 items-center gap-2">
+            <LuClipboardCheck className="h-4 w-4 shrink-0 text-[var(--stocksense-brand)]" />
+            <span className="min-w-0 whitespace-normal break-words text-lg font-semibold leading-6 text-gray-950 max-md:text-base max-md:leading-5 max-md:text-[var(--stocksense-brand)]">
+              {mode === "edit" ? "Edit task" : "New task"}
+            </span>
+          </span>
+          <NativeButton
+            size="sm"
+            className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
+            onPress={onSave}
+            isLoading={isSaving}
+            isDisabled={!form.title.trim()}
+          >
+            {mode === "edit" ? "Save" : "Create"}
+          </NativeButton>
+          <MobileSheetCloseButton onPress={onClose} />
         </ModalHeader>
-        <ModalBody className="grid gap-4 overflow-y-auto pt-5 max-md:max-h-[calc(88svh-9rem)]">
+        <ModalBody className={`grid gap-4 overflow-y-auto pt-5 ${modalBodyClass}`}>
           <NativeInput
             label="Task name"
             value={form.title}
             onValueChange={(value) => setValue("title", value)}
             disabled={isSaving}
+            classNames={modalInputClassNames}
           />
           <label className="space-y-1">
             <span className="block text-xs font-semibold text-gray-700">
@@ -522,6 +545,7 @@ function TaskEditorModal({
                 value={form.recurrenceInterval}
                 onValueChange={(value) => setValue("recurrenceInterval", value)}
                 disabled={isSaving}
+                classNames={modalInputClassNames}
               />
             ) : null}
           </div>
@@ -534,7 +558,7 @@ function TaskEditorModal({
             </p>
           ) : null}
         </ModalBody>
-        <ModalFooter className="flex justify-end gap-2 border-t border-gray-100 max-md:flex-col-reverse max-md:pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <ModalFooter className="flex justify-end gap-2 border-t border-gray-100 max-md:sticky max-md:bottom-0 max-md:z-20 max-md:flex-col-reverse max-md:border-gray-200 max-md:bg-white max-md:px-4 max-md:pb-[max(4.5rem,calc(env(safe-area-inset-bottom)+1rem))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)]">
           <NativeButton variant="light" onPress={onClose} isDisabled={isSaving}>
             Cancel
           </NativeButton>

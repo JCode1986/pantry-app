@@ -6,6 +6,40 @@ import { FaChevronDown } from "react-icons/fa";
 import { cx } from "@/components/ui/classNames";
 import useTransitionMount from "@/components/ui/useTransitionMount";
 
+function getSelectMenuPosition(rect, optionCount) {
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+  const margin = 12;
+  const gap = 6;
+  const menuWidth = Math.min(rect.width, Math.max(0, viewportWidth - margin * 2));
+  const estimatedHeight = Math.min(Math.max(optionCount * 36 + 8, 44), 288);
+  const spaceBelow = Math.max(0, viewportHeight - rect.bottom - margin - gap);
+  const spaceAbove = Math.max(0, rect.top - margin - gap);
+  const placement =
+    spaceBelow < estimatedHeight && spaceAbove > spaceBelow ? "top" : "bottom";
+  const availableSpace = placement === "top" ? spaceAbove : spaceBelow;
+  const maxHeight = Math.max(44, Math.min(288, availableSpace));
+  const top =
+    placement === "top"
+      ? Math.max(margin, rect.top - Math.min(estimatedHeight, maxHeight) - gap)
+      : Math.min(
+          rect.bottom + gap,
+          Math.max(margin, viewportHeight - margin - maxHeight)
+        );
+  const left = Math.min(
+    Math.max(margin, rect.left),
+    Math.max(margin, viewportWidth - margin - menuWidth)
+  );
+
+  return {
+    top,
+    left,
+    width: menuWidth,
+    maxHeight,
+    placement,
+  };
+}
+
 export default function NativeSelect({
   "aria-label": ariaLabel,
   className = "",
@@ -63,13 +97,7 @@ export default function NativeSelect({
     if (disabled) return;
     const rect = buttonRef.current?.getBoundingClientRect();
     if (rect) {
-      const availableHeight = Math.max(160, window.innerHeight - rect.bottom - 18);
-      setMenuPosition({
-        top: rect.bottom + 6,
-        left: rect.left,
-        width: rect.width,
-        maxHeight: Math.min(288, availableHeight),
-      });
+      setMenuPosition(getSelectMenuPosition(rect, options.length));
     }
     if (!isOpen) onOpen?.();
     setIsOpen((current) => !current);
@@ -89,10 +117,14 @@ export default function NativeSelect({
               maxHeight: `${menuPosition.maxHeight}px`,
             }}
             className={cx(
-              "fixed z-[180] origin-top overflow-y-auto rounded-xl border border-gray-200 bg-white p-1 text-sm shadow-xl transition duration-200 ease-out motion-reduce:transition-none",
+              "fixed z-[180] overflow-y-auto rounded-xl border border-gray-200 bg-white p-1 text-sm shadow-xl transition duration-200 ease-out motion-reduce:transition-none",
+              menuPosition.placement === "top" ? "origin-bottom" : "origin-top",
               isVisible
                 ? "translate-y-0 scale-100 opacity-100"
-                : "pointer-events-none -translate-y-2 scale-95 opacity-0"
+                : cx(
+                    "pointer-events-none scale-95 opacity-0",
+                    menuPosition.placement === "top" ? "translate-y-2" : "-translate-y-2"
+                  )
             )}
           >
             {options.map((option) => {
