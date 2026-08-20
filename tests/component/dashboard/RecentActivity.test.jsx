@@ -21,6 +21,19 @@ const { default: RecentActivity } = await import(
   "@/components/dashboard/RecentActivity"
 );
 
+function activityRow(index, overrides = {}) {
+  return {
+    id: `activity_${index}`,
+    entity_type: "task",
+    entity_id: `task_${index}`,
+    action: "completed",
+    item_name: `Activity ${index}`,
+    created_at: `2026-01-${String(index).padStart(2, "0")}T00:00:00.000Z`,
+    changes: {},
+    ...overrides,
+  };
+}
+
 describe("RecentActivity", () => {
   beforeEach(() => {
     activityActionMocks.getRecentActivityAction.mockReset();
@@ -98,5 +111,52 @@ describe("RecentActivity", () => {
     expect(screen.getByRole("button", { name: /filter recent activity by type/i }))
       .toHaveTextContent("Tasks");
     expect(screen.getByText("Take out trash")).toBeInTheDocument();
+  });
+
+  it("keeps appended activity visible after loading more and rerendering", async () => {
+    const initialItems = Array.from({ length: 12 }, (_, index) =>
+      activityRow(index + 1)
+    );
+
+    activityActionMocks.getRecentActivityAction.mockResolvedValueOnce({
+      data: {
+        items: [activityRow(13)],
+        nextCursor: null,
+        hasMore: false,
+      },
+      error: null,
+    });
+
+    const { rerender, user } = renderWithProviders(
+      <RecentActivity
+        variant="full"
+        items={initialItems}
+        members={[]}
+        effectivePlanId="free"
+        initialCursor="2026-01-12T00:00:00.000Z"
+        initialHasMore
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /view more/i }));
+
+    expect(await screen.findByText("Activity 13")).toBeInTheDocument();
+    expect(screen.getByText("Activity 1")).toBeInTheDocument();
+
+    rerender(
+      <RecentActivity
+        variant="full"
+        items={[...initialItems]}
+        members={[]}
+        effectivePlanId="free"
+        initialCursor="2026-01-12T00:00:00.000Z"
+        initialHasMore
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Activity 13")).toBeInTheDocument();
+    });
+    expect(screen.getByText("13 items")).toBeInTheDocument();
   });
 });

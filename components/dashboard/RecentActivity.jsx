@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from '@/components/ui/MotionLite';
 import {
   FaBolt,
@@ -38,6 +38,40 @@ const ENTITY_OPTIONS = [
   { value: 'shopping_list_item', label: 'Shopping List' },
   { value: 'task', label: 'Tasks' },
 ];
+
+function activityHydrationKey({
+  items,
+  initialAction,
+  initialActorUserId,
+  initialCursor,
+  initialEntityType,
+  initialError,
+  initialHasMore,
+  isFullView,
+}) {
+  const itemKey = (items ?? [])
+    .map((row, index) =>
+      [
+        row?.id ?? index,
+        row?.entity_type ?? '',
+        row?.entity_id ?? row?.item_id ?? '',
+        row?.action ?? '',
+        row?.created_at ?? '',
+      ].join(':')
+    )
+    .join('|');
+
+  return JSON.stringify({
+    itemKey,
+    initialAction: initialAction || ALL_FILTER,
+    initialActorUserId: initialActorUserId || ALL_FILTER,
+    initialCursor,
+    initialEntityType: initialEntityType || ALL_FILTER,
+    initialError,
+    initialHasMore: Boolean(initialHasMore),
+    isFullView,
+  });
+}
 
 function label(key) {
   switch (key) {
@@ -519,6 +553,31 @@ export default function RecentActivity({
   const [error, setError] = useState(initialError);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const initialHydrationKey = useMemo(
+    () =>
+      activityHydrationKey({
+        items,
+        initialAction,
+        initialActorUserId,
+        initialCursor,
+        initialEntityType,
+        initialError,
+        initialHasMore,
+        isFullView,
+      }),
+    [
+      initialAction,
+      initialActorUserId,
+      initialCursor,
+      initialEntityType,
+      initialError,
+      initialHasMore,
+      isFullView,
+      items,
+    ]
+  );
+  const hydratedInitialKeyRef = useRef(initialHydrationKey);
+  const cursorRef = useRef(initialCursor);
 
   const memberOptions = useMemo(
     () =>
@@ -541,34 +600,45 @@ export default function RecentActivity({
     isFullView && (effectivePlanId === 'family' || memberOptions.length > 1);
 
   useEffect(() => {
+    if (hydratedInitialKeyRef.current === initialHydrationKey) {
+      return;
+    }
+
+    hydratedInitialKeyRef.current = initialHydrationKey;
+
+    const nextActorUserId = initialActorUserId || ALL_FILTER;
+    const nextEntityType = initialEntityType || ALL_FILTER;
+    const nextAction = initialAction || ALL_FILTER;
+
     if (!isFullView) {
       setActivityItems(items.slice(0, DASHBOARD_ACTIVITY_LIMIT));
       setError(initialError);
       return;
     }
 
-    if (
-      actorUserId !== ALL_FILTER ||
-      entityType !== ALL_FILTER ||
-      action !== ALL_FILTER
-    ) {
-      return;
-    }
+    setActorUserId(nextActorUserId);
+    setEntityType(nextEntityType);
+    setAction(nextAction);
 
     setActivityItems(items);
     setCursor(initialCursor);
     setHasMore(initialHasMore);
     setError(initialError);
   }, [
-    action,
-    actorUserId,
-    entityType,
+    initialAction,
+    initialActorUserId,
+    initialHydrationKey,
     initialCursor,
+    initialEntityType,
     initialError,
     initialHasMore,
     isFullView,
     items,
   ]);
+
+  useEffect(() => {
+    cursorRef.current = cursor;
+  }, [cursor]);
 
   const loadActivity = useCallback(async function loadActivity({
     nextActorUserId = actorUserId,
@@ -595,7 +665,7 @@ export default function RecentActivity({
               entityType: nextEntityType,
               actorUserId:
                 nextActorUserId === ALL_FILTER ? null : nextActorUserId,
-              cursor: append ? cursor : null,
+              cursor: append ? cursorRef.current : null,
             }
           : {
               limit: DASHBOARD_ACTIVITY_LIMIT,
@@ -621,7 +691,7 @@ export default function RecentActivity({
       setIsRefreshing(false);
       setIsLoadingMore(false);
     }
-  }, [action, actorUserId, cursor, entityType, isFullView]);
+  }, [action, actorUserId, entityType, isFullView]);
 
   function handleActorChange(value) {
     const nextActorUserId = String(value || ALL_FILTER);
