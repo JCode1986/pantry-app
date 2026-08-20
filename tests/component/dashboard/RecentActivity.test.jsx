@@ -73,4 +73,30 @@ describe("RecentActivity", () => {
     });
     expect(await screen.findByText("Take out trash")).toBeInTheDocument();
   });
+
+  it("opens full recent activity with an initial task filter selected", () => {
+    renderWithProviders(
+      <RecentActivity
+        variant="full"
+        items={[
+          {
+            id: "activity_task_1",
+            entity_type: "task",
+            entity_id: "task_1",
+            action: "completed",
+            item_name: "Take out trash",
+            created_at: "2026-01-05T00:00:00.000Z",
+            changes: {},
+          },
+        ]}
+        members={[]}
+        effectivePlanId="free"
+        initialEntityType="task"
+      />
+    );
+
+    expect(screen.getByRole("button", { name: /filter recent activity by type/i }))
+      .toHaveTextContent("Tasks");
+    expect(screen.getByText("Take out trash")).toBeInTheDocument();
+  });
 });

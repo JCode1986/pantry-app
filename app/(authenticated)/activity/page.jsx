@@ -15,7 +15,34 @@ export const metadata = createPageMetadata({
   robots: NO_INDEX_ROBOTS,
 });
 
-export default async function ActivityPage() {
+const ACTIVITY_ACTIONS = new Set(["added", "updated", "deleted", "moved", "completed"]);
+const ACTIVITY_ENTITY_TYPES = new Set([
+  "location",
+  "storage_area",
+  "category",
+  "item",
+  "shopping_list_item",
+  "task",
+]);
+
+function normalizedSearchValue(searchParams, key, allowedValues) {
+  const value = searchParams?.[key];
+  const normalized = Array.isArray(value) ? value[0] : value;
+  return allowedValues.has(normalized) ? normalized : "all";
+}
+
+export default async function ActivityPage({ searchParams }) {
+  const resolvedSearchParams = await searchParams;
+  const initialAction = normalizedSearchValue(
+    resolvedSearchParams,
+    "action",
+    ACTIVITY_ACTIONS
+  );
+  const initialEntityType = normalizedSearchValue(
+    resolvedSearchParams,
+    "entityType",
+    ACTIVITY_ENTITY_TYPES
+  );
   const session = await getSessionForLayout();
   const supabase = await createClient();
   let currentUser = session?.user?.user ?? null;
@@ -32,7 +59,11 @@ export default async function ActivityPage() {
   }
 
   const [activityResult, filtersResult] = await Promise.all([
-    getRecentActivityAction({ limit: 12 }),
+    getRecentActivityAction({
+      limit: 12,
+      action: initialAction,
+      entityType: initialEntityType,
+    }),
     getActivityFilterOptionsAction(),
   ]);
 
@@ -58,6 +89,8 @@ export default async function ActivityPage() {
         initialCursor={activityResult.data.nextCursor}
         initialHasMore={activityResult.data.hasMore}
         initialError={activityResult.error || filtersResult.error}
+        initialAction={initialAction}
+        initialEntityType={initialEntityType}
       />
     </main>
   );

@@ -3,6 +3,8 @@ import {
   DEFAULT_PREFERENCES,
   PREFERENCE_STORAGE_KEY,
   applyAppPreferences,
+  clearStoredPreferences,
+  getPreferenceApplyScript,
   getFontById,
   getPreferenceBootScript,
   getThemeById,
@@ -61,11 +63,37 @@ describe("app preference helpers", () => {
     expect(readStoredPreferences()).toEqual(DEFAULT_PREFERENCES);
   });
 
+  it("clears stored preferences and reapplies defaults", () => {
+    saveStoredPreferences({ themeId: "forest", fontId: "mono" });
+
+    clearStoredPreferences();
+
+    expect(window.localStorage.getItem(PREFERENCE_STORAGE_KEY)).toBeNull();
+    expect(document.documentElement.dataset.stocksenseTheme).toBe(
+      DEFAULT_PREFERENCES.themeId
+    );
+    expect(document.documentElement.dataset.stocksenseFont).toBe(
+      DEFAULT_PREFERENCES.fontId
+    );
+  });
+
   it("generates a safe boot script containing preference constants", () => {
     const script = getPreferenceBootScript();
 
     expect(script).toContain(PREFERENCE_STORAGE_KEY);
     expect(script).toContain(DEFAULT_PREFERENCES.themeId);
+    expect(script).not.toContain("</script>");
+  });
+
+  it("generates a safe apply script for server-resolved preferences", () => {
+    const script = getPreferenceApplyScript(
+      { themeId: "forest", fontId: "mono" },
+      { persist: true }
+    );
+
+    expect(script).toContain(PREFERENCE_STORAGE_KEY);
+    expect(script).toContain('"themeId":"forest"');
+    expect(script).toContain("localStorage.setItem");
     expect(script).not.toContain("</script>");
   });
 });

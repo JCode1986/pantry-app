@@ -270,6 +270,18 @@ export function saveStoredPreferences(preferences) {
   return normalized;
 }
 
+export function clearStoredPreferences() {
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.removeItem(PREFERENCE_STORAGE_KEY);
+    } catch {
+      // Storage can fail in private browsing or locked-down contexts.
+    }
+  }
+
+  applyAppPreferences(DEFAULT_PREFERENCES);
+}
+
 export function getPreferenceBootScript() {
   const bootThemes = THEME_OPTIONS.map(({ id, variables }) => ({
     id,
@@ -300,6 +312,36 @@ export function getPreferenceBootScript() {
     root.style.setProperty("--stocksense-font-family", font.family);
     root.dataset.stocksenseTheme = theme.id;
     root.dataset.stocksenseFont = font.id;
+  } catch (error) {}
+})();
+  `.trim();
+}
+
+export function getPreferenceApplyScript(preferences, { persist = false } = {}) {
+  const normalized = normalizePreferences(preferences);
+  const theme = getThemeById(normalized.themeId);
+  const font = getFontById(normalized.fontId);
+
+  return `
+(function () {
+  try {
+    var key = ${JSON.stringify(PREFERENCE_STORAGE_KEY)};
+    var preferences = ${JSON.stringify(normalized)};
+    var variables = ${JSON.stringify(theme.variables)};
+    var fontFamily = ${JSON.stringify(font.family)};
+    var root = document.documentElement;
+
+    Object.keys(variables).forEach(function (name) {
+      root.style.setProperty(name, variables[name]);
+    });
+
+    root.style.setProperty("--stocksense-font-family", fontFamily);
+    root.dataset.stocksenseTheme = preferences.themeId;
+    root.dataset.stocksenseFont = preferences.fontId;
+
+    if (${persist ? "true" : "false"}) {
+      window.localStorage.setItem(key, JSON.stringify(preferences));
+    }
   } catch (error) {}
 })();
   `.trim();

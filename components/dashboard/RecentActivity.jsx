@@ -502,15 +502,18 @@ export default function RecentActivity({
   initialCursor = null,
   initialHasMore = false,
   initialError = null,
+  initialAction = ALL_FILTER,
+  initialEntityType = ALL_FILTER,
+  initialActorUserId = ALL_FILTER,
   variant = 'dashboard',
 }) {
   const isFullView = variant === 'full';
   const [activityItems, setActivityItems] = useState(() =>
     isFullView ? items : items.slice(0, DASHBOARD_ACTIVITY_LIMIT)
   );
-  const [actorUserId, setActorUserId] = useState(ALL_FILTER);
-  const [entityType, setEntityType] = useState(ALL_FILTER);
-  const [action, setAction] = useState(ALL_FILTER);
+  const [actorUserId, setActorUserId] = useState(initialActorUserId || ALL_FILTER);
+  const [entityType, setEntityType] = useState(initialEntityType || ALL_FILTER);
+  const [action, setAction] = useState(initialAction || ALL_FILTER);
   const [cursor, setCursor] = useState(initialCursor);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [error, setError] = useState(initialError);

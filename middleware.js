@@ -23,6 +23,7 @@ function isSupabaseAuthCookie(name) {
 
 function clearAuthCookies(response, request) {
   response.cookies.delete("pantry_session");
+  response.cookies.delete("wherekeep_auth_state");
 
   request.cookies.getAll().forEach((cookie) => {
     if (isSupabaseAuthCookie(cookie.name)) {
@@ -35,6 +36,21 @@ function clearAuthCookies(response, request) {
       response.cookies.delete(cookie.name);
     }
   });
+
+  return response;
+}
+
+function syncAuthMarkerCookie(response, isAuthenticated) {
+  if (isAuthenticated) {
+    response.cookies.set("wherekeep_auth_state", "1", {
+      path: "/",
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 30,
+    });
+  } else {
+    response.cookies.delete("wherekeep_auth_state");
+  }
 
   return response;
 }
@@ -63,6 +79,7 @@ export async function middleware(req) {
     "/categories",
     "/items",
     "/shopping-list",
+    "/tasks",
     "/profile",
     "/support/chat",
   ];
@@ -90,7 +107,10 @@ export async function middleware(req) {
   }
 
   if (pathname === "/" && user && hasAppSession) {
-    return redirectWithCookies(new URL("/dashboard", req.url), supabaseResponse);
+    return syncAuthMarkerCookie(
+      redirectWithCookies(new URL("/dashboard", req.url), supabaseResponse),
+      true
+    );
   }
 
   // If both auth layers agree the user is signed in, keep auth pages out of the way.
@@ -102,10 +122,13 @@ export async function middleware(req) {
         ? redirectTo
         : "/dashboard";
 
-    return redirectWithCookies(new URL(safeRedirect, req.url), supabaseResponse);
+    return syncAuthMarkerCookie(
+      redirectWithCookies(new URL(safeRedirect, req.url), supabaseResponse),
+      true
+    );
   }
 
-  return supabaseResponse;
+  return syncAuthMarkerCookie(supabaseResponse, Boolean(user && hasAppSession));
 }
 
 export const config = {

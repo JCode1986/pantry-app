@@ -1,5 +1,6 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import PreferenceStorageGuard from "@/components/app-shell/PreferenceStorageGuard";
 import { getPreferenceBootScript } from "@/utils/appPreferences";
 import { siteConfig } from "@/utils/metadata";
 
@@ -80,6 +81,7 @@ export default function RootLayout({ children }) {
         <script dangerouslySetInnerHTML={{ __html: getPreferenceBootScript() }} />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <PreferenceStorageGuard />
         {children}
       </body>
     </html>

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   LuCalendarClock,
@@ -91,7 +92,6 @@ const SORT_OPTIONS = [
 const STATUS_OPTIONS = [
   { value: "all", label: "Any status" },
   { value: TASK_STATUS.TODO, label: "To do" },
-  { value: TASK_STATUS.IN_PROGRESS, label: "In progress" },
   { value: TASK_STATUS.COMPLETED, label: "Completed" },
 ];
 
@@ -123,6 +123,7 @@ const SECTION_LABELS = {
   upcoming: "Upcoming",
   completed: "Completed",
 };
+const COMPLETED_HISTORY_HREF = "/activity?entityType=task";
 
 function memberLabel(member) {
   if (!member) return "Unassigned";
@@ -319,10 +320,12 @@ function TaskRow({
 
   return (
     <article
+      aria-busy={isPending || undefined}
       className={cx(
         "relative overflow-hidden rounded-2xl border bg-white p-3 shadow-sm transition hover:border-[var(--stocksense-brand-border)] hover:shadow-md sm:p-4",
         hasActionsMenu ? "pr-12 sm:pr-14" : "pr-3 sm:pr-4",
-        completed ? "border-gray-100 opacity-85" : "border-gray-200/80"
+        completed ? "border-gray-100 opacity-85" : "border-gray-200/80",
+        isPending ? "ring-2 ring-[var(--stocksense-brand-border)]" : ""
       )}
     >
       <span
@@ -413,6 +416,18 @@ function TaskRow({
           </span>
         </div>
       </div>
+      {isPending ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-white/70 backdrop-blur-[1px]">
+          <div
+            role="status"
+            aria-live="polite"
+            className="inline-flex items-center gap-2 rounded-full border border-[var(--stocksense-brand-border)] bg-white px-3 py-2 text-xs font-semibold text-[var(--stocksense-brand)] shadow-sm"
+          >
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--stocksense-brand-border)] border-t-[var(--stocksense-brand)]" />
+            Updating...
+          </div>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -984,9 +999,19 @@ export default function TasksPageClient({
         {Object.entries(groupedTasks).map(([section, sectionTasks]) =>
           sectionTasks.length ? (
             <div key={section} className="space-y-3">
-              <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-gray-400">
-                {SECTION_LABELS[section]}
-              </h2>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-gray-400">
+                  {SECTION_LABELS[section]}
+                </h2>
+                {section === "completed" ? (
+                  <Link
+                    href={COMPLETED_HISTORY_HREF}
+                    className="text-sm font-semibold text-[var(--stocksense-brand)] transition hover:brightness-90"
+                  >
+                    View task history
+                  </Link>
+                ) : null}
+              </div>
               <div className="grid gap-3">
                 {sectionTasks.map((task) => {
                   const assignee = task.assignedTo

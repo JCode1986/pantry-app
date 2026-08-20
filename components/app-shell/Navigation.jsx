@@ -9,7 +9,6 @@ import { addDays, toDateString } from "@/utils/pantry/date";
 import WhereKeepLogo from "@/components/ui/WhereKeepLogo";
 import {
   DEFAULT_PREFERENCES,
-  readStoredPreferences,
   saveStoredPreferences,
 } from "@/utils/appPreferences";
 import { clearBrowserLogoutStorage } from "@/utils/logoutStorage";
@@ -603,6 +602,7 @@ export default function Navigation({
   canEditInventory = true,
   attentionCounts = {},
   navigationSummary = {},
+  initialPreferences = DEFAULT_PREFERENCES,
   initialPreferredName = "",
 }) {
   const router = useRouter();
@@ -637,7 +637,7 @@ export default function Navigation({
   const [removeMemberCandidate, setRemoveMemberCandidate] = useState(null);
   const [lastRemoveMemberCandidate, setLastRemoveMemberCandidate] = useState(null);
   const [copiedInviteId, setCopiedInviteId] = useState(null);
-  const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
+  const [preferences, setPreferences] = useState(initialPreferences);
   const [preferredName, setPreferredName] = useState(initialPreferredName);
   const [preferenceSaving, setPreferenceSaving] = useState(false);
   const [preferenceMessage, setPreferenceMessage] = useState(null);
@@ -1107,9 +1107,9 @@ export default function Navigation({
   }, [isDesktopSidebarCollapsed]);
 
   useEffect(() => {
-    setPreferences(readStoredPreferences());
+    setPreferences(initialPreferences);
     setPreferredName(initialPreferredName || "");
-  }, [initialPreferredName]);
+  }, [initialPreferences, initialPreferredName]);
 
   useEffect(() => {
     let cancelled = false;
