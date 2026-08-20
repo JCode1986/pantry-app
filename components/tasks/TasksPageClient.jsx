@@ -558,7 +558,7 @@ function TaskEditorModal({
             </p>
           ) : null}
         </ModalBody>
-        <ModalFooter className="flex justify-end gap-2 border-t border-gray-100 max-md:sticky max-md:bottom-0 max-md:z-20 max-md:flex-col-reverse max-md:border-gray-200 max-md:bg-white max-md:px-4 max-md:pb-[max(4.5rem,calc(env(safe-area-inset-bottom)+1rem))] max-md:pt-3 max-md:shadow-[0_-12px_24px_rgb(15_23_42_/_0.08)]">
+        <ModalFooter className="hidden justify-end gap-2 border-t border-gray-100 md:flex">
           <NativeButton variant="light" onPress={onClose} isDisabled={isSaving}>
             Cancel
           </NativeButton>
