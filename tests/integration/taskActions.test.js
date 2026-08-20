@@ -215,6 +215,38 @@ describe("task server actions", () => {
     });
   });
 
+  it("loads active tasks plus a capped recent completed set by default", async () => {
+    taskMocks.admin = createSupabaseMock({
+      tasks: [
+        createSupabaseResponse({
+          data: [createTestTask({ id: "task_open", status: "todo" })],
+        }),
+        createSupabaseResponse({
+          data: [
+            createTestTask({
+              id: "task_completed",
+              status: "completed",
+              completed_at: "2026-08-18T12:00:00.000Z",
+            }),
+          ],
+        }),
+      ],
+    });
+    taskMocks.createAdminClient.mockReturnValue(taskMocks.admin);
+
+    const result = await getTasksAction();
+    const taskQueries = taskMocks.admin.__queryHistory.get("tasks");
+
+    expect(taskQueries).toHaveLength(2);
+    expect(taskQueries[0].neq).toHaveBeenCalledWith("status", "completed");
+    expect(taskQueries[1].eq).toHaveBeenCalledWith("status", "completed");
+    expect(taskQueries[1].limit).toHaveBeenCalledWith(10);
+    expect(result.data.items.map((task) => task.id)).toEqual([
+      "task_open",
+      "task_completed",
+    ]);
+  });
+
   it("lets editors update and assign household tasks", async () => {
     setTaskContext({
       role: HOUSEHOLD_ROLES.EDITOR,

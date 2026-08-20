@@ -9,11 +9,15 @@ const InactivityLogout = dynamic(
   { ssr: false }
 );
 
-export function Providers({ children, isAuthenticated = false }) {
+export function Providers({
+  children,
+  initialPreferences,
+  isAuthenticated = false,
+}) {
   return (
     <>
       <MobileViewportInsets />
-      <AppPreferences />
+      <AppPreferences initialPreferences={initialPreferences} />
       <InactivityLogout isAuthenticated={isAuthenticated} />
       {children}
     </>

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 import { getHouseholdForUser, hasHouseholdInviteMetadata } from "@/utils/households";
 import { createPageMetadata, NO_INDEX_ROBOTS } from "@/utils/metadata";
+import { redirect } from "next/navigation";
 
 export const metadata = createPageMetadata({
   title: "Tasks",
@@ -56,9 +57,14 @@ export default async function TasksPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (!user?.id) {
+    redirect("/login?redirectTo=/tasks");
+  }
+
   const { household, member } = await getHouseholdForUser({
-    userId: user?.id,
-    email: user?.email,
+    userId: user.id,
+    email: user.email,
     createIfMissing: !hasHouseholdInviteMetadata(user),
   });
 

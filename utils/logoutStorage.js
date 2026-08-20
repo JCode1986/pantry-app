@@ -1,8 +1,3 @@
-import {
-  DEFAULT_PREFERENCES,
-  applyAppPreferences,
-} from "@/utils/appPreferences";
-
 export function clearBrowserLogoutStorage() {
   if (typeof window === "undefined") return;
 
@@ -17,6 +12,4 @@ export function clearBrowserLogoutStorage() {
   } catch {
     // Session storage cleanup is best-effort.
   }
-
-  applyAppPreferences(DEFAULT_PREFERENCES);
 }

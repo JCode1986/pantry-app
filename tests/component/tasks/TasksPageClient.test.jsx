@@ -251,6 +251,51 @@ describe("TasksPageClient", () => {
     expect(await screen.findByText("Task completed.")).toBeInTheDocument();
   });
 
+  it("shows a card loading state while completing a task", async () => {
+    let resolveComplete;
+    const completePromise = new Promise((resolve) => {
+      resolveComplete = resolve;
+    });
+    const assignedTask = createClientTask({
+      id: "pending_task",
+      title: "Water plants",
+      assignedTo: "user_owner",
+    });
+    actionMocks.completeTaskAction.mockReturnValue(completePromise);
+
+    const { user } = renderWithProviders(
+      <TasksPageClient
+        initialTasks={[assignedTask]}
+        members={[ownerMember]}
+        locations={locations}
+        currentUserId="user_owner"
+        currentUserRole="owner"
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /complete water plants/i }));
+
+    expect(screen.getByText("Updating...")).toBeInTheDocument();
+
+    resolveComplete({
+      data: {
+        task: {
+          ...assignedTask,
+          status: "completed",
+          completedAt: "2026-08-18T12:30:00.000Z",
+          completedBy: "user_owner",
+        },
+        nextTask: null,
+      },
+      error: null,
+    });
+
+    await waitFor(() => {
+      expect(actionMocks.completeTaskAction).toHaveBeenCalledWith("pending_task");
+    });
+    expect(await screen.findByText("Task completed.")).toBeInTheDocument();
+  });
+
   it("shows delete success feedback as a toast", async () => {
     actionMocks.deleteTaskAction.mockResolvedValue({ data: { id: "task_1" }, error: null });
 

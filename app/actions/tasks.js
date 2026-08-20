@@ -205,27 +205,76 @@ export async function getTasksAction(filters = {}) {
 
   try {
     const admin = createAdminClient();
-    let query = admin
-      .from("tasks")
-      .select("*")
-      .eq("household_id", context.household.id)
-      .order("due_date", { ascending: true })
-      .order("created_at", { ascending: false });
-
     const status = normalizeTaskId(filters.status);
     const assignedTo = normalizeTaskId(filters.assignedTo ?? filters.assigned_to);
     const locationId = normalizeTaskId(filters.locationId ?? filters.location_id);
+    const completedLimit = Math.min(
+      Math.max(Number.parseInt(String(filters.completedLimit ?? 10), 10) || 10, 0),
+      50
+    );
 
-    if (status && status !== "all") query = query.eq("status", status);
-    if (assignedTo) query = query.eq("assigned_to", assignedTo);
-    if (locationId) query = query.eq("location_id", locationId);
+    const applyCommonFilters = (query) => {
+      let nextQuery = query;
+      if (assignedTo) nextQuery = nextQuery.eq("assigned_to", assignedTo);
+      if (locationId) nextQuery = nextQuery.eq("location_id", locationId);
+      return nextQuery;
+    };
 
-    const { data, error } = await query;
-    if (error) throw error;
+    if (status && status !== "all") {
+      let query = admin
+        .from("tasks")
+        .select("*")
+        .eq("household_id", context.household.id)
+        .eq("status", status)
+        .order(status === TASK_STATUS.COMPLETED ? "completed_at" : "due_date", {
+          ascending: status !== TASK_STATUS.COMPLETED,
+          nullsFirst: false,
+        })
+        .order("created_at", { ascending: false });
+
+      query = applyCommonFilters(query);
+      if (status === TASK_STATUS.COMPLETED) query = query.limit(completedLimit);
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return {
+        data: {
+          items: (data ?? []).map(mapTaskRow),
+        },
+        error: null,
+      };
+    }
+
+    const activeQuery = applyCommonFilters(
+      admin
+        .from("tasks")
+        .select("*")
+        .eq("household_id", context.household.id)
+        .neq("status", TASK_STATUS.COMPLETED)
+        .order("due_date", { ascending: true, nullsFirst: false })
+        .order("created_at", { ascending: false })
+    );
+    const completedQuery = applyCommonFilters(
+      admin
+        .from("tasks")
+        .select("*")
+        .eq("household_id", context.household.id)
+        .eq("status", TASK_STATUS.COMPLETED)
+        .order("completed_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .limit(completedLimit)
+    );
+
+    const [
+      { data: activeData, error: activeError },
+      { data: completedData, error: completedError },
+    ] = await Promise.all([activeQuery, completedQuery]);
+    if (activeError || completedError) throw activeError || completedError;
 
     return {
       data: {
-        items: (data ?? []).map(mapTaskRow),
+        items: [...(activeData ?? []), ...(completedData ?? [])].map(mapTaskRow),
       },
       error: null,
     };
