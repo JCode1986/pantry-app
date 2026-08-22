@@ -18,6 +18,11 @@ export default function sitemap() {
       priority: 0.5,
     },
     {
+      url: new URL("/home-inventory-app", siteConfig.url).toString(),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
       url: new URL("/terms", siteConfig.url).toString(),
       changeFrequency: "yearly",
       priority: 0.3,

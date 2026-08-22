@@ -84,6 +84,10 @@ const nextConfig = {
         headers: publicSeoHeaders,
       },
       {
+        source: "/home-inventory-app",
+        headers: publicSeoHeaders,
+      },
+      {
         source: "/:path*\\.(jpg|jpeg|png|webp|gif|ico)",
         headers: immutableAssetHeaders,
       },
