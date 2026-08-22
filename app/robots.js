@@ -1,7 +1,10 @@
 import { siteConfig } from "@/utils/metadata";
 
 const privatePaths = [
+  "/activity",
+  "/api",
   "/areas",
+  "/auth/confirm",
   "/categories",
   "/dashboard",
   "/forgot-password",
@@ -9,17 +12,23 @@ const privatePaths = [
   "/items",
   "/locations",
   "/login",
+  "/logout",
   "/magic-link-sync",
   "/profile",
   "/reset-password",
   "/signup",
   "/shopping-list",
+  "/storage",
+  "/storage-areas",
   "/support/chat",
+  "/tasks",
 ];
 
 const publicPaths = [
   "/",
+  "/contact",
   "/privacy",
+  "/support",
   "/terms",
 ];
 
