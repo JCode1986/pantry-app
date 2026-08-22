@@ -115,7 +115,7 @@ const upgradeReasons = [
     icon: FaUserCheck,
     title: 'Keep everyone organized',
     description:
-      'Give everyone the right access — whether they organize, update, or simply need to find something.',
+      'Give everyone the right access, whether they organize, update, or simply need to find something.',
   },
 ];
 
@@ -555,8 +555,8 @@ function TasksChoresSection() {
             Stay on top of what needs to get done.
           </h2>
           <p className="mt-3 max-w-xl text-sm leading-6 text-gray-600 sm:text-base">
-            Assign tasks, set due dates, and keep your household running
-            smoothly together.
+            Assign household chores, set due dates, and keep recurring tasks
+            moving smoothly together.
           </p>
           <div className="mt-5 grid gap-2.5">
             {taskBenefits.map((benefit) => (
@@ -591,7 +591,7 @@ function TasksChoresSection() {
         <div
           className="relative mx-auto w-full min-w-0 max-w-2xl overflow-hidden rounded-[2rem] border border-white/80 bg-white/70 p-2 shadow-[0_24px_70px_rgba(14,116,136,0.10)] sm:p-4 md:overflow-visible"
           role="img"
-          aria-label="Preview of household tasks and chores in WhereKeep"
+          aria-label="WhereKeep household tasks showing assigned chores, due dates, and priorities"
         >
           <div className="absolute left-5 top-5 hidden items-center gap-2 rounded-full border border-[var(--stocksense-brand-border)] bg-white px-3 py-1 text-xs font-semibold text-[var(--stocksense-brand)] shadow-sm sm:flex">
             <LuCalendarClock className="h-3.5 w-3.5" />
@@ -678,7 +678,7 @@ function HierarchySection() {
           description={
             <>
               WhereKeep mirrors real life &mdash; from rooms and shelves to bins
-              and boxes, every item has a place.
+              and boxes, every household inventory item has a place.
             </>
           }
         />
@@ -723,11 +723,23 @@ function ProductPreviewSection() {
   return (
     <section className="border-y border-gray-200 bg-white">
       <div className="mx-auto max-w-6xl px-5 py-14">
-        <SectionHeader
-          eyebrow="SEE WHEREKEEP IN ACTION"
-          title="Your entire home, organized in one place."
-          description="Track your items, search instantly, and always know where everything belongs."
-        />
+          <SectionHeader
+            eyebrow="SEE WHEREKEEP IN ACTION"
+            title="Your entire home inventory, organized in one place."
+            description={
+              <>
+                Track your items, search instantly, and always know where
+                everything belongs. Learn more about using WhereKeep as a{" "}
+                <Link
+                  href="/home-inventory-app"
+                  className="font-semibold text-[var(--stocksense-brand)] hover:brightness-90"
+                >
+                  home inventory app
+                </Link>
+                .
+              </>
+            }
+          />
 
         <div className="grid gap-4 lg:grid-cols-3">
           <ProductScreenshotCard type="dashboard" />
@@ -746,7 +758,7 @@ function LifestyleProblemSection() {
         <SectionHeader
           eyebrow="BUILT FOR EVERYTHING YOU STORE"
           title="Pantry, garage, documents, and everything in between."
-          description="WhereKeep gives every important household item a place, whether it lives on a shelf, in a bin, or inside a document box."
+          description="WhereKeep gives every important household item a place, whether it belongs in pantry inventory, a garage bin, or a document box."
         />
 
         <ProblemExampleVisual />
@@ -790,6 +802,9 @@ export default function LandingPage() {
 
           <div className="grid min-h-[calc(100svh-4rem)] gap-9 py-5 lg:grid-cols-[1fr_0.88fr] lg:items-center lg:gap-6 lg:py-7 xl:gap-8">
             <div className="max-w-2xl">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--stocksense-brand)]">
+                The home inventory app for organized households
+              </p>
               <h1 className="text-[2rem] font-semibold leading-tight tracking-normal text-[var(--stocksense-brand)] min-[380px]:text-4xl sm:text-6xl sm:leading-none lg:text-7xl">
                 <span className="block whitespace-nowrap">Stop buying things</span>
                 <span className="block whitespace-nowrap">you already have.</span>
@@ -798,9 +813,9 @@ export default function LandingPage() {
                 Find anything in your home in seconds.
               </p>
               <p className="mt-4 max-w-xl text-base leading-8 text-gray-700 sm:text-lg sm:leading-9">
-                WhereKeep helps you organize every item by location, storage
-                area, and category &mdash; so you always know exactly where
-                things are.
+                Track items by room, shelf, bin, and category. Share your
+                household inventory, manage shopping lists, and stay on top of
+                recurring chores from one organized place.
               </p>
 
               <div className="mt-5 text-sm font-semibold text-[var(--stocksense-brand)]">
@@ -896,8 +911,8 @@ export default function LandingPage() {
             </h2>
             <p className="mt-3 text-sm leading-6 text-gray-600 sm:text-base">
               Invite your spouse, kids, or family members and choose what they
-              can do. Viewers can search and find items without changing your
-              home inventory.
+              can do. Viewers can search shared household inventory without
+              changing anything.
             </p>
             <div className="mt-5 space-y-2.5">
               {familyBenefits.map((benefit) => (
@@ -932,7 +947,7 @@ export default function LandingPage() {
           <SectionHeader
             eyebrow="GROWS WITH YOU"
             title="Start with one shelf. Organize your entire home."
-            description="WhereKeep grows with you — from a single pantry shelf to a complete household system everyone can use."
+            description="WhereKeep grows with you, from a single pantry shelf to a complete household inventory system everyone can use."
           />
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -1006,7 +1021,7 @@ export default function LandingPage() {
                   </Link>
                 </div>
                 <p className="mt-2 text-center text-xs font-medium text-gray-700 sm:text-left lg:text-right">
-                  No credit card required • Start with the free plan
+                  No credit card required &bull; Start with the free plan
                 </p>
               </div>
             </div>

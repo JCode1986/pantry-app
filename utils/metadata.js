@@ -35,16 +35,21 @@ export function createPageMetadata({
   description = siteConfig.description,
   path = "/",
   robots = INDEX_ROBOTS,
+  twitterCard = "summary",
 } = {}) {
   const pageTitle = title || siteConfig.name;
-  const socialTitle = title ? `${title} | ${siteConfig.name}` : siteConfig.name;
+  const socialTitle = title
+    ? title.includes(siteConfig.name)
+      ? title
+      : `${title} | ${siteConfig.name}`
+    : siteConfig.name;
   const url = new URL(path, siteConfig.url);
 
   return {
     title: pageTitle,
     description,
     alternates: {
-      canonical: url.pathname,
+      canonical: url.toString(),
     },
     openGraph: {
       title: socialTitle,
@@ -62,7 +67,7 @@ export function createPageMetadata({
       type: "website",
     },
     twitter: {
-      card: "summary",
+      card: twitterCard,
       title: socialTitle,
       description,
       images: ["/wherekeep-social-preview.jpg"],

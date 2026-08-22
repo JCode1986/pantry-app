@@ -27,6 +27,7 @@ const privatePaths = [
 const publicPaths = [
   "/",
   "/contact",
+  "/home-inventory-app",
   "/privacy",
   "/support",
   "/terms",

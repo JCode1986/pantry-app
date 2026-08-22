@@ -12,20 +12,23 @@ const mockups = {
     eyebrow: 'Home overview',
     icon: FaHome,
     description: 'See what you own, what needs attention, and what is running low.',
+    alt: 'WhereKeep dashboard showing household inventory, expiring items, and tasks',
   },
   search: {
     imageKey: 'search',
     title: 'Search',
     eyebrow: 'Find anything',
     icon: FaSearch,
-    description: 'Search "passport" and instantly see Bedroom Closet → Document Box.',
+    description: 'Search "passport" and instantly see Bedroom Closet to Document Box.',
+    alt: 'WhereKeep search showing where a household item is stored',
   },
   addItem: {
     imageKey: 'addItem',
     title: 'Add Item',
     eyebrow: 'Fast capture',
     icon: FaPlus,
-    description: 'Add Pasta, quantity 2, and save it to Kitchen → Pantry → Shelf 2.',
+    description: 'Add Pasta, quantity 2, and save it to Kitchen, Pantry, Shelf 2.',
+    alt: 'WhereKeep add item form with quantity, expiration date, and storage location',
   },
 };
 
@@ -37,7 +40,7 @@ export function ProductScreenshotCard({ type }) {
     <article className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-xl">
       <MarketingImage
         imageKey={mockup.imageKey}
-        alt={`${mockup.title} WhereKeep screenshot`}
+        alt={mockup.alt}
         className="aspect-[4/3] rounded-none border-0 shadow-none"
         imageClassName="!object-contain bg-white"
         sizes="(min-width: 1024px) 33vw, 100vw"
@@ -67,7 +70,7 @@ export function LifestyleImageCard({ title, label, detail, imageKey = 'organized
     <article className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-xl">
       <MarketingImage
         imageKey={imageKey}
-        alt={`${title} marketing image`}
+        alt={`${title} storage example for WhereKeep`}
         className="aspect-[3/2] rounded-none border-0 shadow-none"
         sizes="(min-width: 1024px) 33vw, 100vw"
       />
@@ -87,7 +90,7 @@ export function FamilySharingVisual() {
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl lg:scale-[1.02]">
       <MarketingImage
         imageKey="family"
-        alt="Household members sharing WhereKeep"
+        alt="WhereKeep household sharing with member roles and shared inventory access"
         className="aspect-[3/2] rounded-none border-0 shadow-none"
         imageClassName="!object-contain bg-white"
         sizes="(min-width: 1024px) 60vw, 100vw"

@@ -6,7 +6,7 @@ export default function PhoneMockup({ className = '' }) {
       <div className="relative rounded-[2rem] border border-gray-200 bg-gray-950 p-2 shadow-2xl">
         <MarketingImage
           imageKey="heroApp"
-          alt="WhereKeep mobile app preview showing a batteries search"
+          alt="WhereKeep mobile home inventory app showing a batteries search result"
           priority
           className="aspect-[9/16] rounded-[1.5rem] border-gray-800 shadow-none"
           imageClassName="opacity-95"
