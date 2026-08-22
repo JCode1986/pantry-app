@@ -76,6 +76,14 @@ const nextConfig = {
         headers: publicSeoHeaders,
       },
       {
+        source: "/contact",
+        headers: publicSeoHeaders,
+      },
+      {
+        source: "/support",
+        headers: publicSeoHeaders,
+      },
+      {
         source: "/:path*\\.(jpg|jpeg|png|webp|gif|ico)",
         headers: immutableAssetHeaders,
       },

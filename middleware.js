@@ -60,6 +60,16 @@ function hasSupabaseAuthCookie(request) {
 }
 
 export async function middleware(req) {
+  if (
+    process.env.NODE_ENV === "production" &&
+    req.nextUrl.hostname.toLowerCase() === "wherekeep.com"
+  ) {
+    const canonicalUrl = req.nextUrl.clone();
+    canonicalUrl.protocol = "https:";
+    canonicalUrl.hostname = "www.wherekeep.com";
+    return NextResponse.redirect(canonicalUrl, 308);
+  }
+
   const { response: supabaseResponse, user } = await updateSession(req);
   const session = await getSession();
   const hasAppSession = Boolean(session?.user?.access_token);

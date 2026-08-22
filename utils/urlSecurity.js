@@ -1,7 +1,9 @@
+const PRODUCTION_APP_URL = "https://www.wherekeep.com";
+const LOCAL_APP_URL = "http://localhost:3000";
+const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
+
 const DEFAULT_APP_URL =
-  process.env.NODE_ENV === "production"
-    ? "https://www.wherekeep.com"
-    : "http://localhost:3000";
+  process.env.NODE_ENV === "production" ? PRODUCTION_APP_URL : LOCAL_APP_URL;
 
 const KNOWN_APP_ORIGINS = new Set([
   "https://www.wherekeep.com",
@@ -9,10 +11,26 @@ const KNOWN_APP_ORIGINS = new Set([
 ]);
 
 export function getCanonicalAppUrl() {
-  const candidate = process.env.NEXT_PUBLIC_APP_URL || DEFAULT_APP_URL;
+  const previewUrl =
+    process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : null;
+  const candidate = process.env.NEXT_PUBLIC_APP_URL || previewUrl || DEFAULT_APP_URL;
 
   try {
     const url = new URL(candidate);
+    if (url.hostname === "wherekeep.com" || url.hostname === "www.wherekeep.com") {
+      return PRODUCTION_APP_URL;
+    }
+
+    if (
+      process.env.NODE_ENV === "production" &&
+      process.env.VERCEL_ENV !== "preview" &&
+      LOCAL_HOSTNAMES.has(url.hostname)
+    ) {
+      return PRODUCTION_APP_URL;
+    }
+
     if (url.protocol === "http:" || url.protocol === "https:") {
       return url.origin;
     }
