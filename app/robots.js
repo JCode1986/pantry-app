@@ -30,6 +30,7 @@ const publicPaths = [
   "/home-inventory-app",
   "/pantry-inventory-app",
   "/privacy",
+  "/shared-household-inventory",
   "/support",
   "/terms",
 ];

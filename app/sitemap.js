@@ -28,6 +28,11 @@ export default function sitemap() {
       priority: 0.8,
     },
     {
+      url: new URL("/shared-household-inventory", siteConfig.url).toString(),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
       url: new URL("/terms", siteConfig.url).toString(),
       changeFrequency: "yearly",
       priority: 0.3,
