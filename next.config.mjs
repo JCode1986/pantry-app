@@ -92,6 +92,10 @@ const nextConfig = {
         headers: publicSeoHeaders,
       },
       {
+        source: "/shared-household-inventory",
+        headers: publicSeoHeaders,
+      },
+      {
         source: "/:path*\\.(jpg|jpeg|png|webp|gif|ico)",
         headers: immutableAssetHeaders,
       },

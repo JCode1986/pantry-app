@@ -924,7 +924,14 @@ export default function LandingPage() {
             <p className="mt-3 text-sm leading-6 text-gray-600 sm:text-base">
               Invite your spouse, kids, or family members and choose what they
               can do. Viewers can search shared household inventory without
-              changing anything.
+              changing anything. Learn more about creating a{" "}
+              <Link
+                href="/shared-household-inventory"
+                className="font-semibold text-[var(--stocksense-brand)] hover:brightness-90"
+              >
+                shared household inventory
+              </Link>
+              .
             </p>
             <div className="mt-5 space-y-2.5">
               {familyBenefits.map((benefit) => (

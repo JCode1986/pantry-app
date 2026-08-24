@@ -784,7 +784,20 @@ export default function HomeInventoryAppPage() {
                   align="left"
                   eyebrow="Household sharing"
                   title="One inventory for the whole household."
-                  description="Invite household members so everyone can find what they need. Owners, editors, and viewers keep access aligned with each person's role."
+                  description={
+                    <>
+                      Invite household members so everyone can find what they
+                      need. Owners, editors, and viewers keep access aligned
+                      with each person&apos;s role. Learn more about{" "}
+                      <Link
+                        href="/shared-household-inventory"
+                        className="font-semibold text-[var(--stocksense-brand)] hover:brightness-90"
+                      >
+                        sharing one household inventory
+                      </Link>
+                      .
+                    </>
+                  }
                 />
                 <CheckList
                   items={[
