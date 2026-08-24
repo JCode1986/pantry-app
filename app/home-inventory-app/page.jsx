@@ -764,6 +764,16 @@ export default function HomeInventoryAppPage() {
               "Check what you have before you buy more",
             ]}
           />
+          <p className="mt-4 text-sm leading-7 text-gray-700 sm:text-base">
+            For a deeper pantry-specific workflow, see how WhereKeep works as a{" "}
+            <Link
+              href="/pantry-inventory-app"
+              className="font-semibold text-[var(--stocksense-brand)] hover:brightness-90"
+            >
+              pantry inventory app
+            </Link>
+            .
+          </p>
         </TwoColumnSection>
 
         <section className="border-y border-[var(--stocksense-brand-border)] bg-white">

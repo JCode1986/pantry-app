@@ -641,17 +641,17 @@ function HierarchyJourneyPath({ journey }) {
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] md:items-center">
+      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center">
         {journey.steps.map((step, stepIndex) => {
           const Icon = step.icon;
 
           return (
             <div key={step.label} className="contents">
-              <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white p-4">
+              <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-gray-200 bg-white p-4">
                 <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
                   <Icon className="h-5 w-5" />
                 </div>
-                <div className="text-base font-semibold text-gray-900">
+                <div className="min-w-0 truncate text-base font-semibold text-gray-900">
                   {step.label}
                 </div>
               </div>
@@ -758,7 +758,19 @@ function LifestyleProblemSection() {
         <SectionHeader
           eyebrow="BUILT FOR EVERYTHING YOU STORE"
           title="Pantry, garage, documents, and everything in between."
-          description="WhereKeep gives every important household item a place, whether it belongs in pantry inventory, a garage bin, or a document box."
+          description={
+            <>
+              WhereKeep gives every important household item a place, whether it
+              belongs in{" "}
+              <Link
+                href="/pantry-inventory-app"
+                className="font-semibold text-[var(--stocksense-brand)] hover:brightness-90"
+              >
+                pantry inventory
+              </Link>
+              , a garage bin, or a document box.
+            </>
+          }
         />
 
         <ProblemExampleVisual />

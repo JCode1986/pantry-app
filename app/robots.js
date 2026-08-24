@@ -28,6 +28,7 @@ const publicPaths = [
   "/",
   "/contact",
   "/home-inventory-app",
+  "/pantry-inventory-app",
   "/privacy",
   "/support",
   "/terms",
