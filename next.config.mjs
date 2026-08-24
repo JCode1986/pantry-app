@@ -88,6 +88,10 @@ const nextConfig = {
         headers: publicSeoHeaders,
       },
       {
+        source: "/pantry-inventory-app",
+        headers: publicSeoHeaders,
+      },
+      {
         source: "/:path*\\.(jpg|jpeg|png|webp|gif|ico)",
         headers: immutableAssetHeaders,
       },
