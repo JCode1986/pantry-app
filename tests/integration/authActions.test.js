@@ -78,6 +78,7 @@ function createAuthSupabase(overrides = {}) {
 
 describe("auth server actions", () => {
   beforeEach(() => {
+    vi.unstubAllEnvs();
     authMocks.supabase = createAuthSupabase();
     authMocks.createClient.mockResolvedValue(authMocks.supabase);
     authMocks.getSession.mockResolvedValue(createSessionMock(null));
@@ -101,6 +102,22 @@ describe("auth server actions", () => {
       error: "Invalid login credentials.",
     });
     expect(session.save).not.toHaveBeenCalled();
+  });
+
+  it("returns deterministic invalid credentials in e2e auth mock mode", async () => {
+    vi.stubEnv("WHEREKEEP_E2E_AUTH_MOCK", "1");
+
+    const result = await login({
+      email: "invalid@example.test",
+      password: "wrong-password",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Invalid login credentials.",
+    });
+    expect(authMocks.createClient).not.toHaveBeenCalled();
+    expect(authMocks.getSession).not.toHaveBeenCalled();
   });
 
   it("returns a safe login error when Supabase auth is unavailable", async () => {

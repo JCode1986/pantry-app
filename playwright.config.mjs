@@ -26,6 +26,7 @@ const testEnv = {
   NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key",
   SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
+  WHEREKEEP_E2E_AUTH_MOCK: "1",
   SECRET_COOKIE_PASSWORD: "test-secret-cookie-password-with-32-chars",
   STRIPE_SECRET_KEY: "sk_test_placeholder",
   STRIPE_WEBHOOK_SECRET: "whsec_test_placeholder",

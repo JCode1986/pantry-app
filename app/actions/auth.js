@@ -7,6 +7,13 @@ import {
   isServiceUnavailableError,
 } from "@/utils/maintenance";
 
+function isE2EAuthMockEnabled() {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    process.env.WHEREKEEP_E2E_AUTH_MOCK === "1"
+  );
+}
+
 function needsInvitePasswordSetup(user) {
   return Boolean(
     user?.user_metadata?.requires_password_setup &&
@@ -16,6 +23,13 @@ function needsInvitePasswordSetup(user) {
 
 /** LOGIN – server action */
 export async function login({ email, password, redirectTo = "/dashboard" }) {
+  if (isE2EAuthMockEnabled()) {
+    return {
+      success: false,
+      error: "Invalid login credentials.",
+    };
+  }
+
   const { createClient } = await import('@/utils/supabase/server');
   const supa = await createClient();
   const session = await getSession();
