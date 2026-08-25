@@ -54,7 +54,7 @@ export default function CategoryEditModal({
                 className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
                 onPress={onSave}
                 isLoading={isSaving}
-                isDisabled={!editCategoryName.trim()}
+                isDisabled={isSaving || !editCategoryName.trim()}
               >
                 Save
               </NativeButton>
@@ -103,7 +103,7 @@ export default function CategoryEditModal({
                 className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                 onPress={onSave}
                 isLoading={isSaving}
-                isDisabled={!editCategoryName.trim()}
+                isDisabled={isSaving || !editCategoryName.trim()}
               >
                 Save changes
               </NativeButton>

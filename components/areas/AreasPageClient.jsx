@@ -135,6 +135,7 @@ export default function AreasPageClient({
   const [activeAreaId, setActiveAreaId] = useState(null);
 
   const [renameValue, setRenameValue] = useState("");
+  const [isRenamingArea, setIsRenamingArea] = useState(false);
   const [createAreaOpen, setCreateAreaOpen] = useState(false);
   const [createAreaName, setCreateAreaName] = useState("");
   const [createAreaLocationId, setCreateAreaLocationId] = useState("");
@@ -480,7 +481,7 @@ export default function AreasPageClient({
   };
 
   const handleCreateArea = async () => {
-    if (!canEditInventory) return;
+    if (!canEditInventory || isCreatingArea) return;
     const name = createAreaName.trim();
     const targetLocationId = createAreaLocationId || defaultCreateAreaLocationId();
     if (!name || !targetLocationId) return;
@@ -555,29 +556,35 @@ export default function AreasPageClient({
   };
 
   const closeDrawer = () => {
+    if (isRenamingArea) return;
     setDrawerOpen(false);
     setActiveAreaId(null);
     setRenameValue("");
   };
 
   const handleRename = async () => {
-    if (!canEditInventory) return;
+    if (!canEditInventory || isRenamingArea) return;
     if (!activeArea) return;
     const name = renameValue.trim();
     if (!name) return;
 
-    const result = await updateStorageArea(activeArea.id, name);
-    if (result?.error) {
-      console.error("updateStorageArea error:", result.error);
-      return;
-    }
+    setIsRenamingArea(true);
+    try {
+      const result = await updateStorageArea(activeArea.id, name);
+      if (result?.error) {
+        console.error("updateStorageArea error:", result.error);
+        return;
+      }
 
-    setAreas((prev) => prev.map((a) => (a.id === activeArea.id ? { ...a, name } : a)));
-    emitInventoryChange({
-      entity: "storage_area",
-      action: "updated",
-      id: activeArea.id,
-    });
+      setAreas((prev) => prev.map((a) => (a.id === activeArea.id ? { ...a, name } : a)));
+      emitInventoryChange({
+        entity: "storage_area",
+        action: "updated",
+        id: activeArea.id,
+      });
+    } finally {
+      setIsRenamingArea(false);
+    }
   };
 
   const handleAreaImageChange = ({ imagePath, imageUrl, imageThumbUrl }) => {
@@ -1499,6 +1506,7 @@ export default function AreasPageClient({
           renameValue={renameValue}
           setRenameValue={setRenameValue}
           onRename={handleRename}
+          isRenaming={isRenamingArea}
           onImageChange={handleAreaImageChange}
           onDelete={openDelete}
         />

@@ -56,6 +56,7 @@ function CreateImagePicker({
   imageMessage,
   onSelect,
   onClear,
+  isDisabled = false,
 }) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-3 max-md:bg-white">
@@ -88,12 +89,17 @@ function CreateImagePicker({
 
         <div className="flex flex-1 flex-col gap-2">
           <div className="flex flex-wrap gap-2">
-            <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 text-sm font-semibold text-[var(--stocksense-brand)]">
+            <label
+              className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 text-sm font-semibold text-[var(--stocksense-brand)] ${
+                isDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+              }`}
+            >
               <FaImage className="h-3.5 w-3.5" />
               {imageFile ? "Change photo" : "Add photo"}
               <input
                 type="file"
                 accept="image/*"
+                disabled={isDisabled}
                 className="hidden"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
@@ -102,13 +108,18 @@ function CreateImagePicker({
                 }}
               />
             </label>
-            <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 text-sm font-semibold text-[var(--stocksense-brand)] sm:hidden">
+            <label
+              className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[var(--stocksense-brand-border)] bg-white px-3 text-sm font-semibold text-[var(--stocksense-brand)] sm:hidden ${
+                isDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+              }`}
+            >
               <FaCamera className="h-3.5 w-3.5" />
               Take photo
               <input
                 type="file"
                 accept="image/*"
                 capture="environment"
+                disabled={isDisabled}
                 className="hidden"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
@@ -121,6 +132,7 @@ function CreateImagePicker({
               <button
                 type="button"
                 onClick={onClear}
+                disabled={isDisabled}
                 className="inline-flex min-h-10 items-center justify-center rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-600"
               >
                 Remove
@@ -154,11 +166,16 @@ export default function StorageEntityModals({
   onSubmitAreaModal,
   onSubmitCategoryModal,
   onSubmitItemModal,
+  savingEntity,
   onAreaImageChange,
   onCategoryImageChange,
   onItemImageChange,
   onOpenDeleteDialog,
 }) {
+  const isAreaSaving = savingEntity === "area";
+  const isCategorySaving = savingEntity === "category";
+  const isItemSaving = savingEntity === "item";
+  const isSaving = Boolean(savingEntity);
   const shouldAutoFocus = useMemo(
     () => areaModal.open || categoryModal.open || itemModal.open,
     [areaModal.open, categoryModal.open, itemModal.open]
@@ -210,7 +227,7 @@ export default function StorageEntityModals({
       {areaModal.open && (
         <Modal
           isOpen={areaModal.open}
-          onOpenChange={(open) => !open && onCloseAreaModal()}
+          onOpenChange={(open) => !open && !isSaving && onCloseAreaModal()}
           placement="center"
           backdrop="blur"
           scrollBehavior="inside"
@@ -227,7 +244,8 @@ export default function StorageEntityModals({
                 size="sm"
                 radius="full"
                 onPress={onSubmitAreaModal}
-                isDisabled={!areaModal.name.trim()}
+                isLoading={isAreaSaving}
+                isDisabled={isSaving || !areaModal.name.trim()}
                 className={`${modalPrimaryButtonClass} h-10 shrink-0 px-4 text-sm font-semibold md:hidden`}
               >
                 {areaModal.mode === "edit" ? "Save" : "Create"}
@@ -243,6 +261,7 @@ export default function StorageEntityModals({
                 radius="lg"
                 classNames={modalInputClassNames}
                 autoFocus={shouldAutoFocus}
+                isDisabled={isSaving}
               />
               {areaModal.mode === "create" && (
                 <MobileSuggestionChips
@@ -258,6 +277,7 @@ export default function StorageEntityModals({
                   imageMessage={areaModal.imageMessage}
                   onSelect={(file) => setCreateImageFile(setAreaModal, file)}
                   onClear={() => clearCreateImageFile(setAreaModal)}
+                  isDisabled={isSaving}
                 />
               )}
               {areaModal.mode === "edit" && (
@@ -275,12 +295,14 @@ export default function StorageEntityModals({
                   <NativeButton
                     className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
                     onPress={() => {
+                      if (isSaving) return;
                       onCloseAreaModal();
                       onOpenDeleteDialog("area", {
                         areaId: areaModal.areaId,
                         name: areaModal.name,
                       });
                     }}
+                    isDisabled={isSaving}
                   >
                     Delete storage area
                   </NativeButton>
@@ -292,6 +314,7 @@ export default function StorageEntityModals({
                 variant="light"
                 radius="lg"
                 onPress={onCloseAreaModal}
+                isDisabled={isSaving}
                 className="max-md:hidden"
               >
                 Cancel
@@ -300,7 +323,8 @@ export default function StorageEntityModals({
                 color="primary"
                 radius="lg"
                 onPress={onSubmitAreaModal}
-                isDisabled={!areaModal.name.trim()}
+                isLoading={isAreaSaving}
+                isDisabled={isSaving || !areaModal.name.trim()}
                 className={`${modalPrimaryButtonClass} max-md:hidden`}
               >
                 {areaModal.mode === "edit" ? "Save changes" : "Add area"}
@@ -313,7 +337,7 @@ export default function StorageEntityModals({
       {categoryModal.open && (
         <Modal
           isOpen={categoryModal.open}
-          onOpenChange={(open) => !open && onCloseCategoryModal()}
+          onOpenChange={(open) => !open && !isSaving && onCloseCategoryModal()}
           placement="center"
           backdrop="blur"
           scrollBehavior="inside"
@@ -330,7 +354,8 @@ export default function StorageEntityModals({
                 size="sm"
                 radius="full"
                 onPress={onSubmitCategoryModal}
-                isDisabled={!categoryModal.name.trim()}
+                isLoading={isCategorySaving}
+                isDisabled={isSaving || !categoryModal.name.trim()}
                 className={`${modalPrimaryButtonClass} h-10 shrink-0 px-4 text-sm font-semibold md:hidden`}
               >
                 {categoryModal.mode === "edit" ? "Save" : "Create"}
@@ -346,6 +371,7 @@ export default function StorageEntityModals({
                 radius="lg"
                 classNames={modalInputClassNames}
                 autoFocus={shouldAutoFocus}
+                isDisabled={isSaving}
               />
               {categoryModal.mode === "create" && (
                 <MobileSuggestionChips
@@ -361,6 +387,7 @@ export default function StorageEntityModals({
                   imageMessage={categoryModal.imageMessage}
                   onSelect={(file) => setCreateImageFile(setCategoryModal, file)}
                   onClear={() => clearCreateImageFile(setCategoryModal)}
+                  isDisabled={isSaving}
                 />
               )}
               {categoryModal.mode === "edit" && (
@@ -378,6 +405,7 @@ export default function StorageEntityModals({
                   <NativeButton
                     className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
                     onPress={() => {
+                      if (isSaving) return;
                       onCloseCategoryModal();
                       onOpenDeleteDialog("category", {
                         categoryId: categoryModal.categoryId,
@@ -386,6 +414,7 @@ export default function StorageEntityModals({
                         areaName: categoryModal.areaName,
                       });
                     }}
+                    isDisabled={isSaving}
                   >
                     Delete category
                   </NativeButton>
@@ -397,6 +426,7 @@ export default function StorageEntityModals({
                 variant="light"
                 radius="lg"
                 onPress={onCloseCategoryModal}
+                isDisabled={isSaving}
                 className="max-md:hidden"
               >
                 Cancel
@@ -405,7 +435,8 @@ export default function StorageEntityModals({
                 color="primary"
                 radius="lg"
                 onPress={onSubmitCategoryModal}
-                isDisabled={!categoryModal.name.trim()}
+                isLoading={isCategorySaving}
+                isDisabled={isSaving || !categoryModal.name.trim()}
                 className={`${modalPrimaryButtonClass} max-md:hidden`}
               >
                 {categoryModal.mode === "edit" ? "Save changes" : "Add category"}
@@ -418,7 +449,7 @@ export default function StorageEntityModals({
       {itemModal.open && (
         <Modal
           isOpen={itemModal.open}
-          onOpenChange={(open) => !open && onCloseItemModal()}
+          onOpenChange={(open) => !open && !isSaving && onCloseItemModal()}
           placement="center"
           backdrop="blur"
           scrollBehavior="inside"
@@ -435,7 +466,8 @@ export default function StorageEntityModals({
                 size="sm"
                 radius="full"
                 onPress={onSubmitItemModal}
-                isDisabled={!itemModal.name.trim()}
+                isLoading={isItemSaving}
+                isDisabled={isSaving || !itemModal.name.trim()}
                 className={`${modalPrimaryButtonClass} h-10 shrink-0 px-4 text-sm font-semibold md:hidden`}
               >
                 {itemModal.mode === "edit" ? "Save" : "Add"}
@@ -451,6 +483,7 @@ export default function StorageEntityModals({
                 radius="lg"
                 classNames={modalInputClassNames}
                 autoFocus={shouldAutoFocus}
+                isDisabled={isSaving}
               />
               <div className="grid gap-3 sm:grid-cols-2">
                 <QuantityStepperInput
@@ -461,6 +494,7 @@ export default function StorageEntityModals({
                   }
                   min={0}
                   classNames={modalInputClassNames}
+                  isDisabled={isSaving}
                 />
                 <DatePicker
                   label="Expiration date"
@@ -476,6 +510,7 @@ export default function StorageEntityModals({
                   radius="lg"
                   classNames={modalInputClassNames}
                   showMonthAndYearPickers
+                  isDisabled={isSaving}
                 />
               </div>
               {itemModal.mode === "edit" && (
@@ -495,6 +530,7 @@ export default function StorageEntityModals({
                   imageMessage={itemModal.imageMessage}
                   onSelect={(file) => setCreateImageFile(setItemModal, file)}
                   onClear={() => clearCreateImageFile(setItemModal)}
+                  isDisabled={isSaving}
                 />
               )}
               {itemModal.mode === "edit" && (
@@ -503,6 +539,7 @@ export default function StorageEntityModals({
                   <NativeButton
                     className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
                     onPress={() => {
+                      if (isSaving) return;
                       onCloseItemModal();
                       onOpenDeleteDialog("item", {
                         itemId: itemModal.itemId,
@@ -516,6 +553,7 @@ export default function StorageEntityModals({
                           )?.name ?? "this storage area",
                       });
                     }}
+                    isDisabled={isSaving}
                   >
                     Delete item
                   </NativeButton>
@@ -527,6 +565,7 @@ export default function StorageEntityModals({
                 variant="light"
                 radius="lg"
                 onPress={onCloseItemModal}
+                isDisabled={isSaving}
                 className="max-md:hidden"
               >
                 Cancel
@@ -535,7 +574,8 @@ export default function StorageEntityModals({
                 color="primary"
                 radius="lg"
                 onPress={onSubmitItemModal}
-                isDisabled={!itemModal.name.trim()}
+                isLoading={isItemSaving}
+                isDisabled={isSaving || !itemModal.name.trim()}
                 className={`${modalPrimaryButtonClass} max-md:hidden`}
               >
                 {itemModal.mode === "edit" ? "Save changes" : "Add item"}

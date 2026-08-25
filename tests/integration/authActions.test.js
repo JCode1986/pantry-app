@@ -115,7 +115,8 @@ describe("auth server actions", () => {
 
     expect(result).toEqual({
       success: false,
-      error: "Could not log in right now. Please try again.",
+      code: "service-unavailable",
+      error: "WhereKeep account access is temporarily unavailable while maintenance is in progress.",
     });
     expect(session.save).not.toHaveBeenCalled();
   });

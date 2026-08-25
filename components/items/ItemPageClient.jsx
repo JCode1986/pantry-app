@@ -14,7 +14,7 @@ import {
   FaMapMarkedAlt,
   FaSearch,
   FaShoppingBasket,
-  FaTags,
+  FaSpinner,
   FaTimes,
 } from "react-icons/fa";
 import {
@@ -154,13 +154,39 @@ function InlineButton({
   onClick,
   type = "button",
 }) {
+  const [isPending, setIsPending] = useState(false);
+  const mountedRef = useRef(false);
+  const isDisabled = disabled || isPending;
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   return (
     <button
       type={type}
-      disabled={disabled}
-      onClick={onClick}
+      disabled={isDisabled}
+      aria-busy={isPending || undefined}
+      onClick={(event) => {
+        if (isDisabled) {
+          event.preventDefault();
+          return;
+        }
+
+        const result = onClick?.(event);
+        if (result && typeof result.then === "function") {
+          setIsPending(true);
+          Promise.resolve(result).finally(() => {
+            if (mountedRef.current) setIsPending(false);
+          }).catch(() => {});
+        }
+      }}
       className={`${buttonBaseClass} ${className}`}
     >
+      {isPending ? <FaSpinner className="h-4 w-4 animate-spin" /> : null}
       {children}
     </button>
   );
@@ -332,6 +358,7 @@ export default function ItemsPageClient({
   const [editQty, setEditQty] = useState("");
   const [editExp, setEditExp] = useState("");
   const [editBarcode, setEditBarcode] = useState("");
+  const [isSavingItemEdit, setIsSavingItemEdit] = useState(false);
 
   // bulk selection (Set of item IDs)
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -1027,7 +1054,8 @@ export default function ItemsPageClient({
     setDrawerOpen(true);
   };
 
-  const closeDrawer = () => {
+  const closeDrawer = ({ force = false } = {}) => {
+    if (isSavingItemEdit && !force) return;
     setDrawerOpen(false);
     setActiveItemId(null);
     setEditName("");
@@ -1038,7 +1066,7 @@ export default function ItemsPageClient({
   };
 
   const saveEdits = async () => {
-    if (!canEditInventory) return;
+    if (!canEditInventory || isSavingItemEdit) return;
     if (!activeItem) return;
 
     const name = editName.trim();
@@ -1053,32 +1081,37 @@ export default function ItemsPageClient({
       barcode: editBarcode,
     };
 
-    const { data, error } = await updateItem(activeItem.id, updated);
-    if (error) {
-      console.error("updateItem error:", error);
-      return;
-    }
+    setIsSavingItemEdit(true);
+    try {
+      const { data, error } = await updateItem(activeItem.id, updated);
+      if (error) {
+        console.error("updateItem error:", error);
+        return;
+      }
 
-    setItems((prev) =>
-      prev.map((x) =>
-        x.id === activeItem.id
-          ? {
-              ...x,
-              name: data?.name ?? name,
-              quantity: data?.quantity ?? qty,
-              expiration_date: data?.expiration_date ?? updated.expiration_date,
-              barcode: (data?.barcode ?? updated.barcode.trim()) || null,
-            }
-          : x
-      )
-    );
-    emitInventoryChange({
-      entity: "item",
-      action: "updated",
-      id: activeItem.id,
-    });
-    refreshCurrentItems();
-    closeDrawer();
+      setItems((prev) =>
+        prev.map((x) =>
+          x.id === activeItem.id
+            ? {
+                ...x,
+                name: data?.name ?? name,
+                quantity: data?.quantity ?? qty,
+                expiration_date: data?.expiration_date ?? updated.expiration_date,
+                barcode: (data?.barcode ?? updated.barcode.trim()) || null,
+              }
+            : x
+        )
+      );
+      emitInventoryChange({
+        entity: "item",
+        action: "updated",
+        id: activeItem.id,
+      });
+      refreshCurrentItems();
+      closeDrawer({ force: true });
+    } finally {
+      setIsSavingItemEdit(false);
+    }
   };
 
   const handleActiveItemImageChange = ({ imagePath, imageUrl, imageThumbUrl }) => {
@@ -2573,6 +2606,7 @@ export default function ItemsPageClient({
           editExp={editExp}
           editBarcode={editBarcode}
           hasItemEditChanges={hasItemEditChanges}
+          isSaving={isSavingItemEdit}
           onClose={closeDrawer}
           onSave={saveEdits}
           onMove={() => openMove("single")}

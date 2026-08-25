@@ -9,6 +9,12 @@ import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import Image from 'next/image';
 import SiteFooter from '@/components/app-shell/SiteFooter';
 import NativeInput from '@/components/ui/NativeInput';
+import {
+  MAINTENANCE_PATH,
+  SERVICE_UNAVAILABLE_CODE,
+  getSafeInternalPath,
+  isServiceUnavailableError,
+} from '@/utils/maintenance';
 
 const CREDENTIAL_VALIDATION_ERROR =
   'Enter a valid email and a password with at least 6 characters.';
@@ -116,6 +122,16 @@ export default function LoginPage({ mode = 'login' }) {
     setError(messages[urlError] || 'Something went wrong. Try again.');
   }, [urlError]);
 
+  const redirectToMaintenance = () => {
+    const fallback = isSignupMode ? '/signup' : '/login';
+    const safeReturnPath = getSafeInternalPath(
+      redirectTo && redirectTo !== '/' ? redirectTo : fallback,
+      fallback
+    );
+
+    router.replace(`${MAINTENANCE_PATH}?from=${encodeURIComponent(safeReturnPath)}`);
+  };
+
   const handleSignIn = async (e) => {
     e.preventDefault();
     if (!validateCredentials()) return;
@@ -126,6 +142,11 @@ export default function LoginPage({ mode = 'login' }) {
 
     try {
       const result = await login({ email, password, redirectTo });
+      if (result?.code === SERVICE_UNAVAILABLE_CODE) {
+        redirectToMaintenance();
+        return;
+      }
+
       if (result?.error) {
         setError(authErrorMessage(result.error, 'login'));
         return;
@@ -157,19 +178,39 @@ export default function LoginPage({ mode = 'login' }) {
         ? `/login?confirmed=1&redirectTo=${encodeURIComponent(redirectTo)}`
         : '/login?confirmed=1';
 
-    const { supabase } = await import('@/lib/supabaseClient');
-    const { data, error: signErr } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo:
-          typeof window !== 'undefined'
-            ? `${window.location.origin}/magic-link-sync?redirectTo=${encodeURIComponent(loginRedirect)}`
-            : `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.wherekeep.com'}/magic-link-sync?redirectTo=${encodeURIComponent(loginRedirect)}`,
-      },
-    });
+    let signupResult;
+
+    try {
+      const { supabase } = await import('@/lib/supabaseClient');
+      signupResult = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo:
+            typeof window !== 'undefined'
+              ? `${window.location.origin}/magic-link-sync?redirectTo=${encodeURIComponent(loginRedirect)}`
+              : `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.wherekeep.com'}/magic-link-sync?redirectTo=${encodeURIComponent(loginRedirect)}`,
+        },
+      });
+    } catch (err) {
+      if (isServiceUnavailableError(err)) {
+        redirectToMaintenance();
+        return;
+      }
+
+      setError(authErrorMessage(err?.message, 'signup'));
+      setSignupLoading(false);
+      return;
+    }
+
+    const { data, error: signErr } = signupResult;
 
     if (signErr) {
+      if (isServiceUnavailableError(signErr)) {
+        redirectToMaintenance();
+        return;
+      }
+
       setError(authErrorMessage(signErr.message, 'signup'));
     } else {
       const hasIdentity = Boolean(data?.user?.identities?.length);

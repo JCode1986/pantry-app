@@ -1120,6 +1120,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                     size="sm"
                     className="h-10 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white"
                     onPress={() => handleSubmit()}
+                    isLoading={isSaving}
                     isDisabled={isSaving || isLoading || isQuickAdding}
                     startContent={
                       isSaving ? <FaSpinner className="h-3.5 w-3.5 animate-spin" /> : <FaPlus className="h-3.5 w-3.5" />
@@ -1701,6 +1702,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                   variant="flat"
                   className="hidden rounded-xl md:inline-flex"
                   onPress={() => handleSubmit({ closeAfterAdd: true })}
+                  isLoading={isSaving}
                   isDisabled={isSaving || isLoading || isQuickAdding}
                 >
                   Add & close
@@ -1708,6 +1710,7 @@ export default function GlobalAddItemModal({ isOpen, onClose, onAdded, initialCo
                 <NativeButton
                   className="hidden min-h-12 rounded-2xl bg-[var(--stocksense-brand)] text-white md:inline-flex md:min-h-10 md:rounded-xl"
                   onPress={() => handleSubmit()}
+                  isLoading={isSaving}
                   isDisabled={isSaving || isLoading || isQuickAdding}
                   startContent={isSaving ? <FaSpinner className="animate-spin" /> : <FaPlus />}
                 >

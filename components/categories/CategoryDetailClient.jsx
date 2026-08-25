@@ -13,7 +13,6 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
-  FaArrowsAlt,
   FaBarcode,
   FaBoxOpen,
   FaChevronRight,
@@ -647,7 +646,7 @@ export default function CategoryDetailClient({
   };
 
   const saveCategoryName = async () => {
-    if (!canEditInventory) return;
+    if (!canEditInventory || isSaving) return;
     const name = editCategoryName.trim();
     if (!name || !category?.id) return;
 
@@ -684,7 +683,7 @@ export default function CategoryDetailClient({
   };
 
   const saveItem = async () => {
-    if (!canEditInventory || !itemModal.itemId) return;
+    if (!canEditInventory || isSaving || !itemModal.itemId) return;
     const name = itemModal.name.trim();
     if (!name) return;
 
