@@ -1,6 +1,18 @@
 'use server';
 
 import { getSession } from "@/lib/sessionOptions";
+import {
+  SERVICE_UNAVAILABLE_CODE,
+  SERVICE_UNAVAILABLE_MESSAGE,
+  isServiceUnavailableError,
+} from "@/utils/maintenance";
+
+function isE2EAuthMockEnabled() {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    process.env.WHEREKEEP_E2E_AUTH_MOCK === "1"
+  );
+}
 
 function needsInvitePasswordSetup(user) {
   return Boolean(
@@ -11,6 +23,13 @@ function needsInvitePasswordSetup(user) {
 
 /** LOGIN – server action */
 export async function login({ email, password, redirectTo = "/dashboard" }) {
+  if (isE2EAuthMockEnabled()) {
+    return {
+      success: false,
+      error: "Invalid login credentials.",
+    };
+  }
+
   const { createClient } = await import('@/utils/supabase/server');
   const supa = await createClient();
   const session = await getSession();
@@ -18,7 +37,15 @@ export async function login({ email, password, redirectTo = "/dashboard" }) {
   let signInResult;
   try {
     signInResult = await supa.auth.signInWithPassword({ email, password });
-  } catch {
+  } catch (err) {
+    if (isServiceUnavailableError(err)) {
+      return {
+        success: false,
+        code: SERVICE_UNAVAILABLE_CODE,
+        error: SERVICE_UNAVAILABLE_MESSAGE,
+      };
+    }
+
     return {
       success: false,
       error: "Could not log in right now. Please try again.",
@@ -28,6 +55,14 @@ export async function login({ email, password, redirectTo = "/dashboard" }) {
   const { data, error } = signInResult;
 
   if (error || !data?.session) {
+    if (isServiceUnavailableError(error)) {
+      return {
+        success: false,
+        code: SERVICE_UNAVAILABLE_CODE,
+        error: SERVICE_UNAVAILABLE_MESSAGE,
+      };
+    }
+
     return {
       success: false,
       error: error.message || "Invalid login credentials.",

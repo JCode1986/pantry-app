@@ -2,20 +2,15 @@ import Link from "next/link";
 import {
   FaArrowRight,
   FaCheck,
-  FaHome,
-  FaSearch,
 } from "react-icons/fa";
 import {
   LuCalendarClock,
   LuCircleCheck,
-  LuClipboardCheck,
-  LuLayers3,
   LuMapPin,
   LuPackage,
   LuPackageCheck,
   LuShoppingCart,
   LuUsers,
-  LuWarehouse,
 } from "react-icons/lu";
 import SiteFooter from "@/components/app-shell/SiteFooter";
 import MarketingImage from "@/components/marketing/MarketingImage";

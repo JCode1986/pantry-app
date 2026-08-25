@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { cx } from "@/components/ui/classNames";
 import { FaSpinner } from "react-icons/fa";
 
@@ -61,11 +62,22 @@ export default function NativeButton({
   variant = "solid",
   ...props
 }) {
-  const resolvedDisabled = disabled || isDisabled || isLoading;
+  const [isInternalLoading, setIsInternalLoading] = useState(false);
+  const internalLoadingRef = useRef(false);
+  const mountedRef = useRef(false);
+  const isBusy = isLoading || isInternalLoading;
+  const resolvedDisabled = disabled || isDisabled || isBusy;
   const resolvedColor = color === "danger" ? "danger" : color === "primary" ? "primary" : "default";
   const resolvedVariant = variantClasses[variant] ? variant : "solid";
   const Component = as || "button";
   const isNativeButton = Component === "button";
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   return (
     <Component
@@ -74,14 +86,34 @@ export default function NativeButton({
       {...(!isNativeButton && resolvedDisabled
         ? { "aria-disabled": true, tabIndex: -1 }
         : {})}
-      aria-busy={isLoading || undefined}
+      aria-busy={isBusy || undefined}
       onClick={(event) => {
-        if (resolvedDisabled) {
+        if (resolvedDisabled || internalLoadingRef.current) {
           event.preventDefault();
           return;
         }
-        onClick?.(event);
-        if (!event.defaultPrevented) onPress?.(event);
+
+        const promises = [];
+        const maybeClickPromise = onClick?.(event);
+        if (maybeClickPromise && typeof maybeClickPromise.then === "function") {
+          promises.push(maybeClickPromise);
+        }
+
+        if (!event.defaultPrevented) {
+          const maybePressPromise = onPress?.(event);
+          if (maybePressPromise && typeof maybePressPromise.then === "function") {
+            promises.push(maybePressPromise);
+          }
+        }
+
+        if (promises.length > 0) {
+          internalLoadingRef.current = true;
+          setIsInternalLoading(true);
+          Promise.allSettled(promises).then(() => {
+            internalLoadingRef.current = false;
+            if (mountedRef.current) setIsInternalLoading(false);
+          });
+        }
       }}
       className={cx(
         "inline-flex shrink-0 items-center justify-center gap-2 font-semibold outline-none transition duration-200 ease-out hover:opacity-85 focus-visible:ring-2 focus-visible:ring-[var(--stocksense-brand-border)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none",
@@ -91,9 +123,9 @@ export default function NativeButton({
         className
       )}
     >
-      {isLoading ? <FaSpinner className="h-4 w-4 animate-spin" /> : startContent}
+      {isBusy ? <FaSpinner className="h-4 w-4 animate-spin" /> : startContent}
       {children}
-      {!isLoading ? endContent : null}
+      {!isBusy ? endContent : null}
     </Component>
   );
 }

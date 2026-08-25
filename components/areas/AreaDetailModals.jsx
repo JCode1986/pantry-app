@@ -232,7 +232,7 @@ export default function AreaDetailModals({
                   className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
                   onPress={onRenameArea}
                   isLoading={isSaving}
-                  isDisabled={!editAreaName.trim()}
+                  isDisabled={isSaving || !editAreaName.trim()}
                 >
                   Save
                 </NativeButton>
@@ -281,7 +281,7 @@ export default function AreaDetailModals({
                   className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                   onPress={onRenameArea}
                   isLoading={isSaving}
-                  isDisabled={!editAreaName.trim()}
+                  isDisabled={isSaving || !editAreaName.trim()}
                 >
                   Save changes
                 </NativeButton>
@@ -309,6 +309,7 @@ export default function AreaDetailModals({
                   size="sm"
                   className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
                   onPress={onRenameCategory}
+                  isLoading={isSaving}
                   isDisabled={isSaving || !renameModal.name.trim()}
                 >
                   Save
@@ -362,6 +363,7 @@ export default function AreaDetailModals({
                 <NativeButton
                   className="bg-[var(--stocksense-brand)] text-white max-md:hidden"
                   onPress={onRenameCategory}
+                  isLoading={isSaving}
                   isDisabled={isSaving || !renameModal.name.trim()}
                 >
                   Save changes

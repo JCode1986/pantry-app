@@ -24,7 +24,6 @@ import {
   FaSearch,
   FaTags,
   FaTrash,
-  FaEdit,
   FaMapMarkedAlt,
   FaWarehouse,
 } from 'react-icons/fa';

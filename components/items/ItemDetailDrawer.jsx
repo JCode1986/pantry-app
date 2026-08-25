@@ -139,6 +139,7 @@ export default function ItemDetailDrawer({
   editExp,
   editBarcode,
   hasItemEditChanges,
+  isSaving = false,
   onClose,
   onSave,
   onMove,
@@ -178,7 +179,8 @@ export default function ItemDetailDrawer({
                   size="sm"
                   className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
                   onPress={onSave}
-                  isDisabled={!hasItemEditChanges}
+                  isLoading={isSaving}
+                  isDisabled={isSaving || !hasItemEditChanges}
                 >
                   Save
                 </NativeButton>
@@ -199,6 +201,7 @@ export default function ItemDetailDrawer({
                       variant="bordered"
                       radius="lg"
                       classNames={modalInputClassNames}
+                      isDisabled={isSaving}
                     />
                   </div>
 
@@ -209,6 +212,7 @@ export default function ItemDetailDrawer({
                       onValueChange={onEditQtyChange}
                       min={0}
                       classNames={modalInputClassNames}
+                      isDisabled={isSaving}
                     />
 
                     <DatePicker
@@ -220,6 +224,7 @@ export default function ItemDetailDrawer({
                       radius="lg"
                       classNames={modalInputClassNames}
                       showMonthAndYearPickers
+                      isDisabled={isSaving}
                     />
                   </div>
 
@@ -233,6 +238,7 @@ export default function ItemDetailDrawer({
                       radius="lg"
                       classNames={modalInputClassNames}
                       startContent={<FaBarcode className="text-gray-400" />}
+                      isDisabled={isSaving}
                     />
                   </div>
 
@@ -262,13 +268,15 @@ export default function ItemDetailDrawer({
                   <div className="flex gap-2 max-md:flex-col">
                     <NativeButton
                       onPress={onSave}
-                      isDisabled={!hasItemEditChanges}
+                      isLoading={isSaving}
+                      isDisabled={isSaving || !hasItemEditChanges}
                       className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                     >
                       Save changes
                     </NativeButton>
                     <NativeButton
                       onPress={onMove}
+                      isDisabled={isSaving}
                       className="w-full rounded-xl border border-[var(--stocksense-brand-border)] bg-white text-[var(--stocksense-brand)]"
                     >
                       Move
@@ -279,6 +287,7 @@ export default function ItemDetailDrawer({
                     <NativeButton
                       className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
                       onPress={onDelete}
+                      isDisabled={isSaving}
                     >
                       Delete item
                     </NativeButton>
@@ -315,6 +324,7 @@ export default function ItemDetailDrawer({
                 variant="light"
                 className="rounded-xl max-md:hidden"
                 onPress={onClose}
+                isDisabled={isSaving}
               >
                 Close
               </NativeButton>
@@ -322,6 +332,7 @@ export default function ItemDetailDrawer({
                 <NativeButton
                   className="rounded-xl bg-rose-600 text-white max-md:hidden"
                   onPress={onDelete}
+                  isDisabled={isSaving}
                 >
                   Delete
                 </NativeButton>

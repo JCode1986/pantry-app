@@ -127,6 +127,7 @@ export default function CategoriesPageClient({
   const [activeCategoryId, setActiveCategoryId] = useState(null);
 
   const [renameValue, setRenameValue] = useState("");
+  const [isRenamingCategory, setIsRenamingCategory] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
     payload: null,
@@ -421,31 +422,37 @@ export default function CategoriesPageClient({
   };
 
   const closeDrawer = () => {
+    if (isRenamingCategory) return;
     setDrawerOpen(false);
     setActiveCategoryId(null);
     setRenameValue("");
   };
 
   const handleRename = async () => {
-    if (!canEditInventory) return;
+    if (!canEditInventory || isRenamingCategory) return;
     if (!activeCategory) return;
     const name = renameValue.trim();
     if (!name) return;
 
-    const result = await updateCategoryName(activeCategory.id, name);
-    if (result?.error) {
-      console.error(result.error);
-      return;
-    }
+    setIsRenamingCategory(true);
+    try {
+      const result = await updateCategoryName(activeCategory.id, name);
+      if (result?.error) {
+        console.error(result.error);
+        return;
+      }
 
-    setCategories((prev) =>
-      prev.map((c) => (c.id === activeCategory.id ? { ...c, name } : c))
-    );
-    emitInventoryChange({
-      entity: "category",
-      action: "updated",
-      id: activeCategory.id,
-    });
+      setCategories((prev) =>
+        prev.map((c) => (c.id === activeCategory.id ? { ...c, name } : c))
+      );
+      emitInventoryChange({
+        entity: "category",
+        action: "updated",
+        id: activeCategory.id,
+      });
+    } finally {
+      setIsRenamingCategory(false);
+    }
   };
 
   const handleCategoryImageChange = ({ imagePath, imageUrl, imageThumbUrl }) => {
@@ -568,7 +575,7 @@ export default function CategoriesPageClient({
   };
 
   const handleCreateCategory = async () => {
-    if (!canEditInventory) return;
+    if (!canEditInventory || isCreatingCategory) return;
     const name = createCategoryName.trim();
     if (!name || !createCategoryAreaId) return;
 
@@ -1557,6 +1564,7 @@ export default function CategoriesPageClient({
           renameValue={renameValue}
           setRenameValue={setRenameValue}
           onRename={handleRename}
+          isRenaming={isRenamingCategory}
           onImageChange={handleCategoryImageChange}
           onDelete={openDelete}
         />

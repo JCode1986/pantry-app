@@ -151,7 +151,7 @@ export default function CategoryItemEditModal({
                 className="rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                 onPress={onSave}
                 isLoading={isSaving}
-                isDisabled={!itemModal.name.trim()}
+                isDisabled={isSaving || !itemModal.name.trim()}
               >
                 Save changes
               </NativeButton>

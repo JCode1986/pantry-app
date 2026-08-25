@@ -39,6 +39,9 @@ import NativeDropdown from '@/components/ui/NativeDropdown';
 import NativeSelect from '@/components/ui/NativeSelect';
 import PaginationControls from '@/components/ui/PaginationControls';
 import SearchResultsLoadingState from '@/components/ui/SearchResultsLoadingState';
+import InlineButton from '@/components/ui/InlinePendingButton';
+import SearchInput from '@/components/locations/StorageAreaSearchInput';
+import StorageAreasMobileHierarchy from '@/components/locations/StorageAreasMobileHierarchy';
 import {
   daysUntil,
   isExpiringSoon,
@@ -95,45 +98,6 @@ const SORT_SELECT_OPTIONS = SORT_OPTIONS.map(([value, label]) => ({
   value,
   label,
 }));
-
-const buttonBaseClass =
-  'inline-flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50';
-
-function InlineButton({
-  children,
-  className = '',
-  disabled = false,
-  onClick,
-  type = 'button',
-}) {
-  return (
-    <button
-      type={type}
-      disabled={disabled}
-      onClick={onClick}
-      className={`${buttonBaseClass} ${className}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function SearchInput({ value, onChange, placeholder, className = '' }) {
-  return (
-    <label
-      className={`flex min-h-10 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 shadow-sm transition focus-within:border-[var(--stocksense-brand)] focus-within:ring-1 focus-within:ring-[var(--stocksense-brand-border)] ${className}`}
-    >
-      <FaSearch className="h-4 w-4 shrink-0 text-gray-400" />
-      <input
-        type="search"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
-      />
-    </label>
-  );
-}
 
 function ActionMenu({ ariaLabel, items, buttonClassName = 'h-9 w-9 min-w-9' }) {
   return (
@@ -201,6 +165,7 @@ export default function StorageAreasSection({
     imagePreview: null,
     imageMessage: '',
   });
+  const [entityModalSaving, setEntityModalSaving] = useState(null);
   const [limitNotice, setLimitNotice] = useState(null);
 
   const [expandedAreas, setExpandedAreas] = useState({});
@@ -661,7 +626,8 @@ export default function StorageAreasSection({
     );
 
   // ---------- Modal helpers ----------
-  const closeAreaModal = () =>
+  const closeAreaModal = ({ force = false } = {}) => {
+    if (entityModalSaving && !force) return;
     setAreaModal({
       open: false,
       mode: 'create',
@@ -674,8 +640,10 @@ export default function StorageAreasSection({
       imageMessage: '',
       locationName: '',
     });
+  };
 
-  const closeCategoryModal = () =>
+  const closeCategoryModal = ({ force = false } = {}) => {
+    if (entityModalSaving && !force) return;
     setCategoryModal({
       open: false,
       mode: 'create',
@@ -689,8 +657,10 @@ export default function StorageAreasSection({
       imagePreview: null,
       imageMessage: '',
     });
+  };
 
-  const closeItemModal = () =>
+  const closeItemModal = ({ force = false } = {}) => {
+    if (entityModalSaving && !force) return;
     setItemModal({
       open: false,
       mode: 'create',
@@ -707,6 +677,7 @@ export default function StorageAreasSection({
       imagePreview: null,
       imageMessage: '',
     });
+  };
 
   // ---------- Storage Area CRUD ----------
   const openCreateAreaModal = () =>
@@ -766,48 +737,53 @@ export default function StorageAreasSection({
   };
 
   const submitAreaModal = async () => {
-    if (!canEditInventory) return;
+    if (!canEditInventory || entityModalSaving) return;
     const name = areaModal.name.trim();
     if (!name) return;
 
-    if (areaModal.mode === 'edit') {
-      const result = await updateStorageArea(areaModal.areaId, name);
-      if (!result?.error) {
-        setStorageAreas((prev) =>
-          prev.map((a) => (a.id === areaModal.areaId ? { ...a, name } : a))
+    setEntityModalSaving('area');
+    try {
+      if (areaModal.mode === 'edit') {
+        const result = await updateStorageArea(areaModal.areaId, name);
+        if (!result?.error) {
+          setStorageAreas((prev) =>
+            prev.map((a) => (a.id === areaModal.areaId ? { ...a, name } : a))
+          );
+          emitInventoryChange({
+            entity: 'storage_area',
+            action: 'updated',
+            id: areaModal.areaId,
+          });
+          closeAreaModal({ force: true });
+        }
+        return;
+      }
+
+      const result = await addStorageArea(locationId, name);
+      if (result?.data) {
+        const uploadedImage = await uploadCreatedEntityImage(
+          'storage_area',
+          result.data.id,
+          areaModal.imageFile
         );
+        const createdArea = {
+          ...result.data,
+          image_path: uploadedImage?.imagePath ?? result.data.image_path ?? null,
+          imageUrl: uploadedImage?.imageUrl ?? null,
+          imageThumbUrl: uploadedImage?.imageThumbUrl ?? null,
+          categories: [],
+        };
+
+        setStorageAreas((prev) => [...prev, createdArea]);
         emitInventoryChange({
           entity: 'storage_area',
-          action: 'updated',
-          id: areaModal.areaId,
+          action: 'added',
+          id: result.data.id,
         });
-        closeAreaModal();
+        closeAreaModal({ force: true });
       }
-      return;
-    }
-
-    const result = await addStorageArea(locationId, name);
-    if (result?.data) {
-      const uploadedImage = await uploadCreatedEntityImage(
-        'storage_area',
-        result.data.id,
-        areaModal.imageFile
-      );
-      const createdArea = {
-        ...result.data,
-        image_path: uploadedImage?.imagePath ?? result.data.image_path ?? null,
-        imageUrl: uploadedImage?.imageUrl ?? null,
-        imageThumbUrl: uploadedImage?.imageThumbUrl ?? null,
-        categories: [],
-      };
-
-      setStorageAreas((prev) => [...prev, createdArea]);
-      emitInventoryChange({
-        entity: 'storage_area',
-        action: 'added',
-        id: result.data.id,
-      });
-      closeAreaModal();
+    } finally {
+      setEntityModalSaving(null);
     }
   };
 
@@ -893,69 +869,74 @@ export default function StorageAreasSection({
   };
 
   const submitCategoryModal = async () => {
-    if (!canEditInventory) return;
+    if (!canEditInventory || entityModalSaving) return;
     const name = categoryModal.name.trim();
     if (!name) return;
 
-    if (categoryModal.mode === 'edit') {
-      const result = await updateCategoryName(categoryModal.categoryId, name);
-      if (!result?.error) {
+    setEntityModalSaving('category');
+    try {
+      if (categoryModal.mode === 'edit') {
+        const result = await updateCategoryName(categoryModal.categoryId, name);
+        if (!result?.error) {
+          setStorageAreas((prev) =>
+            prev.map((a) =>
+              a.id === categoryModal.areaId
+                ? {
+                    ...a,
+                    categories: a.categories.map((c) =>
+                      c.id === categoryModal.categoryId ? { ...c, name } : c
+                    ),
+                  }
+                : a
+            )
+          );
+          emitInventoryChange({
+            entity: 'category',
+            action: 'updated',
+            id: categoryModal.categoryId,
+          });
+          closeCategoryModal({ force: true });
+        }
+        return;
+      }
+
+      const result = await addCategory(categoryModal.areaId, name);
+      if (result?.error) {
+        console.error('addCategory error:', result.error);
+        alert(result.error.message || 'Failed to add category');
+        return;
+      }
+
+      if (result?.data) {
+        const uploadedImage = await uploadCreatedEntityImage(
+          'category',
+          result.data.id,
+          categoryModal.imageFile
+        );
+        const createdCategory = {
+          ...result.data,
+          image_path: uploadedImage?.imagePath ?? result.data.image_path ?? null,
+          imageUrl: uploadedImage?.imageUrl ?? null,
+          imageThumbUrl: uploadedImage?.imageThumbUrl ?? null,
+          items: [],
+        };
+
         setStorageAreas((prev) =>
           prev.map((a) =>
             a.id === categoryModal.areaId
-              ? {
-                  ...a,
-                  categories: a.categories.map((c) =>
-                    c.id === categoryModal.categoryId ? { ...c, name } : c
-                  ),
-                }
+              ? { ...a, categories: [...(a.categories || []), createdCategory] }
               : a
           )
         );
+        closeCategoryModal({ force: true });
         emitInventoryChange({
           entity: 'category',
-          action: 'updated',
-          id: categoryModal.categoryId,
+          action: 'added',
+          id: result.data.id,
         });
-        closeCategoryModal();
       }
-      return;
-    }
-
-    const result = await addCategory(categoryModal.areaId, name);
-    if (result?.error) {
-      console.error('addCategory error:', result.error);
-      alert(result.error.message || 'Failed to add category');
-      return;
-    }
-
-    if (result?.data) {
-      const uploadedImage = await uploadCreatedEntityImage(
-        'category',
-        result.data.id,
-        categoryModal.imageFile
-      );
-      const createdCategory = {
-        ...result.data,
-        image_path: uploadedImage?.imagePath ?? result.data.image_path ?? null,
-        imageUrl: uploadedImage?.imageUrl ?? null,
-        imageThumbUrl: uploadedImage?.imageThumbUrl ?? null,
-        items: [],
-      };
-
-      setStorageAreas((prev) =>
-        prev.map((a) =>
-          a.id === categoryModal.areaId
-            ? { ...a, categories: [...(a.categories || []), createdCategory] }
-            : a
-        )
-      );
-      closeCategoryModal();
-      emitInventoryChange({
-        entity: 'category',
-        action: 'added',
-        id: result.data.id,
-      });
+    } finally {
+      setEntityModalSaving(null);
     }
   };
 
@@ -1063,109 +1044,114 @@ export default function StorageAreasSection({
   };
 
   const submitItemModal = async () => {
-    if (!canEditInventory) return;
+    if (!canEditInventory || entityModalSaving) return;
     if (!itemModal.name.trim()) return;
     setLimitNotice(null);
+    setEntityModalSaving('item');
 
-    const payload = {
-      name: itemModal.name.trim(),
-      quantity: toNonNegativeInteger(itemModal.quantity, 0),
-      expiration_date: itemModal.expirationDate || null,
-    };
+    try {
+      const payload = {
+        name: itemModal.name.trim(),
+        quantity: toNonNegativeInteger(itemModal.quantity, 0),
+        expiration_date: itemModal.expirationDate || null,
+      };
 
-    if (itemModal.mode === 'edit') {
-      const { data, error } = await updateItem(itemModal.itemId, payload);
-      if (error) {
-        console.error(error);
+      if (itemModal.mode === 'edit') {
+        const { data, error } = await updateItem(itemModal.itemId, payload);
+        if (error) {
+          console.error(error);
+          return;
+        }
+
+        setStorageAreas((prev) =>
+          prev.map((area) =>
+            area.id === itemModal.areaId
+              ? {
+                  ...area,
+                  categories: area.categories.map((cat) =>
+                    cat.id === itemModal.categoryId
+                      ? {
+                          ...cat,
+                          items: cat.items.map((it) =>
+                            it.id === itemModal.itemId
+                              ? {
+                                  ...it,
+                                  ...data,
+                                  imageUrl: it.imageUrl,
+                                }
+                              : it
+                          ),
+                        }
+                      : cat
+                  ),
+                }
+              : area
+          )
+        );
+        emitInventoryChange({
+          entity: 'item',
+          action: 'updated',
+          id: itemModal.itemId,
+        });
+        closeItemModal({ force: true });
         return;
       }
 
-      setStorageAreas((prev) =>
-        prev.map((area) =>
-          area.id === itemModal.areaId
-            ? {
-                ...area,
-                categories: area.categories.map((cat) =>
-                  cat.id === itemModal.categoryId
-                    ? {
-                        ...cat,
-                        items: cat.items.map((it) =>
-                          it.id === itemModal.itemId
-                            ? {
-                                ...it,
-                                ...data,
-                                imageUrl: it.imageUrl,
-                              }
-                            : it
-                        ),
-                      }
-                    : cat
-                ),
-              }
-            : area
-        )
+      const result = await addItem(itemModal.categoryId, payload);
+      if (result?.error) {
+        setLimitNotice({
+          message:
+            typeof result.error === 'string'
+              ? result.error
+              : result.error?.message || 'Could not add item.',
+          upgradeHref: result.upgradeHref,
+        });
+        return;
+      }
+
+      let created = result?.data;
+      if (!created) return;
+
+      const uploadedImage = await uploadCreatedEntityImage(
+        'item',
+        created.id,
+        itemModal.imageFile
       );
-      emitInventoryChange({
-        entity: 'item',
-        action: 'updated',
-        id: itemModal.itemId,
-      });
-      closeItemModal();
-      return;
-    }
+      if (uploadedImage) {
+        created = {
+          ...created,
+          image_path: uploadedImage.imagePath ?? created.image_path ?? null,
+          imageUrl: uploadedImage.imageUrl ?? created.imageUrl ?? null,
+          imageThumbUrl: uploadedImage.imageThumbUrl ?? created.imageThumbUrl ?? null,
+        };
+      }
 
-    const result = await addItem(itemModal.categoryId, payload);
-    if (result?.error) {
-      setLimitNotice({
-        message:
-          typeof result.error === 'string'
-            ? result.error
-            : result.error?.message || 'Could not add item.',
-        upgradeHref: result.upgradeHref,
-      });
-      return;
-    }
+      setStorageAreas((prev) =>
+        prev.map((area) => ({
+          ...area,
+          categories: (area.categories || []).map((cat) =>
+            cat.id === itemModal.categoryId
+              ? { ...cat, items: [...(cat.items || []), created] }
+              : cat
+          ),
+        }))
+      );
 
-    let created = result?.data;
-    if (!created) return;
-
-    const uploadedImage = await uploadCreatedEntityImage(
-      'item',
-      created.id,
-      itemModal.imageFile
-    );
-    if (uploadedImage) {
-      created = {
+      emitItemAdded({
         ...created,
-        image_path: uploadedImage.imagePath ?? created.image_path ?? null,
-        imageUrl: uploadedImage.imageUrl ?? created.imageUrl ?? null,
-        imageThumbUrl: uploadedImage.imageThumbUrl ?? created.imageThumbUrl ?? null,
-      };
+        locationId,
+        locationName,
+        storageAreaId: itemModal.areaId,
+        storageAreaName:
+          storageAreas.find((area) => String(area.id) === String(itemModal.areaId))
+            ?.name ?? null,
+        categoryId: itemModal.categoryId,
+        categoryName: itemModal.categoryName,
+      });
+      closeItemModal({ force: true });
+    } finally {
+      setEntityModalSaving(null);
     }
-
-    setStorageAreas((prev) =>
-      prev.map((area) => ({
-        ...area,
-        categories: (area.categories || []).map((cat) =>
-          cat.id === itemModal.categoryId
-            ? { ...cat, items: [...(cat.items || []), created] }
-            : cat
-        ),
-      }))
-    );
-
-    emitItemAdded({
-      ...created,
-      locationId,
-      locationName,
-      storageAreaId: itemModal.areaId,
-      storageAreaName:
-        storageAreas.find((area) => String(area.id) === String(itemModal.areaId))
-          ?.name ?? null,
-      categoryId: itemModal.categoryId,
-      categoryName: itemModal.categoryName,
-    });
-    closeItemModal();
   };
 
   const performDeleteItem = async (itemId, categoryId, storageAreaId) => {
@@ -1933,284 +1919,38 @@ export default function StorageAreasSection({
         </div>
       </motion.section>
 
-      {/* Mobile hierarchy */}
-      <motion.div
-        variants={pageVariants}
-        initial="hidden"
-        animate="show"
-        className="grid grid-cols-1 gap-3 md:hidden"
-      >
-        <motion.div
-          variants={pageItemVariants}
-          initial="hidden"
-          animate="show"
-          className="flex items-end justify-between gap-3"
-        >
-          <div>
-            <h2 className="text-base font-semibold text-gray-950">
-              Storage areas
-            </h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Browse the places inside this location.
-            </p>
-          </div>
-          {canEditInventory && storageAreas.length > 0 && (
-            <button
-              onClick={openCreateAreaModal}
-              className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white"
-            >
-              <FaPlus className="h-3 w-3" /> Add
-            </button>
-          )}
-        </motion.div>
-
-        <SearchInput
-          value={search}
-          onChange={handleSearchChange}
-          placeholder={`Search ${locationName}`}
-          className="min-h-11"
-        />
-
-        <NativeSelect
-          aria-label="Sort storage areas"
-          value={sortBy}
-          onChange={(value) => setSortBy(value || 'name_asc')}
-          options={SORT_SELECT_OPTIONS}
-          className="w-full"
-        />
-
-        {showSearchRestoreLoader ? (
-          <SearchResultsLoadingState
-            label="Loading inventory"
-            detail="Restoring everything in this location."
-          />
-        ) : storageAreas.length === 0 && !hierarchyFiltersActive ? (
-          <motion.div
-            variants={pageItemVariants}
-            initial="hidden"
-            animate="show"
-            exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
-            className="rounded-2xl border border-dashed border-gray-200 bg-white p-6 text-center shadow-sm"
-          >
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]">
-              <FaWarehouse className="h-6 w-6" />
-            </div>
-            <h2 className="mt-4 text-lg font-semibold text-gray-950">
-              No storage areas yet
-            </h2>
-            <p className="mt-2 text-sm text-gray-500">
-              Create the first storage area for this location.
-            </p>
-            {canEditInventory && (
-              <div className="mt-4">
-                <button
-                  onClick={openCreateAreaModal}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-[var(--stocksense-brand)] shadow-sm"
-                >
-                  <FaPlus /> New storage area
-                </button>
-              </div>
-            )}
-          </motion.div>
-        ) : visibleStorageAreas.length === 0 ? (
-          <motion.div
-            variants={pageItemVariants}
-            initial="hidden"
-            animate="show"
-            exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
-            className="rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm"
-          >
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] text-[var(--stocksense-brand)]">
-              <FaSearch className="h-5 w-5" />
-            </div>
-            <h2 className="mt-4 text-lg font-semibold text-gray-950">
-              No matching inventory
-            </h2>
-            <p className="mt-2 text-sm text-gray-500">
-              {normalizedSearch
-                ? `Nothing matched "${search.trim()}". Clear the search or try a different term.`
-                : 'Try another search or adjust the expiration filter.'}
-            </p>
-            {normalizedSearch ? (
-              <button
-                type="button"
-                onClick={clearSearch}
-                className="mt-5 inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-[var(--stocksense-brand-border)] bg-[var(--stocksense-brand-soft)] px-4 text-sm font-semibold text-[var(--stocksense-brand)] transition hover:brightness-95"
-              >
-                Clear search
-              </button>
-            ) : null}
-          </motion.div>
-        ) : (
-          visibleStorageAreas.map((area) => {
-            const visibleCategories = area.visibleCategories ?? [];
-            const areaItemCount = area.areaItemCount ?? 0;
-
-            return (
-            <motion.article
-              key={area.id}
-              variants={pageItemVariants}
-              initial="hidden"
-              animate="show"
-              exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
-              className="overflow-hidden rounded-2xl border border-stocksense-gray bg-white shadow-sm"
-            >
-              <div className="border-t-4 border-[var(--entity-area-accent)] p-4">
-                <div className="flex items-start gap-3">
-                  <button
-                    type="button"
-                    onClick={() => toggleArea(area.id)}
-                    className="flex min-w-0 flex-1 items-start gap-3 text-left"
-                    aria-expanded={Boolean(expandedAreas[area.id])}
-                    aria-label={`${expandedAreas[area.id] ? 'Collapse' : 'Expand'} ${area.name}`}
-                  >
-                    {area.imageUrl ? (
-                      <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-[var(--entity-area-border)] bg-white">
-                        <ImageWithLoader
-                          src={area.imageThumbUrl || area.imageUrl}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-[var(--entity-area-border)] bg-[var(--entity-area-soft)] text-[var(--entity-area-accent)]">
-                        <FaWarehouse className="h-5 w-5" />
-                      </div>
-                    )}
-
-                    <div className="min-w-0 flex-1">
-                      <h2 className="truncate text-lg font-semibold text-gray-900">
-                        {area.name}
-                      </h2>
-                      <p className="mt-1 text-sm text-gray-500">
-                        {(area.categories || []).length}{' '}
-                        {(area.categories || []).length === 1 ? 'category' : 'categories'} |{' '}
-                        {areaItemCount} {areaItemCount === 1 ? 'item' : 'items'}
-                      </p>
-                    </div>
-
-                    <FaChevronUp
-                      className={`mt-1 h-4 w-4 shrink-0 text-gray-400 transition-transform ${
-                        expandedAreas[area.id] ? '' : 'rotate-180'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {canEditInventory && (
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => openEditAreaModal(area)}
-                      className="inline-flex h-9 items-center justify-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700"
-                    >
-                      <FaEdit /> Edit
-                    </button>
-                    <button
-                      onClick={() =>
-                        openDeleteDialog('area', {
-                          areaId: area.id,
-                          name: area.name,
-                        })
-                      }
-                      className="inline-flex h-9 items-center justify-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-2 text-xs font-medium text-rose-700"
-                    >
-                      <FaTrash /> Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <AnimatePresence initial={false}>
-                {expandedAreas[area.id] && (
-                  <motion.div
-                    key={`${area.id}-mobile-content`}
-                    variants={collapseVariants}
-                    initial="collapsed"
-                    animate="open"
-                    exit="collapsed"
-                    className="overflow-hidden"
-                  >
-                    <div className="space-y-2 border-t border-gray-100 bg-gray-50/70 p-3">
-                      {visibleCategories.length === 0 ? (
-                        <div className="rounded-xl border border-dashed border-gray-200 bg-white px-3 py-4 text-center text-sm text-gray-500">
-                          {normalizedSearch || expSoonEnabled
-                            ? 'No matching categories or items.'
-                            : 'No categories yet.'}
-                        </div>
-                      ) : (
-                        visibleCategories.map((category) => {
-                          const items = category.visibleItems ?? [];
-                          const itemCount = category.itemsCount ?? items.length;
-
-                          return (
-                            <button
-                              key={category.id}
-                              type="button"
-                              onClick={() => {
-                                setMobileCategorySheet({
-                                  areaId: area.id,
-                                  categoryId: category.id,
-                                });
-                                void loadCategoryItems(category.id);
-                              }}
-                              className="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white p-3 text-left shadow-sm"
-                            >
-                              <div className="flex min-w-0 items-center gap-3">
-                                {category.imageUrl ? (
-                                  <div className="h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-[var(--entity-category-border)] bg-white">
-                                    <ImageWithLoader
-                                      src={category.imageThumbUrl || category.imageUrl}
-                                      alt=""
-                                      className="h-full w-full object-cover"
-                                    />
-                                  </div>
-                                ) : (
-                                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[var(--entity-category-border)] bg-[var(--entity-category-soft)] text-[var(--entity-category-accent)]">
-                                    <FaTags className="h-4 w-4" />
-                                  </div>
-                                )}
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold text-gray-900">
-                                    {category.name}
-                                  </p>
-                                  <p className="text-xs text-gray-500">
-                                    {itemCount} {itemCount === 1 ? 'item' : 'items'}
-                                  </p>
-                                </div>
-                              </div>
-                              <FaChevronUp className="h-3.5 w-3.5 rotate-90 text-gray-400" />
-                            </button>
-                          );
-                        })
-                      )}
-
-                      {canEditInventory && (
-                        <button
-                          onClick={() => openCreateCategoryModal(area)}
-                          className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--stocksense-brand-border)] bg-white text-sm font-medium text-[var(--stocksense-brand)]"
-                        >
-                          <FaLayerGroup /> New category
-                        </button>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.article>
-            );
-          })
-        )}
-        <PaginationControls
-          currentPage={safeCurrentPage}
-          totalPages={totalPages}
-          startItem={startItem}
-          endItem={endItem}
-          totalItems={totalStorageAreaCount}
-          isLoading={isLoadingStorageAreas}
-          onPrevious={() => setCurrentPage((page) => Math.max(1, page - 1))}
-          onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-        />
-      </motion.div>
+      <StorageAreasMobileHierarchy
+        canEditInventory={canEditInventory}
+        clearSearch={clearSearch}
+        currentPage={safeCurrentPage}
+        endItem={endItem}
+        expandedAreas={expandedAreas}
+        expSoonEnabled={expSoonEnabled}
+        hierarchyFiltersActive={hierarchyFiltersActive}
+        isLoadingStorageAreas={isLoadingStorageAreas}
+        loadCategoryItems={loadCategoryItems}
+        locationName={locationName}
+        normalizedSearch={normalizedSearch}
+        onCreateArea={openCreateAreaModal}
+        onCreateCategory={openCreateCategoryModal}
+        onDelete={openDeleteDialog}
+        onEditArea={openEditAreaModal}
+        onNextPage={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+        onPreviousPage={() => setCurrentPage((page) => Math.max(1, page - 1))}
+        onSearchChange={handleSearchChange}
+        onSetMobileCategorySheet={setMobileCategorySheet}
+        onSortChange={(value) => setSortBy(value || 'name_asc')}
+        search={search}
+        showSearchRestoreLoader={showSearchRestoreLoader}
+        sortBy={sortBy}
+        sortOptions={SORT_SELECT_OPTIONS}
+        startItem={startItem}
+        storageAreas={storageAreas}
+        toggleArea={toggleArea}
+        totalPages={totalPages}
+        totalStorageAreaCount={totalStorageAreaCount}
+        visibleStorageAreas={visibleStorageAreas}
+      />
 
       {/* Desktop hierarchy */}
       <motion.div variants={pageVariants} className="hidden space-y-5 md:block">
@@ -2895,6 +2635,7 @@ export default function StorageAreasSection({
             onSubmitAreaModal={submitAreaModal}
             onSubmitCategoryModal={submitCategoryModal}
             onSubmitItemModal={submitItemModal}
+            savingEntity={entityModalSaving}
             onAreaImageChange={handleAreaImageChange}
             onCategoryImageChange={handleCategoryImageChange}
             onItemImageChange={handleItemImageChange}

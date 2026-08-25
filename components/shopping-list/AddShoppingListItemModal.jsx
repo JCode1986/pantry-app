@@ -349,6 +349,7 @@ export default function AddShoppingListItemModal({
                 variant="flat"
                 className="rounded-xl max-md:hidden"
                 onPress={() => handleSubmit({ closeAfterAdd: false })}
+                isLoading={isSaving}
                 isDisabled={isSaving}
               >
                 Add another

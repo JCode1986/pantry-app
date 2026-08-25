@@ -1098,9 +1098,7 @@ export default function TasksPageClient({
         onCancel={() => {
           if (!pendingTaskId) setDeleteCandidate(null);
         }}
-        onConfirm={() => {
-          if (deleteCandidate) void deleteTask(deleteCandidate);
-        }}
+        onConfirm={() => (deleteCandidate ? deleteTask(deleteCandidate) : undefined)}
       />
       <TaskToast
         message={toastMessage}

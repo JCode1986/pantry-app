@@ -30,6 +30,7 @@ export default function CategoryDrawer({
   renameValue,
   setRenameValue,
   onRename,
+  isRenaming = false,
   onImageChange,
   onDelete,
 }) {
@@ -67,7 +68,8 @@ export default function CategoryDrawer({
                   size="sm"
                   className="h-10 shrink-0 rounded-full bg-[var(--stocksense-brand)] px-4 text-sm font-semibold text-white md:hidden"
                   onClick={onRename}
-                  isDisabled={!renameValue.trim()}
+                  isLoading={isRenaming}
+                  isDisabled={isRenaming || !renameValue.trim()}
                 >
                   Save
                 </NativeButton>
@@ -87,10 +89,12 @@ export default function CategoryDrawer({
                     variant="bordered"
                     radius="lg"
                     classNames={modalInputClassNames}
+                    isDisabled={isRenaming}
                   />
                   <NativeButton
                     onClick={onRename}
-                    isDisabled={!renameValue.trim()}
+                    isLoading={isRenaming}
+                    isDisabled={isRenaming || !renameValue.trim()}
                     className="w-full rounded-xl bg-[var(--stocksense-brand)] text-white max-md:hidden"
                   >
                     Save name
@@ -114,6 +118,7 @@ export default function CategoryDrawer({
                   <NativeButton
                     className="mt-3 min-h-11 w-full rounded-xl bg-rose-600 text-white"
                     onClick={onDelete}
+                    isDisabled={isRenaming}
                   >
                     Delete category
                   </NativeButton>
@@ -169,6 +174,7 @@ export default function CategoryDrawer({
                 variant="light"
                 className="rounded-xl max-md:hidden"
                 onClick={onClose}
+                isDisabled={isRenaming}
               >
                 Close
               </NativeButton>
@@ -176,6 +182,7 @@ export default function CategoryDrawer({
                 <NativeButton
                   className="rounded-xl bg-rose-600 text-white max-md:hidden"
                   onClick={onDelete}
+                  isDisabled={isRenaming}
                 >
                   Delete category
                 </NativeButton>
